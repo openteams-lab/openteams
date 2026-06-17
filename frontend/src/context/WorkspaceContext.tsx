@@ -260,6 +260,113 @@ const userMessageClientId = (message: Message): string | undefined =>
   message.clientMessageId ??
   (isOptimisticUserMessage(message) ? message.id : undefined);
 
+const messageIdentityKeys = (message: Message): string[] => {
+  const keys = new Set<string>();
+  if (message.id) keys.add(message.id);
+  const clientMessageId = userMessageClientId(message);
+  if (clientMessageId) keys.add(clientMessageId);
+  return [...keys];
+};
+
+const firstMessageSourceKey = (
+  message: Message,
+  sourceKeys: Set<string>,
+): string | null => {
+  if (message.isUser) return null;
+  if (message.sourceMessageId && sourceKeys.has(message.sourceMessageId)) {
+    return message.sourceMessageId;
+  }
+  if (message.clientMessageId && sourceKeys.has(message.clientMessageId)) {
+    return message.clientMessageId;
+  }
+  return null;
+};
+
+const orderMessagesForConversation = (messages: Message[]): Message[] => {
+  const sourceKeys = new Set<string>();
+  for (const message of messages) {
+    if (!message.isUser) continue;
+    for (const key of messageIdentityKeys(message)) {
+      sourceKeys.add(key);
+    }
+  }
+
+  if (sourceKeys.size === 0) return messages;
+
+  const anchoredMessages = new Set<Message>();
+  const anchoredBySourceKey = new Map<string, Message[]>();
+  for (const message of messages) {
+    const sourceKey = firstMessageSourceKey(message, sourceKeys);
+    if (!sourceKey) continue;
+    anchoredMessages.add(message);
+    const anchored = anchoredBySourceKey.get(sourceKey) ?? [];
+    anchored.push(message);
+    anchoredBySourceKey.set(sourceKey, anchored);
+  }
+
+  if (anchoredMessages.size === 0) return messages;
+
+  const emittedAnchored = new Set<Message>();
+  const ordered: Message[] = [];
+  for (const message of messages) {
+    if (anchoredMessages.has(message)) continue;
+
+    ordered.push(message);
+    if (!message.isUser) continue;
+
+    for (const key of messageIdentityKeys(message)) {
+      const anchored = anchoredBySourceKey.get(key);
+      if (!anchored) continue;
+      for (const anchoredMessage of anchored) {
+        if (emittedAnchored.has(anchoredMessage)) continue;
+        ordered.push(anchoredMessage);
+        emittedAnchored.add(anchoredMessage);
+      }
+    }
+  }
+
+  for (const message of messages) {
+    if (anchoredMessages.has(message) && !emittedAnchored.has(message)) {
+      ordered.push(message);
+    }
+  }
+
+  return ordered;
+};
+
+const messageCreatedAtMs = (message: Message): number | null => {
+  if (!message.createdAt) return null;
+  const value = Date.parse(message.createdAt);
+  return Number.isNaN(value) ? null : value;
+};
+
+const insertMessageByCreatedAt = (
+  messages: Message[],
+  message: Message,
+): Message[] => {
+  const messageAt = messageCreatedAtMs(message);
+  if (messageAt === null) return [...messages, message];
+
+  const next = [...messages];
+  const index = next.findIndex((candidate) => {
+    const candidateAt = messageCreatedAtMs(candidate);
+    return candidateAt !== null && candidateAt > messageAt;
+  });
+  next.splice(index >= 0 ? index : next.length, 0, message);
+  return next;
+};
+
+const matchesUserMessageIdentity = (
+  message: Message,
+  messageId: string,
+  clientMessageId?: string,
+): boolean =>
+  Boolean(
+    message.isUser &&
+      (message.id === messageId ||
+        (clientMessageId && userMessageClientId(message) === clientMessageId)),
+  );
+
 type PendingPlaceholderMatch = {
   sessionAgentId?: string;
   clientMessageId?: string | null;
@@ -278,13 +385,20 @@ const pendingPlaceholderMatches = (
   match: PendingPlaceholderMatch,
 ): boolean => {
   if (!isPendingAgentPlaceholder(message)) return false;
+  const hasCorrelationId = Boolean(
+    match.clientMessageId || match.sourceMessageId,
+  );
   if (match.clientMessageId && message.clientMessageId === match.clientMessageId) {
     return true;
   }
   if (match.sourceMessageId && message.sourceMessageId === match.sourceMessageId) {
     return true;
   }
-  if (match.sessionAgentId && message.sessionAgentId === match.sessionAgentId) {
+  if (
+    !hasCorrelationId &&
+    match.sessionAgentId &&
+    message.sessionAgentId === match.sessionAgentId
+  ) {
     return true;
   }
   return false;
@@ -490,6 +604,7 @@ const makePendingAgentPlaceholder = (
     sender,
     model: fallbackMember?.modelName,
     time: 'just now',
+    createdAt: new Date().toISOString(),
     text: '',
     isThinking: true,
     isAgentRunning: true,
@@ -571,7 +686,7 @@ const filterMessagesForSession = (
     deduped.push(message);
   }
 
-  return deduped;
+  return orderMessagesForConversation(deduped);
 };
 
 const mergePersistedWithRunningPlaceholders = (
@@ -643,8 +758,15 @@ const mergePersistedWithRunningPlaceholders = (
   }
 
   const placeholders = [...carriedMessagesByKey.values()];
+  let merged = persisted;
+  for (const placeholder of placeholders) {
+    merged =
+      placeholder.sourceMessageId || placeholder.clientMessageId
+        ? [...merged, placeholder]
+        : insertMessageByCreatedAt(merged, placeholder);
+  }
 
-  return placeholders.length > 0 ? [...persisted, ...placeholders] : persisted;
+  return orderMessagesForConversation(merged);
 };
 
 const sortActivityLines = (
@@ -715,6 +837,7 @@ const hydrateRunningAgentPlaceholders = async (
         sender: asAgentHandle(agentName),
         model: effectiveSessionAgentModelName(agent, sessionAgent) ?? undefined,
         time: 'just now',
+        createdAt: run?.created_at ?? sessionAgent.updated_at,
         text: '',
         isThinking: true,
         isAgentRunning: true,
@@ -752,6 +875,7 @@ interface WorkspaceContextProps {
   createProject: (data: CreateProjectRequest) => Promise<Project>;
   messages: Message[];
   memberQueuesBySessionAgentId: MemberQueuesBySessionAgentId;
+  deferredQueuedMessagesById: Record<string, Message>;
   workflowRuntimeLinesByExecution: Record<string, WorkflowRuntimeLine[]>;
   activeSessionId: string;
   setActiveSessionId: (id: string) => void;
@@ -928,6 +1052,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const allMessagesRef = useRef<Record<string, Message[]>>({});
   const [memberQueuesBySessionAgentId, setMemberQueuesBySessionAgentId] =
     useState<MemberQueuesBySessionAgentId>({});
+  const [deferredQueuedMessagesById, setDeferredQueuedMessagesById] = useState<
+    Record<string, Message>
+  >({});
   const [workflowRuntimeLinesByExecution, setWorkflowRuntimeLinesByExecution] =
     useState<Record<string, WorkflowRuntimeLine[]>>({});
   const [messagesAsync, setMessagesAsync] = useState<
@@ -1017,9 +1144,86 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const optimisticallyStoppedSessionAgentIdsRef = useRef<Set<string>>(
     new Set(),
   );
+  const deferredQueuedMessageIdsRef = useRef<Set<string>>(new Set());
+  const deferredQueuedClientMessageIdsRef = useRef<Set<string>>(new Set());
+  const deferredQueuedUserMessagesRef = useRef<Map<string, Message>>(new Map());
   useEffect(() => {
     allMessagesRef.current = allMessages;
   }, [allMessages]);
+
+  const rememberDeferredQueuedUserMessage = useCallback((message: Message) => {
+    if (!message.isUser) return;
+    deferredQueuedMessageIdsRef.current.add(message.id);
+    deferredQueuedUserMessagesRef.current.set(message.id, message);
+    setDeferredQueuedMessagesById((prev) => ({
+      ...prev,
+      [message.id]: message,
+      ...(message.clientMessageId ? { [message.clientMessageId]: message } : {}),
+    }));
+    if (message.clientMessageId) {
+      deferredQueuedClientMessageIdsRef.current.add(message.clientMessageId);
+      deferredQueuedUserMessagesRef.current.set(
+        message.clientMessageId,
+        message,
+      );
+    }
+  }, []);
+
+  const isDeferredQueuedUserMessage = useCallback((message: Message) => {
+    if (!message.isUser) return false;
+    return (
+      deferredQueuedMessageIdsRef.current.has(message.id) ||
+      Boolean(
+        message.clientMessageId &&
+          deferredQueuedClientMessageIdsRef.current.has(message.clientMessageId),
+      )
+    );
+  }, []);
+
+  const filterDeferredQueuedUserMessages = useCallback(
+    (messages: Message[]): Message[] =>
+      messages.filter((message) => !isDeferredQueuedUserMessage(message)),
+    [isDeferredQueuedUserMessage],
+  );
+
+  const hasDeferredQueuedUserMessage = useCallback(
+    (messageId: string, clientMessageId?: string | null): boolean =>
+      deferredQueuedMessageIdsRef.current.has(messageId) ||
+      Boolean(
+        clientMessageId &&
+          deferredQueuedClientMessageIdsRef.current.has(clientMessageId),
+      ),
+    [],
+  );
+
+  const releaseDeferredQueuedUserMessage = useCallback(
+    (messageId: string, clientMessageId?: string | null): Message | null => {
+      const message =
+        (clientMessageId
+          ? deferredQueuedUserMessagesRef.current.get(clientMessageId)
+          : undefined) ??
+        deferredQueuedUserMessagesRef.current.get(messageId) ??
+        null;
+
+      deferredQueuedMessageIdsRef.current.delete(messageId);
+      deferredQueuedUserMessagesRef.current.delete(messageId);
+      setDeferredQueuedMessagesById((prev) => {
+        const next = { ...prev };
+        delete next[messageId];
+        if (clientMessageId) {
+          delete next[clientMessageId];
+        }
+        return next;
+      });
+      if (clientMessageId) {
+        deferredQueuedClientMessageIdsRef.current.delete(clientMessageId);
+        deferredQueuedUserMessagesRef.current.delete(clientMessageId);
+      }
+
+      return message;
+    },
+    [],
+  );
 
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
@@ -1037,14 +1241,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     setMessagesAsync(
       succeed(
         activeSessionId
-          ? filterMessagesForSession(
-              activeSessionId,
-              allMessagesRef.current[activeSessionId] ?? [],
+          ? filterDeferredQueuedUserMessages(
+              filterMessagesForSession(
+                activeSessionId,
+                allMessagesRef.current[activeSessionId] ?? [],
+              ),
             )
           : [],
       ),
     );
-  }, [activeSessionId]);
+  }, [activeSessionId, filterDeferredQueuedUserMessages]);
 
   // Keep the cached workspace path in sync with the active session so the
   // WebSocket `file_change_refresh` handler always refreshes the right path.
@@ -1131,6 +1337,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const clearSessionScopedState = useCallback(() => {
     activeSessionIdRef.current = '';
+    deferredQueuedMessageIdsRef.current.clear();
+    deferredQueuedClientMessageIdsRef.current.clear();
+    deferredQueuedUserMessagesRef.current.clear();
+    setDeferredQueuedMessagesById({});
     setActiveSessionId('');
     setMessagesAsync(succeed([]));
     setMembersAsync(succeed([]));
@@ -1433,10 +1643,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       agentNamesByIdRef.current = agentNamesById;
       agentModelsByIdRef.current = agentModelsById;
-      const mapped = mapMessages(backendMsgs, {
-        agentNamesById,
-        agentModelsById,
-      });
+      const mapped = filterDeferredQueuedUserMessages(
+        mapMessages(backendMsgs, {
+          agentNamesById,
+          agentModelsById,
+        }),
+      );
       // Drop the optimistic-stop suppression for any agent that has already
       // moved out of the `stopping` state (terminal, or a new run is active).
       const suppressedStoppedIds =
@@ -1473,7 +1685,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           .map((sessionAgent) => sessionAgent.id),
       );
       setAllMessages((prev) => {
-        const current = filterMessagesForSession(sid, prev[sid] ?? []);
+        const current = filterDeferredQueuedUserMessages(
+          filterMessagesForSession(sid, prev[sid] ?? []),
+        );
         const next = resolveQuotedMessageReferences(
           mergePersistedWithRunningPlaceholders(
             mapped,
@@ -1495,7 +1709,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         setMessagesAsync((prev) => fail(prev, err, mock));
       }
     }
-  }, []);
+  }, [filterDeferredQueuedUserMessages]);
 
   // Optimistically clear the running placeholder of a session agent the user
   // just stopped. The stopped run keeps the agent in the `stopping` state for a
@@ -1838,6 +2052,51 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     [],
   );
 
+  const insertDeferredQueuedUserMessage = useCallback(
+    (sid: string, runId: string, message: Message) => {
+      setAllMessages((prev) => {
+        const current = filterMessagesForSession(sid, prev[sid] ?? []);
+        const clientMessageId = userMessageClientId(message);
+        const withoutExistingUserMessage = current.filter(
+          (candidate) =>
+            !matchesUserMessageIdentity(
+              candidate,
+              message.id,
+              clientMessageId,
+            ),
+        );
+
+        const runIndex = withoutExistingUserMessage.findIndex(
+          (candidate) => candidate.isAgentRunning && candidate.runId === runId,
+        );
+        const next = [...withoutExistingUserMessage];
+        next.splice(runIndex >= 0 ? runIndex : next.length, 0, message);
+        return { ...prev, [sid]: resolveQuotedMessageReferences(next) };
+      });
+    },
+    [],
+  );
+
+  const revealDeferredQueuedBackendMessage = useCallback(
+    async (
+      event: Extract<ChatStreamEvent, { type: 'agent_run_started' }>,
+    ): Promise<void> => {
+      try {
+        const backendMessage = await chatMessagesApi.get(
+          event.source_message_id,
+        );
+        insertDeferredQueuedUserMessage(
+          event.session_id,
+          event.run_id,
+          mapBackendChatMessage(backendMessage),
+        );
+      } catch {
+        // Queue reveal is best-effort; the running agent placeholder still shows.
+      }
+    },
+    [insertDeferredQueuedUserMessage, mapBackendChatMessage],
+  );
+
   const upsertStreamedMessage = useCallback(
     (sid: string, incoming: Message) => {
       setAllMessages((prev) => {
@@ -1885,7 +2144,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
                 sourceMessageId: incoming.sourceMessageId,
               })
             : -1;
-        const withoutPlaceholder = current.filter((message) => {
+        let replacementIndex: number | null = null;
+        const withoutPlaceholder = current.filter((message, index) => {
           const isMatchingRun =
             incoming.runId &&
             message.runId === incoming.runId &&
@@ -1917,6 +2177,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
             isMatchingSessionAgent ||
             isPendingRun
           ) {
+            replacementIndex =
+              replacementIndex === null
+                ? index
+                : Math.min(replacementIndex, index);
             carriedLines = message.activityLines;
             carriedState = message.activityLoadState ?? 'loaded';
             carriedSessionAgentId =
@@ -1953,7 +2217,17 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
             ? withoutPlaceholder.map((message, index) =>
                 index === existingIndex ? nextMessage : message,
               )
-            : [...withoutPlaceholder, nextMessage];
+            : (() => {
+                const inserted = [...withoutPlaceholder];
+                inserted.splice(
+                  replacementIndex === null
+                    ? inserted.length
+                    : Math.min(replacementIndex, inserted.length),
+                  0,
+                  nextMessage,
+                );
+                return inserted;
+              })();
         const correlatedNext =
           nextMessage.isUser && nextClientMessageId
             ? next.map((message) =>
@@ -1965,7 +2239,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
             : next;
         return {
           ...prev,
-          [sid]: resolveQuotedMessageReferences(correlatedNext),
+          [sid]: resolveQuotedMessageReferences(
+            orderMessagesForConversation(correlatedNext),
+          ),
         };
       });
     },
@@ -2026,6 +2302,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         sender: agentName,
         model: agentModelsByIdRef.current[line.agent_id] ?? undefined,
         time: 'just now',
+        createdAt: line.created_at,
         text: '',
         isThinking: true,
         isAgentRunning: true,
@@ -2051,7 +2328,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         );
         return { ...prev, [line.session_id]: next };
       }
-      return { ...prev, [line.session_id]: [...pruned, placeholder] };
+        return {
+          ...prev,
+          [line.session_id]: orderMessagesForConversation([
+            ...pruned,
+            placeholder,
+          ]),
+        };
     });
   }, []);
 
@@ -2061,13 +2344,59 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       optimisticallyStoppedSessionAgentIdsRef.current.delete(
         event.session_agent_id,
       );
+      const wasDeferredQueuedUserMessage = hasDeferredQueuedUserMessage(
+        event.source_message_id,
+        event.client_message_id,
+      );
+      const deferredUserMessage = wasDeferredQueuedUserMessage
+        ? releaseDeferredQueuedUserMessage(
+            event.source_message_id,
+            event.client_message_id,
+          )
+        : null;
+      const releasedUserMessage = deferredUserMessage
+        ? {
+            ...deferredUserMessage,
+            id: event.source_message_id,
+            sessionId: event.session_id,
+            clientMessageId:
+              event.client_message_id ?? deferredUserMessage.clientMessageId,
+          }
+        : null;
+      if (wasDeferredQueuedUserMessage && !releasedUserMessage) {
+        void revealDeferredQueuedBackendMessage(event);
+      }
       setAllMessages((prev) => {
         const current = filterMessagesForSession(
           event.session_id,
           prev[event.session_id] ?? [],
         );
-        if (current.some((message) => message.runId === event.run_id)) {
-          return prev;
+        const releasedUserClientMessageId = releasedUserMessage
+          ? userMessageClientId(releasedUserMessage)
+          : undefined;
+        const currentWithoutReleasedUser = releasedUserMessage
+          ? current.filter(
+              (message) =>
+                !matchesUserMessageIdentity(
+                  message,
+                  releasedUserMessage.id,
+                  releasedUserClientMessageId,
+                ),
+            )
+          : current;
+        const existingRunIndex = currentWithoutReleasedUser.findIndex(
+          (message) => message.runId === event.run_id,
+        );
+        if (existingRunIndex >= 0) {
+          if (!releasedUserMessage) {
+            return prev;
+          }
+          const next = [...currentWithoutReleasedUser];
+          next.splice(existingRunIndex, 0, releasedUserMessage);
+          return {
+            ...prev,
+            [event.session_id]: resolveQuotedMessageReferences(next),
+          };
         }
         const agentName = event.agent_name.startsWith('@')
           ? event.agent_name
@@ -2079,6 +2408,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           sender: agentName,
           model: agentModelsByIdRef.current[event.agent_id] ?? undefined,
           time: 'just now',
+          createdAt: event.started_at ?? new Date().toISOString(),
           text: '',
           isThinking: true,
           isAgentRunning: true,
@@ -2092,25 +2422,47 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         // Evict any stale running placeholder for a different run of the same
         // agent before placing the new one (see evictStaleRunPlaceholders).
         const pruned = evictStaleRunPlaceholders(
-          current,
+          currentWithoutReleasedUser,
           event.session_agent_id,
           event.run_id,
         );
-        const pendingIndex = findPendingAgentPlaceholderIndex(pruned, {
+        const withReleasedUser =
+          releasedUserMessage &&
+          !pruned.some(
+            (message) =>
+              matchesUserMessageIdentity(
+                message,
+                releasedUserMessage.id,
+                releasedUserClientMessageId,
+              ),
+          )
+            ? [...pruned, releasedUserMessage]
+            : pruned;
+        const pendingIndex = findPendingAgentPlaceholderIndex(withReleasedUser, {
           sessionAgentId: event.session_agent_id,
           sourceMessageId: event.source_message_id,
           clientMessageId: event.client_message_id,
         });
         if (pendingIndex >= 0) {
-          const next = pruned.map((message, index) =>
+          const next = withReleasedUser.map((message, index) =>
             index === pendingIndex ? placeholder : message,
           );
           return { ...prev, [event.session_id]: next };
         }
-        return { ...prev, [event.session_id]: [...pruned, placeholder] };
+        return {
+          ...prev,
+          [event.session_id]: orderMessagesForConversation([
+            ...withReleasedUser,
+            placeholder,
+          ]),
+        };
       });
     },
-    [],
+    [
+      hasDeferredQueuedUserMessage,
+      releaseDeferredQueuedUserMessage,
+      revealDeferredQueuedBackendMessage,
+    ],
   );
 
   const handleWorkflowRuntimeLine = useCallback(
@@ -2227,7 +2579,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
             notifyBuildStatsUsageUpdated(projectId);
           }
         }
-        upsertStreamedMessage(sid, mapBackendChatMessage(parsed.message));
+        const incomingMessage = mapBackendChatMessage(parsed.message);
+        if (isDeferredQueuedUserMessage(incomingMessage)) {
+          rememberDeferredQueuedUserMessage(incomingMessage);
+          return;
+        }
+        upsertStreamedMessage(sid, incomingMessage);
         return;
       }
 
@@ -2334,8 +2691,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     appendStreamActivityLine,
     handleWorkflowRuntimeLine,
     insertRunningPlaceholder,
+    isDeferredQueuedUserMessage,
     mapBackendChatMessage,
     mergeMemberQueueSnapshot,
+    rememberDeferredQueuedUserMessage,
     refreshMessages,
     refreshMemberQueues,
     refreshWorkspaceChanges,
@@ -2371,9 +2730,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const members = membersAsync.data;
   const providers = providersAsync.data;
   const messages = activeSessionId
-    ? filterMessagesForSession(
-        activeSessionId,
-        allMessages[activeSessionId] ?? [],
+    ? filterDeferredQueuedUserMessages(
+        filterMessagesForSession(
+          activeSessionId,
+          allMessages[activeSessionId] ?? [],
+        ),
       )
     : [];
 
@@ -2569,6 +2930,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       avatar: 'YOU',
       sender: 'You',
       time: 'just now',
+      createdAt: new Date().toISOString(),
       text,
       isUser: true,
       clientMessageId: userMsgId,
@@ -2588,44 +2950,60 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
             sid,
           )
         : null;
+    const existingQueue = pendingAgentMsg?.sessionAgentId
+      ? memberQueuesBySessionAgentId[pendingAgentMsg.sessionAgentId]
+      : undefined;
+    const targetMember = pendingAgentMsg?.sessionAgentId
+      ? membersAsync.data.find(
+          (member) => member.id === pendingAgentMsg.sessionAgentId,
+        )
+      : undefined;
+    const shouldQueueForMember = Boolean(
+      pendingAgentMsg?.sessionAgentId &&
+        (targetMember?.status === 'run' ||
+          existingQueue?.blocked ||
+          existingQueue?.paused ||
+          (existingQueue?.items.length ?? 0) > 0),
+    );
+    if (shouldQueueForMember) {
+      rememberDeferredQueuedUserMessage(userMsg);
+    }
     setAllMessages((prev) => {
       const cur = filterMessagesForSession(sid, prev[sid] ?? []);
-      const withoutStalePending = pendingAgentMsg?.sessionAgentId
-        ? cur.filter(
-            (message) =>
-              !(
-                isPendingAgentPlaceholder(message) &&
-                message.sessionAgentId === pendingAgentMsg.sessionAgentId
-              ),
-          )
-        : pendingAgentMsg
-          ? cur.filter((message) => !isPendingAgentPlaceholder(message))
-          : cur;
+      const visibleCurrent = shouldQueueForMember
+        ? filterDeferredQueuedUserMessages(cur)
+        : cur;
+      const withoutStalePending =
+        !shouldQueueForMember && pendingAgentMsg?.sessionAgentId
+          ? visibleCurrent.filter(
+              (message) =>
+                !(
+                  isPendingAgentPlaceholder(message) &&
+                  message.sessionAgentId === pendingAgentMsg.sessionAgentId
+                ),
+            )
+          : !shouldQueueForMember && pendingAgentMsg
+            ? visibleCurrent.filter(
+                (message) => !isPendingAgentPlaceholder(message),
+              )
+            : visibleCurrent;
+      const messagesToAppend =
+        shouldQueueForMember
+          ? []
+          : pendingAgentMsg
+            ? [userMsg, pendingAgentMsg]
+            : [userMsg];
       return {
         ...prev,
-        [sid]: pendingAgentMsg
-          ? [...withoutStalePending, userMsg, pendingAgentMsg]
-          : [...withoutStalePending, userMsg],
+        [sid]: [...withoutStalePending, ...messagesToAppend],
       };
     });
-    if (pendingAgentMsg?.sessionAgentId) {
-      const existingQueue =
-        memberQueuesBySessionAgentId[pendingAgentMsg.sessionAgentId];
-      const targetMember = membersAsync.data.find(
-        (member) => member.id === pendingAgentMsg.sessionAgentId,
+    if (shouldQueueForMember && pendingAgentMsg?.sessionAgentId) {
+      stageOptimisticQueuedMessage(
+        sid,
+        pendingAgentMsg.sessionAgentId,
+        userMsgId,
       );
-      if (
-        targetMember?.status === 'run' ||
-        existingQueue?.blocked ||
-        existingQueue?.paused ||
-        (existingQueue?.items.length ?? 0) > 0
-      ) {
-        stageOptimisticQueuedMessage(
-          sid,
-          pendingAgentMsg.sessionAgentId,
-          userMsgId,
-        );
-      }
     }
 
     // Mock-only session (e.g., backend offline): use the local cascade.
@@ -2668,11 +3046,32 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
     persistMessage()
       .then((message) => {
-        upsertStreamedMessage(sid, mapBackendChatMessage(message));
+        const incomingMessage = mapBackendChatMessage(message);
+        if (shouldQueueForMember) {
+          rememberDeferredQueuedUserMessage(incomingMessage);
+          void refreshMemberQueues();
+          return;
+        }
+        upsertStreamedMessage(sid, incomingMessage);
         void refreshMessages();
         void refreshMemberQueues();
       })
       .catch((err) => {
+        if (shouldQueueForMember) {
+          releaseDeferredQueuedUserMessage(userMsg.id, userMsg.clientMessageId);
+          setAllMessages((prev) => {
+            const cur = filterMessagesForSession(sid, prev[sid] ?? []);
+            if (
+              cur.some(
+                (message) =>
+                  userMessageClientId(message) === userMsg.clientMessageId,
+              )
+            ) {
+              return prev;
+            }
+            return { ...prev, [sid]: [...cur, userMsg] };
+          });
+        }
         if (pendingAgentMsg) {
           setAllMessages((prev) => {
             const cur = filterMessagesForSession(sid, prev[sid] ?? []);
@@ -2839,6 +3238,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         createProject,
         messages,
         memberQueuesBySessionAgentId,
+        deferredQueuedMessagesById,
         workflowRuntimeLinesByExecution,
         activeSessionId,
         setActiveSessionId,

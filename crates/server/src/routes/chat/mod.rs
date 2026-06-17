@@ -1,6 +1,7 @@
 pub mod agents;
 pub mod messages;
 pub mod presets;
+pub mod queues;
 pub mod runs;
 pub mod sessions;
 pub mod skills;
@@ -42,6 +43,19 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route(
             "/agents/{session_agent_id}/stop",
             axum::routing::post(sessions::stop_session_agent),
+        )
+        .route("/queue", get(queues::list_session_queue))
+        .route(
+            "/queue/{queue_id}",
+            axum::routing::delete(queues::delete_queue_item),
+        )
+        .route(
+            "/agents/{session_agent_id}/queue",
+            get(queues::list_member_queue),
+        )
+        .route(
+            "/agents/{session_agent_id}/queue/continue",
+            axum::routing::post(queues::continue_member_queue),
         )
         .route(
             "/messages",

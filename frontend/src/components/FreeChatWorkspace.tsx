@@ -697,13 +697,6 @@ function titleCaseStatus(status: string) {
     .join(" ");
 }
 
-const visibleQueueItemStatuses = new Set([
-  "queued",
-  "processing",
-  "running",
-  "failed",
-]);
-
 const queuedMessageStatusLabel = (status: string) => {
   switch (status) {
     case "processing":
@@ -728,6 +721,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     activeSessionId,
     messages,
     memberQueuesBySessionAgentId,
+    deferredQueuedMessagesById,
     sendMessage,
     stagePendingAgentPlaceholder,
     members,
@@ -851,22 +845,31 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
       })
     : messages;
   const messagesById = useMemo(
-    () => new Map(messages.map((message) => [message.id, message])),
-    [messages],
+    () =>
+      new Map([
+        ...messages.map((message) => [message.id, message] as const),
+        ...Object.entries(deferredQueuedMessagesById),
+      ]),
+    [deferredQueuedMessagesById, messages],
   );
   const visibleQueueGroups = useMemo(
     () =>
       Object.values(memberQueuesBySessionAgentId)
         .filter((queue) => queue.session_id === activeSessionId)
-        .map((queue) => ({
-          queue,
-          member: members.find((member) => member.id === queue.session_agent_id),
-          items: queue.items.filter(
+        .map((queue) => {
+          const queuedQueueItems = queue.items.filter(
             (item) =>
               item.message.session_id === activeSessionId &&
-              visibleQueueItemStatuses.has(String(item.message.status)),
-          ),
-        }))
+              String(item.message.status) === "queued",
+          );
+          return {
+            queue,
+            member: members.find(
+              (member) => member.id === queue.session_agent_id,
+            ),
+            items: queuedQueueItems,
+          };
+        })
         .filter((group) => group.items.length > 0),
     [activeSessionId, memberQueuesBySessionAgentId, members],
   );
@@ -1329,7 +1332,9 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   };
 
   const summarizeQueuedMessage = (item: QueuedMessageListItem) => {
-    const source = messagesById.get(item.message.chat_message_id);
+    const source =
+      messagesById.get(item.message.chat_message_id) ??
+      messagesById.get(item.message.id);
     return summarizeMessage(source?.text ?? "");
   };
 
@@ -2233,22 +2238,22 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
               </div>
             )}
             {visibleQueueGroups.length > 0 && (
-              <div className="mb-2 flex justify-end">
-                <div className="flex w-full max-w-md flex-col gap-2 sm:w-[min(28rem,92vw)]">
+              <div className="mb-1.5 flex justify-end">
+                <div className="flex w-full max-w-sm flex-col gap-1.5 sm:w-[min(22rem,88vw)]">
                   {visibleQueueGroups.map(({ queue, member, items }) => {
                     const continueActionId = `continue-${queue.session_agent_id}`;
                     return (
                       <div
                         key={queue.session_agent_id}
-                        className="rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface-1)] shadow-[0_12px_30px_rgba(15,23,42,0.10)]"
+                        className="rounded-md border border-[var(--hairline)] bg-[var(--surface-1)]/95 shadow-[0_8px_20px_rgba(15,23,42,0.06)]"
                       >
-                        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-[var(--hairline)] px-3 py-2">
+                        <div className="flex min-w-0 items-center justify-between gap-1.5 border-b border-[var(--hairline)] px-2 py-1">
                           <div className="min-w-0">
-                            <div className="truncate text-[12px] font-semibold text-[var(--ink)]">
+                            <div className="truncate text-[10px] font-medium text-[var(--ink-muted)]">
                               消息正在等待执行
                             </div>
                             {member && (
-                              <div className="truncate font-mono text-[10px] text-[var(--ink-tertiary)]">
+                              <div className="truncate font-mono text-[9px] text-[var(--ink-tertiary)]">
                                 {member.name}
                               </div>
                             )}
@@ -2263,15 +2268,15 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                                 )
                               }
                               disabled={queueActionIds.has(continueActionId)}
-                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--primary)] transition hover:bg-[var(--primary-tint)] disabled:cursor-wait disabled:opacity-60"
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--primary)] disabled:cursor-wait disabled:opacity-60"
                               title="继续执行队列"
                               aria-label="继续执行队列"
                             >
-                              <Play className="h-3.5 w-3.5" />
+                              <Play className="h-3 w-3" />
                             </button>
                           )}
                         </div>
-                        <div className="max-h-36 overflow-y-auto p-1.5">
+                        <div className="max-h-24 overflow-y-auto p-1">
                           {items.map((item) => {
                             const status = String(item.message.status);
                             const canDelete =
@@ -2279,7 +2284,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                             return (
                               <div
                                 key={item.message.id}
-                                className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-[11px] text-[var(--ink-muted)] hover:bg-[var(--surface-2)]"
+                                className="flex min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-[10px] text-[var(--ink-tertiary)] hover:bg-[var(--surface-2)]"
                               >
                                 <span
                                   className="min-w-0 flex-1 truncate"
@@ -2287,7 +2292,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                                 >
                                   {summarizeQueuedMessage(item)}
                                 </span>
-                                <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--ink-tertiary)]">
+                                <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-mono text-[8px] text-[var(--ink-tertiary)]">
                                   {queuedMessageStatusLabel(status)}
                                 </span>
                                 {canDelete && (
@@ -2300,11 +2305,11 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                                       )
                                     }
                                     disabled={queueActionIds.has(item.message.id)}
-                                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-rose-500 disabled:cursor-wait disabled:opacity-60"
+                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-rose-500 disabled:cursor-wait disabled:opacity-60"
                                     title="删除排队消息"
                                     aria-label="删除排队消息"
                                   >
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <Trash2 className="h-3 w-3" />
                                   </button>
                                 )}
                               </div>

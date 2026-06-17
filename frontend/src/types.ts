@@ -6,6 +6,22 @@
 // below; mapping is performed in `src/lib/mappers.ts`.
 // =============================================================================
 
+import type { MemberQueueSnapshot } from '../../shared/types';
+
+export type {
+  ChatMemberQueueResponse,
+  ChatQueueListResponse,
+  ContinueQueuedMessageResponse,
+  DeleteQueuedMessageResponse,
+  MemberQueueSnapshot,
+  MemberQueueStatus,
+  QueuedMessage,
+  QueuedMessageListItem,
+  QueuedMessageStatus,
+} from '../../shared/types';
+
+export type MemberQueuesBySessionAgentId = Record<string, MemberQueueSnapshot>;
+
 export type Theme = 'dark' | 'light';
 
 export type Locale = 'en' | 'zh' | 'ja' | 'ko' | 'fr' | 'es';
@@ -48,6 +64,7 @@ export interface Message {
   avatar: string;
   sender: string;
   time: string;
+  createdAt?: string;
   text: string;
   cost?: string;
   model?: string;
