@@ -1093,21 +1093,30 @@ export function IssueDetailPage({
           linkedGitHubIssueNumber,
           labels,
         );
+        const mirrored = await projectWorkItemsApi.update(
+          projectId,
+          current.id,
+          { labels_json: JSON.stringify(nextLabels) },
+        );
         setDetail((existing) =>
-          existing?.github_issue_detail
+          existing
             ? {
                 ...existing,
-                github_issue_detail: {
-                  ...existing.github_issue_detail,
-                  summary: {
-                    ...existing.github_issue_detail.summary,
-                    labels: nextLabels,
-                  },
-                },
+                work_item: mirrored,
+                github_issue_detail: existing.github_issue_detail
+                  ? {
+                      ...existing.github_issue_detail,
+                      summary: {
+                        ...existing.github_issue_detail.summary,
+                        labels: nextLabels,
+                      },
+                    }
+                  : existing.github_issue_detail,
               }
             : existing,
         );
-        onIssueSync?.({ workItem: current, labels: nextLabels });
+        onWorkItemChange?.(mirrored);
+        onIssueSync?.({ workItem: mirrored, labels: nextLabels });
         onAction(
           tr('issue.detail.action.labelsSynced', 'Labels synced to GitHub'),
         );
