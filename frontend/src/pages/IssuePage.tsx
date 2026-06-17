@@ -55,6 +55,7 @@ import {
   readIssueNavigationTarget,
   type IssueNavigationTarget,
 } from '@/lib/issueNavigation';
+import { notifyBuildStatsUsageUpdated } from '@/lib/buildStatsEvents';
 import {
   IssueDetailPage,
   PriorityMenuIcon,
@@ -1057,6 +1058,7 @@ export function IssuePage() {
           type: 'task',
           source: 'manual',
         });
+        notifyBuildStatsUsageUpdated(selectedProjectId);
         let sessionLinkError = '';
         if (sessionId) {
           try {

@@ -56,6 +56,7 @@ import {
   type LinkedWorkItemsChangedDetail,
 } from "@/lib/linkedWorkItemsEvents";
 import { markPendingIssueStatusSync } from "@/lib/pendingIssueStatusSync";
+import { notifyBuildStatsUsageUpdated } from "@/lib/buildStatsEvents";
 import {
   flattenWorkspaceChanges,
   hasRelatedFileDiff,
@@ -1336,6 +1337,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
         ),
       );
       markPendingIssueStatusSync(selectedProjectId, updated.id, updated.status);
+      notifyBuildStatsUsageUpdated(selectedProjectId);
       showToast(t("linkedWorkItems.statusUpdated"));
     } catch {
       setLinkedWorkItems((current) =>

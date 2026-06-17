@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Plus, RefreshCw } from 'lucide-react';
 import { projectWorkItemsApi } from '@/lib/api';
+import { notifyBuildStatsUsageUpdated } from '@/lib/buildStatsEvents';
 import type {
   GitHubErrorData,
   ProjectWorkItem,
@@ -85,6 +86,7 @@ export function ProjectWorkItemsView({ projectId }: ProjectWorkItemsViewProps) {
         status,
         source: 'manual',
       });
+      notifyBuildStatsUsageUpdated(projectId);
       setItems((current) => [created, ...current]);
       setSelectedId(created.id);
       setTitle('');

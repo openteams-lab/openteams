@@ -53,6 +53,7 @@ import {
   getPendingIssueStatusSync,
 } from '@/lib/pendingIssueStatusSync';
 import { notifyLinkedWorkItemsChanged } from '@/lib/linkedWorkItemsEvents';
+import { notifyBuildStatsUsageUpdated } from '@/lib/buildStatsEvents';
 import { mapSession } from '@/lib/mappers';
 import type {
   BackendChatSession,
@@ -683,6 +684,7 @@ export function IssueDetailPage({
     setActionError('');
     try {
       await projectWorkItemsApi.delete(projectId, current.id);
+      notifyBuildStatsUsageUpdated(projectId);
       onAction(tr('issue.detail.action.deleted', 'Issue deleted'));
       onIssueDeleted?.(current.id);
       return true;
@@ -1026,6 +1028,7 @@ export function IssueDetailPage({
       });
       patchCurrentWorkItem(updated);
       clearPendingIssueStatusSync(projectId, current.id);
+      notifyBuildStatsUsageUpdated(projectId);
       onAction(
         tr(
           'issue.detail.action.statusUpdated',
