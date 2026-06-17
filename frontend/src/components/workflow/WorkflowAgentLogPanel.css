@@ -197,16 +197,16 @@ body[data-mode="light"] .workflow-window-root .wf-log-group + .wf-log-group {
   text-overflow: ellipsis;
 }
 
-body[data-mode="light"] .workflow-window-root .wf-log-task-tool-icon {
-  color: rgba(0, 0, 0, 0.25);
+body[data-mode="light"] :is(.workflow-window-root, .wf-log-panel-inline) .wf-log-task-tool-icon {
+  color: var(--ink-subtle, #62666d);
 }
 
-body[data-mode="light"] .workflow-window-root .wf-log-task-label {
-  color: rgba(0, 0, 0, 0.25);
+body[data-mode="light"] :is(.workflow-window-root, .wf-log-panel-inline) .wf-log-task-label {
+  color: var(--ink-subtle, #62666d);
 }
 
-body[data-mode="light"] .workflow-window-root .wf-log-task-target {
-  color: rgba(0, 0, 0, 0.38);
+body[data-mode="light"] :is(.workflow-window-root, .wf-log-panel-inline) .wf-log-task-target {
+  color: var(--ink-muted, #2b2d34);
 }
 
 /* Content-type tasks (skill output, think) keep high-contrast text */

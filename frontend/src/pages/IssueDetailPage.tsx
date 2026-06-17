@@ -495,7 +495,6 @@ export function IssueDetailPage({
   );
   const issueTitle = githubIssue?.summary.title ?? current.title;
   const issueBody = githubIssue?.body ?? current.description;
-  const issueComments = githubIssue?.comments ?? [];
   const localIssueLabels = useMemo(
     () => projectWorkItemLabelList(current.labels_json),
     [current.labels_json],
@@ -516,6 +515,28 @@ export function IssueDetailPage({
   const localCreatorIdentity = defaultIssueUserIdentity(
     githubAccount ?? null,
     tr,
+  );
+  const canComment = hasGitHubIssue ? canWriteGitHub : Boolean(current.id);
+  const issueComments = useMemo(
+    () =>
+      githubIssue
+        ? githubIssue.comments
+        : (detail?.comments ?? []).map((comment) => ({
+            id: comment.id,
+            body: comment.body,
+            author: comment.author ?? localCreatorIdentity.name,
+            author_avatar_url: comment.author
+              ? null
+              : localCreatorIdentity.avatarUrl,
+            created_at: comment.created_at,
+            url: null,
+          })),
+    [
+      detail?.comments,
+      githubIssue,
+      localCreatorIdentity.avatarUrl,
+      localCreatorIdentity.name,
+    ],
   );
   const creatorName = githubIssue?.summary.author ?? localCreatorIdentity.name;
   const creatorAvatarUrl =
@@ -905,38 +926,74 @@ export function IssueDetailPage({
 
   const handleSubmitComment = async () => {
     const body = composeIssueCommentBody(commentText, selectedFiles, tr);
-    if (!body || !targetRepoIntegrationId || !linkedGitHubIssueNumber) return;
+    if (!body) return;
+    if (
+      hasGitHubIssue &&
+      (!targetRepoIntegrationId || !linkedGitHubIssueNumber)
+    ) {
+      return;
+    }
     await runAction('comment', async () => {
-      await projectGithubApi.commentIssue(
-        projectId,
-        targetRepoIntegrationId,
-        linkedGitHubIssueNumber,
-        body,
-      );
+      if (targetRepoIntegrationId && linkedGitHubIssueNumber) {
+        await projectGithubApi.commentIssue(
+          projectId,
+          targetRepoIntegrationId,
+          linkedGitHubIssueNumber,
+          body,
+        );
+      } else {
+        const comment = await projectWorkItemsApi.comment(
+          projectId,
+          current.id,
+          body,
+        );
+        setDetail((existing) =>
+          existing
+            ? {
+                ...existing,
+                comments: [...existing.comments, comment],
+              }
+            : {
+                work_item: current,
+                external_links: [],
+                comments: [comment],
+                execution_links: [],
+                delivery_records: [],
+                github_audits: [],
+                github_issue_detail: null,
+              },
+        );
+      }
       setCommentText('');
       setSelectedFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      const githubDetail = await projectGithubApi.refreshIssue(
-        projectId,
-        targetRepoIntegrationId,
-        linkedGitHubIssueNumber,
-      );
-      setDetail((existing) =>
-        existing
-          ? { ...existing, github_issue_detail: githubDetail }
-          : existing,
-      );
+      if (targetRepoIntegrationId && linkedGitHubIssueNumber) {
+        const githubDetail = await projectGithubApi.refreshIssue(
+          projectId,
+          targetRepoIntegrationId,
+          linkedGitHubIssueNumber,
+        );
+        setDetail((existing) =>
+          existing
+            ? { ...existing, github_issue_detail: githubDetail }
+            : existing,
+        );
+      }
       onAction(
-        tr('issue.detail.action.commentSynced', 'Comment synced to GitHub'),
+        hasGitHubIssue
+          ? tr('issue.detail.action.commentSynced', 'Comment synced to GitHub')
+          : tr('issue.detail.action.commentAdded', 'Comment added'),
       );
-      showSyncNotice(
-        tr('issue.detail.syncNotice.complete.title', 'GitHub sync complete'),
-        tr(
-          'issue.detail.syncNotice.commentSynced.message',
-          'Comment synced to GitHub.',
-        ),
-        'success',
-      );
+      if (hasGitHubIssue) {
+        showSyncNotice(
+          tr('issue.detail.syncNotice.complete.title', 'GitHub sync complete'),
+          tr(
+            'issue.detail.syncNotice.commentSynced.message',
+            'Comment synced to GitHub.',
+          ),
+          'success',
+        );
+      }
     });
   };
 
@@ -1626,7 +1683,7 @@ export function IssueDetailPage({
                   <button
                     type="button"
                     disabled={
-                      action === 'comment' || !commentBody || !canWriteGitHub
+                      action === 'comment' || !commentBody || !canComment
                     }
                     className="flex h-8 items-center gap-2 rounded-[8px] bg-[var(--primary)] px-3 text-[13px] font-bold text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[var(--surface-4)] disabled:text-[var(--ink-tertiary)]"
                     onClick={() => void handleSubmitComment()}

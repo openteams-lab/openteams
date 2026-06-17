@@ -4,6 +4,7 @@ use db::models::{
     project_delivery_record::ProjectDeliveryRecord,
     project_repo::ProjectRepo,
     project_work_item::{CreateProjectWorkItem, ProjectWorkItem, UpdateProjectWorkItem},
+    project_work_item_comment::{CreateProjectWorkItemComment, ProjectWorkItemComment},
     project_work_item_execution_link::{
         CreateProjectWorkItemExecutionLink, ProjectWorkItemExecutionLink,
     },
@@ -22,6 +23,7 @@ use crate::services::github::rest_client::GitHubIssueDetail;
 pub struct ProjectWorkItemDetail {
     pub work_item: ProjectWorkItem,
     pub external_links: Vec<ProjectWorkItemExternalLink>,
+    pub comments: Vec<ProjectWorkItemComment>,
     pub execution_links: Vec<ProjectWorkItemExecutionLink>,
     pub delivery_records: Vec<ProjectDeliveryRecord>,
     pub github_audits: Vec<GitHubOperationAudit>,
@@ -127,6 +129,10 @@ impl ProjectWorkItemService {
         .bind(work_item_id)
         .execute(&mut *tx)
         .await?;
+        sqlx::query("DELETE FROM project_work_item_comments WHERE project_work_item_id = ?1")
+            .bind(work_item_id)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query(
             "DELETE FROM project_work_item_execution_links WHERE project_work_item_id = ?1",
         )
@@ -160,6 +166,7 @@ impl ProjectWorkItemService {
         let external_links =
             ProjectWorkItemExternalLink::find_by_work_item(pool, work_item_id).await?;
         let github_issue_detail = external_links.iter().find_map(cached_github_issue_detail);
+        let comments = ProjectWorkItemComment::find_by_work_item(pool, work_item_id).await?;
         let execution_links =
             ProjectWorkItemExecutionLink::find_by_work_item(pool, work_item_id).await?;
         let delivery_records =
@@ -171,11 +178,47 @@ impl ProjectWorkItemService {
         Ok(ProjectWorkItemDetail {
             work_item,
             external_links,
+            comments,
             execution_links,
             delivery_records,
             github_audits,
             github_issue_detail,
         })
+    }
+
+    pub async fn create_comment(
+        &self,
+        pool: &SqlitePool,
+        project_id: Uuid,
+        work_item_id: Uuid,
+        input: CreateProjectWorkItemComment,
+    ) -> Result<ProjectWorkItemComment> {
+        let work_item = ProjectWorkItem::find_by_id(pool, work_item_id)
+            .await?
+            .ok_or_else(|| anyhow!("Project work item not found"))?;
+        if work_item.project_id != project_id {
+            return Err(anyhow!("Project work item not found"));
+        }
+        let body = input.body.trim().to_string();
+        if body.is_empty() {
+            return Err(anyhow!("Comment body is required"));
+        }
+        let comment = ProjectWorkItemComment::create(
+            pool,
+            work_item_id,
+            CreateProjectWorkItemComment {
+                body,
+                author: input.author,
+            },
+        )
+        .await?;
+        sqlx::query(
+            "UPDATE project_work_items SET updated_at = datetime('now', 'subsec') WHERE id = ?1",
+        )
+        .bind(work_item_id)
+        .execute(pool)
+        .await?;
+        Ok(comment)
     }
 
     pub async fn link_external(

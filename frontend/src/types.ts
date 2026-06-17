@@ -423,6 +423,15 @@ export interface ProjectWorkItem {
   updated_at: string;
 }
 
+export interface ProjectWorkItemComment {
+  id: string;
+  project_work_item_id: string;
+  body: string;
+  author: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProjectWorkItemExternalLink {
   id: string;
   project_work_item_id: string;
@@ -586,6 +595,7 @@ export interface GitHubCreatePrResponse {
 export interface ProjectWorkItemDetailResponse {
   work_item: ProjectWorkItem;
   external_links: ProjectWorkItemExternalLink[];
+  comments: ProjectWorkItemComment[];
   execution_links: ProjectWorkItemExecutionLink[];
   delivery_records: ProjectDeliveryRecord[];
   github_audits?: GitHubOperationAudit[];

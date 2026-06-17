@@ -58,6 +58,10 @@ export enum ProjectWorkItemPriority { low = "low", medium = "medium", high = "hi
 
 export enum ProjectWorkItemSource { manual = "manual", github_issue = "github_issue", workflow = "workflow", session = "session" }
 
+export type ProjectWorkItemComment = { id: string, project_work_item_id: string, body: string, author: string | null, created_at: Date, updated_at: Date, };
+
+export type CreateProjectWorkItemComment = { body: string, author: string | null, };
+
 export type ProjectWorkItemExternalLink = { id: string, project_work_item_id: string, provider: string, repo_id: string | null, external_type: ProjectExternalType, external_id: string, number: bigint | null, url: string | null, state: string | null, metadata_json: string | null, last_synced_at: Date | null, stale: boolean, created_at: Date, updated_at: Date, };
 
 export type CreateProjectWorkItemExternalLink = { provider: string, repo_id: string | null, external_type: ProjectExternalType, external_id: string, number: bigint | null, url: string | null, state: string | null, metadata_json: string | null, last_synced_at: Date | null, stale: boolean, };
@@ -118,7 +122,7 @@ export enum GitHubPendingOperationStatus { pending_approval = "pending_approval"
 
 export type ProjectDetail = { project: Project, paths: Array<ProjectPath>, members: Array<ProjectMember>, sessions: Array<ChatSession>, repos: Array<Repo>, stats: Array<ProjectStats>, };
 
-export type ProjectWorkItemDetail = { work_item: ProjectWorkItem, external_links: Array<ProjectWorkItemExternalLink>, execution_links: Array<ProjectWorkItemExecutionLink>, delivery_records: Array<ProjectDeliveryRecord>, github_audits: Array<GitHubOperationAudit>, github_issue_detail: GitHubIssueDetail | null, };
+export type ProjectWorkItemDetail = { work_item: ProjectWorkItem, external_links: Array<ProjectWorkItemExternalLink>, comments: Array<ProjectWorkItemComment>, execution_links: Array<ProjectWorkItemExecutionLink>, delivery_records: Array<ProjectDeliveryRecord>, github_audits: Array<GitHubOperationAudit>, github_issue_detail: GitHubIssueDetail | null, };
 
 export type SourceControlFileStatus = "modified" | "added" | "deleted" | "untracked" | "renamed" | "copied" | "type_changed";
 
@@ -264,9 +268,9 @@ is_terminal_visible: boolean | null,
  */
 workspace_panel_states: { [key in string]?: WorkspacePanelStateData }, };
 
-export type ScratchPayload = { "type": "DRAFT_TASK", "data": string } | { "type": "DRAFT_FOLLOW_UP", "data": DraftFollowUpData } | { "type": "DRAFT_WORKSPACE", "data": DraftWorkspaceData } | { "type": "PREVIEW_SETTINGS", "data": PreviewSettingsData } | { "type": "WORKSPACE_NOTES", "data": WorkspaceNotesData } | { "type": "UI_PREFERENCES", "data": UiPreferencesData };
+export type ScratchPayload = { "type": "DRAFT_TASK", "data": string } | { "type": "DRAFT_FOLLOW_UP", "data": DraftFollowUpData } | { "type": "QUEUED_FOLLOW_UP", "data": DraftFollowUpData } | { "type": "DRAFT_WORKSPACE", "data": DraftWorkspaceData } | { "type": "PREVIEW_SETTINGS", "data": PreviewSettingsData } | { "type": "WORKSPACE_NOTES", "data": WorkspaceNotesData } | { "type": "UI_PREFERENCES", "data": UiPreferencesData };
 
-export enum ScratchType { DRAFT_TASK = "DRAFT_TASK", DRAFT_FOLLOW_UP = "DRAFT_FOLLOW_UP", DRAFT_WORKSPACE = "DRAFT_WORKSPACE", PREVIEW_SETTINGS = "PREVIEW_SETTINGS", WORKSPACE_NOTES = "WORKSPACE_NOTES", UI_PREFERENCES = "UI_PREFERENCES" }
+export enum ScratchType { DRAFT_TASK = "DRAFT_TASK", DRAFT_FOLLOW_UP = "DRAFT_FOLLOW_UP", QUEUED_FOLLOW_UP = "QUEUED_FOLLOW_UP", DRAFT_WORKSPACE = "DRAFT_WORKSPACE", PREVIEW_SETTINGS = "PREVIEW_SETTINGS", WORKSPACE_NOTES = "WORKSPACE_NOTES", UI_PREFERENCES = "UI_PREFERENCES" }
 
 export type Scratch = { id: string, payload: ScratchPayload, created_at: string, updated_at: string, };
 
@@ -697,6 +701,8 @@ export type DeliveryRecordsQuery = { work_item_id: string | null, repo_id: strin
 
 export type DeliveryStatsQuery = { period_start: string, period_end: string, };
 
+export type WorkItemCommentRequest = { body: string, };
+
 export type IssueCommentRequest = { body: string, operation_source: GitHubOperationSource, };
 
 export type IssueBodyRequest = { body: string, operation_source: GitHubOperationSource, };
@@ -1107,21 +1113,11 @@ export type CreatePresetSnapshotResponse = { team: ChatTeamPreset, members: Arra
 
 export type GitBranch = { name: string, is_current: boolean, is_remote: boolean, last_commit_date: Date, };
 
-export type QueuedMessage = { 
-/**
- * The session this message is queued for
- */
-session_id: string, 
-/**
- * The follow-up data (message + variant)
- */
-data: DraftFollowUpData, 
-/**
- * Timestamp when the message was queued
- */
-queued_at: string, };
+export enum QueuedMessageStatus { queued = "queued", processing = "processing", running = "running", failed = "failed", skipped = "skipped", completed = "completed" }
 
-export type QueueStatus = { "status": "empty" } | { "status": "queued", message: QueuedMessage, };
+export type QueuedMessage = { id: string, session_id: string, session_agent_id: string, agent_id: string, chat_message_id: string, status: QueuedMessageStatus, created_at: string, updated_at: string, processing_started_at: string | null, run_id: string | null, failure_reason: string | null, };
+
+export type QueueStatus = { "status": "empty" } | { "status": "queued", messages: Array<QueuedMessage>, } | { "status": "processing", message: QueuedMessage, queued_count: bigint, } | { "status": "running", message: QueuedMessage, queued_count: bigint, } | { "status": "blocked", message: QueuedMessage, queued_count: bigint, } | { "status": "paused", message: QueuedMessage, queued_count: bigint, };
 
 export type ConflictOp = "rebase" | "merge" | "cherry_pick" | "revert";
 

@@ -21,6 +21,7 @@ use db::models::{
         CreateProjectWorkItem, ProjectWorkItem, ProjectWorkItemPriority, ProjectWorkItemSource,
         ProjectWorkItemStatus, ProjectWorkItemType, UpdateProjectWorkItem,
     },
+    project_work_item_comment::ProjectWorkItemComment,
     project_work_item_execution_link::{
         CreateProjectWorkItemExecutionLink, ProjectWorkItemExecutionLink,
     },
@@ -114,6 +115,11 @@ pub struct DeliveryStatsQuery {
     pub period_start: NaiveDate,
     #[ts(type = "string")]
     pub period_end: NaiveDate,
+}
+
+#[derive(Debug, Deserialize, TS)]
+pub struct WorkItemCommentRequest {
+    pub body: String,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -212,6 +218,10 @@ pub fn router() -> Router<DeploymentImpl> {
             get(work_item_detail)
                 .put(update_work_item)
                 .delete(delete_work_item),
+        )
+        .route(
+            "/projects/{project_id}/work-items/{work_item_id}/comments",
+            post(create_work_item_comment),
         )
         .route(
             "/projects/{project_id}/work-items/{work_item_id}/external-links",
@@ -588,6 +598,27 @@ async fn delete_work_item(
         .await
         .map_err(|err| ApiError::BadRequest(err.to_string()))?;
     Ok(ResponseJson(ApiResponse::success(())))
+}
+
+async fn create_work_item_comment(
+    State(deployment): State<DeploymentImpl>,
+    Path((project_id, work_item_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<WorkItemCommentRequest>,
+) -> Result<ResponseJson<ApiResponse<ProjectWorkItemComment>>, ApiError> {
+    ensure_project(&deployment, project_id).await?;
+    let row = ProjectWorkItemService::new()
+        .create_comment(
+            &deployment.db().pool,
+            project_id,
+            work_item_id,
+            db::models::project_work_item_comment::CreateProjectWorkItemComment {
+                body: payload.body,
+                author: None,
+            },
+        )
+        .await
+        .map_err(|err| ApiError::BadRequest(err.to_string()))?;
+    Ok(ResponseJson(ApiResponse::success(row)))
 }
 
 async fn link_external(

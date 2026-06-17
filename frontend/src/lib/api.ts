@@ -63,6 +63,7 @@ import type {
   ProjectIssueIntegrationsResponse,
   ProjectRepoIntegration,
   ProjectWorkItem,
+  ProjectWorkItemComment,
   ProjectWorkItemDetailResponse,
   ProjectWorkItemExecutionLink,
   ProfilesContent,
@@ -1731,6 +1732,19 @@ export const projectWorkItemsApi = {
       { method: "PUT", body: jsonBody(data) },
     );
     return handleApiResponse<ProjectWorkItem, GitHubErrorData>(r);
+  },
+  comment: async (
+    projectId: string,
+    workItemId: string,
+    body: string,
+  ): Promise<ProjectWorkItemComment> => {
+    const r = await makeRequest(
+      `/api/projects/${encodeURIComponent(projectId)}/work-items/${encodeURIComponent(
+        workItemId,
+      )}/comments`,
+      { method: "POST", body: jsonBody({ body }) },
+    );
+    return handleApiResponse<ProjectWorkItemComment, GitHubErrorData>(r);
   },
   delete: async (projectId: string, workItemId: string): Promise<void> => {
     const r = await makeRequest(

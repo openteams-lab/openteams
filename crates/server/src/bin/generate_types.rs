@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, fs, path::Path};
 
-use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
+use schemars::{generate::SchemaSettings, JsonSchema, Schema, SchemaGenerator};
 use services::services::config::{DEFAULT_COMMIT_REMINDER_PROMPT, DEFAULT_PR_DESCRIPTION_PROMPT};
 use ts_rs::TS;
 
@@ -36,6 +36,8 @@ fn generate_types_content() -> String {
         db::models::project_work_item::ProjectWorkItemStatus::decl(),
         db::models::project_work_item::ProjectWorkItemPriority::decl(),
         db::models::project_work_item::ProjectWorkItemSource::decl(),
+        db::models::project_work_item_comment::ProjectWorkItemComment::decl(),
+        db::models::project_work_item_comment::CreateProjectWorkItemComment::decl(),
         db::models::project_work_item_external_link::ProjectWorkItemExternalLink::decl(),
         db::models::project_work_item_external_link::CreateProjectWorkItemExternalLink::decl(),
         db::models::project_work_item_external_link::ProjectExternalType::decl(),
@@ -302,6 +304,7 @@ fn generate_types_content() -> String {
         server::routes::project_github::ImportGitHubIssueRequest::decl(),
         server::routes::project_github::DeliveryRecordsQuery::decl(),
         server::routes::project_github::DeliveryStatsQuery::decl(),
+        server::routes::project_github::WorkItemCommentRequest::decl(),
         server::routes::project_github::IssueCommentRequest::decl(),
         server::routes::project_github::IssueBodyRequest::decl(),
         server::routes::project_github::IssueStateRequest::decl(),
@@ -379,6 +382,7 @@ fn generate_types_content() -> String {
         server::routes::chat::presets::PresetSnapshotOverwriteStrategy::decl(),
         server::routes::chat::presets::CreatePresetSnapshotResponse::decl(),
         git::GitBranch::decl(),
+        db::models::chat_message_queue::QueuedMessageStatus::decl(),
         services::services::queued_message::QueuedMessage::decl(),
         services::services::queued_message::QueueStatus::decl(),
         git::ConflictOp::decl(),
