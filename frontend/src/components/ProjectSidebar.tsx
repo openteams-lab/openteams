@@ -233,6 +233,35 @@ function SidebarNavigationButton({
   );
 }
 
+const ZERO_BUILD_STATS: SidebarBuildStats = {
+  title: 'Build stats',
+  defaultExpanded: true,
+  summary: '',
+  stats: [
+    {
+      id: 'features',
+      label: 'Features shipped',
+      value: '0',
+      helper: '',
+      tone: 'success',
+    },
+    {
+      id: 'bugs-fixed',
+      label: 'Bugs fixed',
+      value: '0',
+      helper: '',
+      tone: 'accent',
+    },
+    {
+      id: 'weekly-spend',
+      label: 'Weekly spend',
+      value: '$0.00',
+      helper: '',
+      tone: 'warning',
+    },
+  ],
+};
+
 export function ProjectSidebar({
   shellOptions,
   projects = [],
@@ -242,7 +271,6 @@ export function ProjectSidebar({
   sessions,
   activeSessionId,
   activePage,
-  weeklyCost,
   t,
   onNavigate,
   onSessionSelect,
@@ -295,6 +323,7 @@ export function ProjectSidebar({
   const [realBuildStats, setRealBuildStats] =
     useState<SidebarBuildStats | null>(null);
   const [buildStatsRefreshVersion, setBuildStatsRefreshVersion] = useState(0);
+  const buildStatsProjectRef = useRef<string | null>(null);
   const portalTarget =
     appScale.portalRoot ??
     (typeof document === "undefined" ? null : document.body);
@@ -331,7 +360,7 @@ export function ProjectSidebar({
         : undefined,
     [displayedProjects, projectActionMenu],
   );
-  const buildStats = realBuildStats ?? shellOptions?.buildStats;
+  const buildStats = realBuildStats ?? ZERO_BUILD_STATS;
   const hasOverflowSessions = sessions.length > visibleSessionLimit;
   const visibleSessions = sessionsExpanded
     ? sessions
@@ -374,21 +403,22 @@ export function ProjectSidebar({
         },
       );
 
-  const statValue = (statId: string, value: string) => {
-    if (!realBuildStats && statId === "weekly-spend") {
-      return `$${weeklyCost.toFixed(2)}`;
-    }
-    return value;
-  };
+  const statValue = (_statId: string, value: string) => value;
 
   useEffect(() => {
     if (!selectedProjectId) {
       setRealBuildStats(null);
+      buildStatsProjectRef.current = null;
       return;
     }
 
     let cancelled = false;
-    setRealBuildStats(null);
+    const isProjectChanged =
+      buildStatsProjectRef.current !== selectedProjectId;
+    if (isProjectChanged) {
+      setRealBuildStats(null);
+      buildStatsProjectRef.current = selectedProjectId;
+    }
     const loadSidebarBuildStats = async () => {
       try {
         const [activity, modelPricing] = await Promise.all([

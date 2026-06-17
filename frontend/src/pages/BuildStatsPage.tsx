@@ -26,7 +26,10 @@ import {
   formatPrice,
   truncateTitle,
 } from '@/lib/buildStatsUtils';
-import { notifyBuildStatsPricingUpdated } from '@/lib/buildStatsEvents';
+import {
+  notifyBuildStatsPricingUpdated,
+  onBuildStatsUpdated,
+} from '@/lib/buildStatsEvents';
 
 type TimeRange = '7d' | '30d' | '90d';
 
@@ -603,6 +606,24 @@ export function BuildStatsPage() {
   useEffect(() => {
     void fetchModels();
   }, [fetchModels]);
+
+  useEffect(() => {
+    if (!selectedProjectId) return undefined;
+    return onBuildStatsUpdated((projectId) => {
+      if (projectId === selectedProjectId) {
+        void fetchDailyTokens();
+        void fetchActivity();
+        void fetchSessions();
+        void fetchModels();
+      }
+    });
+  }, [
+    selectedProjectId,
+    fetchDailyTokens,
+    fetchActivity,
+    fetchSessions,
+    fetchModels,
+  ]);
 
   useEffect(() => {
     setSelectedSession(null);
