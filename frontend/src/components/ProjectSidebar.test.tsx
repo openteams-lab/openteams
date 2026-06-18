@@ -143,12 +143,27 @@ const runningSessionHtml = renderToStaticMarkup(
     onProjectAction={() => undefined}
   />,
 );
+const workflowRunningSessionHtml = renderToStaticMarkup(
+  <ProjectSidebar
+    shellOptions={mockShellOptions}
+    sessions={[
+      { ...mockWorkspaceBootstrap.sessions[0], hasRunningWorkflow: true },
+    ]}
+    activeSessionId={mockWorkspaceBootstrap.sessions[0].id}
+    activePage="workspace"
+    weeklyCost={mockWorkspaceBootstrap.defaults.weeklyCost}
+    onNavigate={() => undefined}
+    onSessionSelect={() => undefined}
+    onPrimaryAction={() => undefined}
+    onProjectAction={() => undefined}
+  />,
+);
 const runningOrderedHtml = renderToStaticMarkup(
   <ProjectSidebar
     shellOptions={mockShellOptions}
     sessions={mockWorkspaceBootstrap.sessions.map((session) => ({
       ...session,
-      hasRunningAgent: session.id === "sess-8",
+      hasRunningWorkflow: session.id === "sess-8",
     }))}
     activeSessionId={mockWorkspaceBootstrap.defaults.activeSessionId}
     activePage="workspace"
@@ -174,6 +189,7 @@ const componentSource = readFileSync(
   new URL("./ProjectSidebar.tsx", import.meta.url),
   "utf8",
 );
+const appSource = readFileSync(new URL("../App.tsx", import.meta.url), "utf8");
 
 check("renders active project monogram", html.includes("MS"), html);
 check("renders active project name", html.includes("my-saas"), html);
@@ -226,7 +242,13 @@ check(
   runningSessionHtml,
 );
 check(
-  "moves running sessions to the top of the collapsed session group",
+  "renders running workflow sessions with activity icon",
+  workflowRunningSessionHtml.includes("animate-spin") &&
+    workflowRunningSessionHtml.includes("agent running"),
+  workflowRunningSessionHtml,
+);
+check(
+  "moves running workflow sessions to the top of the collapsed session group",
   runningOrderedHtml.indexOf("Billing copy polish") >= 0 &&
     runningOrderedHtml.indexOf("Billing copy polish") <
       runningOrderedHtml.indexOf("Fix login flicker") &&
@@ -384,6 +406,50 @@ check(
     componentSource.includes("startDeleteProject(actionMenuProject)") &&
     componentSource.includes("onDeleteProject(deletingProjectDraft.id)"),
   componentSource,
+);
+check(
+  "supports a portal-backed session context menu",
+  componentSource.includes("onContextMenu={(event) =>") &&
+    componentSource.includes("openSessionContextMenu(session, event)") &&
+    componentSource.includes('role="menu"') &&
+    componentSource.includes("sessionContextMenu") &&
+    componentSource.includes("fixed z-[1001] w-[180px]"),
+  componentSource,
+);
+check(
+  "session context menu includes rename archive and delete actions",
+  componentSource.includes('translate("sidebar.renameSession"') &&
+    componentSource.includes('translate("sidebar.archiveSession"') &&
+    componentSource.includes('translate("sidebar.deleteSession"') &&
+    componentSource.includes("onRenameSession(renamingSession.id") &&
+    componentSource.includes("onArchiveSession(session.id)") &&
+    componentSource.includes("onDeleteSession(deletingSession.id)"),
+  componentSource,
+);
+check(
+  "session rename dialog guards empty titles and pending saves",
+  componentSource.includes('aria-labelledby="rename-session-dialog-title"') &&
+    componentSource.includes("!renameTitle.trim()") &&
+    componentSource.includes('translate("sidebar.renamingSession"'),
+  componentSource,
+);
+check(
+  "session delete confirmation describes irreversible deletion",
+  componentSource.includes('aria-labelledby="delete-session-dialog-title"') &&
+    componentSource.includes(
+      "will be permanently deleted. This action cannot be undone.",
+    ),
+  componentSource,
+);
+check(
+  "wires WorkspaceContext session actions into ProjectSidebar",
+  appSource.includes("renameSession,") &&
+    appSource.includes("archiveSession,") &&
+    appSource.includes("deleteSession,") &&
+    appSource.includes("onRenameSession: renameSession") &&
+    appSource.includes("onArchiveSession: archiveSession") &&
+    appSource.includes("onDeleteSession: deleteSession"),
+  appSource,
 );
 check(
   "supports creating projects from sidebar",

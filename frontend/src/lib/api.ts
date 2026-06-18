@@ -103,6 +103,7 @@ import type {
   WorkflowIterationSummaryData,
   WorkflowPendingInputData,
   WorkflowPendingReviewData,
+  WorkflowSessionStatusResponse,
   WorkflowStepTokenUsageResponse,
   WorkflowTranscriptEntry,
   WorkspaceChangesResponse,
@@ -840,6 +841,15 @@ export const skillsApi = {
 // -----------------------------------------------------------------------------
 
 export const workflowApi = {
+  getSessionStatus: async (
+    sessionId: string,
+  ): Promise<WorkflowSessionStatusResponse> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/workflow/status`,
+      { method: "GET" },
+    );
+    return handleApiResponse<WorkflowSessionStatusResponse>(r);
+  },
   generatePlanAndRun: async (
     sessionId: string,
     userGoal?: string,

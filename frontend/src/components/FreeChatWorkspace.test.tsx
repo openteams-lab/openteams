@@ -327,6 +327,9 @@ check(
   "running agent messages expose a stop action wired to the backend",
   source.includes("sessionAgentsApi.stop(activeSessionId, sessionAgentId)") &&
     source.includes("handleStopAgentMessage") &&
+    source.includes("markSessionAgentStopped(sessionAgentId)") &&
+    source.indexOf("markSessionAgentStopped(sessionAgentId)") <
+      source.indexOf("sessionAgentsApi.stop(activeSessionId, sessionAgentId)") &&
     source.includes("msg.isAgentRunning") &&
     source.includes("msg.sessionAgentId") &&
     source.includes('title={t("agent.stop")}') &&

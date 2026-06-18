@@ -54,13 +54,13 @@ export function ActivityTrendChart({
         {
           id: 'bugs',
           label: label('buildStats.bugsFixed', 'Bugs fixed'),
-          color: '#2f9e8f',
+          color: '#5e6ad2',
           value: (datum) => datum.bugs_fixed,
         },
         {
           id: 'features',
           label: label('buildStats.featuresDelivered', 'Features delivered'),
-          color: '#5e6ad2',
+          color: '#2f9e8f',
           value: (datum) => datum.features_delivered,
         },
       ]}

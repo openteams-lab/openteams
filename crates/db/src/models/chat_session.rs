@@ -322,6 +322,29 @@ impl ChatSession {
     }
 
     pub async fn delete(pool: &SqlitePool, id: Uuid) -> Result<u64, sqlx::Error> {
+        // Clear soft references whose foreign keys lack ON DELETE handling
+        // (project_work_item_execution_links, project_delivery_records and
+        // github_operation_audits reference chat_sessions without a cascade
+        // rule), otherwise deleting a session linked to those rows fails.
+        sqlx::query(
+            "UPDATE project_work_item_execution_links SET session_id = NULL WHERE session_id = ?1",
+        )
+        .bind(id)
+        .execute(pool)
+        .await?;
+        sqlx::query(
+            "UPDATE project_delivery_records SET source_session_id = NULL WHERE source_session_id = ?1",
+        )
+        .bind(id)
+        .execute(pool)
+        .await?;
+        sqlx::query(
+            "UPDATE github_operation_audits SET session_id = NULL WHERE session_id = ?1",
+        )
+        .bind(id)
+        .execute(pool)
+        .await?;
+
         let result = sqlx::query!("DELETE FROM chat_sessions WHERE id = $1", id)
             .execute(pool)
             .await?;

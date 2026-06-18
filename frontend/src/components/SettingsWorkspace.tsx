@@ -4,6 +4,9 @@ import {
   useWorkspace,
 } from '@/context/WorkspaceContext';
 import {
+  AlertTriangle,
+  Archive,
+  RotateCcw,
   Bell,
   Cpu,
   CreditCard,
@@ -13,6 +16,7 @@ import {
   Keyboard,
   Route,
   SlidersHorizontal,
+  Trash2,
   User,
   Users,
 } from 'lucide-react';
@@ -22,7 +26,7 @@ import { ProviderSettingsPanel } from '@/components/settings/ProviderSettingsPan
 import { githubAuthApi } from '@/lib/api';
 import { mockFrontendApi } from '@/lib/mockFrontendApi';
 import type { SettingsOptionsMock } from '@/mockApiData';
-import type { GitHubAccount } from '@/types';
+import type { GitHubAccount, Session } from '@/types';
 
 type NotificationToggleKey =
   | 'newMessage'
@@ -75,6 +79,9 @@ const NotificationSettingRow: React.FC<NotificationSettingRowProps> = ({
   </div>
 );
 
+const sessionErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? `${fallback}: ${error.message}` : fallback;
+
 export const SettingsWorkspace: React.FC = () => {
   const {
     t,
@@ -87,7 +94,11 @@ export const SettingsWorkspace: React.FC = () => {
     chatMessageFontSize,
     setChatMessageFontSize,
     configAsync,
-    refreshConfig
+    refreshConfig,
+    archivedSessionsAsync,
+    refreshArchivedSessions,
+    restoreSession,
+    deleteSession,
   } = useWorkspace();
   const [settingsOptions, setSettingsOptions] =
     useState<SettingsOptionsMock | null>(null);
@@ -102,6 +113,16 @@ export const SettingsWorkspace: React.FC = () => {
     soundEnabled: true,
   });
   const [notificationSound, setNotificationSound] = useState('soft-chime');
+  const [restoringArchivedSessionId, setRestoringArchivedSessionId] =
+    useState<string | null>(null);
+  const [deletingArchivedSession, setDeletingArchivedSession] =
+    useState<Session | null>(null);
+  const [deleteArchivedSessionInFlight, setDeleteArchivedSessionInFlight] =
+    useState(false);
+  const [archivedSessionActionError, setArchivedSessionActionError] =
+    useState<string | null>(null);
+  const [deleteArchivedSessionError, setDeleteArchivedSessionError] =
+    useState<string | null>(null);
   const chatMessageFontSizeOptions: DropdownSelectOption[] =
     CHAT_MESSAGE_FONT_SIZE_OPTIONS.map((size) => ({
       id: String(size),
@@ -126,6 +147,11 @@ export const SettingsWorkspace: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (activeSettingsTab !== 'archived-sessions') return;
+    void refreshArchivedSessions();
+  }, [activeSettingsTab, refreshArchivedSessions]);
+
   const translate = (
     key: string,
     fallback: string,
@@ -140,6 +166,57 @@ export const SettingsWorkspace: React.FC = () => {
       ...current,
       [key]: !current[key],
     }));
+  };
+
+  const handleRestoreArchivedSession = async (session: Session) => {
+    if (restoringArchivedSessionId || deleteArchivedSessionInFlight) return;
+
+    setRestoringArchivedSessionId(session.id);
+    setArchivedSessionActionError(null);
+    try {
+      await restoreSession(session.id);
+    } catch (error) {
+      setArchivedSessionActionError(
+        sessionErrorMessage(
+          error,
+          t('settings.archivedSessions.restoreFailed'),
+        ),
+      );
+    } finally {
+      setRestoringArchivedSessionId(null);
+    }
+  };
+
+  const startDeleteArchivedSession = (session: Session) => {
+    setDeletingArchivedSession(session);
+    setDeleteArchivedSessionError(null);
+    setArchivedSessionActionError(null);
+  };
+
+  const closeDeleteArchivedSessionDialog = () => {
+    if (deleteArchivedSessionInFlight) return;
+    setDeletingArchivedSession(null);
+    setDeleteArchivedSessionError(null);
+  };
+
+  const confirmDeleteArchivedSession = async () => {
+    if (!deletingArchivedSession) return;
+
+    setDeleteArchivedSessionInFlight(true);
+    setDeleteArchivedSessionError(null);
+    try {
+      await deleteSession(deletingArchivedSession.id);
+      setDeletingArchivedSession(null);
+    } catch (error) {
+      setDeleteArchivedSessionError(
+        sessionErrorMessage(
+          error,
+          t('settings.archivedSessions.deleteFailed'),
+        ),
+      );
+    } finally {
+      setDeleteArchivedSessionInFlight(false);
+    }
   };
 
   const accountDisplayLabel =
@@ -341,6 +418,85 @@ export const SettingsWorkspace: React.FC = () => {
         );
       }
 
+      case 'archived-sessions':
+        return (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--ink)] tracking-tight">{t('settings.archivedSessions.title')}</h3>
+              <p className="mt-0.5 text-sm text-[var(--ink-subtle)]">{t('settings.archivedSessions.desc')}</p>
+            </div>
+
+            <ResourceStateNotice
+              resource={archivedSessionsAsync}
+              className="!text-sm [&_button]:!text-sm [&_p]:!text-sm"
+              labels={{
+                loading: t('settings.archivedSessions.loading'),
+                empty: t('settings.archivedSessions.empty'),
+                error: t('settings.archivedSessions.error'),
+              }}
+              onRetry={() => void refreshArchivedSessions()}
+            />
+
+            {archivedSessionActionError && (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                {archivedSessionActionError}
+              </p>
+            )}
+
+            {archivedSessionsAsync.data.length > 0 && (
+              <div className="overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)]">
+                {archivedSessionsAsync.data.map((session, index) => {
+                  const restoring = restoringArchivedSessionId === session.id;
+                  const busy = Boolean(
+                    restoringArchivedSessionId || deleteArchivedSessionInFlight,
+                  );
+                  return (
+                    <div
+                      key={session.id}
+                      className={`flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+                        index < archivedSessionsAsync.data.length - 1
+                          ? 'border-b border-[var(--hairline)]'
+                          : ''
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[var(--ink)]">
+                          {session.title}
+                        </p>
+                        <p className="mt-0.5 truncate font-mono text-xs text-[var(--ink-tertiary)]">
+                          {session.id}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleRestoreArchivedSession(session)}
+                          disabled={busy}
+                          className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[var(--hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <RotateCcw className={`h-3.5 w-3.5 ${restoring ? 'animate-spin' : ''}`} />
+                          {restoring
+                            ? t('settings.archivedSessions.restoring')
+                            : t('settings.archivedSessions.restore')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startDeleteArchivedSession(session)}
+                          disabled={busy}
+                          className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-red-500/40 px-3 py-1.5 text-xs font-medium text-red-400 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {t('settings.archivedSessions.delete')}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+
       case 'account':
         return (
           <div className="space-y-4">
@@ -413,6 +569,7 @@ export const SettingsWorkspace: React.FC = () => {
     const iconProps = { className: 'h-3.5 w-3.5', strokeWidth: 1.5 };
     const icons: Record<string, React.ReactNode> = {
       user: <User {...iconProps} />,
+      archive: <Archive {...iconProps} />,
       'credit-card': <CreditCard {...iconProps} />,
       bell: <Bell {...iconProps} />,
       cpu: <Cpu {...iconProps} />,
@@ -430,11 +587,89 @@ export const SettingsWorkspace: React.FC = () => {
   const menuItems = settingsOptions?.menu ?? [];
   const getMenuSectionLabel = (section: string) =>
     translate(`settings.menu.section.${section.toLowerCase()}`, section);
-  const getMenuItemLabel = (id: string, label: string) =>
-    translate(`settings.menu.item.${id}`, label);
+  const getMenuItemLabel = (id: string, label: string) => {
+    const keyId = id.replace(/-([a-z])/g, (_, letter: string) =>
+      letter.toUpperCase(),
+    );
+    return translate(`settings.menu.item.${keyId}`, label);
+  };
 
   return (
     <div className="settings-workspace h-full w-full overflow-hidden font-sans text-sm select-none">
+      {deletingArchivedSession && (
+        <div
+          className="fixed inset-0 z-[1002] flex items-center justify-center p-4"
+          role="presentation"
+        >
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+            onClick={closeDeleteArchivedSessionDialog}
+          />
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-archived-session-dialog-title"
+            aria-describedby="delete-archived-session-dialog-desc"
+            className="relative w-full max-w-md overflow-hidden rounded-xl border border-[var(--hairline-strong)] bg-[var(--canvas)] select-none"
+          >
+            <div className="p-5">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/15">
+                <AlertTriangle className="h-5 w-5 text-red-400" />
+              </div>
+              <p
+                id="delete-archived-session-dialog-title"
+                className="text-base font-semibold tracking-tight text-[var(--ink)]"
+              >
+                {translate(
+                  'settings.archivedSessions.deleteConfirmTitle',
+                  'Delete archived session?',
+                )}
+              </p>
+              <p
+                id="delete-archived-session-dialog-desc"
+                className="mt-1 text-xs leading-relaxed text-[var(--ink-subtle)]"
+              >
+                {translate(
+                  'settings.archivedSessions.deleteConfirmDesc',
+                  `"${deletingArchivedSession.title}" will be permanently deleted. This action cannot be undone.`,
+                  { name: deletingArchivedSession.title },
+                )}
+              </p>
+              {deleteArchivedSessionError && (
+                <p className="mt-2 text-xs text-red-400">
+                  {deleteArchivedSessionError}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center justify-between border-t border-[var(--hairline)] bg-[var(--surface-1)] px-5 py-3">
+              <span className="font-mono text-[10px] text-[var(--ink-tertiary)]">
+                {translate('escToCancel', 'Esc to cancel')}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="cursor-pointer rounded-md border border-[var(--hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={closeDeleteArchivedSessionDialog}
+                  disabled={deleteArchivedSessionInFlight}
+                >
+                  {translate('cancel', 'Cancel')}
+                </button>
+                <button
+                  type="button"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-md bg-red-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => void confirmDeleteArchivedSession()}
+                  disabled={deleteArchivedSessionInFlight}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {deleteArchivedSessionInFlight
+                    ? t('settings.archivedSessions.deleting')
+                    : t('settings.archivedSessions.delete')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[196px_1fr]">
         {/* Left Nav menu list */}

@@ -497,6 +497,7 @@ export const mockSettingsOptions: SettingsOptionsMock = {
         { id: 'account', label: 'Account', icon: 'user' },
         { id: 'appearance', label: 'Perferences', icon: 'sliders' },
         { id: 'notifications', label: 'Notifications', icon: 'bell' },
+        { id: 'archived-sessions', label: 'Archived sessions', icon: 'archive' },
       ],
     },
     {

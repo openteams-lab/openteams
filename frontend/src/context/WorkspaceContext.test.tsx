@@ -29,17 +29,46 @@ const workflowCardSource = readFileSync(
   'utf8',
 );
 
-const refreshProjectsIndex = source.indexOf('await refreshProjects();');
-const refreshSessionsIndex = source.indexOf('refreshSessions(),');
+const refreshAllIndex = source.indexOf('const refreshAll = useCallback');
+const refreshProjectsIndex = source.indexOf('await refreshProjects();', refreshAllIndex);
+const refreshSessionsIndex = source.indexOf('refreshSessions(),', refreshAllIndex);
 const pendingPlaceholderIndex = source.indexOf(
   'makePendingAgentPlaceholder(',
 );
 const sendApiIndex = source.indexOf('.send(sid,');
 
 check(
-  'loads sessions through project-scoped project API',
-  source.includes('projectApi.listSessions(projectId)') &&
-    !source.includes('chatSessionsApi.list(undefined, projectId)'),
+  'loads active sessions through status-filtered chat session API',
+  source.includes("chatSessionsApi.list('active', projectId)") &&
+    !source.includes('projectApi.listSessions(projectId)'),
+  source,
+);
+check(
+  'exposes project-scoped archived session loading',
+  source.includes('archivedSessionsAsync') &&
+    source.includes('refreshArchivedSessions') &&
+    source.includes("chatSessionsApi.list('archived', projectId)"),
+  source,
+);
+check(
+  'exposes project-scoped session management actions',
+  source.includes('renameSession') &&
+    source.includes('archiveSession') &&
+    source.includes('deleteSession') &&
+    source.includes('restoreSession') &&
+    /chatSessionsApi\.update\(\s*sessionId/.test(source) &&
+    source.includes('chatSessionsApi.archive(sessionId)') &&
+    source.includes('chatSessionsApi.delete(sessionId)') &&
+    source.includes('chatSessionsApi.restore(sessionId)') &&
+    source.includes('refreshSessions()') &&
+    source.includes('refreshArchivedSessions()'),
+  source,
+);
+check(
+  'invalid active session selection falls back to next active or empty state',
+  source.includes('syncActiveSessionSelection') &&
+    source.includes('activeBackendSessions') &&
+    source.includes('clearSessionScopedState();'),
   source,
 );
 check(
@@ -285,6 +314,15 @@ check(
   source.includes('isOptimisticPendingAgentPlaceholder') &&
     source.includes('PENDING_AGENT_MESSAGE_PREFIX}${OPTIMISTIC_USER_MESSAGE_PREFIX}') &&
     source.includes('!isOptimisticPendingAgentPlaceholder(message)'),
+  source,
+);
+check(
+  'optimistically stopped agents do not keep session running indicators active',
+  source.includes('ignoredSessionAgentIds?: ReadonlySet<string>') &&
+    source.includes('!ignoredSessionAgentIds?.has(sessionAgent.id)') &&
+    source.includes('optimisticallyStoppedSessionAgentIdsRef.current') &&
+    source.includes('hasRemainingRunningAgent') &&
+    source.includes('setSessionRunningIndicator(sid, hasRemainingRunningAgent)'),
   source,
 );
 check(

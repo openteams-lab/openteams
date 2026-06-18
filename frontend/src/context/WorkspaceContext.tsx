@@ -15,6 +15,7 @@ import {
   Message,
   BackendChatAgent,
   BackendChatMessage,
+  BackendChatSession,
   BackendChatSessionAgent,
   ChatRunActivityLine,
   ChatRunRetentionInfo,
@@ -184,6 +185,11 @@ type ChatStreamEvent =
       created_at: string;
     }
   | {
+      type: 'workflow_execution_updated';
+      session_id: string;
+      execution_id: string;
+    }
+  | {
       type: 'file_change_refresh';
       session_id: string;
       session_agent_id: string;
@@ -250,28 +256,44 @@ const isRunningSessionAgentState = (state: string | undefined): boolean =>
 
 const hasRunningSessionAgent = (
   sessionAgents: BackendChatSessionAgent[],
+  ignoredSessionAgentIds?: ReadonlySet<string>,
 ): boolean =>
   sessionAgents.some((sessionAgent) =>
+    !ignoredSessionAgentIds?.has(sessionAgent.id) &&
     isRunningSessionAgentState(sessionAgent.state),
   );
 
-const loadSessionIdsWithRunningAgents = async (
+type SessionRunningIndicators = {
+  hasRunningAgent: boolean;
+  hasRunningWorkflow: boolean;
+};
+
+const loadSessionRunningIndicators = async (
   sessionIds: string[],
-): Promise<Set<string>> => {
+  ignoredSessionAgentIds?: ReadonlySet<string>,
+): Promise<Map<string, SessionRunningIndicators>> => {
   const entries = await Promise.all(
     sessionIds.map(async (sessionId) => {
-      const sessionAgents = await sessionAgentsApi
-        .list(sessionId)
-        .catch(() => []);
-      return [sessionId, hasRunningSessionAgent(sessionAgents)] as const;
+      const [sessionAgents, workflowStatus] = await Promise.all([
+        sessionAgentsApi.list(sessionId).catch(() => []),
+        workflowApi
+          .getSessionStatus(sessionId)
+          .catch(() => ({ has_running_workflow: false })),
+      ]);
+      return [
+        sessionId,
+        {
+          hasRunningAgent: hasRunningSessionAgent(
+            sessionAgents,
+            ignoredSessionAgentIds,
+          ),
+          hasRunningWorkflow: workflowStatus.has_running_workflow,
+        },
+      ] as const;
     }),
   );
 
-  return new Set(
-    entries
-      .filter(([, sessionHasRunningAgent]) => sessionHasRunningAgent)
-      .map(([sessionId]) => sessionId),
-  );
+  return new Map(entries);
 };
 
 const isOptimisticUserMessage = (message: Message): boolean =>
@@ -1082,6 +1104,12 @@ interface WorkspaceContextProps {
   // Async-status surface appended to the preserved legacy context shape.
   sessionsAsync: AsyncResourceState<Session[]>;
   refreshSessions: () => Promise<void>;
+  archivedSessionsAsync: AsyncResourceState<Session[]>;
+  refreshArchivedSessions: () => Promise<void>;
+  renameSession: (sessionId: string, title: string) => Promise<void>;
+  archiveSession: (sessionId: string) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
+  restoreSession: (sessionId: string) => Promise<void>;
   messagesAsync: AsyncResourceState<Message[]>;
   refreshMessages: () => Promise<void>;
   /**
@@ -1173,6 +1201,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   // the UI renders before the first API response arrives (or if the backend
   // is unreachable / has a contract gap).
   const [sessionsAsync, setSessionsAsync] = useState<
+    AsyncResourceState<Session[]>
+  >(() => initialAsync([]));
+  const [archivedSessionsAsync, setArchivedSessionsAsync] = useState<
     AsyncResourceState<Session[]>
   >(() => initialAsync([]));
   const [projectsAsync, setProjectsAsync] = useState<
@@ -1491,6 +1522,26 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     },
     [],
   );
+  const setSessionWorkflowRunningIndicator = useCallback(
+    (sessionId: string, hasRunningWorkflow: boolean) => {
+      if (!sessionId) return;
+      setSessionsAsync((prev) => {
+        let changed = false;
+        const data = prev.data.map((session) => {
+          if (
+            session.id !== sessionId ||
+            session.hasRunningWorkflow === hasRunningWorkflow
+          ) {
+            return session;
+          }
+          changed = true;
+          return { ...session, hasRunningWorkflow };
+        });
+        return changed ? { ...prev, data } : prev;
+      });
+    },
+    [],
+  );
 
   const clearSessionScopedState = useCallback(() => {
     activeSessionIdRef.current = '';
@@ -1520,6 +1571,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (previousProjectId !== id) {
         setSessionsAsync(succeed([]));
+        setArchivedSessionsAsync(succeed([]));
         clearSessionScopedState();
       }
     },
@@ -1634,6 +1686,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       toastDurationMsRef.current = bootstrap.defaults.toastDurationMs;
       setTasks(bootstrap.tasks);
       setSessionsAsync(initialAsync([]));
+      setArchivedSessionsAsync(initialAsync([]));
       setAllMessages(messagesBySession);
       clearSessionScopedState();
       setMembersAsync(initialAsync(bootstrap.members));
@@ -1688,6 +1741,29 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     [setSelectedProjectId],
   );
 
+  const syncActiveSessionSelection = useCallback(
+    (activeBackendSessions: BackendChatSession[]): string => {
+      const currentActiveSessionId = activeSessionIdRef.current;
+      const nextActiveSessionId = activeBackendSessions.some(
+        (session) => session.id === currentActiveSessionId,
+      )
+        ? currentActiveSessionId
+        : (activeBackendSessions[0]?.id ?? '');
+
+      if (nextActiveSessionId !== currentActiveSessionId) {
+        activeSessionIdRef.current = nextActiveSessionId;
+        setActiveSessionId(nextActiveSessionId);
+      }
+
+      if (!nextActiveSessionId) {
+        clearSessionScopedState();
+      }
+
+      return nextActiveSessionId;
+    },
+    [clearSessionScopedState],
+  );
+
   const refreshSessions = useCallback(async (): Promise<void> => {
     const projectId = selectedProjectIdRef.current;
     if (!projectId) {
@@ -1698,10 +1774,14 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setSessionsAsync(beginLoad);
     try {
-      const backend = await projectApi.listSessions(projectId);
+      const backend = await chatSessionsApi.list('active', projectId);
       if (selectedProjectIdRef.current !== projectId) return;
-      const runningSessionIds = await loadSessionIdsWithRunningAgents(
+      const ignoredSessionAgentIds = new Set(
+        optimisticallyStoppedSessionAgentIdsRef.current,
+      );
+      const runningIndicators = await loadSessionRunningIndicators(
         backend.map((session) => session.id),
+        ignoredSessionAgentIds,
       );
       if (selectedProjectIdRef.current !== projectId) return;
 
@@ -1721,32 +1801,123 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         ),
       }));
 
-      const currentActiveSessionId = activeSessionIdRef.current;
-      const nextActiveSessionId = backend.some(
-        (session) => session.id === currentActiveSessionId,
-      )
-        ? currentActiveSessionId
-        : (backend[0]?.id ?? '');
+      const activeBackendSessions = backend;
+      const nextActiveSessionId = syncActiveSessionSelection(
+        activeBackendSessions,
+      );
       const mapped = mapSessions(backend, nextActiveSessionId).map(
-        (session) => ({
-          ...session,
-          hasRunningAgent: runningSessionIds.has(session.id),
-        }),
+        (session) => {
+          const indicators = runningIndicators.get(session.id);
+          return {
+            ...session,
+            hasRunningAgent: indicators?.hasRunningAgent ?? false,
+            hasRunningWorkflow: indicators?.hasRunningWorkflow ?? false,
+          };
+        },
       );
       setSessionsAsync(succeed(mapped));
-
-      if (nextActiveSessionId !== currentActiveSessionId) {
-        activeSessionIdRef.current = nextActiveSessionId;
-        setActiveSessionId(nextActiveSessionId);
-      }
-
-      if (!nextActiveSessionId) {
-        clearSessionScopedState();
-      }
     } catch (err) {
       setSessionsAsync((prev) => fail(prev, err));
     }
-  }, [clearSessionScopedState]);
+  }, [clearSessionScopedState, syncActiveSessionSelection]);
+
+  const refreshArchivedSessions = useCallback(async (): Promise<void> => {
+    const projectId = selectedProjectIdRef.current;
+    if (!projectId) {
+      setArchivedSessionsAsync(succeed([]));
+      return;
+    }
+
+    setArchivedSessionsAsync(beginLoad);
+    try {
+      const backend = await chatSessionsApi.list('archived', projectId);
+      if (selectedProjectIdRef.current !== projectId) return;
+      setArchivedSessionsAsync(succeed(mapSessions(backend, null)));
+    } catch (err) {
+      setArchivedSessionsAsync((prev) => fail(prev, err));
+    }
+  }, []);
+
+  const refreshSessionLists = useCallback(async (): Promise<void> => {
+    await Promise.all([refreshSessions(), refreshArchivedSessions()]);
+  }, [refreshArchivedSessions, refreshSessions]);
+
+  const renameSession = useCallback(
+    async (sessionId: string, title: string): Promise<void> => {
+      const nextTitle = title.trim();
+      if (!nextTitle) return;
+      try {
+        await chatSessionsApi.update(
+          sessionId,
+          chatSessionUpdatePayload({ title: nextTitle }),
+        );
+        await refreshSessionLists();
+      } catch (err) {
+        showToast(
+          err instanceof Error
+            ? `Rename failed: ${err.message}`
+            : 'Rename failed.',
+          'error',
+        );
+        throw err;
+      }
+    },
+    [refreshSessionLists],
+  );
+
+  const archiveSession = useCallback(
+    async (sessionId: string): Promise<void> => {
+      try {
+        await chatSessionsApi.archive(sessionId);
+        await refreshSessionLists();
+      } catch (err) {
+        showToast(
+          err instanceof Error
+            ? `Archive failed: ${err.message}`
+            : 'Archive failed.',
+          'error',
+        );
+        throw err;
+      }
+    },
+    [refreshSessionLists],
+  );
+
+  const deleteSession = useCallback(
+    async (sessionId: string): Promise<void> => {
+      try {
+        await chatSessionsApi.delete(sessionId);
+        await refreshSessionLists();
+      } catch (err) {
+        showToast(
+          err instanceof Error
+            ? `Delete failed: ${err.message}`
+            : 'Delete failed.',
+          'error',
+        );
+        throw err;
+      }
+    },
+    [refreshSessionLists],
+  );
+
+  const restoreSession = useCallback(
+    async (sessionId: string): Promise<void> => {
+      try {
+        await chatSessionsApi.restore(sessionId);
+        await refreshSessionLists();
+      } catch (err) {
+        showToast(
+          err instanceof Error
+            ? `Restore failed: ${err.message}`
+            : 'Restore failed.',
+          'error',
+        );
+        throw err;
+      }
+    },
+    [refreshSessionLists],
+  );
 
   const refreshMessages = useCallback(async (): Promise<void> => {
     const sid = activeSessionIdRef.current;
@@ -1766,6 +1937,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     setMessagesAsync(beginLoad);
     try {
       const projectId = selectedProjectIdRef.current;
+      const ignoredSessionAgentIds = new Set(
+        optimisticallyStoppedSessionAgentIdsRef.current,
+      );
       const [
         backendMsgs,
         backendAgents,
@@ -1829,7 +2003,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         }
       }
-      setSessionRunningIndicator(sid, hasRunningSessionAgent(sessionAgents));
+      setSessionRunningIndicator(
+        sid,
+        hasRunningSessionAgent(sessionAgents, ignoredSessionAgentIds),
+      );
       const runningPlaceholders = (
         await hydrateRunningAgentPlaceholders(
           sessionAgents,
@@ -1900,12 +2077,22 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
             message.sessionAgentId === sessionAgentId
           ),
       );
+      const hasRemainingRunningAgent = updated.some(
+        (message) =>
+          message.isAgentRunning &&
+          !isOptimisticPendingAgentPlaceholder(message) &&
+          (!message.sessionAgentId ||
+            !optimisticallyStoppedSessionAgentIdsRef.current.has(
+              message.sessionAgentId,
+            )),
+      );
+      setSessionRunningIndicator(sid, hasRemainingRunningAgent);
       if (updated.length === current.length) return prev;
       const next = { ...prev, [sid]: updated };
       setMessagesAsync(succeed(updated));
       return next;
     });
-  }, []);
+  }, [setSessionRunningIndicator]);
 
   const mergeMemberQueueSnapshot = useCallback((queue: MemberQueueSnapshot) => {
     setMemberQueuesBySessionAgentId((prev) => ({
@@ -2056,12 +2243,18 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     setMembersAsync(beginLoad);
     try {
       const projectId = selectedProjectIdRef.current;
+      const ignoredSessionAgentIds = new Set(
+        optimisticallyStoppedSessionAgentIdsRef.current,
+      );
       const [agents, sessionAgents, projectMembers] = await Promise.all([
         chatAgentsApi.list(projectId ? { projectId } : undefined),
         sessionAgentsApi.list(sid).catch(() => []),
         projectId ? projectApi.listMembers(projectId).catch(() => []) : [],
       ]);
-      setSessionRunningIndicator(sid, hasRunningSessionAgent(sessionAgents));
+      setSessionRunningIndicator(
+        sid,
+        hasRunningSessionAgent(sessionAgents, ignoredSessionAgentIds),
+      );
       const mainAgentId = resolveProjectMainAgentId(projectMembers);
       const mainAgentName = resolveProjectMainAgentName(projectMembers, agents);
       const hasMainAgentInSession =
@@ -2167,6 +2360,49 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     [],
   );
 
+  const refreshSessionWorkflowRunningIndicator = useCallback(
+    async (sessionId: string): Promise<void> => {
+      if (!sessionId) return;
+      try {
+        const status = await workflowApi.getSessionStatus(sessionId);
+        setSessionWorkflowRunningIndicator(
+          sessionId,
+          status.has_running_workflow,
+        );
+      } catch {
+        // Sidebar status is best-effort; card/message refresh remains primary.
+      }
+    },
+    [setSessionWorkflowRunningIndicator],
+  );
+
+  const refreshSessionRunningIndicators = useCallback(
+    async (sessionId: string): Promise<void> => {
+      if (!sessionId) return;
+      const ignoredSessionAgentIds = new Set(
+        optimisticallyStoppedSessionAgentIdsRef.current,
+      );
+      const [sessionAgents, workflowStatus] = await Promise.all([
+        sessionAgentsApi.list(sessionId).catch(() => null),
+        workflowApi.getSessionStatus(sessionId).catch(() => null),
+      ]);
+
+      if (sessionAgents) {
+        setSessionRunningIndicator(
+          sessionId,
+          hasRunningSessionAgent(sessionAgents, ignoredSessionAgentIds),
+        );
+      }
+      if (workflowStatus) {
+        setSessionWorkflowRunningIndicator(
+          sessionId,
+          workflowStatus.has_running_workflow,
+        );
+      }
+    },
+    [setSessionRunningIndicator, setSessionWorkflowRunningIndicator],
+  );
+
   const resetWorkspaceChanges = useCallback(() => {
     workspaceChangesRequestIdRef.current += 1;
     setWorkspaceChangesAsync(initialAsync(null));
@@ -2201,6 +2437,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     await refreshProjects();
     await Promise.all([
       refreshSessions(),
+      refreshArchivedSessions(),
       refreshProviders(),
       refreshSkills(),
       refreshConfig(),
@@ -2210,6 +2447,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     ]);
   }, [
     refreshSessions,
+    refreshArchivedSessions,
     refreshProjects,
     refreshProviders,
     refreshSkills,
@@ -2729,7 +2967,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         parsed.type === 'workflow_runtime_line' &&
         parsed.session_id === sid
       ) {
+        setSessionWorkflowRunningIndicator(sid, true);
         handleWorkflowRuntimeLine(parsed);
+        return;
+      }
+
+      if (
+        parsed.type === 'workflow_execution_updated' &&
+        parsed.session_id === sid
+      ) {
+        void refreshSessionRunningIndicators(sid);
         return;
       }
 
@@ -2785,6 +3032,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         void refreshMembers();
         if (isRunningSessionAgentState(parsed.state)) {
           setSessionRunningIndicator(sid, true);
+        } else {
+          void refreshSessionRunningIndicators(sid);
         }
 
         // When an agent leaves an active run state,
@@ -2893,9 +3142,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     rememberDeferredQueuedUserMessage,
     refreshMessages,
     refreshMemberQueues,
+    refreshSessionRunningIndicators,
+    refreshSessionWorkflowRunningIndicator,
     refreshWorkspaceChanges,
     refreshMembers,
     setSessionRunningIndicator,
+    setSessionWorkflowRunningIndicator,
     sessionsAsync.source,
     upsertStreamedMessage,
   ]);
@@ -3327,10 +3579,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       workflowApi
         .generatePlanAndRun(sid, title)
         .then((res) => {
+          setSessionWorkflowRunningIndicator(sid, true);
           void refreshWorkflowCard(res.workflow_card_message.id);
           void refreshMessages();
         })
         .catch(() => {
+          void refreshSessionWorkflowRunningIndicator(sid);
           // Silent: mock state remains in place.
         });
     }
@@ -3488,6 +3742,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
         sessionsAsync,
         refreshSessions,
+        archivedSessionsAsync,
+        refreshArchivedSessions,
+        renameSession,
+        archiveSession,
+        deleteSession,
+        restoreSession,
         messagesAsync,
         refreshMessages,
         markSessionAgentStopped,

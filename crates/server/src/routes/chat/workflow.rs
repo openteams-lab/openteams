@@ -69,6 +69,39 @@ pub struct RetryPlanGenerationResponse {
     pub message_id: Uuid,
 }
 
+#[derive(Debug, Serialize)]
+pub struct WorkflowSessionStatusResponse {
+    pub has_running_workflow: bool,
+}
+
+fn is_sidebar_running_workflow_status(status: &WorkflowExecutionStatus) -> bool {
+    matches!(
+        status,
+        WorkflowExecutionStatus::Pending
+            | WorkflowExecutionStatus::Running
+            | WorkflowExecutionStatus::Waiting
+            | WorkflowExecutionStatus::Recompiling
+    )
+}
+
+pub async fn get_workflow_status(
+    Extension(session): Extension<ChatSession>,
+    State(deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<WorkflowSessionStatusResponse>>, ApiError> {
+    let executions =
+        WorkflowExecution::find_generation_blocking_by_session(&deployment.db().pool, session.id)
+            .await?;
+    let has_running_workflow = executions
+        .iter()
+        .any(|execution| is_sidebar_running_workflow_status(&execution.status));
+
+    Ok(ResponseJson(ApiResponse::success(
+        WorkflowSessionStatusResponse {
+            has_running_workflow,
+        },
+    )))
+}
+
 pub async fn generate_plan_and_run(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,

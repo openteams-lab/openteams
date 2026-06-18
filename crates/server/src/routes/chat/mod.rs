@@ -66,6 +66,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             "/workflow/generate-plan-and-run",
             axum::routing::post(workflow::generate_plan_and_run),
         )
+        .route("/workflow/status", get(workflow::get_workflow_status))
         .route(
             "/workflow/plans/{plan_id}/execute",
             axum::routing::post(workflow::execute_plan),

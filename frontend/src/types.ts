@@ -50,6 +50,7 @@ export interface Session {
   icon: string;
   active: boolean;
   hasRunningAgent?: boolean;
+  hasRunningWorkflow?: boolean;
 }
 
 export interface ArtifactItem {
@@ -1156,6 +1157,10 @@ export type WorkflowCardState =
   | 'paused'
   | 'completed'
   | 'failed';
+
+export interface WorkflowSessionStatusResponse {
+  has_running_workflow: boolean;
+}
 
 export interface WorkflowCardStep {
   id: string;

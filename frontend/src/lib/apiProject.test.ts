@@ -12,7 +12,11 @@ import type {
   UpdateProject,
   UpdateProjectMemberRequest,
 } from "../../../shared/types";
-import type { BackendChatSession, ChatSessionStatus } from "@/types";
+import type {
+  BackendChatSession,
+  ChatSessionStatus,
+  UpdateChatSession,
+} from "@/types";
 import { readFileSync } from "node:fs";
 import { chatSessionsApi, projectApi } from "./api";
 import { paths } from "./paths";
@@ -116,6 +120,21 @@ export type ChatSessionsApiListArgs = Expect<
     [status?: ChatSessionStatus, projectId?: string]
   >
 >;
+export type ChatSessionsApiUpdateArgs = Expect<
+  Equal<
+    Parameters<typeof chatSessionsApi.update>,
+    [sessionId: string, data: UpdateChatSession]
+  >
+>;
+export type ChatSessionsApiDeleteArgs = Expect<
+  Equal<Parameters<typeof chatSessionsApi.delete>, [sessionId: string]>
+>;
+export type ChatSessionsApiArchiveReturn = Expect<
+  Equal<Awaited<ReturnType<typeof chatSessionsApi.archive>>, BackendChatSession>
+>;
+export type ChatSessionsApiRestoreReturn = Expect<
+  Equal<Awaited<ReturnType<typeof chatSessionsApi.restore>>, BackendChatSession>
+>;
 
 export const projectPathExamples = [
   paths.projectList(),
@@ -154,6 +173,14 @@ check(
 check(
   "chat session list filters with project_id query param",
   apiSource.includes("qs({ status, project_id: projectId })"),
+  apiSource,
+);
+check(
+  "chat session API exposes update delete archive and restore",
+  apiSource.includes("update: async (") &&
+    apiSource.includes("delete: async (sessionId: string)") &&
+    apiSource.includes("archive: async (sessionId: string)") &&
+    apiSource.includes("restore: async (sessionId: string)"),
   apiSource,
 );
 
