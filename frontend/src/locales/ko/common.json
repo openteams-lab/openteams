@@ -77,7 +77,6 @@
   "generateWorkflowFromChat": "채팅에서 워크플로 생성",
   "hoursAgo": "{hours}시간 전",
   "inThisSession": "현재 방 구성원",
-  "inputHint": "Enter로 전송 · Shift+Enter로 줄바꿈",
   "inviteMember": "멤버 초대",
   "justNow": "방금",
   "keyStorageTip": "사용자 키는 기기 로컬 키체인 내부에서 완전하게 암호화 보전되며 노출되지 않습니다.",

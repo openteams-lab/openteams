@@ -77,7 +77,6 @@
   "generateWorkflowFromChat": "チャットからワークフローを生成",
   "hoursAgo": "{hours}時間前",
   "inThisSession": "参加中エージェント",
-  "inputHint": "Enter で送信 · Shift+Enter で改行",
   "inviteMember": "メンバーを招待",
   "justNow": "たった今",
   "keyStorageTip": "提供されたキーはエンドツーエンドで暗号化され、常にあなたの機器に留まります。",

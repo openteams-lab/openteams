@@ -78,7 +78,6 @@
   "generateWorkflowFromChat": "Generate workflow from chat",
   "hoursAgo": "{hours}h ago",
   "inThisSession": "In this session",
-  "inputHint": "Enter to send · Shift+Enter for newline",
   "inviteMember": "Invite member",
   "justNow": "just now",
   "keyStorageTip": "API keys are stored encrypted in your local keychain. They never leave your machine.",

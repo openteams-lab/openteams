@@ -2562,11 +2562,6 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                 </div>
               </div>
             </div>
-            <div className="flex justify-center pt-1.5 select-none">
-              <span className="pointer-events-none text-[10px] leading-none text-[var(--ink-tertiary)]">
-                {t("inputHint")}
-              </span>
-            </div>
           </div>
         </main>
 

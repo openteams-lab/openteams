@@ -78,7 +78,6 @@
   "generateWorkflowFromChat": "从聊天生成工作流",
   "hoursAgo": "{hours} 小时前",
   "inThisSession": "当前会话成员",
-  "inputHint": "Enter 发送 · Shift+Enter 换行",
   "inviteMember": "邀请成员",
   "justNow": "刚刚",
   "keyStorageTip": "配置openteams内置Agent(openteams-cli)的大模型服务供应商，所有配置信息均保存在本地。",

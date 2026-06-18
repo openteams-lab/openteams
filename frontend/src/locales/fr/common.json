@@ -77,7 +77,6 @@
   "generateWorkflowFromChat": "Générer un workflow depuis le chat",
   "hoursAgo": "il y a {hours} h",
   "inThisSession": "Dans cette session",
-  "inputHint": "Entrée pour envoyer · Maj+Entrée pour saut de ligne",
   "inviteMember": "Inviter un membre",
   "justNow": "à l’instant",
   "keyStorageTip": "Vos clés API sont stockées localement et chiffrées de bout en bout.",
