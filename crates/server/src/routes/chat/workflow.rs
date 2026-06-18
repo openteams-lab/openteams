@@ -75,13 +75,7 @@ pub struct WorkflowSessionStatusResponse {
 }
 
 fn is_sidebar_running_workflow_status(status: &WorkflowExecutionStatus) -> bool {
-    matches!(
-        status,
-        WorkflowExecutionStatus::Pending
-            | WorkflowExecutionStatus::Running
-            | WorkflowExecutionStatus::Waiting
-            | WorkflowExecutionStatus::Recompiling
-    )
+    matches!(status, WorkflowExecutionStatus::Running)
 }
 
 pub async fn get_workflow_status(
@@ -1557,4 +1551,27 @@ async fn load_effective_agents_for_route(
         agents.push(agent);
     }
     Ok(agents)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sidebar_running_workflow_status_only_counts_running() {
+        assert!(is_sidebar_running_workflow_status(
+            &WorkflowExecutionStatus::Running
+        ));
+
+        for status in [
+            WorkflowExecutionStatus::Pending,
+            WorkflowExecutionStatus::Failed,
+            WorkflowExecutionStatus::Paused,
+            WorkflowExecutionStatus::Recompiling,
+            WorkflowExecutionStatus::Completed,
+            WorkflowExecutionStatus::Waiting,
+        ] {
+            assert!(!is_sidebar_running_workflow_status(&status));
+        }
+    }
 }
