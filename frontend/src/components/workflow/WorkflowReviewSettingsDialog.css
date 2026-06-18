@@ -1,5 +1,5 @@
 .workflow-review-settings-dialog-overlay {
-  --wrs-modal-overlay-bg: #010102;
+  --wrs-modal-overlay-bg: rgba(1, 1, 2, 0.58);
 }
 
 body[data-mode="light"] .workflow-review-settings-dialog-overlay {
