@@ -736,14 +736,11 @@ impl ChatRunner {
                 if let Err(err) = other {
                     tracing::warn!(error = %err, "failed to load queued chat message");
                 }
-                let _ = QueuedMessageService::new()
-                    .mark_failed(
-                        &self.db.pool,
-                        entry.id,
-                        Some("queued chat message no longer exists".to_string()),
-                    )
-                    .await;
-                self.emit_member_queue_update(session_id, session_agent_id).await;
+                self.fail_or_skip_queue_entry(
+                    &entry,
+                    Some("queued chat message no longer exists".to_string()),
+                )
+                .await;
                 return;
             }
         };
@@ -753,14 +750,11 @@ impl ChatRunner {
                 if let Err(err) = other {
                     tracing::warn!(error = %err, "failed to load agent for queued message");
                 }
-                let _ = QueuedMessageService::new()
-                    .mark_failed(
-                        &self.db.pool,
-                        entry.id,
-                        Some("queued message agent no longer exists".to_string()),
-                    )
-                    .await;
-                self.emit_member_queue_update(session_id, session_agent_id).await;
+                self.fail_or_skip_queue_entry(
+                    &entry,
+                    Some("queued message agent no longer exists".to_string()),
+                )
+                .await;
                 return;
             }
         };
@@ -784,16 +778,14 @@ impl ChatRunner {
                 session_agent_id = %session_agent_id,
                 "failed to dispatch queued message"
             );
-            // The run never started, so finalize the claimed entry as failed. It will block the
-            // queue until the user continues, matching the stop-on-failure semantics.
-            let _ = QueuedMessageService::new()
-                .mark_failed(
-                    &self.db.pool,
-                    entry.id,
-                    Some(format!("failed to dispatch queued message: {err}")),
-                )
-                .await;
-            self.emit_member_queue_update(session_id, session_agent_id).await;
+            // The run never started (or failed before binding), so finalize the claimed entry.
+            // `fail_or_skip_queue_entry` blocks when queued messages remain or auto-skips
+            // when nothing is waiting, keeping the queue clean.
+            self.fail_or_skip_queue_entry(
+                &entry,
+                Some(format!("failed to dispatch queued message: {err}")),
+            )
+            .await;
         }
     }
 
@@ -848,24 +840,66 @@ impl ChatRunner {
         }
     }
 
-    /// Mark the queue entry bound to a run as `failed`. Remaining `queued` entries are preserved so
-    /// the member queue is blocked until the user chooses to continue.
+    /// Finalize a failed queue entry, choosing between `failed` (block) and `skipped`
+    /// (auto-skip) based on whether queued messages are waiting behind it.
+    ///
+    /// "Continue execution" is only meaningful when queued messages are waiting. If nothing is
+    /// queued, the failed entry is auto-skipped so the queue stays clean and the next message
+    /// runs directly instead of being blocked by a stale failure.
+    async fn fail_or_skip_queue_entry(
+        &self,
+        entry: &QueuedMessage,
+        failure_reason: Option<String>,
+    ) {
+        let service = QueuedMessageService::new();
+        let has_queued = match service
+            .has_queued(&self.db.pool, entry.session_agent_id)
+            .await
+        {
+            Ok(has_queued) => has_queued,
+            Err(err) => {
+                tracing::warn!(
+                    session_agent_id = %entry.session_agent_id,
+                    entry_id = %entry.id,
+                    error = %err,
+                    "failed to check for queued messages; defaulting to fail-and-block"
+                );
+                true
+            }
+        };
+
+        let result: Result<Option<QueuedMessage>, sqlx::Error> = if has_queued {
+            service
+                .mark_failed(&self.db.pool, entry.id, failure_reason)
+                .await
+        } else {
+            service
+                .skip_inflight(&self.db.pool, entry.id, failure_reason)
+                .await
+        };
+
+        if let Err(err) = result {
+            tracing::warn!(
+                entry_id = %entry.id,
+                error = %err,
+                "failed to finalize queue entry"
+            );
+        }
+        self.emit_member_queue_update(entry.session_id, entry.session_agent_id)
+            .await;
+    }
+
+    /// Finalize the queue entry bound to a failed run. When queued messages are waiting, the
+    /// entry is marked `failed` so the member queue blocks until the user continues. When
+    /// nothing is queued, the entry is auto-skipped so the next message runs directly.
     async fn mark_run_queue_failed(&self, run_id: Uuid, failure_reason: Option<String>) {
         match QueuedMessageService::new()
             .find_by_run_id(&self.db.pool, run_id)
             .await
         {
             Ok(Some(entry)) => {
-                if let Err(err) =
-                    QueuedMessageService::new()
-                        .mark_failed(&self.db.pool, entry.id, failure_reason)
-                        .await
-                {
-                    tracing::warn!(run_id = %run_id, error = %err, "failed to fail queue entry");
-                } else {
-                    self.emit_member_queue_update(entry.session_id, entry.session_agent_id)
-                        .await;
-                }
+                self.fail_or_skip_queue_entry(&entry, failure_reason)
+                    .await;
             }
             Ok(None) => {}
             Err(err) => {
