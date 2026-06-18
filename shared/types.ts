@@ -1129,7 +1129,13 @@ export type ChatQueueListResponse = { session_id: string, members: Array<MemberQ
 
 export type ChatMemberQueueResponse = { queue: MemberQueueSnapshot, };
 
-export type DeleteQueuedMessageResponse = { deleted_id: string, queue: MemberQueueSnapshot, };
+export type DeleteQueuedMessageResponse = { deleted_id: string, queue: MemberQueueSnapshot,
+/**
+ * Set when the underlying `chat_messages` row was also removed because no other queue entry
+ * (any member, any status) referenced it. The frontend uses this to drop the message from the
+ * visible conversation without a round-trip.
+ */
+deleted_chat_message_id: string | null, };
 
 export type ContinueQueuedMessageResponse = { skipped_failed_count: bigint, queue: MemberQueueSnapshot, };
 

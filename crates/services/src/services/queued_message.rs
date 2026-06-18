@@ -179,7 +179,7 @@ impl QueuedMessageService {
             status,
             blocked: has_failed,
             paused: status == MemberQueueStatus::Paused,
-            can_continue: has_failed,
+            can_continue: has_failed && queued_count > 0,
             queued_count,
             items: active_messages
                 .into_iter()
@@ -338,9 +338,39 @@ impl QueuedMessageService {
         ChatMessageQueue::skip_failed_for_member(pool, session_agent_id).await
     }
 
+    /// Skip an in-flight entry directly when a run fails but no queued messages remain for the
+    /// member. Keeps the queue clean so the next message runs instead of being blocked.
+    pub async fn skip_inflight(
+        &self,
+        pool: &SqlitePool,
+        id: Uuid,
+        failure_reason: Option<String>,
+    ) -> Result<Option<QueuedMessage>, sqlx::Error> {
+        Ok(ChatMessageQueue::skip_inflight(pool, id, failure_reason)
+            .await?
+            .map(Self::from_row))
+    }
+
     /// Delete a queued row that has not started yet.
     pub async fn delete_queued(&self, pool: &SqlitePool, id: Uuid) -> Result<u64, sqlx::Error> {
         ChatMessageQueue::delete_queued(pool, id).await
+    }
+
+    /// Count other queue rows that reference the same source `chat_messages` row, excluding the
+    /// given queue id. Used to decide whether the source message can be cleaned up after a queued
+    /// row is deleted.
+    pub async fn other_reference_count_for_chat_message(
+        &self,
+        pool: &SqlitePool,
+        chat_message_id: Uuid,
+        exclude_queue_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        ChatMessageQueue::count_other_references_for_chat_message(
+            pool,
+            chat_message_id,
+            exclude_queue_id,
+        )
+        .await
     }
 
     pub async fn requeue_stale_inflight(
@@ -723,5 +753,99 @@ mod tests {
             .expect("claim remaining");
         assert_eq!(claimed.id, to_claim.id);
         assert_eq!(service.delete_queued(&pool, claimed.id).await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn paused_snapshot_without_queued_messages_hides_continue() {
+        let pool = setup_pool().await;
+        let service = QueuedMessageService::new();
+        let member = Uuid::new_v4();
+        let entry = create_with_order(&service, &pool, member, 1).await;
+
+        let claimed = service
+            .claim_next(&pool, member)
+            .await
+            .unwrap()
+            .expect("claim only item");
+        service
+            .mark_failed(&pool, claimed.id, Some("boom".to_string()))
+            .await
+            .unwrap()
+            .expect("fail");
+
+        let snapshot = service
+            .snapshot_for_member(&pool, entry.session_id, member, entry.agent_id)
+            .await
+            .expect("snapshot");
+
+        assert_eq!(snapshot.status, MemberQueueStatus::Paused);
+        assert!(snapshot.blocked);
+        assert!(snapshot.paused);
+        // No queued messages waiting → "continue execution" is not meaningful.
+        assert!(!snapshot.can_continue);
+        assert_eq!(snapshot.queued_count, 0);
+    }
+
+    #[tokio::test]
+    async fn blocked_snapshot_with_queued_messages_shows_continue() {
+        let pool = setup_pool().await;
+        let service = QueuedMessageService::new();
+        let member = Uuid::new_v4();
+        let first = create_with_order(&service, &pool, member, 1).await;
+        create_with_order(&service, &pool, member, 2).await;
+
+        let claimed = service
+            .claim_next(&pool, member)
+            .await
+            .unwrap()
+            .expect("claim first");
+        service
+            .mark_failed(&pool, claimed.id, Some("boom".to_string()))
+            .await
+            .unwrap()
+            .expect("fail");
+
+        let snapshot = service
+            .snapshot_for_member(&pool, first.session_id, member, first.agent_id)
+            .await
+            .expect("snapshot");
+
+        assert_eq!(snapshot.status, MemberQueueStatus::Blocked);
+        assert!(snapshot.blocked);
+        // Queued messages are waiting → "continue execution" is meaningful.
+        assert!(snapshot.can_continue);
+        assert_eq!(snapshot.queued_count, 1);
+    }
+
+    #[tokio::test]
+    async fn skip_inflight_cleans_up_lone_failure() {
+        let pool = setup_pool().await;
+        let service = QueuedMessageService::new();
+        let member = Uuid::new_v4();
+        let entry = create_with_order(&service, &pool, member, 1).await;
+
+        let claimed = service
+            .claim_next(&pool, member)
+            .await
+            .unwrap()
+            .expect("claim");
+
+        let skipped = service
+            .skip_inflight(&pool, claimed.id, Some("auto-skip".to_string()))
+            .await
+            .unwrap()
+            .expect("skip inflight");
+        assert_eq!(skipped.status, QueuedMessageStatus::Skipped);
+
+        // No blocking failure and no queued messages — the queue is clean.
+        assert!(!service.has_blocking_failure(&pool, member).await.unwrap());
+        assert!(!service.has_queued(&pool, member).await.unwrap());
+
+        let snapshot = service
+            .snapshot_for_member(&pool, entry.session_id, member, entry.agent_id)
+            .await
+            .expect("snapshot");
+        assert_eq!(snapshot.status, MemberQueueStatus::Empty);
+        assert!(!snapshot.can_continue);
     }
 }

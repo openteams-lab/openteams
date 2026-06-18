@@ -374,6 +374,29 @@ impl ChatMessageQueue {
         .await
     }
 
+    /// Skip an in-flight (`processing`/`running`) entry directly, transitioning it to `skipped`.
+    ///
+    /// Used when a run fails but there are no queued messages waiting behind it, so the queue
+    /// stays clean for the next message instead of being blocked by a stale `failed` row.
+    pub async fn skip_inflight(
+        pool: &SqlitePool,
+        id: Uuid,
+        failure_reason: Option<String>,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(&format!(
+            "UPDATE chat_message_queue
+             SET status = 'skipped',
+                 failure_reason = ?2,
+                 updated_at = datetime('now', 'subsec')
+             WHERE id = ?1 AND status IN ('processing', 'running')
+             RETURNING {CHAT_MESSAGE_QUEUE_COLUMNS}"
+        ))
+        .bind(id)
+        .bind(failure_reason)
+        .fetch_optional(pool)
+        .await
+    }
+
     /// Continue execution after a failure: move all `failed` entries for a member to `skipped`
     /// so `claim_next` can pick up the remaining queue. Returns the number of skipped entries.
     pub async fn skip_failed_for_member(
@@ -401,6 +424,28 @@ impl ChatMessageQueue {
                 .execute(pool)
                 .await?;
         Ok(result.rows_affected())
+    }
+
+    /// Count queue rows that reference the same `chat_message_id`, excluding the given queue id.
+    ///
+    /// Used by the delete-queue flow to decide whether the underlying `chat_messages` row can be
+    /// removed safely: when no other queue entry (any member, any status) references it, the source
+    /// message was never visible to any agent run and should be cleaned up so it does not
+    /// reappear on refresh.
+    pub async fn count_other_references_for_chat_message(
+        pool: &SqlitePool,
+        chat_message_id: Uuid,
+        exclude_queue_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        let (count,): (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM chat_message_queue
+             WHERE chat_message_id = ?1 AND id <> ?2",
+        )
+        .bind(chat_message_id)
+        .bind(exclude_queue_id)
+        .fetch_one(pool)
+        .await?;
+        Ok(count)
     }
 }
 
@@ -765,6 +810,82 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn skip_inflight_transitions_processing_to_skipped() {
+        let pool = setup_pool().await;
+        let member = Uuid::new_v4();
+        let first = enqueue(&pool, member, 1).await;
+
+        let claimed = ChatMessageQueue::claim_next(&pool, member)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(claimed.id, first.id);
+
+        let skipped = ChatMessageQueue::skip_inflight(&pool, claimed.id, Some("auto-skip".into()))
+            .await
+            .unwrap()
+            .expect("skip inflight");
+        assert_eq!(skipped.status, QueuedMessageStatus::Skipped);
+        assert_eq!(skipped.failure_reason.as_deref(), Some("auto-skip"));
+
+        // No blocking failure remains — the queue is clean for the next message.
+        assert!(
+            !ChatMessageQueue::has_blocking_failure(&pool, member)
+                .await
+                .unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn skip_inflight_leaves_queued_entries_claimable() {
+        let pool = setup_pool().await;
+        let member = Uuid::new_v4();
+        let first = enqueue(&pool, member, 1).await;
+        let second = enqueue(&pool, member, 2).await;
+
+        let claimed = ChatMessageQueue::claim_next(&pool, member)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(claimed.id, first.id);
+
+        // Auto-skipping the in-flight entry does not touch queued entries.
+        let skipped = ChatMessageQueue::skip_inflight(&pool, claimed.id, Some("auto-skip".into()))
+            .await
+            .unwrap()
+            .expect("skip inflight");
+        assert_eq!(skipped.status, QueuedMessageStatus::Skipped);
+
+        // The remaining queued entry is claimable immediately (no failed row blocking it).
+        let next = ChatMessageQueue::claim_next(&pool, member)
+            .await
+            .unwrap()
+            .expect("claim remaining");
+        assert_eq!(next.id, second.id);
+    }
+
+    #[tokio::test]
+    async fn skip_inflight_only_affects_in_flight_rows() {
+        let pool = setup_pool().await;
+        let member = Uuid::new_v4();
+        let queued = enqueue(&pool, member, 1).await;
+
+        // A queued (not in-flight) row is not affected by skip_inflight.
+        let result = ChatMessageQueue::skip_inflight(&pool, queued.id, Some("nope".into()))
+            .await
+            .unwrap();
+        assert!(result.is_none());
+        assert_eq!(
+            ChatMessageQueue::find_by_id(&pool, queued.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            QueuedMessageStatus::Queued
+        );
+    }
+
+    #[tokio::test]
     async fn delete_only_removes_queued_entries() {
         let pool = setup_pool().await;
         let member = Uuid::new_v4();
@@ -802,6 +923,77 @@ mod tests {
                 .await
                 .unwrap()
                 .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn count_other_references_for_chat_message_reflects_remaining_rows() {
+        let pool = setup_pool().await;
+        // Two members share the same source chat_message (e.g. multi-agent mention).
+        let shared_message_id = Uuid::new_v4();
+        let session_id = Uuid::new_v4();
+        let agent_a = Uuid::new_v4();
+        let agent_b = Uuid::new_v4();
+        let row_a = ChatMessageQueue::create_queued(
+            &pool,
+            &CreateChatMessageQueue {
+                session_id,
+                session_agent_id: agent_a,
+                agent_id: Uuid::new_v4(),
+                chat_message_id: shared_message_id,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("enqueue a");
+        let row_b = ChatMessageQueue::create_queued(
+            &pool,
+            &CreateChatMessageQueue {
+                session_id,
+                session_agent_id: agent_b,
+                agent_id: Uuid::new_v4(),
+                chat_message_id: shared_message_id,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("enqueue b");
+
+        // From row_a's perspective, row_b still references the source message.
+        assert_eq!(
+            ChatMessageQueue::count_other_references_for_chat_message(
+                &pool,
+                shared_message_id,
+                row_a.id
+            )
+            .await
+            .unwrap(),
+            1
+        );
+        // Once row_b is gone, no other references remain.
+        ChatMessageQueue::delete_queued(&pool, row_b.id)
+            .await
+            .unwrap();
+        assert_eq!(
+            ChatMessageQueue::count_other_references_for_chat_message(
+                &pool,
+                shared_message_id,
+                row_a.id
+            )
+            .await
+            .unwrap(),
+            0
+        );
+        // An unrelated message has no references at all.
+        assert_eq!(
+            ChatMessageQueue::count_other_references_for_chat_message(
+                &pool,
+                Uuid::new_v4(),
+                row_a.id
+            )
+            .await
+            .unwrap(),
+            0
         );
     }
 
