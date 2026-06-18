@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import {
   Activity,
   AlertTriangle,
+  Archive,
   ArrowRightLeft,
   BookOpen,
   Bot,
@@ -72,6 +73,12 @@ type EditableProjectDraft = {
   activeRepoId: string | null;
 };
 
+type SessionContextMenuState = {
+  sessionId: string;
+  left: number;
+  top: number;
+};
+
 interface ProjectSidebarProps {
   shellOptions: ShellOptionsMock | null;
   projects?: Project[];
@@ -88,6 +95,9 @@ interface ProjectSidebarProps {
   onPrimaryAction: (action: SidebarPrimaryAction) => void;
   onProjectAction: (actionId: string) => void;
   onProjectSelect?: (projectId: string) => void;
+  onRenameSession?: (sessionId: string, title: string) => Promise<void>;
+  onArchiveSession?: (sessionId: string) => Promise<void>;
+  onDeleteSession?: (sessionId: string) => Promise<void>;
   onCreateProject?: (
     data: CreateProjectRequest,
     options?: { teamId?: string },
@@ -286,6 +296,9 @@ export function ProjectSidebar({
   onPrimaryAction,
   onProjectAction,
   onProjectSelect,
+  onRenameSession,
+  onArchiveSession,
+  onDeleteSession,
   onCreateProject,
   onUpdateProject,
   onDeleteProject,
@@ -295,6 +308,7 @@ export function ProjectSidebar({
   const projectSwitcherTriggerRef = useRef<HTMLButtonElement | null>(null);
   const projectSwitcherMenuRef = useRef<HTMLDivElement | null>(null);
   const projectActionMenuRef = useRef<HTMLDivElement | null>(null);
+  const sessionMenuRef = useRef<HTMLDivElement | null>(null);
   const [buildStatsVisible, setBuildStatsVisible] = useState(true);
   const [sessionsExpanded, setSessionsExpanded] = useState(false);
   const [projectSwitcherOpen, setProjectSwitcherOpen] = useState(false);
@@ -308,6 +322,23 @@ export function ProjectSidebar({
     left: number;
     top: number;
   } | null>(null);
+  const [sessionContextMenu, setSessionContextMenu] =
+    useState<SessionContextMenuState | null>(null);
+  const [sessionActionError, setSessionActionError] = useState<string | null>(
+    null,
+  );
+  const [renamingSession, setRenamingSession] = useState<Session | null>(null);
+  const [renameTitle, setRenameTitle] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [renameInFlight, setRenameInFlight] = useState(false);
+  const [archivingSessionId, setArchivingSessionId] = useState<string | null>(
+    null,
+  );
+  const [deletingSession, setDeletingSession] = useState<Session | null>(null);
+  const [deleteSessionError, setDeleteSessionError] = useState<string | null>(
+    null,
+  );
+  const [deleteSessionInFlight, setDeleteSessionInFlight] = useState(false);
   const [createFormOpen, setCreateFormOpen] = useState(false);
   const [editingProject, setEditingProject] =
     useState<EditableProjectDraft | null>(null);
@@ -378,6 +409,13 @@ export function ProjectSidebar({
   const visibleSessions = sessionsExpanded
     ? orderedSessions
     : orderedSessions.slice(0, visibleSessionLimit);
+  const menuSession = useMemo(
+    () =>
+      sessionContextMenu
+        ? sessions.find((session) => session.id === sessionContextMenu.sessionId)
+        : undefined,
+    [sessionContextMenu, sessions],
+  );
   const hiddenSessionCount = Math.max(
     orderedSessions.length - visibleSessionLimit,
     0,
@@ -643,6 +681,126 @@ export function ProjectSidebar({
     setProjectActionMenu(null);
   };
 
+  const sessionErrorMessage = (error: unknown, fallback: string): string =>
+    error instanceof Error ? error.message : fallback;
+
+  const openSessionContextMenu = (
+    session: Session,
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault();
+    closeProjectMenus();
+    setSessionActionError(null);
+
+    const viewportWidth = toOverlayValue(window.innerWidth);
+    const viewportHeight = toOverlayValue(window.innerHeight);
+    const menuWidth = 180;
+    const menuHeight = 132;
+    setSessionContextMenu({
+      sessionId: session.id,
+      left: Math.min(
+        Math.max(8, toOverlayValue(event.clientX)),
+        Math.max(8, viewportWidth - menuWidth - 8),
+      ),
+      top: Math.min(
+        Math.max(8, toOverlayValue(event.clientY)),
+        Math.max(8, viewportHeight - menuHeight - 8),
+      ),
+    });
+  };
+
+  const startRenameSession = (session: Session) => {
+    setRenamingSession(session);
+    setRenameTitle(session.title);
+    setRenameError(null);
+    setSessionContextMenu(null);
+    setSessionActionError(null);
+  };
+
+  const closeRenameDialog = () => {
+    if (renameInFlight) return;
+    setRenamingSession(null);
+    setRenameTitle("");
+    setRenameError(null);
+  };
+
+  const handleRenameSession = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    if (!renamingSession || !onRenameSession || !renameTitle.trim()) return;
+
+    setRenameInFlight(true);
+    setRenameError(null);
+    try {
+      await onRenameSession(renamingSession.id, renameTitle.trim());
+      setRenamingSession(null);
+      setRenameTitle("");
+    } catch (error) {
+      setRenameError(
+        sessionErrorMessage(
+          error,
+          translate("sidebar.renameSessionFailed", "Failed to rename session"),
+        ),
+      );
+    } finally {
+      setRenameInFlight(false);
+    }
+  };
+
+  const handleArchiveSession = async (session: Session) => {
+    if (!onArchiveSession || archivingSessionId) return;
+
+    setArchivingSessionId(session.id);
+    setSessionActionError(null);
+    try {
+      await onArchiveSession(session.id);
+      setSessionContextMenu(null);
+    } catch (error) {
+      setSessionActionError(
+        sessionErrorMessage(
+          error,
+          translate("sidebar.archiveSessionFailed", "Failed to archive session"),
+        ),
+      );
+    } finally {
+      setArchivingSessionId(null);
+    }
+  };
+
+  const startDeleteSession = (session: Session) => {
+    setDeletingSession(session);
+    setDeleteSessionError(null);
+    setSessionContextMenu(null);
+    setSessionActionError(null);
+  };
+
+  const closeDeleteSessionDialog = () => {
+    if (deleteSessionInFlight) return;
+    setDeletingSession(null);
+    setDeleteSessionError(null);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!deletingSession || !onDeleteSession) return;
+
+    setDeleteSessionInFlight(true);
+    setDeleteSessionError(null);
+    try {
+      await onDeleteSession(deletingSession.id);
+      setDeletingSession(null);
+    } catch (error) {
+      setDeleteSessionError(
+        sessionErrorMessage(
+          error,
+          translate("sidebar.deleteSessionFailed", "Failed to delete session"),
+        ),
+      );
+    } finally {
+      setDeleteSessionInFlight(false);
+    }
+  };
+
   const startEditProject = (project: SidebarProjectDisplay) => {
     const draft = draftFromProject(project);
     setEditingProject(draft);
@@ -729,6 +887,63 @@ export function ProjectSidebar({
       window.removeEventListener("scroll", updateProjectSwitcherPosition, true);
     };
   }, [projectSwitcherOpen, updateProjectSwitcherPosition]);
+
+  useEffect(() => {
+    if (!sessionContextMenu) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && sessionMenuRef.current?.contains(target)) return;
+      if (!archivingSessionId) {
+        setSessionContextMenu(null);
+        setSessionActionError(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !archivingSessionId) {
+        setSessionContextMenu(null);
+        setSessionActionError(null);
+      }
+    };
+    const closeOnViewportChange = () => {
+      if (!archivingSessionId) {
+        setSessionContextMenu(null);
+        setSessionActionError(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", closeOnViewportChange);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", closeOnViewportChange);
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+    };
+  }, [archivingSessionId, sessionContextMenu]);
+
+  useEffect(() => {
+    if (sessionContextMenu && !menuSession) {
+      setSessionContextMenu(null);
+      setSessionActionError(null);
+    }
+  }, [menuSession, sessionContextMenu]);
+
+  useEffect(() => {
+    if (!renamingSession && !deletingSession) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (renamingSession) closeRenameDialog();
+      if (deletingSession) closeDeleteSessionDialog();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [deleteSessionInFlight, deletingSession, renameInFlight, renamingSession]);
 
   useEffect(() => {
     if (!createFormOpen) return;
@@ -1362,6 +1577,222 @@ export function ProjectSidebar({
           portalTarget,
         )}
 
+      {sessionContextMenu &&
+        menuSession &&
+        portalTarget &&
+        createPortal(
+          <div
+            ref={sessionMenuRef}
+            role="menu"
+            aria-label={translate("sidebar.sessionActions", "Session actions")}
+            className="fixed z-[1001] w-[180px] overflow-hidden rounded-xl border border-[var(--hairline-strong)] bg-[var(--surface-3)] p-1 shadow-none"
+            style={{
+              left: sessionContextMenu.left,
+              top: sessionContextMenu.top,
+            }}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] text-[var(--ink-muted)] transition hover:bg-[var(--surface-1)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => startRenameSession(menuSession)}
+              disabled={!onRenameSession || Boolean(archivingSessionId)}
+            >
+              <Pencil className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+              {translate("sidebar.renameSession", "Rename")}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] text-[var(--ink-muted)] transition hover:bg-[var(--surface-1)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => void handleArchiveSession(menuSession)}
+              disabled={
+                !onArchiveSession || archivingSessionId === menuSession.id
+              }
+            >
+              {archivingSessionId === menuSession.id ? (
+                <LoaderCircle className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--primary)]" />
+              ) : (
+                <Archive className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+              )}
+              {archivingSessionId === menuSession.id
+                ? translate("sidebar.archivingSession", "Archiving...")
+                : translate("sidebar.archiveSession", "Archive")}
+            </button>
+            <div className="my-1 border-t border-[var(--hairline)]" />
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => startDeleteSession(menuSession)}
+              disabled={!onDeleteSession || Boolean(archivingSessionId)}
+            >
+              <Trash2 className="h-3.5 w-3.5 shrink-0" />
+              {translate("sidebar.deleteSession", "Delete")}
+            </button>
+            {sessionActionError && (
+              <p className="px-2.5 py-1 text-[11px] leading-snug text-red-400">
+                {sessionActionError}
+              </p>
+            )}
+          </div>,
+          portalTarget,
+        )}
+
+      {renamingSession &&
+        portalTarget &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[1002] flex items-center justify-center p-4"
+            role="presentation"
+          >
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+              onClick={closeRenameDialog}
+            />
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="rename-session-dialog-title"
+              className="relative w-full max-w-md overflow-hidden rounded-xl border border-[var(--hairline-strong)] bg-[var(--canvas)] select-none"
+            >
+              <header className="flex items-center justify-between border-b border-[var(--hairline)] px-5 py-4">
+                <h2
+                  id="rename-session-dialog-title"
+                  className="text-[14px] font-semibold tracking-tight text-[var(--ink)]"
+                >
+                  {translate("sidebar.renameSession", "Rename session")}
+                </h2>
+                <button
+                  type="button"
+                  className="rounded-md p-1 text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={closeRenameDialog}
+                  disabled={renameInFlight}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </header>
+              <form className="space-y-4 p-5" onSubmit={handleRenameSession}>
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-medium tracking-[0.4px] text-[var(--ink-tertiary)]">
+                    {translate("sidebar.sessionTitle", "Session title")}
+                  </label>
+                  <input
+                    className="w-full rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-60"
+                    value={renameTitle}
+                    onChange={(event) => setRenameTitle(event.target.value)}
+                    disabled={renameInFlight}
+                    autoFocus
+                  />
+                </div>
+                {renameError && (
+                  <p className="text-[13px] text-red-400">{renameError}</p>
+                )}
+                <div className="flex items-center justify-between border-t border-[var(--hairline)] bg-[var(--surface-1)] -mx-5 -mb-5 mt-2 px-5 py-3">
+                  <span className="font-mono text-[10px] text-[var(--ink-tertiary)]">
+                    {translate("escToCancel", "Esc to cancel")}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="cursor-pointer rounded-md border border-[var(--hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={closeRenameDialog}
+                      disabled={renameInFlight}
+                    >
+                      {translate("cancel", "Cancel")}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={renameInFlight || !renameTitle.trim()}
+                      className="cursor-pointer rounded-md bg-[var(--primary)] px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {renameInFlight
+                        ? translate("sidebar.renamingSession", "Saving...")
+                        : translate("sidebar.saveSession", "Save")}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </section>
+          </div>,
+          portalTarget,
+        )}
+
+      {deletingSession &&
+        portalTarget &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[1002] flex items-center justify-center p-4"
+            role="presentation"
+          >
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+              onClick={closeDeleteSessionDialog}
+            />
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="delete-session-dialog-title"
+              aria-describedby="delete-session-dialog-desc"
+              className="relative w-full max-w-md overflow-hidden rounded-xl border border-[var(--hairline-strong)] bg-[var(--canvas)] select-none"
+            >
+              <div className="p-5">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/15">
+                  <AlertTriangle className="h-5 w-5 text-red-400" />
+                </div>
+                <p
+                  id="delete-session-dialog-title"
+                  className="text-base font-semibold tracking-tight text-[var(--ink)]"
+                >
+                  {translate("sidebar.deleteSessionConfirmTitle", "Delete session?")}
+                </p>
+                <p
+                  id="delete-session-dialog-desc"
+                  className="mt-1 text-xs leading-relaxed text-[var(--ink-subtle)]"
+                >
+                  {translate(
+                    "sidebar.deleteSessionConfirmDesc",
+                    `"${deletingSession.title}" will be permanently deleted. This action cannot be undone.`,
+                    { name: deletingSession.title },
+                  )}
+                </p>
+                {deleteSessionError && (
+                  <p className="mt-2 text-xs text-red-400">
+                    {deleteSessionError}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center justify-between border-t border-[var(--hairline)] bg-[var(--surface-1)] px-5 py-3">
+                <span className="font-mono text-[10px] text-[var(--ink-tertiary)]">
+                  {translate("escToCancel", "Esc to cancel")}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded-md border border-[var(--hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={closeDeleteSessionDialog}
+                    disabled={deleteSessionInFlight}
+                  >
+                    {translate("cancel", "Cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex cursor-pointer items-center gap-1.5 rounded-md bg-red-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => void confirmDeleteSession()}
+                    disabled={deleteSessionInFlight}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {deleteSessionInFlight
+                      ? translate("sidebar.deletingSession", "Deleting...")
+                      : translate("sidebar.deleteSession", "Delete")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          portalTarget,
+        )}
+
       <div className="flex-1 space-y-5 overflow-y-auto px-2.5 py-2 ot-scroll-area-styled">
         <section className="space-y-1" data-section="Primary actions">
           {(shellOptions?.primaryActions ?? []).map((action) => {
@@ -1497,6 +1928,9 @@ export function ProjectSidebar({
                       key={session.id}
                       type="button"
                       onClick={() => onSessionSelect(session.id)}
+                      onContextMenu={(event) =>
+                        openSessionContextMenu(session, event)
+                      }
                       aria-label={sessionLabel}
                       title={sessionLabel}
                       className={`${sidebarItemClass} cursor-pointer ${

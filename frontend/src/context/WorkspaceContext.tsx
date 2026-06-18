@@ -15,6 +15,7 @@ import {
   Message,
   BackendChatAgent,
   BackendChatMessage,
+  BackendChatSession,
   BackendChatSessionAgent,
   ChatRunActivityLine,
   ChatRunRetentionInfo,
@@ -1734,6 +1735,29 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     [setSelectedProjectId],
   );
 
+  const syncActiveSessionSelection = useCallback(
+    (activeBackendSessions: BackendChatSession[]): string => {
+      const currentActiveSessionId = activeSessionIdRef.current;
+      const nextActiveSessionId = activeBackendSessions.some(
+        (session) => session.id === currentActiveSessionId,
+      )
+        ? currentActiveSessionId
+        : (activeBackendSessions[0]?.id ?? '');
+
+      if (nextActiveSessionId !== currentActiveSessionId) {
+        activeSessionIdRef.current = nextActiveSessionId;
+        setActiveSessionId(nextActiveSessionId);
+      }
+
+      if (!nextActiveSessionId) {
+        clearSessionScopedState();
+      }
+
+      return nextActiveSessionId;
+    },
+    [clearSessionScopedState],
+  );
+
   const refreshSessions = useCallback(async (): Promise<void> => {
     const projectId = selectedProjectIdRef.current;
     if (!projectId) {
@@ -1744,7 +1768,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setSessionsAsync(beginLoad);
     try {
-      const backend = await projectApi.listSessions(projectId);
+      const backend = await chatSessionsApi.list('active', projectId);
       if (selectedProjectIdRef.current !== projectId) return;
       const runningIndicators = await loadSessionRunningIndicators(
         backend.map((session) => session.id),
@@ -1767,12 +1791,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         ),
       }));
 
-      const currentActiveSessionId = activeSessionIdRef.current;
-      const nextActiveSessionId = backend.some(
-        (session) => session.id === currentActiveSessionId,
-      )
-        ? currentActiveSessionId
-        : (backend[0]?.id ?? '');
+      const activeBackendSessions = backend;
+      const nextActiveSessionId = syncActiveSessionSelection(
+        activeBackendSessions,
+      );
       const mapped = mapSessions(backend, nextActiveSessionId).map(
         (session) => {
           const indicators = runningIndicators.get(session.id);
@@ -1784,19 +1806,108 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         },
       );
       setSessionsAsync(succeed(mapped));
-
-      if (nextActiveSessionId !== currentActiveSessionId) {
-        activeSessionIdRef.current = nextActiveSessionId;
-        setActiveSessionId(nextActiveSessionId);
-      }
-
-      if (!nextActiveSessionId) {
-        clearSessionScopedState();
-      }
     } catch (err) {
       setSessionsAsync((prev) => fail(prev, err));
     }
-  }, [clearSessionScopedState]);
+  }, [clearSessionScopedState, syncActiveSessionSelection]);
+
+  const refreshArchivedSessions = useCallback(async (): Promise<void> => {
+    const projectId = selectedProjectIdRef.current;
+    if (!projectId) {
+      setArchivedSessionsAsync(succeed([]));
+      return;
+    }
+
+    setArchivedSessionsAsync(beginLoad);
+    try {
+      const backend = await chatSessionsApi.list('archived', projectId);
+      if (selectedProjectIdRef.current !== projectId) return;
+      setArchivedSessionsAsync(succeed(mapSessions(backend, null)));
+    } catch (err) {
+      setArchivedSessionsAsync((prev) => fail(prev, err));
+    }
+  }, []);
+
+  const refreshSessionLists = useCallback(async (): Promise<void> => {
+    await Promise.all([refreshSessions(), refreshArchivedSessions()]);
+  }, [refreshArchivedSessions, refreshSessions]);
+
+  const renameSession = useCallback(
+    async (sessionId: string, title: string): Promise<void> => {
+      const nextTitle = title.trim();
+      if (!nextTitle) return;
+      try {
+        await chatSessionsApi.update(
+          sessionId,
+          chatSessionUpdatePayload({ title: nextTitle }),
+        );
+        await refreshSessionLists();
+      } catch (err) {
+        showToast(
+          err instanceof Error
+            ? `Rename failed: ${err.message}`
+            : 'Rename failed.',
+          'error',
+        );
+        throw err;
+      }
+    },
+    [refreshSessionLists],
+  );
+
+  const archiveSession = useCallback(
+    async (sessionId: string): Promise<void> => {
+      try {
+        await chatSessionsApi.archive(sessionId);
+        await refreshSessionLists();
+      } catch (err) {
+        showToast(
+          err instanceof Error
+            ? `Archive failed: ${err.message}`
+            : 'Archive failed.',
+          'error',
+        );
+        throw err;
+      }
+    },
+    [refreshSessionLists],
+  );
+
+  const deleteSession = useCallback(
+    async (sessionId: string): Promise<void> => {
+      try {
+        await chatSessionsApi.delete(sessionId);
+        await refreshSessionLists();
+      } catch (err) {
+        showToast(
+          err instanceof Error
+            ? `Delete failed: ${err.message}`
+            : 'Delete failed.',
+          'error',
+        );
+        throw err;
+      }
+    },
+    [refreshSessionLists],
+  );
+
+  const restoreSession = useCallback(
+    async (sessionId: string): Promise<void> => {
+      try {
+        await chatSessionsApi.restore(sessionId);
+        await refreshSessionLists();
+      } catch (err) {
+        showToast(
+          err instanceof Error
+            ? `Restore failed: ${err.message}`
+            : 'Restore failed.',
+          'error',
+        );
+        throw err;
+      }
+    },
+    [refreshSessionLists],
+  );
 
   const refreshMessages = useCallback(async (): Promise<void> => {
     const sid = activeSessionIdRef.current;
@@ -2267,6 +2378,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     await refreshProjects();
     await Promise.all([
       refreshSessions(),
+      refreshArchivedSessions(),
       refreshProviders(),
       refreshSkills(),
       refreshConfig(),
@@ -2276,6 +2388,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     ]);
   }, [
     refreshSessions,
+    refreshArchivedSessions,
     refreshProjects,
     refreshProviders,
     refreshSkills,
@@ -3567,6 +3680,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
 
         sessionsAsync,
         refreshSessions,
+        archivedSessionsAsync,
+        refreshArchivedSessions,
+        renameSession,
+        archiveSession,
+        deleteSession,
+        restoreSession,
         messagesAsync,
         refreshMessages,
         markSessionAgentStopped,
