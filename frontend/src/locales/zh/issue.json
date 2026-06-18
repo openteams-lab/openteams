@@ -59,6 +59,7 @@
   "issue.detail.commentFocused": "{id} 的评论已聚焦",
   "issue.detail.commentPlaceholder": "留下评论...",
   "issue.detail.createdIssue": "创建了该事项",
+  "issue.detail.createLabel": "创建新标签“{label}”",
   "issue.detail.createSession": "创建会话",
   "issue.detail.expandPanel": "展开 {title}",
   "issue.detail.collapsePanel": "折叠 {title}",

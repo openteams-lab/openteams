@@ -54,7 +54,7 @@ export function ConfirmationDialog({
       <button
         type="button"
         aria-label={cancelLabel}
-        className="absolute inset-0 bg-black/70 backdrop-blur-xs"
+        className="absolute inset-0 bg-black/55 backdrop-blur-xs"
         disabled={confirming}
         onClick={onCancel}
       />
@@ -63,7 +63,7 @@ export function ConfirmationDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="relative w-full max-w-[500px] overflow-hidden rounded-[16px] border border-white/10 bg-[#0c0c0d] font-sans text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_24px_80px_rgba(0,0,0,0.55)] select-none"
+        className="relative w-full max-w-[500px] overflow-hidden rounded-[16px] border border-[var(--hairline)] bg-[var(--surface-1)] font-sans text-[var(--ink)] shadow-[0_24px_80px_rgba(0,0,0,0.28)] select-none"
         style={{
           fontFamily:
             'Inter, "PingFang SC", "Hiragino Sans GB", "Source Han Sans SC", "Microsoft YaHei", sans-serif',
@@ -72,26 +72,26 @@ export function ConfirmationDialog({
         <div className="relative px-8 pb-7 pt-8">
           <div
             className={`mb-5 flex h-8 w-8 items-center justify-center rounded-[8px] ${
-              isDanger ? 'bg-[#ff3b30]/10' : 'bg-amber-400/10'
+              isDanger ? 'bg-red-500/10' : 'bg-amber-500/10'
             }`}
           >
             <AlertTriangle
               strokeWidth={1.8}
               className={`h-[18px] w-[18px] ${
-                isDanger ? 'text-[#ff6b72]' : 'text-amber-400'
+                isDanger ? 'text-red-500' : 'text-amber-500'
               }`}
             />
           </div>
           <div className="min-w-0">
             <p
               id={titleId}
-              className="text-[18px] font-semibold leading-[1.2] text-white"
+              className="text-[18px] font-semibold leading-[1.2] text-[var(--ink)]"
             >
               {title}
             </p>
             <div
               id={descriptionId}
-              className="mt-3 text-[13px] leading-[1.55] text-[#8a8a8e]"
+              className="mt-3 text-[13px] leading-[1.55] text-[var(--ink-subtle)]"
             >
               {description}
             </div>
@@ -100,16 +100,16 @@ export function ConfirmationDialog({
             type="button"
             disabled={confirming}
             onClick={onCancel}
-            className="absolute right-6 top-6 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/35 transition hover:bg-white/[0.04] hover:text-white/60 disabled:cursor-not-allowed disabled:opacity-40"
+            className="absolute right-6 top-6 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-40"
             aria-label={cancelLabel}
             title={cancelLabel}
           >
             <X className="h-[13px] w-[13px]" strokeWidth={1.6} />
           </button>
         </div>
-        <div className="flex items-center justify-between border-t border-white/[0.08] bg-[#111112] px-8 py-4">
-          <span className="flex items-center gap-2 text-[12px] text-[#63666d]">
-            <kbd className="rounded-[5px] border border-white/[0.08] bg-white/[0.035] px-1.5 py-0.5 font-mono text-[10px] leading-none text-[#8a8a8e] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="flex items-center justify-between border-t border-[var(--hairline)] bg-[var(--surface-2)] px-8 py-4">
+          <span className="flex items-center gap-2 text-[12px] text-[var(--ink-tertiary)]">
+            <kbd className="rounded-[5px] border border-[var(--hairline)] bg-[var(--surface-3)] px-1.5 py-0.5 font-mono text-[10px] leading-none text-[var(--ink-subtle)]">
               {escKey}
             </kbd>
             {escHelp && <span>{escHelp}</span>}
@@ -117,7 +117,7 @@ export function ConfirmationDialog({
           <div className="flex gap-2.5">
             <button
               type="button"
-              className="h-9 cursor-pointer rounded-[8px] border border-white/[0.08] bg-white/[0.025] px-4 text-[13px] font-medium text-[#a0a0a6] transition hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-9 cursor-pointer rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)] px-4 text-[13px] font-medium text-[var(--ink-muted)] transition hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
               disabled={confirming}
               onClick={onCancel}
             >
@@ -127,8 +127,8 @@ export function ConfirmationDialog({
               type="button"
               className={`flex h-9 cursor-pointer items-center gap-2 rounded-[8px] border px-4 text-[13px] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] transition disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-4 [&_svg]:w-4 ${
                 isDanger
-                  ? 'border-[#ff8a80]/20 bg-[#d64b42] hover:bg-[#e0574f]'
-                  : 'border-white/10 bg-[var(--primary)] hover:bg-[var(--primary-hover)]'
+                  ? 'border-red-500/25 bg-red-600 hover:bg-red-500'
+                  : 'border-[var(--primary)] bg-[var(--primary)] hover:bg-[var(--primary-hover)]'
               }`}
               disabled={confirming}
               onClick={onConfirm}

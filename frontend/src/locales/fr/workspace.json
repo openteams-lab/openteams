@@ -200,7 +200,6 @@
   "sourceControl.confirm.sharedTitle": "{action} les fichiers partagés ?",
   "sourceControl.disabledTitle": "{action} : {reason}",
   "sourceControl.externalStagedCount": "Indexé en externe : {count}",
-  "sourceControl.externalStagedFiles": "Fichiers indexés en dehors de la session :",
   "sourceControl.loading": "Chargement de l'état du contrôle de source...",
   "sourceControl.openDiffFor": "Ouvrir le diff de {path}",
   "sourceControl.operationRunning": "Une opération de contrôle de source est en cours",

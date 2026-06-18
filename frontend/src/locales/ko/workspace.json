@@ -200,7 +200,6 @@
   "sourceControl.confirm.sharedTitle": "공유 파일을 {action}할까요?",
   "sourceControl.disabledTitle": "{action}: {reason}",
   "sourceControl.externalStagedCount": "외부 스테이지됨: {count}",
-  "sourceControl.externalStagedFiles": "외부에서 스테이지된 파일:",
   "sourceControl.loading": "소스 제어 상태 로드 중...",
   "sourceControl.openDiffFor": "{path} diff 열기",
   "sourceControl.operationRunning": "소스 제어 작업이 실행 중입니다",

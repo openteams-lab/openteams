@@ -59,6 +59,7 @@
   "issue.detail.commentFocused": "Commentaire ciblé pour {id}",
   "issue.detail.commentPlaceholder": "Laisser un commentaire...",
   "issue.detail.createdIssue": "a créé le ticket",
+  "issue.detail.createLabel": "Créer le nouveau libellé « {label} »",
   "issue.detail.createSession": "Créer une session",
   "issue.detail.expandPanel": "Développer {title}",
   "issue.detail.collapsePanel": "Réduire {title}",

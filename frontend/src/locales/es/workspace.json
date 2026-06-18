@@ -200,7 +200,6 @@
   "sourceControl.confirm.sharedTitle": "¿{action} archivos compartidos?",
   "sourceControl.disabledTitle": "{action}: {reason}",
   "sourceControl.externalStagedCount": "Preparados externos: {count}",
-  "sourceControl.externalStagedFiles": "Archivos preparados fuera de la sesión:",
   "sourceControl.loading": "Cargando estado de control de código...",
   "sourceControl.openDiffFor": "Abrir diff de {path}",
   "sourceControl.operationRunning": "Hay una operación de control de código en curso",

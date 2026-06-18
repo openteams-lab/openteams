@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import type { WorkflowCardData } from '@/lib/api';
+import { AgentMarkdown } from '@/components/AgentMarkdown';
 import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
 import { WorkflowIterationFeedbackCard } from './WorkflowIterationFeedbackCard';
 import { WorkflowPendingInputCard } from './WorkflowPendingInputCard';
@@ -549,13 +550,9 @@ export function ChatWorkflowCard({
           {projection.title}
         </div>
         {isPlanGenerationCard ? (
-          <ChatMarkdown
-            content={displayGoal}
-            maxWidth="100%"
-            hideCopyButton
-            className="mt-2"
-            textClassName="text-[13px] leading-6 text-[var(--ink-muted)]"
-          />
+          <div className="mt-2">
+            <AgentMarkdown content={displayGoal} fontSize={13} />
+          </div>
         ) : (
           <div className="mt-2 text-[13px] leading-6 text-[var(--ink-muted)]">
             {displayGoal}
@@ -626,13 +623,9 @@ export function ChatWorkflowCard({
                 })}
           </div>
           {isPlanGenerationCard ? (
-            <ChatMarkdown
-              content={emptyGraphDescription}
-              maxWidth="100%"
-              hideCopyButton
-              className="mt-2 text-center"
-              textClassName="text-sm leading-6 text-[var(--ink-muted)]"
-            />
+            <div className="mt-2 text-center">
+              <AgentMarkdown content={emptyGraphDescription} fontSize={14} />
+            </div>
           ) : (
             <div className="mt-2 text-sm leading-6 text-[var(--ink-muted)]">
               {emptyGraphDescription}

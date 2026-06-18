@@ -59,6 +59,7 @@
   "issue.detail.commentFocused": "Comment focused for {id}",
   "issue.detail.commentPlaceholder": "Leave a comment...",
   "issue.detail.createdIssue": "created the issue",
+  "issue.detail.createLabel": "Create new label '{label}'",
   "issue.detail.createSession": "Create session",
   "issue.detail.expandPanel": "Expand {title}",
   "issue.detail.collapsePanel": "Collapse {title}",

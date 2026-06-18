@@ -92,6 +92,7 @@ export type IssueDetailPageProps = {
   projectId: string;
   projectName: string;
   issue: IssueDetailItem;
+  availableLabels?: string[];
   onBack: () => void;
   onAction: (message: string) => void;
   onWorkItemChange?: (item: ProjectWorkItem) => void;
@@ -333,6 +334,7 @@ export function IssueDetailPage({
   projectId,
   projectName,
   issue,
+  availableLabels = [],
   onBack,
   onAction,
   onWorkItemChange,
@@ -1093,21 +1095,30 @@ export function IssueDetailPage({
           linkedGitHubIssueNumber,
           labels,
         );
+        const mirrored = await projectWorkItemsApi.update(
+          projectId,
+          current.id,
+          { labels_json: JSON.stringify(nextLabels) },
+        );
         setDetail((existing) =>
-          existing?.github_issue_detail
+          existing
             ? {
                 ...existing,
-                github_issue_detail: {
-                  ...existing.github_issue_detail,
-                  summary: {
-                    ...existing.github_issue_detail.summary,
-                    labels: nextLabels,
-                  },
-                },
+                work_item: mirrored,
+                github_issue_detail: existing.github_issue_detail
+                  ? {
+                      ...existing.github_issue_detail,
+                      summary: {
+                        ...existing.github_issue_detail.summary,
+                        labels: nextLabels,
+                      },
+                    }
+                  : existing.github_issue_detail,
               }
             : existing,
         );
-        onIssueSync?.({ workItem: current, labels: nextLabels });
+        onWorkItemChange?.(mirrored);
+        onIssueSync?.({ workItem: mirrored, labels: nextLabels });
         onAction(
           tr('issue.detail.action.labelsSynced', 'Labels synced to GitHub'),
         );
@@ -1170,11 +1181,26 @@ export function IssueDetailPage({
           if (option) handleAssignSession(option.value);
           return;
         }
-        const option = filterMenuOptions(
-          buildLabelMenuOptions(labelDraftToList(labelDraft), tr),
+        const trimmedLabelQuery = labelQuery.trim();
+        const labelOptions = filterMenuOptions(
+          buildLabelMenuOptions(
+            labelDraftToList(labelDraft),
+            tr,
+            availableLabels,
+          ),
           labelQuery,
-        )[0];
-        if (option) handleLabelMenuSelect(option.value);
+        );
+        const exactLabelMatch = labelOptions.find(
+          (candidate) =>
+            labelKey(candidate.value) === labelKey(trimmedLabelQuery),
+        );
+        if (exactLabelMatch) {
+          handleLabelMenuSelect(exactLabelMatch.value);
+        } else if (trimmedLabelQuery) {
+          handleLabelMenuSelect(trimmedLabelQuery);
+        } else if (labelOptions[0]) {
+          handleLabelMenuSelect(labelOptions[0].value);
+        }
         return;
       }
 
@@ -1203,6 +1229,7 @@ export function IssueDetailPage({
       const option = buildLabelMenuOptions(
         labelDraftToList(labelDraft),
         tr,
+        availableLabels,
       ).find((candidate) => candidate.shortcut === event.key);
       if (option) {
         event.preventDefault();
@@ -1339,7 +1366,11 @@ export function IssueDetailPage({
 
   const commentBody = composeIssueCommentBody(commentText, selectedFiles, tr);
   const labelList = labelDraftToList(labelDraft);
-  const labelMenuOptions = buildLabelMenuOptions(labelList, tr);
+  const labelMenuOptions = buildLabelMenuOptions(
+    labelList,
+    tr,
+    availableLabels,
+  );
   const filteredLabelOptions = filterMenuOptions(labelMenuOptions, labelQuery);
   const filteredSessionOptions = filterMenuOptions(
     sessionMenuOptions,
@@ -2682,6 +2713,12 @@ function LabelDropdown({
   const hasLabels = labels.length > 0;
   const addLabelLabel = tr('issue.detail.addLabel', 'Add label');
   const savingLabelsLabel = tr('issue.detail.savingLabels', 'Saving labels');
+  const createLabelValue = query.trim();
+  const canCreateLabel =
+    createLabelValue !== '' &&
+    !options.some(
+      (option) => labelKey(option.value) === labelKey(createLabelValue),
+    );
 
   return (
     <div ref={menuRef} className="relative">
@@ -2786,8 +2823,30 @@ function LabelDropdown({
                   </button>
                 );
               })
-            ) : (
+            ) : canCreateLabel ? null : (
               <CommandNoMatches tr={tr} />
+            )}
+            {canCreateLabel && (
+              <button
+                key={`create-${createLabelValue}`}
+                type="button"
+                disabled={disabled}
+                className="flex h-8 w-full items-center gap-3 whitespace-nowrap rounded-[8px] px-3 text-left text-[13px] font-bold leading-normal text-[var(--ink)] transition hover:bg-[var(--surface-4)] disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => onSelect(createLabelValue)}
+              >
+                <Plus
+                  aria-hidden="true"
+                  className="h-[13px] w-[13px] shrink-0 text-[var(--primary)]"
+                  strokeWidth={2.6}
+                />
+                <span className="min-w-0 flex-1 truncate">
+                  {tr(
+                    'issue.detail.createLabel',
+                    "Create new label '{label}'",
+                    { label: labelDisplayName(createLabelValue, tr) },
+                  )}
+                </span>
+              </button>
             )}
           </div>
         </div>
@@ -3234,16 +3293,19 @@ export function projectWorkItemLabelList(value?: string | null) {
 function buildLabelMenuOptions(
   selectedLabels: string[],
   tr: IssueDetailTranslator,
+  availableLabels: string[] = [],
 ): LabelMenuOption[] {
   const values: string[] = [];
   const seen = new Set<string>();
 
-  [...COMMON_GITHUB_LABELS, ...selectedLabels].forEach((label) => {
-    const key = labelKey(label);
-    if (seen.has(key)) return;
-    seen.add(key);
-    values.push(label);
-  });
+  [...COMMON_GITHUB_LABELS, ...availableLabels, ...selectedLabels].forEach(
+    (label) => {
+      const key = labelKey(label);
+      if (seen.has(key)) return;
+      seen.add(key);
+      values.push(label);
+    },
+  );
 
   return values.map((value, index) => ({
     value,
@@ -3267,7 +3329,7 @@ function labelKey(label: string) {
   return label.trim().toLowerCase();
 }
 
-function labelDisplayName(label: string, tr?: IssueDetailTranslator) {
+export function labelDisplayName(label: string, tr?: IssueDetailTranslator) {
   const normalized = labelKey(label);
   const displayConfig = labelDisplayKeysByName[normalized];
   if (displayConfig) {
@@ -3283,7 +3345,7 @@ function labelDisplayName(label: string, tr?: IssueDetailTranslator) {
     .join(' ');
 }
 
-function labelColor(label: string) {
+export function labelColor(label: string) {
   const normalized = labelKey(label);
   if (labelColorByName[normalized]) return labelColorByName[normalized];
 

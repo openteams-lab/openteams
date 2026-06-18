@@ -59,6 +59,7 @@
   "issue.detail.commentFocused": "{id}의 댓글에 포커스됨",
   "issue.detail.commentPlaceholder": "댓글 남기기...",
   "issue.detail.createdIssue": "이 이슈를 생성했습니다",
+  "issue.detail.createLabel": "새 라벨 '{label}' 만들기",
   "issue.detail.createSession": "세션 생성",
   "issue.detail.expandPanel": "{title} 펼치기",
   "issue.detail.collapsePanel": "{title} 접기",

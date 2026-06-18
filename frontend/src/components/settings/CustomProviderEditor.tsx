@@ -667,7 +667,7 @@ export function CustomProviderEditor({
                 'settings.providers.custom.deleteConfirmDescription',
                 'This will remove the provider configuration and its models.',
               )}{' '}
-              <span className="font-medium text-white">
+              <span className="font-medium text-[var(--ink)]">
                 {initialProvider.name || initialProvider.id}
               </span>
             </>

@@ -202,7 +202,6 @@
   "sourceControl.confirm.sharedTitle": "{action}共享文件？",
   "sourceControl.disabledTitle": "{action}：{reason}",
   "sourceControl.externalStagedCount": "外部已暂存：{count}",
-  "sourceControl.externalStagedFiles": "外部已暂存文件：",
   "sourceControl.loading": "正在加载源代码管理状态...",
   "sourceControl.openDiffFor": "打开 {path} 的差异",
   "sourceControl.operationRunning": "源代码管理操作正在运行",

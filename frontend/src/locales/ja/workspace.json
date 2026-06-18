@@ -200,7 +200,6 @@
   "sourceControl.confirm.sharedTitle": "共有ファイルを{action}しますか？",
   "sourceControl.disabledTitle": "{action}: {reason}",
   "sourceControl.externalStagedCount": "外部でステージ済み: {count}",
-  "sourceControl.externalStagedFiles": "外部でステージ済みのファイル:",
   "sourceControl.loading": "ソース管理ステータスを読み込み中...",
   "sourceControl.openDiffFor": "{path} の差分を開く",
   "sourceControl.operationRunning": "ソース管理操作を実行中です",

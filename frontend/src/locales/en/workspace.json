@@ -202,7 +202,6 @@
   "sourceControl.confirm.sharedTitle": "{action} shared files?",
   "sourceControl.disabledTitle": "{action}: {reason}",
   "sourceControl.externalStagedCount": "External staged: {count}",
-  "sourceControl.externalStagedFiles": "External staged files:",
   "sourceControl.loading": "Loading source-control status...",
   "sourceControl.openDiffFor": "Open diff for {path}",
   "sourceControl.operationRunning": "Source-control operation is running",

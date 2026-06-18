@@ -59,6 +59,7 @@
   "issue.detail.commentFocused": "Comentario enfocado para {id}",
   "issue.detail.commentPlaceholder": "Deja un comentario...",
   "issue.detail.createdIssue": "creó la incidencia",
+  "issue.detail.createLabel": "Crear nueva etiqueta «{label}»",
   "issue.detail.createSession": "Crear sesión",
   "issue.detail.expandPanel": "Expandir {title}",
   "issue.detail.collapsePanel": "Contraer {title}",
