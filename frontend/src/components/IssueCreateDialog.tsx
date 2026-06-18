@@ -23,6 +23,12 @@ import {
   type ReactNode,
 } from 'react';
 import { ProjectBreadcrumbAvatar } from '@/components/ProjectBreadcrumbAvatar';
+import {
+  COMMON_GITHUB_LABELS,
+  labelColor,
+  labelDisplayName,
+  type IssueDetailTranslator,
+} from '@/pages/IssueDetailPage';
 import type {
   BackendChatSession,
   ProjectWorkItemPriority,
@@ -46,6 +52,8 @@ type IssueCreateDialogProps = {
   sessions: BackendChatSession[];
   sessionsLoading?: boolean;
   submitting?: boolean;
+  tr: IssueDetailTranslator;
+  availableLabels?: string[];
   onClose: () => void;
   onCreate: (value: IssueCreateDialogSubmitValue) => Promise<void> | void;
 };
@@ -78,20 +86,21 @@ const priorityMenuOptions: Array<MenuOption<ProjectWorkItemPriority>> = [
   { value: 'low', label: 'Low', shortcut: '1' },
 ];
 
-const commonLabelOptions = [
-  'bug',
-  'feature',
-  'enhancement',
-  'documentation',
-  'question',
-  'help wanted',
-  'good first issue',
-].map((value, index) => ({
-  value,
-  label: labelDisplayName(value),
-  shortcut: index < 9 ? String(index + 1) : '',
-  color: labelColor(value),
-}));
+const buildLabelOptions = (
+  tr: IssueDetailTranslator,
+  availableLabels: readonly string[],
+  selectedLabels: readonly string[],
+): Array<MenuOption<string>> =>
+  dedupeLabels([
+    ...COMMON_GITHUB_LABELS,
+    ...availableLabels,
+    ...selectedLabels,
+  ]).map((value, index) => ({
+    value,
+    label: labelDisplayName(value, tr),
+    shortcut: index < 9 ? String(index + 1) : '',
+    color: labelColor(value),
+  }));
 
 const projectChipLabel = (projectName: string) =>
   projectName.trim() || 'Project';
@@ -103,6 +112,8 @@ export function IssueCreateDialog({
   sessions,
   sessionsLoading = false,
   submitting = false,
+  tr,
+  availableLabels = [],
   onClose,
   onCreate,
 }: IssueCreateDialogProps) {
@@ -149,7 +160,11 @@ export function IssueCreateDialog({
     sessionOptions,
     sessionQuery,
   );
-  const filteredLabelOptions = filterMenuOptions(commonLabelOptions, labelQuery);
+  const labelOptions = useMemo(
+    () => buildLabelOptions(tr, availableLabels, labels),
+    [availableLabels, labels, tr],
+  );
+  const filteredLabelOptions = filterMenuOptions(labelOptions, labelQuery);
 
   useEffect(() => {
     if (!open) return;
@@ -444,6 +459,7 @@ export function IssueCreateDialog({
               open={openMenu === 'labels'}
               options={filteredLabelOptions}
               query={labelQuery}
+              tr={tr}
               onOpenChange={(nextOpen) =>
                 setOpenMenu(nextOpen ? 'labels' : null)
               }
@@ -608,6 +624,7 @@ function LabelDropdown({
   open,
   options,
   query,
+  tr,
   onOpenChange,
   onQueryChange,
   onToggleLabel,
@@ -616,20 +633,22 @@ function LabelDropdown({
   open: boolean;
   options: Array<MenuOption<string>>;
   query: string;
+  tr: IssueDetailTranslator;
   onOpenChange: (open: boolean) => void;
   onQueryChange: (query: string) => void;
   onToggleLabel: (label: string) => void;
 }) {
   const labelText =
     labels.length === 0
-      ? 'Labels'
-      : labels.map((label) => labelDisplayName(label)).join(', ');
+      ? tr('issue.detail.panel.labels', 'Labels')
+      : labels.map((label) => labelDisplayName(label, tr)).join(', ');
   const createLabelValue = query.trim();
   const canCreateLabel =
     createLabelValue !== '' &&
     !options.some(
       (option) => labelKey(option.value) === labelKey(createLabelValue),
     );
+  const createLabelDisplay = labelDisplayName(createLabelValue, tr);
 
   const handleSearchEnter = () => {
     if (canCreateLabel) {
@@ -658,7 +677,10 @@ function LabelDropdown({
       {open && (
         <PropertyMenuShell>
           <PropertySearchRow
-            placeholder="Add labels..."
+            placeholder={tr(
+              'issue.detail.addLabelsPlaceholder',
+              'Add labels...',
+            )}
             shortcut="L"
             value={query}
             onChange={onQueryChange}
@@ -695,7 +717,11 @@ function LabelDropdown({
             {canCreateLabel && (
               <button
                 key={`create-${createLabelValue}`}
-                aria-label={`Create new label ${createLabelValue}`}
+                aria-label={tr(
+                  'issue.detail.createLabel',
+                  "Create new label '{label}'",
+                  { label: createLabelDisplay },
+                )}
                 className="flex h-8 w-full items-center gap-3 whitespace-nowrap rounded-[7px] px-3 text-left text-[13px] font-bold leading-none text-[var(--ink)] transition hover:bg-[var(--surface-4)]"
                 role="option"
                 type="button"
@@ -707,8 +733,11 @@ function LabelDropdown({
                   strokeWidth={2.6}
                 />
                 <span className="min-w-0 flex-1 truncate">
-                  Create new label &lsquo;{labelDisplayName(createLabelValue)}
-                  &rsquo;
+                  {tr(
+                    'issue.detail.createLabel',
+                    "Create new label '{label}'",
+                    { label: createLabelDisplay },
+                  )}
                 </span>
               </button>
             )}
@@ -1048,31 +1077,18 @@ function labelMatches(left: string, right: string) {
   return labelKey(left) === labelKey(right);
 }
 
+function dedupeLabels(labels: readonly string[]) {
+  const seen = new Set<string>();
+  return labels.filter((label) => {
+    const key = labelKey(label);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function labelKey(label: string) {
   return label.trim().toLowerCase();
-}
-
-function labelDisplayName(label: string) {
-  const normalized = labelKey(label);
-  if (normalized === 'enhancement') return 'Improvement';
-  return label
-    .trim()
-    .split(/[\s_-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-function labelColor(label: string) {
-  const normalized = labelKey(label);
-  if (normalized === 'bug') return '#f25f67';
-  if (normalized === 'feature') return '#b987ff';
-  if (normalized === 'enhancement') return '#5aaef7';
-  if (normalized === 'documentation') return '#8ddfcb';
-  if (normalized === 'question') return '#f3c86b';
-  if (normalized === 'help wanted') return '#f59fb7';
-  if (normalized === 'good first issue') return '#7edc8f';
-  return '#8ddfcb';
 }
 
 function statusLabel(status: ProjectWorkItemStatus) {

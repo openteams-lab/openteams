@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import {
+  collectProjectIssueLabels,
   issueDisplayIdFontSizePx,
   issueSourceProviderId,
   projectIssueIdPrefix,
@@ -13,6 +14,7 @@ import {
   findGitHubIssueLink,
   formatFileSize,
   labelDraftToList,
+  labelDisplayName,
   projectWorkItemLabelList,
 } from './IssueDetailPage';
 import type { ProjectWorkItem, ProjectWorkItemDetailResponse } from '@/types';
@@ -433,6 +435,29 @@ check(
     ?.map((label) => label.name)
     .join(',') === 'bug,feature',
   localLabelGroups[0]?.items[0]?.labels,
+);
+check(
+  'issue label catalog shares local and synced labels',
+  collectProjectIssueLabels(
+    [
+      {
+        ...item('66666666-6666-4666-8666-666666666666', 'open'),
+        labels_json: JSON.stringify(['bug', 'custom']),
+      },
+      item('77777777-7777-4777-8777-777777777777', 'done'),
+    ],
+    {
+      '77777777-7777-4777-8777-777777777777': {
+        externalLabels: [{ name: 'help wanted', color: 'cyan' }],
+      },
+    },
+  ).join(',') === 'bug,custom,help wanted',
+);
+check(
+  'known issue labels translate through the shared label helper',
+  labelDisplayName('bug', (key, fallback) =>
+    key === 'issue.detail.labelBug' ? 'Translated Bug' : fallback,
+  ) === 'Translated Bug',
 );
 check(
   'issue row labels do not include derived type or priority chips',

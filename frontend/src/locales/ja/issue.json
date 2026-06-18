@@ -59,6 +59,7 @@
   "issue.detail.commentFocused": "{id} のコメントにフォーカスしました",
   "issue.detail.commentPlaceholder": "コメントを残す...",
   "issue.detail.createdIssue": "この課題を作成しました",
+  "issue.detail.createLabel": "新しいラベル「{label}」を作成",
   "issue.detail.createSession": "セッションを作成",
   "issue.detail.expandPanel": "{title} を展開",
   "issue.detail.collapsePanel": "{title} を折りたたむ",

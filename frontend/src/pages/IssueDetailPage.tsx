@@ -92,6 +92,7 @@ export type IssueDetailPageProps = {
   projectId: string;
   projectName: string;
   issue: IssueDetailItem;
+  availableLabels?: string[];
   onBack: () => void;
   onAction: (message: string) => void;
   onWorkItemChange?: (item: ProjectWorkItem) => void;
@@ -333,6 +334,7 @@ export function IssueDetailPage({
   projectId,
   projectName,
   issue,
+  availableLabels = [],
   onBack,
   onAction,
   onWorkItemChange,
@@ -1181,7 +1183,11 @@ export function IssueDetailPage({
         }
         const trimmedLabelQuery = labelQuery.trim();
         const labelOptions = filterMenuOptions(
-          buildLabelMenuOptions(labelDraftToList(labelDraft), tr),
+          buildLabelMenuOptions(
+            labelDraftToList(labelDraft),
+            tr,
+            availableLabels,
+          ),
           labelQuery,
         );
         const exactLabelMatch = labelOptions.find(
@@ -1223,6 +1229,7 @@ export function IssueDetailPage({
       const option = buildLabelMenuOptions(
         labelDraftToList(labelDraft),
         tr,
+        availableLabels,
       ).find((candidate) => candidate.shortcut === event.key);
       if (option) {
         event.preventDefault();
@@ -1359,7 +1366,11 @@ export function IssueDetailPage({
 
   const commentBody = composeIssueCommentBody(commentText, selectedFiles, tr);
   const labelList = labelDraftToList(labelDraft);
-  const labelMenuOptions = buildLabelMenuOptions(labelList, tr);
+  const labelMenuOptions = buildLabelMenuOptions(
+    labelList,
+    tr,
+    availableLabels,
+  );
   const filteredLabelOptions = filterMenuOptions(labelMenuOptions, labelQuery);
   const filteredSessionOptions = filterMenuOptions(
     sessionMenuOptions,
@@ -3282,16 +3293,19 @@ export function projectWorkItemLabelList(value?: string | null) {
 function buildLabelMenuOptions(
   selectedLabels: string[],
   tr: IssueDetailTranslator,
+  availableLabels: string[] = [],
 ): LabelMenuOption[] {
   const values: string[] = [];
   const seen = new Set<string>();
 
-  [...COMMON_GITHUB_LABELS, ...selectedLabels].forEach((label) => {
-    const key = labelKey(label);
-    if (seen.has(key)) return;
-    seen.add(key);
-    values.push(label);
-  });
+  [...COMMON_GITHUB_LABELS, ...availableLabels, ...selectedLabels].forEach(
+    (label) => {
+      const key = labelKey(label);
+      if (seen.has(key)) return;
+      seen.add(key);
+      values.push(label);
+    },
+  );
 
   return values.map((value, index) => ({
     value,
@@ -3315,7 +3329,7 @@ function labelKey(label: string) {
   return label.trim().toLowerCase();
 }
 
-function labelDisplayName(label: string, tr?: IssueDetailTranslator) {
+export function labelDisplayName(label: string, tr?: IssueDetailTranslator) {
   const normalized = labelKey(label);
   const displayConfig = labelDisplayKeysByName[normalized];
   if (displayConfig) {
@@ -3331,7 +3345,7 @@ function labelDisplayName(label: string, tr?: IssueDetailTranslator) {
     .join(' ');
 }
 
-function labelColor(label: string) {
+export function labelColor(label: string) {
   const normalized = labelKey(label);
   if (labelColorByName[normalized]) return labelColorByName[normalized];
 

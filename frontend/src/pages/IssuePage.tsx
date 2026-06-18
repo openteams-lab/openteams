@@ -59,6 +59,7 @@ import { notifyBuildStatsUsageUpdated } from '@/lib/buildStatsEvents';
 import {
   IssueDetailPage,
   PriorityMenuIcon,
+  labelDisplayName,
   projectWorkItemLabelList,
   type IssueDetailSyncSnapshot,
 } from '@/pages/IssueDetailPage';
@@ -368,6 +369,27 @@ const githubIssueLabelColor = (label: string): IssueLabel['color'] => {
   return 'cyan';
 };
 
+export const collectProjectIssueLabels = (
+  items: ProjectWorkItem[],
+  overrides: IssueRowOverrides = {},
+) => {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+
+  items.forEach((item) => {
+    projectWorkItemLabels(item, overrides[item.id]?.externalLabels).forEach(
+      (label) => {
+        const key = label.name.trim().toLowerCase();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        labels.push(label.name);
+      },
+    );
+  });
+
+  return labels;
+};
+
 const titleCaseToken = (value: string) =>
   value
     .split('_')
@@ -594,6 +616,10 @@ export function IssuePage() {
         issueRowOverrides,
       ),
     [activeFilter, issueRowOverrides, selectedProjectName, workItems],
+  );
+  const projectIssueLabels = useMemo(
+    () => collectProjectIssueLabels(workItems, issueRowOverrides),
+    [issueRowOverrides, workItems],
   );
   const visibleIssueCount = visibleGroups.reduce(
     (total, group) => total + group.items.length,
@@ -1463,6 +1489,7 @@ export function IssuePage() {
           projectId={selectedProjectId}
           projectName={selectedProjectName}
           issue={activeIssue}
+          availableLabels={projectIssueLabels}
           onBack={handleIssueBack}
           onAction={handleAction}
           onWorkItemChange={(item) => mergeWorkItem(item, setWorkItems)}
@@ -1590,6 +1617,8 @@ export function IssuePage() {
         sessions={projectSessions}
         sessionsLoading={projectSessionsLoading}
         submitting={createIssueSubmitting}
+        tr={tr}
+        availableLabels={projectIssueLabels}
         onClose={() => setCreateDialogOpen(false)}
         onCreate={handleCreateIssue}
       />
@@ -2891,7 +2920,11 @@ function IssueRow({
         {issue.labels && issue.labels.length > 0 && (
           <div className="flex shrink-0 items-center gap-1.5">
             {issue.labels.map((label) => (
-              <IssueLabel key={`${issue.id}-${label.name}`} label={label} />
+              <IssueLabel
+                key={`${issue.id}-${label.name}`}
+                label={label}
+                tr={tr}
+              />
             ))}
           </div>
         )}
@@ -2949,7 +2982,15 @@ function IssueSourceIcon({
   );
 }
 
-function IssueLabel({ label }: { label: IssueLabel }) {
+function IssueLabel({
+  label,
+  tr,
+}: {
+  label: IssueLabel;
+  tr: IssueTranslator;
+}) {
+  const displayName = labelDisplayName(label.name, tr);
+
   return (
     <span className="inline-flex h-[27px] min-w-0 max-w-[116px] items-center gap-2 rounded-full border border-[var(--hairline)] bg-[var(--surface-1)] px-[10px] text-[13px] font-medium leading-normal text-[var(--ink-subtle)]">
       <span
@@ -2958,7 +2999,9 @@ function IssueLabel({ label }: { label: IssueLabel }) {
           labelColorClass[label.color],
         )}
       />
-      <span className="min-w-0 truncate">{label.name}</span>
+      <span className="min-w-0 truncate" title={displayName}>
+        {displayName}
+      </span>
     </span>
   );
 }
