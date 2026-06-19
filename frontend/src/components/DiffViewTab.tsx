@@ -94,7 +94,7 @@ const DiffLineRow: React.FC<{
       >
         {prefix}
       </span>
-      <span className="flex-1 px-2 whitespace-pre text-[var(--ink)]">
+      <span className="flex-1 px-2 whitespace-pre-wrap break-words text-[var(--ink)]">
         {line.content}
       </span>
     </div>
@@ -110,7 +110,7 @@ const SplitLineRow: React.FC<{
         <div className="flex-1 flex border-l-2 border-transparent font-mono text-[13px] leading-[1.5] min-w-0">
           <span className="w-12 text-right pr-2 text-[12px] select-none shrink-0" />
           <span className="w-4 shrink-0 select-none" />
-          <span className="flex-1 px-2 whitespace-pre" />
+          <span className="flex-1 px-2 whitespace-pre-wrap break-words" />
         </div>
       );
     }
@@ -133,7 +133,7 @@ const SplitLineRow: React.FC<{
         >
           {prefix}
         </span>
-        <span className="flex-1 px-2 whitespace-pre text-[var(--ink)]">
+        <span className="flex-1 px-2 whitespace-pre-wrap break-words text-[var(--ink)]">
           {line.content}
         </span>
       </div>
@@ -365,7 +365,7 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
                   <span className="w-12 shrink-0" />
                   <span className="w-12 shrink-0" />
                   <span className="w-4 shrink-0" />
-                  <span className="flex-1 px-2 whitespace-pre">
+                  <span className="flex-1 px-2 whitespace-pre-wrap break-words">
                     {hunk.header}
                   </span>
                 </>
@@ -373,7 +373,7 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
                 <>
                   <span className="w-12 shrink-0" />
                   <span className="w-4 shrink-0" />
-                  <span className="flex-1 px-2 whitespace-pre">
+                  <span className="flex-1 px-2 whitespace-pre-wrap break-words">
                     {hunk.header}
                   </span>
                   <div
@@ -382,7 +382,7 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
                   />
                   <span className="w-12 shrink-0" />
                   <span className="w-4 shrink-0" />
-                  <span className="flex-1 px-2 whitespace-pre">
+                  <span className="flex-1 px-2 whitespace-pre-wrap break-words">
                     {hunk.header}
                   </span>
                 </>
