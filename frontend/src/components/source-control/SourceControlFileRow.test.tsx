@@ -46,6 +46,13 @@ check(
   source,
 );
 
+check(
+  "resolves file-row hover title to the workspace absolute path",
+  source.includes("resolveLocalPathToAbsolutePath(file.path, viewModel.workspacePath)") &&
+    source.includes("title={fullPath}"),
+  source,
+);
+
 if (failures > 0) {
   // eslint-disable-next-line no-console
   console.error(`\n${failures} SourceControlFileRow assertion(s) failed.`);

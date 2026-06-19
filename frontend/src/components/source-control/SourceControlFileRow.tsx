@@ -69,6 +69,7 @@ import {
 } from "simple-icons";
 import type { SimpleIcon } from "simple-icons";
 import type { SourceControlDiffArea, SourceControlFile } from "@/types";
+import { resolveLocalPathToAbsolutePath } from "@/utils/readOnlyLinks";
 import {
   getFileActionDisabledReason,
   sourceControlStatusLabel,
@@ -416,16 +417,20 @@ export const SourceControlFileRow: React.FC<SourceControlFileRowProps> = ({
     "sourceControl.action.unstage",
     "Unstage",
   );
+  const fullPath =
+    resolveLocalPathToAbsolutePath(file.path, viewModel.workspacePath) ??
+    file.path;
 
   return (
     <div
       className="group/source-file relative flex min-h-9 w-full min-w-0 items-center gap-2 rounded-md bg-[var(--surface-1)] px-2 py-1 text-left text-[13px] transition-colors hover:bg-[var(--surface-3)]"
-      title={file.blocked_reason ?? file.path}
+      title={fullPath}
     >
       <div className="flex min-w-0 flex-1 items-center">
         <button
           type="button"
           onClick={() => onOpenDiff(file, area)}
+          title={fullPath}
           className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--primary)]"
           aria-label={translateSourceControl(
             t,
@@ -435,7 +440,10 @@ export const SourceControlFileRow: React.FC<SourceControlFileRowProps> = ({
           )}
         >
           <SourceControlFileTypeIcon path={file.path} />
-          <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-[var(--ink)]">
+          <span
+            className="min-w-0 flex-1 truncate font-mono text-[13px] text-[var(--ink)]"
+            title={fullPath}
+          >
             {file.path}
           </span>
         </button>
