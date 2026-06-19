@@ -211,7 +211,6 @@ export type SidebarNavigationTarget =
   | 'routing'
   | 'github'
   | 'providers'
-  | 'tokens'
   | 'agents'
   | 'build-stats';
 

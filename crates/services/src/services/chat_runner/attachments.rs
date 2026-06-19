@@ -85,7 +85,11 @@ pub(super) fn is_internal_openteams_runtime_path(path: &Path) -> bool {
     }
 }
 
-fn normalize_workspace_observed_path(raw: &str, workspace_root: &Path) -> Option<String> {
+fn normalize_workspace_observed_path_with_options(
+    raw: &str,
+    workspace_root: &Path,
+    allow_internal_runtime_path: bool,
+) -> Option<String> {
     let trimmed = raw
         .trim()
         .trim_matches(|ch: char| {
@@ -110,7 +114,7 @@ fn normalize_workspace_observed_path(raw: &str, workspace_root: &Path) -> Option
         candidate_path
     };
 
-    if is_internal_openteams_runtime_path(&relative) {
+    if !allow_internal_runtime_path && is_internal_openteams_runtime_path(&relative) {
         return None;
     }
 
@@ -130,7 +134,19 @@ fn normalize_workspace_observed_path(raw: &str, workspace_root: &Path) -> Option
     Some(normalized.join("/"))
 }
 
-fn extract_workspace_paths_from_text(text: &str, workspace_root: &Path) -> Vec<String> {
+fn normalize_workspace_observed_path(raw: &str, workspace_root: &Path) -> Option<String> {
+    normalize_workspace_observed_path_with_options(raw, workspace_root, false)
+}
+
+fn extract_workspace_paths_from_artifact_text(text: &str, workspace_root: &Path) -> Vec<String> {
+    extract_workspace_paths_from_text_with_options(text, workspace_root, true)
+}
+
+fn extract_workspace_paths_from_text_with_options(
+    text: &str,
+    workspace_root: &Path,
+    allow_internal_runtime_path: bool,
+) -> Vec<String> {
     let mut candidates = Vec::new();
 
     for capture in INLINE_CODE_PATH_RE.captures_iter(text) {
@@ -145,7 +161,11 @@ fn extract_workspace_paths_from_text(text: &str, workspace_root: &Path) -> Vec<S
 
     let mut deduped = BTreeMap::<String, ()>::new();
     for candidate in candidates {
-        if let Some(path) = normalize_workspace_observed_path(&candidate, workspace_root) {
+        if let Some(path) = normalize_workspace_observed_path_with_options(
+            &candidate,
+            workspace_root,
+            allow_internal_runtime_path,
+        ) {
             deduped.insert(path, ());
         }
     }

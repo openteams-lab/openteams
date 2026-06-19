@@ -1010,7 +1010,7 @@ impl ChatRunner {
                 continue;
             }
 
-            for path in extract_workspace_paths_from_text(&entry.content, workspace_path) {
+            for path in extract_workspace_paths_from_artifact_text(&entry.content, workspace_path) {
                 paths.insert(path, ());
             }
         }
@@ -1076,13 +1076,11 @@ impl ChatRunner {
         session_id: Uuid,
         run_id: Uuid,
         workspace_path: &Path,
-        latest_assistant: &str,
         diff_info: Option<&DiffInfo>,
         untracked_paths: &[String],
     ) -> Vec<WorkspaceObservedPathEntry> {
         let artifact_paths =
             Self::collect_run_artifact_paths(session_id, run_id, workspace_path).await;
-        let output_paths = extract_workspace_paths_from_text(latest_assistant, workspace_path);
         let mut observed = BTreeMap::<String, WorkspaceObservedPathEntry>::new();
 
         if let Some(diff_info) = diff_info {
@@ -1114,30 +1112,21 @@ impl ChatRunner {
             );
         }
 
-        for path in output_paths {
-            let (existed_after_run, _) = Self::observed_file_metadata(workspace_path, &path);
-            if !existed_after_run {
-                continue;
-            }
-            Self::upsert_workspace_observed_path(
-                &mut observed,
-                workspace_path,
-                path,
-                "output_text",
-            );
-        }
-
         observed.into_values().collect()
     }
 
     /// Derive the `FileChangeRefresh` payload from the workspace paths observed
     /// during a run. A path absent after the run is `Deleted`; a newly tracked
     /// (untracked) path is `Created`; everything else is `Modified`.
-    fn file_change_entries_from_observed(
+    pub(super) fn file_change_entries_from_observed(
         observed: &[WorkspaceObservedPathEntry],
     ) -> Vec<FileChangeEntry> {
         observed
             .iter()
+            .filter(|entry| {
+                !(Self::is_artifact_observed_source(&entry.source)
+                    && Self::is_openteams_observed_path(&entry.path))
+            })
             .map(|entry| {
                 let change_type = if !entry.existed_after_run {
                     FileChangeType::Deleted
@@ -1156,6 +1145,18 @@ impl ChatRunner {
                 }
             })
             .collect()
+    }
+
+    fn is_artifact_observed_source(source: &str) -> bool {
+        source
+            .split(',')
+            .any(|part| part.trim().eq_ignore_ascii_case("artifact_record"))
+    }
+
+    fn is_openteams_observed_path(path: &str) -> bool {
+        PathBuf::from(path).components().next().is_some_and(|component| {
+            matches!(component, Component::Normal(part) if part == ".openteams")
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1515,11 +1516,49 @@ impl ChatRunner {
                                 session_id,
                                 run_id,
                                 &workspace_path,
-                                &latest_assistant,
                                 diff_info.as_ref(),
                                 &untracked_files,
                             )
                             .await;
+                        let observed_git_diff_count = workspace_observed_paths
+                            .iter()
+                            .filter(|entry| {
+                                entry
+                                    .source
+                                    .split(',')
+                                    .any(|source| source.trim() == "git_diff")
+                            })
+                            .count();
+                        let observed_git_untracked_count = workspace_observed_paths
+                            .iter()
+                            .filter(|entry| {
+                                entry
+                                    .source
+                                    .split(',')
+                                    .any(|source| source.trim() == "git_untracked")
+                            })
+                            .count();
+                        let observed_artifact_count = workspace_observed_paths
+                            .iter()
+                            .filter(|entry| {
+                                entry
+                                    .source
+                                    .split(',')
+                                    .any(|source| source.trim() == "artifact_record")
+                            })
+                            .count();
+                        tracing::debug!(
+                            session_id = %session_id,
+                            run_id = %run_id,
+                            session_agent_id = %session_agent_id,
+                            agent_id = %agent_id,
+                            workspace_path = %workspace_path.display(),
+                            observed_path_count = workspace_observed_paths.len(),
+                            observed_git_diff_count,
+                            observed_git_untracked_count,
+                            observed_artifact_count,
+                            "[chat_runner] Collected workspace observed paths for agent run"
+                        );
                         let diff_file_count = diff_info
                             .as_ref()
                             .map(|info| info.observed_paths.len())
@@ -1703,8 +1742,23 @@ impl ChatRunner {
                             serde_json::to_value(&workspace_observed_paths)
                                 .unwrap_or(serde_json::Value::Array(Vec::new()));
 
-                        let _ = fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap())
-                            .await;
+                        let meta_content = serde_json::to_string_pretty(&meta).unwrap();
+                        match fs::write(&meta_path, meta_content).await {
+                            Ok(_) => tracing::debug!(
+                                session_id = %session_id,
+                                run_id = %run_id,
+                                meta_path = %meta_path.display(),
+                                observed_path_count = workspace_observed_paths.len(),
+                                "[chat_runner] Wrote run meta with workspace observed paths"
+                            ),
+                            Err(err) => tracing::warn!(
+                                session_id = %session_id,
+                                run_id = %run_id,
+                                meta_path = %meta_path.display(),
+                                error = %err,
+                                "failed to write run meta with workspace observed paths"
+                            ),
+                        }
 
                         let error_summary = visible_error_content
                             .map(|content| content.chars().take(200).collect::<String>());
@@ -2201,11 +2255,17 @@ impl ChatRunner {
                         SourceControlService::invalidate_session_caches(session_id);
                         let changed_files =
                             Self::file_change_entries_from_observed(&workspace_observed_paths);
+                        let changed_file_paths = changed_files
+                            .iter()
+                            .map(|entry| entry.path.as_str())
+                            .take(20)
+                            .collect::<Vec<_>>();
                         tracing::debug!(
                             session_id = %session_id,
                             run_id = %run_id,
                             message_id = %source_message_id,
                             changed_file_count = changed_files.len(),
+                            changed_file_paths = ?changed_file_paths,
                             "[chat_runner] Emitting file_change_refresh after agent message completion"
                         );
                         runner.emit_file_change_refresh(

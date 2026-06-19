@@ -352,6 +352,20 @@ pub async fn get_run_files(
         .unwrap_or(false);
 
     let changes = collect_run_files(&run, include_diff);
+    tracing::debug!(
+        run_id = %run_id,
+        session_id = %run.session_id,
+        session_agent_id = %run.session_agent_id,
+        run_index = run.run_index,
+        workspace_path = ?workspace_path,
+        include_diff,
+        is_git_repo,
+        modified_count = changes.modified.len(),
+        added_count = changes.added.len(),
+        deleted_count = changes.deleted.len(),
+        untracked_count = changes.untracked.len(),
+        "[chat_runs] Returning structured run file changes"
+    );
 
     Ok(ResponseJson(ApiResponse::success(ChatRunFilesResponse {
         run_id,

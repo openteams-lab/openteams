@@ -553,7 +553,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn create_message_skips_user_mentions_in_workflow_mode() {
+    async fn create_message_routes_explicit_user_mentions_in_workflow_mode() {
         let pool = setup_chat_message_pool().await;
         let session = create_active_session(&pool).await;
 
@@ -568,7 +568,7 @@ mod tests {
         .await
         .expect("create workflow user message");
 
-        assert!(message.mentions.0.is_empty());
+        assert_eq!(message.mentions.0, vec!["backend"]);
         assert_eq!(
             message
                 .meta
@@ -580,7 +580,48 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn create_attachment_message_skips_user_mentions_in_workflow_mode() {
+    async fn create_message_keeps_unmentioned_workflow_user_message_unmentioned() {
+        let pool = setup_chat_message_pool().await;
+        let session = create_active_session(&pool).await;
+
+        let message = create_message(
+            &pool,
+            session.id,
+            ChatSenderType::User,
+            None,
+            "please plan this".to_string(),
+            Some(serde_json::json!({ "chat_input_mode": "workflow" })),
+        )
+        .await
+        .expect("create workflow user message");
+
+        assert!(message.mentions.0.is_empty());
+    }
+
+    #[tokio::test]
+    async fn create_message_routes_workflow_user_mentions_from_meta() {
+        let pool = setup_chat_message_pool().await;
+        let session = create_active_session(&pool).await;
+
+        let message = create_message(
+            &pool,
+            session.id,
+            ChatSenderType::User,
+            None,
+            "please review this".to_string(),
+            Some(serde_json::json!({
+                "chat_input_mode": "workflow",
+                "mentions": ["backend"]
+            })),
+        )
+        .await
+        .expect("create workflow user message");
+
+        assert_eq!(message.mentions.0, vec!["backend"]);
+    }
+
+    #[tokio::test]
+    async fn create_attachment_message_routes_explicit_user_mentions_in_workflow_mode() {
         let pool = setup_chat_message_pool().await;
         let session = create_active_session(&pool).await;
 
@@ -605,7 +646,7 @@ mod tests {
         .await
         .expect("create workflow attachment message");
 
-        assert!(message.mentions.0.is_empty());
+        assert_eq!(message.mentions.0, vec!["backend"]);
     }
 
     #[tokio::test]

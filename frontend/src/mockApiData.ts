@@ -611,15 +611,8 @@ export const mockShellOptions: ShellOptionsMock = {
       targetPage: 'team-templates',
     },
     {
-      id: 'skills-library',
-      label: 'Skill library',
-      icon: 'book-open',
-      helper: 'Browse local skill placeholders for project agents.',
-      targetPage: 'tokens',
-    },
-    {
       id: 'agent-runtime',
-      label: 'Agents',
+      label: 'Agent runtime',
       icon: 'bot',
       helper: 'Configure local agent runtimes and diagnostics.',
       targetPage: 'agents',

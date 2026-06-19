@@ -1618,6 +1618,42 @@ fn build_exact_markdown_prompt_includes_team_protocol_section_when_empty() {
 }
 
 #[test]
+fn artifact_path_extraction_allows_explicit_openteams_runtime_paths() {
+    let paths = super::extract_workspace_paths_from_artifact_text(
+        "Saved `.openteams/context/demo/messages.jsonl`, `.openteams/context/demo/attachments/message-1/input.txt`, and `src/app.ts`.",
+        Path::new(r"E:\workspace\projectSS\MainPage2"),
+    );
+
+    assert!(paths.contains(&".openteams/context/demo/messages.jsonl".to_string()));
+    assert!(paths.contains(&".openteams/context/demo/attachments/message-1/input.txt".to_string()));
+    assert!(paths.contains(&"src/app.ts".to_string()));
+}
+
+#[test]
+fn file_change_refresh_excludes_openteams_artifact_paths() {
+    let changes = ChatRunner::file_change_entries_from_observed(&[
+        super::WorkspaceObservedPathEntry {
+            path: ".openteams/context/demo/report.md".to_string(),
+            source: "artifact_record".to_string(),
+            existed_after_run: true,
+            modified_at: None,
+        },
+        super::WorkspaceObservedPathEntry {
+            path: "src/app.ts".to_string(),
+            source: "git_diff".to_string(),
+            existed_after_run: true,
+            modified_at: None,
+        },
+    ]);
+
+    let paths = changes
+        .iter()
+        .map(|entry| entry.path.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(paths, vec!["src/app.ts"]);
+}
+
+#[test]
 fn build_exact_markdown_prompt_matches_expected_input_template() {
     let session_id = Uuid::parse_str("1475cda0-6f11-464e-a61a-7dc81217810e").expect("uuid");
     let message_id = Uuid::parse_str("88bd7b05-1ba3-407c-8ca3-a52f14c8aced").expect("uuid");

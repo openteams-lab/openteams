@@ -39,6 +39,8 @@ interface CreateAgentSessionModalProps {
       taskMode: CreateTaskMode;
       memberId?: string;
       memberName?: string;
+      memberAvatar?: string;
+      memberModelName?: string;
       workItemId?: string;
     },
   ) => void;
@@ -242,6 +244,8 @@ export function CreateAgentSessionModal({
       taskMode,
       memberId: selectedMember.id,
       memberName: selectedMember.name,
+      memberAvatar: selectedMember.avatar,
+      memberModelName: selectedMember.modelName,
       workItemId: selectedWorkItemId || undefined,
     });
     onClose();

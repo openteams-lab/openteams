@@ -146,13 +146,24 @@ check(
     source.includes('sendMessageToSession') &&
     source.includes('stagePendingAgentPlaceholder') &&
     source.includes('persistToBackend?: boolean') &&
+    source.includes("placeholderMember?: Pick<Member, 'avatar' | 'name' | 'modelName'> | null") &&
     source.includes('const shouldPersistToBackend =') &&
     source.includes('const effectiveMentions =') &&
-    source.includes("mentions: effectiveChatInputMode === 'workflow' ? [] : routeMentions") &&
+    source.includes('const visibleMentions =') &&
+    source.includes('mentions: visibleMentions') &&
     source.includes('options.routeMentions') &&
     source.includes('meta.client_message_id = userMsgId') &&
     pendingPlaceholderIndex < sendApiIndex,
   { pendingPlaceholderIndex, sendApiIndex },
+);
+check(
+  'pending placeholders can carry display member model without stale session agent id',
+  source.includes('const displayMember = fallbackMember ?? placeholderMember ?? null') &&
+    source.includes('avatar: displayMember?.avatar ?? monogramFromName(sender)') &&
+    source.includes('model: displayMember?.modelName') &&
+    source.includes('sessionAgentId: fallbackMember?.id') &&
+    source.includes('options.placeholderMember'),
+  source,
 );
 check(
   'pending agent placeholders are matched by correlation ids before fallback',
@@ -213,7 +224,8 @@ check(
     source.includes('setSessionChatInputMode') &&
     source.includes("meta.chat_input_mode = 'workflow'") &&
     source.includes('const routeMentions =') &&
-    source.includes("effectiveChatInputMode !== 'workflow' && routeMentions.length > 0") &&
+    source.includes('const shouldPersistRouteMentions =') &&
+    source.includes("effectiveChatInputMode !== 'workflow' ||") &&
     source.includes('meta.mentions = routeMentions'),
   source,
 );
@@ -268,10 +280,16 @@ check(
   'hydrated run placeholders keep the optimistic pending placeholder anchor',
   source.includes('correlateRunningPlaceholdersWithPending') &&
     source.includes('pendingBySessionAgentId') &&
+    source.includes('pendingBySender') &&
+    source.includes('orphanPending') &&
+    source.includes('pendingPlaceholderSenderKey') &&
     source.includes('consumedPendingPlaceholderIds') &&
+    source.includes('senderMatches.length === 1') &&
+    source.includes('runningPlaceholders.length === 1') &&
     source.includes('sourceMessageId: pending.sourceMessageId') &&
     source.includes('clientMessageId: pending.clientMessageId') &&
     source.includes('createdAt: pending.createdAt ?? placeholder.createdAt') &&
+    !source.includes('!placeholder.runId ||') &&
     source.includes('...correlated.current') &&
     source.includes('...correlated.runningPlaceholders'),
   source,

@@ -25,7 +25,6 @@ import { TeamPage } from "@/pages/TeamPage";
 import { TeamTemplatesPage } from "@/pages/TeamTemplatesPage";
 import {
   Activity,
-  BookOpen,
   Bot,
   Box,
   FileText,
@@ -130,8 +129,7 @@ const pageTabConfig: Record<
   routing: { label: "Routing engine", icon: Route },
   github: { label: "GitHub", icon: Github },
   providers: { label: "Settings", icon: Settings2 },
-  tokens: { label: "Skill library", icon: BookOpen },
-  agents: { label: "Agents", icon: Bot },
+  agents: { label: "Agent runtime", icon: Bot },
   "build-stats": { label: "Build Statistics", icon: Activity },
 };
 
@@ -737,20 +735,6 @@ function WorkspaceLayout() {
         return <SettingsPage />;
       case "build-stats":
         return <BuildStatsPage />;
-      case "tokens":
-        return (
-          <div className="max-w-6xl mx-auto space-y-6">
-            <div className="pb-4 mb-2 select-all">
-              <h1 className="text-base font-bold tracking-tight text-[var(--ink)]">
-                Dialog Manager
-              </h1>
-              <p className="text-xs text-[var(--ink-subtle)] mt-1">
-                DialogManager.tsx UI content preview for the skill library tab.
-              </p>
-            </div>
-            <DialogManager preview />
-          </div>
-        );
       case "agents":
         return <AgentsPage />;
       case "workspace":
@@ -983,6 +967,8 @@ function WorkspaceLayout() {
       taskMode: 'workflow' | 'freeChat';
       memberId?: string;
       memberName?: string;
+      memberAvatar?: string;
+      memberModelName?: string;
       workItemId?: string;
     },
   ) => {
@@ -1070,6 +1056,25 @@ function WorkspaceLayout() {
           routeMentions && routeMentions.length > 0
             ? routeMentions[0]
             : (options.memberName ?? null);
+        const placeholderMention =
+          fallbackMention?.replace(/^@/, '').toLowerCase() ?? null;
+        const placeholderMemberFromCurrentSession = placeholderMention
+          ? members.find(
+              (member) =>
+                member.name.replace(/^@/, '').toLowerCase() ===
+                placeholderMention,
+            )
+          : undefined;
+        const placeholderMember =
+          placeholderMemberFromCurrentSession ??
+          (options.memberName
+            ? {
+                name: options.memberName,
+                avatar:
+                  options.memberAvatar ?? monogramFromName(options.memberName),
+                modelName: options.memberModelName ?? 'agent',
+              }
+            : undefined);
 
         sendMessageToSession(backendSession.id, content, {
           chatInputMode: nextChatInputMode,
@@ -1077,6 +1082,7 @@ function WorkspaceLayout() {
           fallbackMention,
           workflowLeadAgentId,
           persistToBackend: true,
+          placeholderMember,
         });
       }
 
@@ -1343,7 +1349,7 @@ function WorkspaceLayout() {
         <NotificationToast message={toast.message} tone={toast.tone} />
       )}
 
-      {activeAppPage !== "tokens" && <DialogManager />}
+      <DialogManager />
       <CreateAgentSessionModal
         open={isCreateSessionModalOpen}
         projectId={selectedProjectId}

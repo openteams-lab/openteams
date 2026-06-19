@@ -96,6 +96,16 @@ async fn seed_session_with_paths(
     workspace_path: &Path,
     paths: &[&str],
 ) -> Uuid {
+    seed_session_with_observed_source(pool, project_id, workspace_path, paths, "git_diff").await
+}
+
+async fn seed_session_with_observed_source(
+    pool: &SqlitePool,
+    project_id: Uuid,
+    workspace_path: &Path,
+    paths: &[&str],
+    source: &str,
+) -> Uuid {
     let session = ChatSession::create(
         pool,
         &CreateChatSession {
@@ -145,7 +155,7 @@ async fn seed_session_with_paths(
         .map(|path| {
             json!({
                 "path": path,
-                "source": "git_diff",
+                "source": source,
                 "existed_after_run": true
             })
         })
@@ -289,6 +299,69 @@ async fn git_workspace_separates_unstaged_and_staged_files() {
     let (changes, staged) = git_status_paths(&status);
     assert_eq!(changes, vec!["tracked.txt"]);
     assert_eq!(staged, vec!["staged.txt"]);
+}
+
+#[tokio::test]
+async fn git_workspace_ignores_output_text_observed_paths() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+    let session_id = seed_session_with_observed_source(
+        &pool,
+        project.id,
+        &repo_path,
+        &["tracked.txt"],
+        "output_text",
+    )
+    .await;
+
+    fs::write(repo_path.join("tracked.txt"), "mentioned in output only\n")
+        .expect("modify tracked");
+
+    let status = SourceControlService::new()
+        .session_status(&pool, project.id, session_id, None)
+        .await
+        .expect("status");
+
+    let (changes, staged) = git_status_paths(&status);
+    assert!(changes.is_empty());
+    assert!(staged.is_empty());
+}
+
+#[tokio::test]
+async fn git_workspace_ignores_openteams_artifact_observed_paths() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+    let session_id = seed_session_with_observed_source(
+        &pool,
+        project.id,
+        &repo_path,
+        &[".openteams/context/demo/report.md"],
+        "artifact_record",
+    )
+    .await;
+
+    fs::create_dir_all(repo_path.join(".openteams").join("context").join("demo"))
+        .expect("create openteams dir");
+    fs::write(
+        repo_path
+            .join(".openteams")
+            .join("context")
+            .join("demo")
+            .join("report.md"),
+        "artifact\n",
+    )
+    .expect("write openteams artifact");
+
+    let status = SourceControlService::new()
+        .session_status(&pool, project.id, session_id, None)
+        .await
+        .expect("status");
+
+    let (changes, staged) = git_status_paths(&status);
+    assert!(changes.is_empty());
+    assert!(staged.is_empty());
 }
 
 #[tokio::test]

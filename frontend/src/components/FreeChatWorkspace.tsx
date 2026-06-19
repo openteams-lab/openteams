@@ -751,8 +751,18 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   } = useWorkspace();
 
   const [inputText, setInputText] = useState("");
-  const inputTextRef = useRef(inputText);
-  inputTextRef.current = inputText;
+  const setInputTextDraft = useCallback(
+    (nextText: string) => {
+      setInputText(nextText);
+      if (!activeSessionId) return;
+      if (nextText.length > 0) {
+        sessionDraftCache.set(activeSessionId, nextText);
+      } else {
+        sessionDraftCache.delete(activeSessionId);
+      }
+    },
+    [activeSessionId],
+  );
   const [isMemberPickerOpen, setIsMemberPickerOpen] = useState(false);
   const [activeMemberPickerIndex, setActiveMemberPickerIndex] = useState(0);
   const [isRelatedFilesOpen, setIsRelatedFilesOpen] = useState(true);
@@ -1166,20 +1176,15 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   }, [activeSessionId]);
 
   // Preserve unsent composer text per session across tab switches and
-  // component unmount/remount. The cleanup saves the latest draft before
-  // the session changes or the component unmounts; the effect restores the
-  // cached draft (if any) for the active session.
+  // component unmount/remount. The change handlers keep the cache hot, so this
+  // effect only restores the cached draft for the newly active session.
   useEffect(() => {
     const cachedDraft = activeSessionId
       ? sessionDraftCache.get(activeSessionId)
       : undefined;
     setInputText(cachedDraft ?? "");
-
-    return () => {
-      if (activeSessionId) {
-        sessionDraftCache.set(activeSessionId, inputTextRef.current);
-      }
-    };
+    setIsMemberPickerOpen(false);
+    setActiveMemberPickerIndex(0);
   }, [activeSessionId]);
 
   const reloadRelatedFiles = useCallback(() => {
@@ -1241,7 +1246,11 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     (detail: ChatInputPrefillDetail) => {
       if (!detail || detail.sessionId !== activeSessionId) return false;
 
-      sessionDraftCache.set(detail.sessionId, detail.text);
+      if (detail.text.length > 0) {
+        sessionDraftCache.set(detail.sessionId, detail.text);
+      } else {
+        sessionDraftCache.delete(detail.sessionId);
+      }
       setInputText(detail.text);
       setQuotedMessage(null);
       setAttachedFiles([]);
@@ -1682,7 +1691,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
             ...(quotedMessage ? { quotedMessage } : {}),
           });
         }
-        setInputText("");
+        setInputTextDraft("");
         setQuotedMessage(null);
         setAttachedFiles([]);
         await refreshMessages();
@@ -1698,7 +1707,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
       chatInputMode,
       ...(quotedMessage ? { quotedMessage } : {}),
     });
-    setInputText("");
+    setInputTextDraft("");
     setQuotedMessage(null);
   };
 
@@ -1707,10 +1716,10 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   ) => {
     const nextValue = event.target.value;
     const cursor = event.target.selectionStart ?? nextValue.length;
-    setInputText(nextValue);
+    setInputTextDraft(nextValue);
     resizeChatTextarea(event.target);
 
-    if (!isPlanMode && cursor > 0 && nextValue[cursor - 1] === "@") {
+    if (cursor > 0 && nextValue[cursor - 1] === "@") {
       setIsMemberPickerOpen(true);
       setActiveMemberPickerIndex(0);
     }
@@ -1737,7 +1746,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     const nextValue = `${prefix}${inserted}${suffix}`;
     const nextCursor = prefix.length + inserted.length;
 
-    setInputText(nextValue);
+    setInputTextDraft(nextValue);
     setIsMemberPickerOpen(false);
     setActiveMemberPickerIndex(0);
 
@@ -1753,7 +1762,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!isPlanMode && isMemberPickerOpen) {
+    if (isMemberPickerOpen) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setActiveMemberPickerIndex((current) =>
@@ -1902,6 +1911,9 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   );
   const isPlanMode = chatInputMode === "workflow";
   const planModeMainAgentName = mainAgentHandle;
+  const freeModePlaceholder = t("discussPlaceholder", {
+    agent: mainAgentHandle,
+  });
   const canSend =
     (Boolean(inputText.trim()) || attachedFiles.length > 0) &&
     !isUploadingAttachments;
@@ -2425,7 +2437,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                     ? t("planModePlaceholder", {
                         agent: planModeMainAgentName,
                       })
-                    : t("discussPlaceholder")
+                    : freeModePlaceholder
                 }
               />
 

@@ -21,6 +21,7 @@ const ACTIVITY_LOAD_TIMEOUT_MS = 15000;
  * reuse across message re-renders and avoid refetching on every scroll.
  */
 const runFileRowsCache = new Map<string, AgentFileRow[]>();
+const runFileRowsPending = new Map<string, Promise<AgentFileRow[]>>();
 
 interface AgentMessageContentProps {
   message: Message;
@@ -170,19 +171,30 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
       setRunFileRows(cached);
       return;
     }
+
     let cancelled = false;
-    runFileRowsCache.set(runId, []);
-    chatRunsApi
-      .getFiles(runId, { includeDiff: false })
-      .then((response) => {
+    let pending = runFileRowsPending.get(runId);
+    if (!pending) {
+      pending = chatRunsApi
+        .getFiles(runId, { includeDiff: false })
+        .then((response) => {
+          const rows = flattenRunFileChanges(response);
+          runFileRowsCache.set(runId, rows);
+          return rows;
+        })
+        .finally(() => {
+          runFileRowsPending.delete(runId);
+        });
+      runFileRowsPending.set(runId, pending);
+    }
+
+    pending
+      .then((rows) => {
         if (cancelled) return;
-        const rows = flattenRunFileChanges(response);
-        runFileRowsCache.set(runId, rows);
         setRunFileRows(rows);
       })
       .catch(() => {
         if (cancelled) return;
-        runFileRowsCache.set(runId, []);
         setRunFileRows([]);
       });
     return () => {

@@ -45,9 +45,18 @@ pub fn run_records_prefix(session_agent_id: Uuid, run_index: i64) -> String {
 }
 
 pub async fn capture_workspace_change_baseline(workspace_path: &Path) -> WorkspaceChangeBaseline {
+    let git_tree = capture_baseline_git_tree(workspace_path).await;
+    let untracked_files = capture_untracked_file_snapshot(workspace_path).await;
+    tracing::debug!(
+        workspace_path = %workspace_path.display(),
+        baseline_has_git_tree = git_tree.is_some(),
+        baseline_untracked_count = untracked_files.len(),
+        "[workspace_change_capture] Captured workspace change baseline"
+    );
+
     WorkspaceChangeBaseline {
-        git_tree: capture_baseline_git_tree(workspace_path).await,
-        untracked_files: capture_untracked_file_snapshot(workspace_path).await,
+        git_tree,
+        untracked_files,
     }
 }
 
@@ -66,17 +75,29 @@ pub async fn capture_workspace_change_delta(
         None => (String::new(), Vec::new()),
     };
 
+    let mut diff_patch_written = false;
     if !diff_patch.trim().is_empty() && !diff_paths.is_empty() {
         let diff_path = run_dir.join(format!(
             "{}_diff.patch",
             run_records_prefix(session_agent_id, run_index)
         ));
-        if let Err(err) = fs::write(&diff_path, &diff_patch).await {
-            tracing::warn!(
-                path = %diff_path.display(),
-                error = %err,
-                "failed to write run-scoped diff patch"
-            );
+        match fs::write(&diff_path, &diff_patch).await {
+            Ok(_) => {
+                diff_patch_written = true;
+                tracing::debug!(
+                    path = %diff_path.display(),
+                    diff_patch_bytes = diff_patch.len(),
+                    diff_path_count = diff_paths.len(),
+                    "[workspace_change_capture] Wrote run-scoped diff patch"
+                );
+            }
+            Err(err) => {
+                tracing::warn!(
+                    path = %diff_path.display(),
+                    error = %err,
+                    "failed to write run-scoped diff patch"
+                );
+            }
         }
     }
 
@@ -86,6 +107,19 @@ pub async fn capture_workspace_change_delta(
         .into_iter()
         .filter(|path| !baseline_untracked.contains(path))
         .collect::<Vec<_>>();
+
+    tracing::debug!(
+        workspace_path = %workspace_path.display(),
+        run_dir = %run_dir.display(),
+        session_agent_id = %session_agent_id,
+        run_index,
+        baseline_has_git_tree = baseline.git_tree.is_some(),
+        diff_path_count = diff_paths.len(),
+        diff_patch_bytes = diff_patch.len(),
+        diff_patch_written,
+        untracked_count = untracked_files.len(),
+        "[workspace_change_capture] Captured workspace change delta"
+    );
 
     WorkspaceChangeDelta {
         diff_patch: (!diff_patch.trim().is_empty() && !diff_paths.is_empty()).then_some(diff_patch),

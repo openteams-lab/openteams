@@ -241,6 +241,35 @@ struct PlainWorkspaceObservedPath {
     existed_after_run: bool,
 }
 
+fn is_output_text_only_observed_source(source: &str) -> bool {
+    let mut saw_output_text = false;
+    let mut saw_other_source = false;
+    for part in source
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+    {
+        if part.eq_ignore_ascii_case("output_text") {
+            saw_output_text = true;
+        } else {
+            saw_other_source = true;
+        }
+    }
+    saw_output_text && !saw_other_source
+}
+
+fn is_artifact_observed_source(source: &str) -> bool {
+    source
+        .split(',')
+        .any(|part| part.trim().eq_ignore_ascii_case("artifact_record"))
+}
+
+fn is_openteams_relative_path(path: &str) -> bool {
+    PathBuf::from(path).components().next().is_some_and(|component| {
+        matches!(component, Component::Normal(part) if part == ".openteams")
+    })
+}
+
 static INLINE_CODE_PATH_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"`([^`\r\n]+)`").expect("inline code path regex"));
 
@@ -426,6 +455,14 @@ fn normalize_workspace_relative_path(
     raw: &str,
     workspace_root: &std::path::Path,
 ) -> Option<String> {
+    normalize_workspace_relative_path_with_options(raw, workspace_root, false)
+}
+
+fn normalize_workspace_relative_path_with_options(
+    raw: &str,
+    workspace_root: &std::path::Path,
+    allow_internal_runtime_path: bool,
+) -> Option<String> {
     let trimmed = raw
         .trim()
         .trim_matches(|ch: char| {
@@ -447,7 +484,7 @@ fn normalize_workspace_relative_path(
         candidate
     };
 
-    if is_internal_openteams_runtime_path(&relative) {
+    if !allow_internal_runtime_path && is_internal_openteams_runtime_path(&relative) {
         return None;
     }
 
@@ -467,9 +504,17 @@ fn normalize_workspace_relative_path(
     Some(normalized.join("/"))
 }
 
-fn extract_workspace_paths_from_text(
+fn extract_workspace_paths_from_artifact_text(
     text: &str,
     workspace_root: &std::path::Path,
+) -> HashSet<String> {
+    extract_workspace_paths_from_text_with_options(text, workspace_root, true)
+}
+
+fn extract_workspace_paths_from_text_with_options(
+    text: &str,
+    workspace_root: &std::path::Path,
+    allow_internal_runtime_path: bool,
 ) -> HashSet<String> {
     let mut candidates = Vec::new();
 
@@ -485,7 +530,13 @@ fn extract_workspace_paths_from_text(
 
     candidates
         .into_iter()
-        .filter_map(|candidate| normalize_workspace_relative_path(&candidate, workspace_root))
+        .filter_map(|candidate| {
+            normalize_workspace_relative_path_with_options(
+                &candidate,
+                workspace_root,
+                allow_internal_runtime_path,
+            )
+        })
         .collect()
 }
 
@@ -785,17 +836,23 @@ pub(crate) fn collect_run_files(run: &ChatRun, include_diff: bool) -> WorkspaceC
         }
     }
 
-    // Augment with newly-created untracked files recorded in the run metadata.
+    // Augment with newly-created untracked files and artifact-only paths
+    // recorded in the run metadata. Artifact paths are run-scoped deliverables;
+    // they intentionally appear in the message-bottom run file list even when
+    // they live under ignored directories such as `.openteams/`.
     let meta_paths = load_run_meta_observed_paths(run);
     for entry in meta_paths {
         let is_untracked = entry
             .source
             .split(',')
             .any(|source| source.trim() == "git_untracked");
-        if !is_untracked {
+        let is_artifact = is_artifact_observed_source(&entry.source);
+        if !is_untracked && !is_artifact {
             continue;
         }
-        let Some(path) = normalize_workspace_relative_path(&entry.path, root) else {
+        let Some(path) =
+            normalize_workspace_relative_path_with_options(&entry.path, root, is_artifact)
+        else {
             continue;
         };
         if covered.contains(&path) {
@@ -943,7 +1000,18 @@ fn collect_session_plain_observed_paths(
     for run in runs {
         let meta_paths = load_run_meta_observed_paths(run);
         for entry in meta_paths {
-            if let Some(path) = normalize_workspace_relative_path(&entry.path, workspace_path) {
+            if is_output_text_only_observed_source(&entry.source) {
+                continue;
+            }
+            let is_artifact = is_artifact_observed_source(&entry.source);
+            if let Some(path) = normalize_workspace_relative_path_with_options(
+                &entry.path,
+                workspace_path,
+                is_artifact,
+            ) {
+                if is_artifact && is_openteams_relative_path(&path) {
+                    continue;
+                }
                 let state = observed.entry(path).or_insert(PlainWorkspaceObservedPath {
                     existed_after_run: false,
                 });
@@ -954,17 +1022,11 @@ fn collect_session_plain_observed_paths(
         for record in work_records.iter().filter(|record| {
             record.run_id == run.id && record.message_type.eq_ignore_ascii_case("artifact")
         }) {
-            for path in extract_workspace_paths_from_text(&record.content, workspace_path) {
-                observed.entry(path).or_insert(PlainWorkspaceObservedPath {
-                    existed_after_run: false,
-                });
-            }
-        }
-
-        if let Some(output_path) = run.output_path.as_deref()
-            && let Ok(content) = std::fs::read_to_string(output_path)
-        {
-            for path in extract_workspace_paths_from_text(&content, workspace_path) {
+            for path in extract_workspace_paths_from_artifact_text(&record.content, workspace_path)
+            {
+                if is_openteams_relative_path(&path) {
+                    continue;
+                }
                 observed.entry(path).or_insert(PlainWorkspaceObservedPath {
                     existed_after_run: false,
                 });
@@ -1540,6 +1602,32 @@ pub async fn get_session_workspace_changes(
         );
         ApiError::BadRequest(format!("Failed to inspect workspace changes: {err}"))
     })?;
+
+    let (modified_count, added_count, deleted_count, untracked_count) = response
+        .changes
+        .as_ref()
+        .map(|changes| {
+            (
+                changes.modified.len(),
+                changes.added.len(),
+                changes.deleted.len(),
+                changes.untracked.len(),
+            )
+        })
+        .unwrap_or((0, 0, 0, 0));
+    tracing::debug!(
+        session_id = %session.id,
+        workspace_path,
+        include_diff,
+        is_git_repo = response.is_git_repo,
+        has_changes = response.changes.is_some(),
+        modified_count,
+        added_count,
+        deleted_count,
+        untracked_count,
+        error = ?response.error,
+        "[chat_sessions] Returning session workspace changes"
+    );
 
     let diff_file_count = response
         .changes
@@ -2275,10 +2363,11 @@ new file mode 100644
         )
         .expect("write untracked snapshot");
 
-        // meta.json records the untracked file so collect_run_files picks it up.
+        // meta.json records an untracked file and an artifact-only `.openteams`
+        // file so collect_run_files picks both up for the run-scoped list.
         fs::write(
             run_dir.join("meta.json"),
-            "{\"workspace_observed_paths\":[{\"path\":\"src/new/file.ts\",\"source\":\"git_untracked\",\"existed_after_run\":true}]}",
+            "{\"workspace_observed_paths\":[{\"path\":\"src/new/file.ts\",\"source\":\"git_untracked\",\"existed_after_run\":true},{\"path\":\".openteams/context/demo/report.md\",\"source\":\"artifact_record\",\"existed_after_run\":true}]}",
         )
         .expect("write meta");
 
@@ -2314,9 +2403,14 @@ new file mode 100644
         assert_eq!(changes.modified[0].deletions, 1);
         assert_eq!(added_paths, vec!["src/created.txt"]);
         assert_eq!(changes.added[0].additions, 3);
-        assert_eq!(untracked_paths, vec!["src/new/file.ts"]);
-        assert_eq!(changes.untracked[0].additions, 2);
-        assert!(changes.untracked[0].has_diff);
+        assert_eq!(
+            untracked_paths,
+            vec![".openteams/context/demo/report.md", "src/new/file.ts"]
+        );
+        assert_eq!(changes.untracked[0].additions, 0);
+        assert!(!changes.untracked[0].has_diff);
+        assert_eq!(changes.untracked[1].additions, 2);
+        assert!(changes.untracked[1].has_diff);
     }
 
     #[test]
@@ -2659,7 +2753,7 @@ new file mode 100644
         fs::create_dir_all(&run_dir).expect("create run dir");
         fs::write(
             run_dir.join("meta.json"),
-            r#"{"workspace_observed_paths":[{"path":"plain.txt","source":"output_text","existed_after_run":true}]}"#,
+            r#"{"workspace_observed_paths":[{"path":"plain.txt","source":"artifact_record","existed_after_run":true}]}"#,
         )
         .expect("write meta");
         let run = test_run(
@@ -2686,6 +2780,45 @@ new file mode 100644
                     .iter()
                     .any(|entry| entry.path == "plain.txt")
         );
+        assert!(response.error.is_none());
+    }
+
+    #[test]
+    fn collect_workspace_changes_ignores_output_text_manifest_entries() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let workspace_path = tempdir.path();
+        fs::write(workspace_path.join("plain.txt"), "plain\n").expect("write plain file");
+
+        let session_id = Uuid::new_v4();
+        let session_agent_id = Uuid::new_v4();
+        let run_dir = tempdir.path().join("run-record");
+        fs::create_dir_all(&run_dir).expect("create run dir");
+        fs::write(
+            run_dir.join("meta.json"),
+            r#"{"workspace_observed_paths":[{"path":"plain.txt","source":"output_text","existed_after_run":true}]}"#,
+        )
+        .expect("write meta");
+        let run = test_run(
+            session_id,
+            session_agent_id,
+            1,
+            &run_dir,
+            Utc::now() - chrono::Duration::minutes(1),
+        );
+
+        let response = collect_workspace_changes(
+            session_id,
+            &workspace_path.to_string_lossy(),
+            true,
+            vec![run],
+        );
+
+        assert!(!response.is_git_repo);
+        let changes = response.changes.expect("plain changes present");
+        assert!(changes.modified.is_empty());
+        assert!(changes.added.is_empty());
+        assert!(changes.deleted.is_empty());
+        assert!(changes.untracked.is_empty());
         assert!(response.error.is_none());
     }
 
@@ -2766,7 +2899,7 @@ new file mode 100644
     }
 
     #[test]
-    fn collect_workspace_changes_merges_artifact_paths_with_git_meta_and_allows_user_openteams_files()
+    fn collect_workspace_changes_merges_artifact_paths_but_excludes_openteams_artifacts()
      {
         let tempdir = tempfile::tempdir().expect("create tempdir");
         let repo_path = tempdir.path().join("repo");
@@ -2851,7 +2984,7 @@ new file mode 100644
             format!(
                 concat!(
                     "{{\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved `binaries/test.txt`.\"}}\n",
-                    "{{\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved `.openteams/test.txt`, `.openteams/context/demo/messages.jsonl`, and `.openteams/context/demo/independent-mode-discussion-proposal.md`.\"}}\n"
+                    "{{\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved `.openteams/test.txt`, `.openteams/context/demo/messages.jsonl`, `.openteams/context/demo/attachments/message-1/input.txt`, and `.openteams/context/demo/independent-mode-discussion-proposal.md`.\"}}\n"
                 ),
                 run_id = run.id
             ),
@@ -2880,9 +3013,9 @@ new file mode 100644
 
         assert!(all_paths.contains(&"tracked.txt"));
         assert!(all_paths.contains(&"binaries/test.txt"));
-        assert!(all_paths.contains(&".openteams/test.txt"));
+        assert!(!all_paths.contains(&".openteams/test.txt"));
         assert!(
-            all_paths.contains(&".openteams/context/demo/independent-mode-discussion-proposal.md")
+            !all_paths.contains(&".openteams/context/demo/independent-mode-discussion-proposal.md")
         );
         assert!(!all_paths.contains(&".openteams/context/demo/messages.jsonl"));
         assert!(!all_paths.contains(&".openteams/context/demo/attachments/message-1/input.txt"));

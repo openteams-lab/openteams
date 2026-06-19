@@ -127,6 +127,14 @@ check(
   html,
 );
 check(
+  'passes selected member display data to new session creation',
+  source.includes('memberAvatar?: string') &&
+    source.includes('memberModelName?: string') &&
+    source.includes('memberAvatar: selectedMember.avatar') &&
+    source.includes('memberModelName: selectedMember.modelName'),
+  source,
+);
+check(
   'read-only workflow main agent has no outer border',
   source.includes(
     'inline-flex min-w-0 max-w-[280px] items-center gap-2 rounded-md bg-[var(--surface-2)]',

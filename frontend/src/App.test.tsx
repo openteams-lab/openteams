@@ -245,7 +245,17 @@ check(
     source.includes("sendMessageToSession(backendSession.id, content") &&
     source.includes("fallbackMention") &&
     source.includes("persistToBackend: true") &&
+    source.includes("placeholderMember,") &&
     !source.includes("chatMessagesApi.send(backendSession.id"),
+  source,
+);
+check(
+  "new session first prompt gives optimistic placeholder member display data",
+  source.includes("const placeholderMemberFromCurrentSession = placeholderMention") &&
+    source.includes("members.find(") &&
+    source.includes("options.memberAvatar ?? monogramFromName(options.memberName)") &&
+    source.includes("options.memberModelName ?? 'agent'") &&
+    source.includes("placeholderMember,"),
   source,
 );
 check(
@@ -423,10 +433,10 @@ check(
   source,
 );
 check(
-  "renders DialogManager preview in the skill library tab",
-  source.includes('case "tokens"') &&
-    source.includes("<DialogManager preview />") &&
-    source.includes('activeAppPage !== "tokens"'),
+  "does not expose the removed skill library page",
+  !source.includes('case "tokens"') &&
+    !source.includes("<DialogManager preview />") &&
+    !source.includes('activeAppPage !== "tokens"'),
   source,
 );
 check(

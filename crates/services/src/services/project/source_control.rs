@@ -362,6 +362,8 @@ struct RunMetaFile {
 #[derive(Debug, Deserialize)]
 struct WorkRecordJsonLine {
     run_id: Uuid,
+    #[serde(default)]
+    message_type: String,
     content: String,
 }
 
@@ -372,6 +374,35 @@ struct StatusPathEntry {
     staged: char,
     unstaged: char,
     is_untracked: bool,
+}
+
+fn is_output_text_only_observed_source(source: &str) -> bool {
+    let mut saw_output_text = false;
+    let mut saw_other_source = false;
+    for part in source
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+    {
+        if part.eq_ignore_ascii_case("output_text") {
+            saw_output_text = true;
+        } else {
+            saw_other_source = true;
+        }
+    }
+    saw_output_text && !saw_other_source
+}
+
+fn is_artifact_observed_source(source: &str) -> bool {
+    source
+        .split(',')
+        .any(|part| part.trim().eq_ignore_ascii_case("artifact_record"))
+}
+
+fn is_openteams_relative_path(path: &str) -> bool {
+    PathBuf::from(path).components().next().is_some_and(|component| {
+        matches!(component, Component::Normal(part) if part == ".openteams")
+    })
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1248,10 +1279,15 @@ fn collect_paths_from_runs(
     let mut paths = BTreeMap::<String, SessionPathState>::new();
     for run in runs {
         for entry in load_run_meta_observed_paths(run)? {
+            if is_output_text_only_observed_source(&entry.source) {
+                continue;
+            }
             if let Ok(path) = normalize_workspace_relative_path(&entry.path, workspace_path) {
+                if is_artifact_observed_source(&entry.source) && is_openteams_relative_path(&path) {
+                    continue;
+                }
                 let state = paths.entry(path).or_default();
                 state.existed_after_run |= entry.existed_after_run;
-                let _ = &entry.source;
             }
         }
 
@@ -1276,10 +1312,13 @@ fn collect_paths_from_runs(
 
     let run_ids = runs.iter().map(|run| run.id).collect::<HashSet<_>>();
     for line in load_work_record_lines(session_id)? {
-        if !run_ids.contains(&line.run_id) {
+        if !run_ids.contains(&line.run_id) || !line.message_type.eq_ignore_ascii_case("artifact") {
             continue;
         }
         for path in extract_workspace_paths_from_text(&line.content, workspace_path) {
+            if is_openteams_relative_path(&path) {
+                continue;
+            }
             paths.entry(path).or_default();
         }
     }

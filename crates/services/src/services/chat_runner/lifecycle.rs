@@ -1279,6 +1279,16 @@ impl ChatRunner {
             }
             let workspace_change_baseline =
                 capture_workspace_change_baseline(PathBuf::from(&workspace_path).as_path()).await;
+            tracing::debug!(
+                session_id = %session_id,
+                run_id = %run_id,
+                session_agent_id = %session_agent_id,
+                agent_id = %agent_id,
+                workspace_path = %workspace_path,
+                baseline_has_git_tree = workspace_change_baseline.git_tree.is_some(),
+                baseline_untracked_count = workspace_change_baseline.untracked_files.len(),
+                "[chat_runner] Captured workspace change baseline for agent run"
+            );
             let run_records_dir = Self::workspace_run_records_dir(
                 PathBuf::from(&workspace_path).as_path(),
                 session_id,

@@ -542,11 +542,8 @@ check(
   html,
 );
 check("renders system section", html.includes("System"), html);
-check(
-  "renders Skill library with book icon",
-  html.includes("Skill library") && html.includes("lucide-book-open"),
-  html,
-);
+check("renders Agent runtime navigation", html.includes("Agent runtime"), html);
+check("does not render Skill library", !html.includes("Skill library"), html);
 check(
   "does not render duplicate project sessions from shell data",
   !html.includes("undefined"),

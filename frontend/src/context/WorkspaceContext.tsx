@@ -105,6 +105,7 @@ interface SendMessageOptions {
   fallbackMention?: string | null;
   workflowLeadAgentId?: string | null;
   persistToBackend?: boolean;
+  placeholderMember?: Pick<Member, 'avatar' | 'name' | 'modelName'> | null;
 }
 
 export type ToastTone = 'info' | 'success' | 'warning' | 'error';
@@ -570,6 +571,11 @@ const mergeCarriedRunPlaceholder = (
   };
 };
 
+const pendingPlaceholderSenderKey = (message: Message): string | null => {
+  const normalized = message.sender.replace(/^@/, '').trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+};
+
 const correlateRunningPlaceholdersWithPending = (
   current: Message[],
   runningPlaceholders: Message[],
@@ -579,33 +585,65 @@ const correlateRunningPlaceholdersWithPending = (
   }
 
   const pendingBySessionAgentId = new Map<string, Message>();
+  const pendingBySender = new Map<string, Message[]>();
+  const orphanPending: Message[] = [];
   for (const message of current) {
-    if (
-      isPendingAgentPlaceholder(message) &&
-      !message.runId &&
-      message.sessionAgentId
-    ) {
+    if (!isPendingAgentPlaceholder(message) || message.runId) {
+      continue;
+    }
+
+    if (message.sessionAgentId) {
       pendingBySessionAgentId.set(message.sessionAgentId, message);
+    } else {
+      orphanPending.push(message);
+    }
+
+    const senderKey = pendingPlaceholderSenderKey(message);
+    if (senderKey) {
+      const pendingForSender = pendingBySender.get(senderKey) ?? [];
+      pendingForSender.push(message);
+      pendingBySender.set(senderKey, pendingForSender);
     }
   }
 
-  if (pendingBySessionAgentId.size === 0) {
+  if (
+    pendingBySessionAgentId.size === 0 &&
+    pendingBySender.size === 0 &&
+    orphanPending.length === 0
+  ) {
     return { current, runningPlaceholders };
   }
 
   const consumedPendingPlaceholderIds = new Set<string>();
   const correlatedRunningPlaceholders = runningPlaceholders.map(
     (placeholder) => {
-      if (
-        !placeholder.runId ||
-        placeholder.sourceMessageId ||
-        placeholder.clientMessageId ||
-        !placeholder.sessionAgentId
-      ) {
+      if (placeholder.sourceMessageId || placeholder.clientMessageId) {
         return placeholder;
       }
 
-      const pending = pendingBySessionAgentId.get(placeholder.sessionAgentId);
+      let pending = placeholder.sessionAgentId
+        ? pendingBySessionAgentId.get(placeholder.sessionAgentId)
+        : undefined;
+      if (!pending) {
+        const senderKey = pendingPlaceholderSenderKey(placeholder);
+        const senderMatches = senderKey
+          ? (pendingBySender.get(senderKey) ?? []).filter(
+              (candidate) =>
+                !consumedPendingPlaceholderIds.has(candidate.id),
+            )
+          : [];
+        if (senderMatches.length === 1) {
+          pending = senderMatches[0];
+        }
+      }
+      if (
+        !pending &&
+        runningPlaceholders.length === 1 &&
+        orphanPending.length === 1 &&
+        !consumedPendingPlaceholderIds.has(orphanPending[0].id)
+      ) {
+        pending = orphanPending[0];
+      }
       if (!pending) return placeholder;
       consumedPendingPlaceholderIds.add(pending.id);
 
@@ -760,6 +798,7 @@ const makePendingAgentPlaceholder = (
   members: Member[],
   fallbackMention?: string | null,
   sessionId?: string,
+  placeholderMember?: Pick<Member, 'avatar' | 'name' | 'modelName'> | null,
 ): Message | null => {
   const mentions = extractAgentMentions(text);
   const effectiveMentions =
@@ -779,14 +818,15 @@ const makePendingAgentPlaceholder = (
   const fallbackName = effectiveMentions[0]
     ? asAgentHandle(effectiveMentions[0])
     : '@agent';
-  const sender = asAgentHandle(fallbackMember?.name ?? fallbackName);
+  const displayMember = fallbackMember ?? placeholderMember ?? null;
+  const sender = asAgentHandle(displayMember?.name ?? fallbackName);
 
   return {
     id: `${PENDING_AGENT_MESSAGE_PREFIX}${userMsgId}`,
     sessionId,
-    avatar: fallbackMember?.avatar ?? monogramFromName(sender),
+    avatar: displayMember?.avatar ?? monogramFromName(sender),
     sender,
-    model: fallbackMember?.modelName,
+    model: displayMember?.modelName,
     time: 'just now',
     createdAt: new Date().toISOString(),
     text: '',
@@ -3479,6 +3519,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       sessionId === activeSessionIdRef.current ? membersAsync.data : [],
       fallbackMention,
       sessionId,
+      options.placeholderMember,
     );
     if (!pendingAgentMsg) return;
 
@@ -3527,21 +3568,30 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         ? chatInputMode
         : DEFAULT_CHAT_INPUT_MODE);
     const explicitMentions = extractAgentMentions(text);
+    const hasExplicitMentions = explicitMentions.length > 0;
+    const hasRouteMentionOverride =
+      options.routeMentions !== undefined && options.routeMentions.length > 0;
     const mainAgentMention = mainAgentName
       ? mainAgentName.replace(/^@/, '').toLowerCase()
       : null;
     const routeMentions =
       options.routeMentions ??
-      (explicitMentions.length > 0
+      (hasExplicitMentions
         ? explicitMentions
         : mainAgentMention
           ? [mainAgentMention]
           : []);
+    const visibleMentions =
+      effectiveChatInputMode === 'workflow' &&
+      !hasExplicitMentions &&
+      !hasRouteMentionOverride
+        ? []
+        : routeMentions;
     const fallbackMention =
       options.fallbackMention ??
       (routeMentions.length > 0
         ? routeMentions[0]
-        : explicitMentions.length === 0
+        : !hasExplicitMentions
           ? mainAgentMention
           : null);
     const userMsgId = `msg-user-${Date.now()}`;
@@ -3555,7 +3605,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       text,
       isUser: true,
       clientMessageId: userMsgId,
-      mentions: effectiveChatInputMode === 'workflow' ? [] : routeMentions,
+      mentions: visibleMentions,
       quotedMessage: options.quotedMessage,
       referenceMessageId: options.quotedMessage?.id,
     };
@@ -3569,6 +3619,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
             sid === activeSessionIdRef.current ? membersAsync.data : [],
             fallbackMention,
             sid,
+            options.placeholderMember,
           )
         : null;
     const existingQueue = pendingAgentMsg?.sessionAgentId
@@ -3641,7 +3692,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     if (effectiveChatInputMode === 'workflow') {
       meta.chat_input_mode = 'workflow';
     }
-    if (effectiveChatInputMode !== 'workflow' && routeMentions.length > 0) {
+    const shouldPersistRouteMentions =
+      routeMentions.length > 0 &&
+      (effectiveChatInputMode !== 'workflow' ||
+        hasExplicitMentions ||
+        hasRouteMentionOverride);
+    if (shouldPersistRouteMentions) {
       meta.mentions = routeMentions;
     }
     meta.client_message_id = userMsgId;

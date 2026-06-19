@@ -130,6 +130,23 @@ check(
   { source, chatInputPrefillSource },
 );
 check(
+  "caches composer drafts per session as input changes",
+  source.includes("const setInputTextDraft = useCallback") &&
+    source.includes("sessionDraftCache.set(activeSessionId, nextText)") &&
+    source.includes("sessionDraftCache.delete(activeSessionId)") &&
+    source.includes("setInputTextDraft(nextValue)") &&
+    source.includes('setInputTextDraft("")') &&
+    !source.includes("inputTextRef"),
+  source,
+);
+check(
+  "uses the main agent mention in the free-mode placeholder",
+  source.includes('const freeModePlaceholder = t("discussPlaceholder", {') &&
+    source.includes("agent: mainAgentHandle") &&
+    source.includes(": freeModePlaceholder"),
+  source,
+);
+check(
   "opens files when a related file has no inline diff",
   source.includes("openFileInVSCode") &&
     source.includes("openAsDiff: false") &&
@@ -420,7 +437,7 @@ check(
   source,
 );
 check(
-  "free-chat mention picker opens on @ and captures keyboard selection",
+  "composer mention picker opens on @ and captures keyboard selection",
   source.includes("activeMemberPickerIndex") &&
     source.includes("const handleInputChange = (") &&
     source.includes('nextValue[cursor - 1] === "@"') &&
@@ -431,6 +448,8 @@ check(
     source.includes("insertMemberMention(member)") &&
     source.includes("aria-selected={index === activeMemberPickerIndex}") &&
     source.includes("onChange={handleInputChange}") &&
+    !source.includes("if (!isPlanMode && isMemberPickerOpen)") &&
+    !source.includes("if (!isPlanMode && cursor") &&
     source.indexOf("insertMemberMention(member)") <
       source.indexOf("void handleSend()"),
   source,

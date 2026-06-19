@@ -60,7 +60,12 @@ eq(
   mockShellOptions.systemItems.find((item) => item.id === 'team-templates')?.targetPage,
   'team-templates',
 );
-check('system includes skill library', systemIds.has('skills-library'));
+check('system omits skill library', !systemIds.has('skills-library'));
+eq(
+  'agent runtime label is explicit',
+  mockShellOptions.systemItems.find((item) => item.id === 'agent-runtime')?.label,
+  'Agent runtime',
+);
 check('system includes settings', systemIds.has('settings'));
 
 const personalSettings = mockSettingsOptions.menu.find(
