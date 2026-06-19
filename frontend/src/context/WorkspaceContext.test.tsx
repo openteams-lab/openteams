@@ -322,7 +322,31 @@ check(
     source.includes('!ignoredSessionAgentIds?.has(sessionAgent.id)') &&
     source.includes('optimisticallyStoppedSessionAgentIdsRef.current') &&
     source.includes('hasRemainingRunningAgent') &&
-    source.includes('setSessionRunningIndicator(sid, hasRemainingRunningAgent)'),
+    source.includes('setSessionRunningIndicator(sid, hasRemainingRunningAgent)') &&
+    source.includes('message.sessionAgentId !== parsed.session_agent_id') &&
+    source.includes("sessionAgent.state !== 'running'"),
+  source,
+);
+check(
+  'agent completion highlights persist until the session is opened',
+  source.includes('UNREAD_AGENT_COMPLETION_SESSION_IDS_STORAGE_KEY') &&
+    source.includes('RUNNING_AGENT_SESSION_IDS_STORAGE_KEY') &&
+    source.includes('runningAgentSessionIdsRef') &&
+    source.includes('unreadAgentCompletionSessionIdsRef') &&
+    source.includes('syncSessionAgentActivityIndicator') &&
+    source.includes('hasUnreadAgentCompletion') &&
+    source.includes('clearUnreadAgentCompletion(activeSessionId)'),
+  source,
+);
+check(
+  'polls non-active running sessions so sidebar icons leave running state',
+  source.includes('SIDEBAR_RUNNING_INDICATOR_POLL_MS') &&
+    source.includes('runningSidebarSessionIds') &&
+    source.includes('session.id !== activeSessionId') &&
+    source.includes('session.hasRunningAgent || session.hasRunningWorkflow') &&
+    source.includes('refreshRunningSidebarSessions') &&
+    source.includes('window.setInterval(') &&
+    source.includes('refreshSessionRunningIndicators(sessionId)'),
   source,
 );
 check(

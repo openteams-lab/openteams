@@ -91,6 +91,12 @@ eq('session title', sess.title, 'Fix login flicker');
 eq('session active', sess.active, true);
 eq('session default icon', sess.icon, 'message-square');
 eq(
+  'session unread agent completion indicator',
+  mapSession(sessB, { hasUnreadAgentCompletion: true })
+    .hasUnreadAgentCompletion,
+  true,
+);
+eq(
   'session falls back when title null',
   mapSession({ ...sessB, title: null }).title,
   'Untitled session',

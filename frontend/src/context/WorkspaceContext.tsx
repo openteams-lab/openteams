@@ -224,11 +224,44 @@ const LEGACY_AGENT_MARKDOWN_FONT_SIZE_STORAGE_KEY =
 // instead of always falling back to the first session in the list.
 const ACTIVE_SESSION_ID_STORAGE_KEY = 'openteams-active-session-id';
 const SELECTED_PROJECT_ID_STORAGE_KEY = 'openteams-selected-project-id';
+const RUNNING_AGENT_SESSION_IDS_STORAGE_KEY =
+  'openteams-running-agent-session-ids';
+const UNREAD_AGENT_COMPLETION_SESSION_IDS_STORAGE_KEY =
+  'openteams-unread-agent-completion-session-ids';
 // WebSocket auto-reconnect backoff bounds (ms).
 const CHAT_STREAM_RECONNECT_BASE_DELAY_MS = 1000;
 const CHAT_STREAM_RECONNECT_MAX_DELAY_MS = 30000;
+const SIDEBAR_RUNNING_INDICATOR_POLL_MS = 3000;
 const CHAT_MESSAGE_FONT_SIZE_DEFAULT = 14;
 export const CHAT_MESSAGE_FONT_SIZE_OPTIONS = [13, 14, 15, 16] as const;
+
+const readSessionIdSet = (storageKey: string): Set<string> => {
+  if (typeof localStorage === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(
+      parsed.filter(
+        (value): value is string =>
+          typeof value === 'string' && value.trim().length > 0,
+      ),
+    );
+  } catch {
+    return new Set();
+  }
+};
+
+const writeSessionIdSet = (storageKey: string, sessionIds: Set<string>) => {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    if (sessionIds.size === 0) {
+      localStorage.removeItem(storageKey);
+      return;
+    }
+    localStorage.setItem(storageKey, JSON.stringify([...sessionIds]));
+  } catch {}
+};
 
 const normalizeChatMessageFontSize = (value: number | string | null): number => {
   const numeric = typeof value === 'number' ? value : Number(value);
@@ -1312,12 +1345,91 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const optimisticallyStoppedSessionAgentIdsRef = useRef<Set<string>>(
     new Set(),
   );
+  const runningAgentSessionIdsRef = useRef<Set<string>>(
+    readSessionIdSet(RUNNING_AGENT_SESSION_IDS_STORAGE_KEY),
+  );
+  const unreadAgentCompletionSessionIdsRef = useRef<Set<string>>(
+    readSessionIdSet(UNREAD_AGENT_COMPLETION_SESSION_IDS_STORAGE_KEY),
+  );
   const deferredQueuedMessageIdsRef = useRef<Set<string>>(new Set());
   const deferredQueuedClientMessageIdsRef = useRef<Set<string>>(new Set());
   const deferredQueuedUserMessagesRef = useRef<Map<string, Message>>(new Map());
   useEffect(() => {
     allMessagesRef.current = allMessages;
   }, [allMessages]);
+
+  const persistAgentSessionActivityStorage = useCallback(() => {
+    writeSessionIdSet(
+      RUNNING_AGENT_SESSION_IDS_STORAGE_KEY,
+      runningAgentSessionIdsRef.current,
+    );
+    writeSessionIdSet(
+      UNREAD_AGENT_COMPLETION_SESSION_IDS_STORAGE_KEY,
+      unreadAgentCompletionSessionIdsRef.current,
+    );
+  }, []);
+
+  const syncSessionAgentActivityIndicator = useCallback(
+    (sessionId: string, hasRunningAgent: boolean): boolean => {
+      if (!sessionId) return false;
+
+      let changed = false;
+      if (hasRunningAgent) {
+        if (!runningAgentSessionIdsRef.current.has(sessionId)) {
+          runningAgentSessionIdsRef.current.add(sessionId);
+          changed = true;
+        }
+        if (unreadAgentCompletionSessionIdsRef.current.delete(sessionId)) {
+          changed = true;
+        }
+      } else {
+        const wasRunning = runningAgentSessionIdsRef.current.delete(sessionId);
+        if (wasRunning) {
+          changed = true;
+        }
+        if (activeSessionIdRef.current === sessionId) {
+          if (unreadAgentCompletionSessionIdsRef.current.delete(sessionId)) {
+            changed = true;
+          }
+        } else if (wasRunning) {
+          unreadAgentCompletionSessionIdsRef.current.add(sessionId);
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        persistAgentSessionActivityStorage();
+      }
+      return unreadAgentCompletionSessionIdsRef.current.has(sessionId);
+    },
+    [persistAgentSessionActivityStorage],
+  );
+
+  const clearUnreadAgentCompletion = useCallback(
+    (sessionId: string) => {
+      if (!sessionId) return;
+      if (!unreadAgentCompletionSessionIdsRef.current.delete(sessionId)) {
+        return;
+      }
+
+      persistAgentSessionActivityStorage();
+      setSessionsAsync((prev) => {
+        let changed = false;
+        const data = prev.data.map((session) => {
+          if (
+            session.id !== sessionId ||
+            !session.hasUnreadAgentCompletion
+          ) {
+            return session;
+          }
+          changed = true;
+          return { ...session, hasUnreadAgentCompletion: false };
+        });
+        return changed ? { ...prev, data } : prev;
+      });
+    },
+    [persistAgentSessionActivityStorage],
+  );
 
   const rememberDeferredQueuedUserMessage = useCallback((message: Message) => {
     if (!message.isUser) return;
@@ -1402,7 +1514,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         localStorage.removeItem(ACTIVE_SESSION_ID_STORAGE_KEY);
       }
     } catch {}
-  }, [activeSessionId]);
+    clearUnreadAgentCompletion(activeSessionId);
+  }, [activeSessionId, clearUnreadAgentCompletion]);
 
   useEffect(() => {
     messagesRequestIdRef.current += 1;
@@ -1505,22 +1618,31 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const setSessionRunningIndicator = useCallback(
     (sessionId: string, hasRunningAgent: boolean) => {
       if (!sessionId) return;
+      const hasUnreadAgentCompletion = syncSessionAgentActivityIndicator(
+        sessionId,
+        hasRunningAgent,
+      );
       setSessionsAsync((prev) => {
         let changed = false;
         const data = prev.data.map((session) => {
           if (
             session.id !== sessionId ||
-            session.hasRunningAgent === hasRunningAgent
+            (session.hasRunningAgent === hasRunningAgent &&
+              session.hasUnreadAgentCompletion === hasUnreadAgentCompletion)
           ) {
             return session;
           }
           changed = true;
-          return { ...session, hasRunningAgent };
+          return {
+            ...session,
+            hasRunningAgent,
+            hasUnreadAgentCompletion,
+          };
         });
         return changed ? { ...prev, data } : prev;
       });
     },
-    [],
+    [syncSessionAgentActivityIndicator],
   );
   const setSessionWorkflowRunningIndicator = useCallback(
     (sessionId: string, hasRunningWorkflow: boolean) => {
@@ -1808,10 +1930,15 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       const mapped = mapSessions(backend, nextActiveSessionId).map(
         (session) => {
           const indicators = runningIndicators.get(session.id);
+          const hasRunningAgent = indicators?.hasRunningAgent ?? false;
           return {
             ...session,
-            hasRunningAgent: indicators?.hasRunningAgent ?? false,
+            hasRunningAgent,
             hasRunningWorkflow: indicators?.hasRunningWorkflow ?? false,
+            hasUnreadAgentCompletion: syncSessionAgentActivityIndicator(
+              session.id,
+              hasRunningAgent,
+            ),
           };
         },
       );
@@ -1819,7 +1946,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (err) {
       setSessionsAsync((prev) => fail(prev, err));
     }
-  }, [clearSessionScopedState, syncActiveSessionSelection]);
+  }, [
+    clearSessionScopedState,
+    syncActiveSessionSelection,
+    syncSessionAgentActivityIndicator,
+  ]);
 
   const refreshArchivedSessions = useCallback(async (): Promise<void> => {
     const projectId = selectedProjectIdRef.current;
@@ -1997,7 +2128,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         for (const sessionAgent of sessionAgents) {
           if (
             suppressedStoppedIds.has(sessionAgent.id) &&
-            sessionAgent.state !== 'stopping'
+            sessionAgent.state !== 'stopping' &&
+            sessionAgent.state !== 'running'
           ) {
             suppressedStoppedIds.delete(sessionAgent.id);
           }
@@ -2402,6 +2534,37 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     },
     [setSessionRunningIndicator, setSessionWorkflowRunningIndicator],
   );
+
+  useEffect(() => {
+    if (sessionsAsync.source !== 'api') return;
+
+    const runningSidebarSessionIds = sessionsAsync.data
+      .filter(
+        (session) =>
+          session.id !== activeSessionId &&
+          Boolean(session.hasRunningAgent || session.hasRunningWorkflow),
+      )
+      .map((session) => session.id);
+    if (runningSidebarSessionIds.length === 0) return;
+
+    const refreshRunningSidebarSessions = () => {
+      for (const sessionId of runningSidebarSessionIds) {
+        void refreshSessionRunningIndicators(sessionId);
+      }
+    };
+
+    refreshRunningSidebarSessions();
+    const intervalId = window.setInterval(
+      refreshRunningSidebarSessions,
+      SIDEBAR_RUNNING_INDICATOR_POLL_MS,
+    );
+    return () => window.clearInterval(intervalId);
+  }, [
+    activeSessionId,
+    refreshSessionRunningIndicators,
+    sessionsAsync.data,
+    sessionsAsync.source,
+  ]);
 
   const resetWorkspaceChanges = useCallback(() => {
     workspaceChangesRequestIdRef.current += 1;
@@ -3029,21 +3192,30 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       if (parsed.type === 'agent_state') {
-        void refreshMembers();
         if (isRunningSessionAgentState(parsed.state)) {
           setSessionRunningIndicator(sid, true);
         } else {
+          optimisticallyStoppedSessionAgentIdsRef.current.add(
+            parsed.session_agent_id,
+          );
+          const hasRemainingRunningAgent = (
+            allMessagesRef.current[sid] ?? []
+          ).some(
+            (message) =>
+              message.isAgentRunning &&
+              message.sessionAgentId !== parsed.session_agent_id &&
+              !isOptimisticPendingAgentPlaceholder(message),
+          );
+          setSessionRunningIndicator(sid, hasRemainingRunningAgent);
           void refreshSessionRunningIndicators(sid);
         }
+        void refreshMembers();
 
         // When an agent leaves an active run state,
         // clear only placeholders tied to that concrete run. Optimistic
         // pending placeholders represent newly sent/queued messages and must
         // survive stale idle/dead events from an earlier run.
         if (!isActiveAgentState(parsed.state)) {
-          optimisticallyStoppedSessionAgentIdsRef.current.delete(
-            parsed.session_agent_id,
-          );
           setAllMessages((prev) => {
             const current = filterMessagesForSession(sid, prev[sid] ?? []);
             if (current.length === 0) return prev;

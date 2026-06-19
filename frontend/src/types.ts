@@ -51,6 +51,7 @@ export interface Session {
   active: boolean;
   hasRunningAgent?: boolean;
   hasRunningWorkflow?: boolean;
+  hasUnreadAgentCompletion?: boolean;
 }
 
 export interface ArtifactItem {

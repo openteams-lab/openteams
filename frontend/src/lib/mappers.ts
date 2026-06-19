@@ -58,7 +58,7 @@ const SESSION_ICON_DEFAULT = 'message-square';
  * `Session.icon` and `Session.active` have no backend counterpart.
  * - `icon` defaults to `'message-square'`; UI can post-process by title keyword.
  * - `active` is derived by the caller using the current `activeSessionId`.
- * - running indicators are derived by callers that already loaded runtime state.
+ * - activity indicators are derived by callers that already loaded runtime state.
  */
 export const mapSession = (
   backend: BackendChatSession,
@@ -67,6 +67,7 @@ export const mapSession = (
     iconOverride?: string;
     hasRunningAgent?: boolean;
     hasRunningWorkflow?: boolean;
+    hasUnreadAgentCompletion?: boolean;
   },
 ): Session => ({
   id: backend.id,
@@ -75,6 +76,7 @@ export const mapSession = (
   active: opts?.activeSessionId === backend.id,
   hasRunningAgent: opts?.hasRunningAgent,
   hasRunningWorkflow: opts?.hasRunningWorkflow,
+  hasUnreadAgentCompletion: opts?.hasUnreadAgentCompletion,
 });
 
 export const mapSessions = (

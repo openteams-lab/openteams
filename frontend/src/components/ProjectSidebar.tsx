@@ -1916,11 +1916,18 @@ export function ProjectSidebar({
                     activePage === "workspace" &&
                     session.id === activeSessionId;
                   const isRunning = hasRunningSessionActivity(session);
+                  const hasUnreadAgentCompletion =
+                    !isRunning && Boolean(session.hasUnreadAgentCompletion);
                   const SessionIcon = isRunning ? LoaderCircle : Box;
                   const sessionLabel = isRunning
                     ? `${session.title} - ${translate(
                         "sidebar.sessionRunning",
                         "agent running",
+                      )}`
+                    : hasUnreadAgentCompletion
+                    ? `${session.title} - ${translate(
+                        "sidebar.sessionAgentCompleted",
+                        "agent completed",
                       )}`
                     : session.title;
                   return (
@@ -1943,6 +1950,8 @@ export function ProjectSidebar({
                         className={`h-3.5 w-3.5 shrink-0 ${
                           isRunning
                             ? "animate-spin text-[var(--primary)]"
+                            : hasUnreadAgentCompletion
+                            ? "text-[var(--primary)]"
                             : active
                             ? "text-[var(--primary)]"
                             : "text-[var(--ink-tertiary)]"

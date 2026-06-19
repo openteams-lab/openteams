@@ -158,6 +158,24 @@ const workflowRunningSessionHtml = renderToStaticMarkup(
     onProjectAction={() => undefined}
   />,
 );
+const completedAgentSessionHtml = renderToStaticMarkup(
+  <ProjectSidebar
+    shellOptions={mockShellOptions}
+    sessions={[
+      {
+        ...mockWorkspaceBootstrap.sessions[0],
+        hasUnreadAgentCompletion: true,
+      },
+    ]}
+    activeSessionId="another-session"
+    activePage="workspace"
+    weeklyCost={mockWorkspaceBootstrap.defaults.weeklyCost}
+    onNavigate={() => undefined}
+    onSessionSelect={() => undefined}
+    onPrimaryAction={() => undefined}
+    onProjectAction={() => undefined}
+  />,
+);
 const runningOrderedHtml = renderToStaticMarkup(
   <ProjectSidebar
     shellOptions={mockShellOptions}
@@ -246,6 +264,13 @@ check(
   workflowRunningSessionHtml.includes("animate-spin") &&
     workflowRunningSessionHtml.includes("agent running"),
   workflowRunningSessionHtml,
+);
+check(
+  "renders completed agent sessions with non-running highlighted icon",
+  completedAgentSessionHtml.includes("text-[var(--primary)]") &&
+    completedAgentSessionHtml.includes("agent completed") &&
+    !completedAgentSessionHtml.includes("animate-spin"),
+  completedAgentSessionHtml,
 );
 check(
   "moves running workflow sessions to the top of the collapsed session group",
