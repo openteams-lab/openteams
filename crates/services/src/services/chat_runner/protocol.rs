@@ -18,7 +18,40 @@ struct PlanGenerationPreviousPlanContext {
     plan_json: String,
 }
 
+const AGENT_EMPTY_OUTPUT_FALLBACK_MESSAGE: &str = "Agent运行失败";
+const AGENT_EMPTY_OUTPUT_FALLBACK_I18N_KEY: &str = "agent.runFailed";
+const AGENT_STOPPED_OUTPUT_I18N_KEY: &str = "agent.stopped";
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct AgentEmptyOutputFallback {
+    message: &'static str,
+    i18n_key: Option<&'static str>,
+}
+
+const DEFAULT_AGENT_EMPTY_OUTPUT_FALLBACK: AgentEmptyOutputFallback = AgentEmptyOutputFallback {
+    message: AGENT_EMPTY_OUTPUT_FALLBACK_MESSAGE,
+    i18n_key: Some(AGENT_EMPTY_OUTPUT_FALLBACK_I18N_KEY),
+};
+
 impl ChatRunner {
+    fn localized_agent_stopped_message(language_code: &str) -> &'static str {
+        match language_code {
+            "zh-Hans" | "zh-Hant" => "Agent停止运行",
+            "ja" => "エージェントは停止しました",
+            "ko" => "에이전트 실행이 중지되었습니다",
+            "fr" => "L’agent a été arrêté",
+            "es" => "El agente se detuvo",
+            _ => "Agent stopped",
+        }
+    }
+
+    fn stopped_empty_output_fallback(language_code: &str) -> AgentEmptyOutputFallback {
+        AgentEmptyOutputFallback {
+            message: Self::localized_agent_stopped_message(language_code),
+            i18n_key: Some(AGENT_STOPPED_OUTPUT_I18N_KEY),
+        }
+    }
+
     pub(super) fn emit_protocol_notice(
         &self,
         notice: ProtocolNoticeArgs<'_>,
@@ -114,13 +147,17 @@ impl ChatRunner {
         run_id: Uuid,
         agent_name: &str,
         source_message_id: Uuid,
+        client_message_id: Option<&str>,
         chain_depth: u32,
         prompt_language: ResolvedPromptLanguage,
         raw_output: &str,
         error_info: Option<(&str, Option<&NormalizedEntryError>)>,
         token_usage: Option<&TokenUsageInfo>,
+        empty_output_fallback: Option<AgentEmptyOutputFallback>,
     ) -> Result<(), ChatRunnerError> {
         let output_is_empty = raw_output.trim().is_empty();
+        let empty_output_fallback =
+            empty_output_fallback.unwrap_or(DEFAULT_AGENT_EMPTY_OUTPUT_FALLBACK);
 
         tracing::debug!(
             session_id = %session_id,
@@ -137,6 +174,7 @@ impl ChatRunner {
             "session_id": session_id,
             "session_agent_id": session_agent_id,
             "source_message_id": source_message_id,
+            "client_message_id": client_message_id,
             "chain_depth": chain_depth + 1,
             "protocol": {
                 "type": "message",
@@ -164,17 +202,48 @@ impl ChatRunner {
                 "model_context_window": token_usage.model_context_window,
                 "input_tokens": token_usage.input_tokens,
                 "output_tokens": token_usage.output_tokens,
+                "reasoning_output_tokens": token_usage.reasoning_output_tokens,
                 "cache_read_tokens": token_usage.cache_read_tokens,
-                "cache_write_tokens": token_usage.cache_write_tokens,
+                "runtime_agent": token_usage.runtime_agent,
+                "runtime_model_id": token_usage.runtime_model_id,
+                "provider_id": token_usage.provider_id,
+                "runtime_thread_id": token_usage.runtime_thread_id,
+                "usage_scope": token_usage.usage_scope,
+                "snapshot_total_tokens": token_usage.snapshot_total_tokens,
+                "snapshot_input_tokens": token_usage.snapshot_input_tokens,
+                "snapshot_output_tokens": token_usage.snapshot_output_tokens,
+                "snapshot_reasoning_output_tokens": token_usage.snapshot_reasoning_output_tokens,
+                "snapshot_cache_read_tokens": token_usage.snapshot_cache_read_tokens,
                 "is_estimated": token_usage.is_estimated,
             });
         }
+        let (display_content, used_empty_output_fallback) = if raw_output.trim().is_empty() {
+            match error_info.and_then(|(error_content, _)| {
+                let trimmed = error_content.trim();
+                (!trimmed.is_empty()).then(|| trimmed.to_string())
+            }) {
+                Some(error_content) => (error_content, false),
+                None => (empty_output_fallback.message.to_string(), true),
+            }
+        } else {
+            (raw_output.to_string(), false)
+        };
+
+        if used_empty_output_fallback
+            && let Some(i18n_key) = empty_output_fallback.i18n_key
+        {
+            meta["i18n"] = serde_json::json!({
+                "key": i18n_key,
+                "params": {}
+            });
+        }
+
         let message = chat::create_message(
             &self.db.pool,
             session_id,
             ChatSenderType::Agent,
             Some(agent_id),
-            raw_output.to_string(),
+            display_content.clone(),
             Some(meta),
         )
         .await?;
@@ -188,7 +257,7 @@ impl ChatRunner {
             agent_id,
             owner: agent_name.to_string(),
             message_type: "message",
-            content: raw_output.to_string(),
+            content: display_content,
             created_at: message.created_at.to_rfc3339(),
         };
         Self::append_jsonl_line(&Self::session_work_records_path(session_id), &entry).await?;
@@ -207,6 +276,7 @@ impl ChatRunner {
         run_id: Uuid,
         agent_name: &str,
         source_message_id: Uuid,
+        client_message_id: Option<&str>,
         error_content: &str,
         error_type: Option<&NormalizedEntryError>,
     ) -> Result<(), ChatRunnerError> {
@@ -224,6 +294,7 @@ impl ChatRunner {
             "session_agent_id": session_agent_id,
             "agent_id": agent_id,
             "source_message_id": source_message_id,
+            "client_message_id": client_message_id,
             "error": error_meta,
         });
 
@@ -248,6 +319,70 @@ impl ChatRunner {
 
         self.emit_message_new(session_id, message);
 
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn persist_protocol_display_fallback_message(
+        &self,
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        run_id: Uuid,
+        source_message_id: Uuid,
+        client_message_id: Option<&str>,
+        chain_depth: u32,
+        prompt_language: ResolvedPromptLanguage,
+        fallback_type: &str,
+        content: String,
+        error_content: Option<&str>,
+        error_type: Option<&NormalizedEntryError>,
+        token_usage: Option<&TokenUsageInfo>,
+    ) -> Result<(), ChatRunnerError> {
+        let mut meta = Self::build_protocol_send_message_meta(
+            prompt_language.code,
+            run_id,
+            session_agent_id,
+            source_message_id,
+            client_message_id,
+            chain_depth,
+            "you",
+            0,
+            None,
+            None,
+            token_usage,
+        );
+        meta["protocol"] = serde_json::json!({
+            "type": fallback_type,
+            "mode": "display_fallback",
+            "source": "no_send"
+        });
+
+        if let Some(error_content) = error_content
+            && !error_content.trim().is_empty()
+        {
+            let summary: String = error_content.chars().take(200).collect();
+            let mut error_meta = serde_json::json!({
+                "content": error_content,
+                "summary": summary,
+            });
+            if let Some(error_type) = error_type {
+                error_meta["error_type"] =
+                    serde_json::to_value(error_type).unwrap_or(serde_json::Value::Null);
+            }
+            meta["error"] = error_meta;
+        }
+
+        let message = chat::create_message(
+            &self.db.pool,
+            session_id,
+            ChatSenderType::Agent,
+            Some(agent_id),
+            content,
+            Some(meta),
+        )
+        .await?;
+        self.emit_message_new(session_id, message);
         Ok(())
     }
 
@@ -447,17 +582,24 @@ impl ChatRunner {
         agent_name: &str,
         run_id: Uuid,
         source_message_id: Uuid,
+        client_message_id: Option<&str>,
         chain_depth: u32,
         prompt_language: ResolvedPromptLanguage,
         latest_assistant: &str,
         error_content: Option<&str>,
         error_type: Option<&NormalizedEntryError>,
+        completion_was_stopped: bool,
         token_usage: Option<&TokenUsageInfo>,
         protocol_retry_attempt: u32,
     ) -> Result<ProtocolProcessResult, ChatRunnerError> {
         let output_is_empty = latest_assistant.trim().is_empty();
         let has_error = error_content.is_some_and(|e| !e.is_empty());
         let error_info = error_content.map(|ec| (ec, error_type));
+        let empty_output_fallback = if completion_was_stopped {
+            Self::stopped_empty_output_fallback(prompt_language.code)
+        } else {
+            DEFAULT_AGENT_EMPTY_OUTPUT_FALLBACK
+        };
 
         tracing::debug!(
             session_id = %session_id,
@@ -474,43 +616,33 @@ impl ChatRunner {
             Ok(messages) => messages,
             Err(err) => {
                 if err.code == ChatProtocolNoticeCode::EmptyMessage {
-                    // If there's an error, persist a message even with empty output
-                    if has_error {
-                        tracing::info!(
-                            session_id = %session_id,
-                            session_agent_id = %session_agent_id,
-                            agent_id = %agent_id,
-                            run_id = %run_id,
-                            source_message_id = %source_message_id,
-                            agent_name,
-                            "persisting error message with empty assistant output"
-                        );
-                        self.persist_raw_agent_message_and_work_record(
-                            session_id,
-                            session_agent_id,
-                            agent_id,
-                            run_id,
-                            agent_name,
-                            source_message_id,
-                            chain_depth,
-                            prompt_language,
-                            latest_assistant,
-                            error_info,
-                            token_usage,
-                        )
-                        .await?;
-                        return Ok(ProtocolProcessResult::Success(1));
-                    }
-                    tracing::warn!(
+                    tracing::info!(
                         session_id = %session_id,
                         session_agent_id = %session_agent_id,
                         agent_id = %agent_id,
                         run_id = %run_id,
                         source_message_id = %source_message_id,
                         agent_name,
-                        "skipping empty assistant output"
+                        has_error,
+                        "persisting fallback message for empty assistant output"
                     );
-                    return Ok(ProtocolProcessResult::Success(0));
+                    self.persist_raw_agent_message_and_work_record(
+                        session_id,
+                        session_agent_id,
+                        agent_id,
+                        run_id,
+                        agent_name,
+                        source_message_id,
+                        client_message_id,
+                        chain_depth,
+                        prompt_language,
+                        latest_assistant,
+                        error_info,
+                        token_usage,
+                        Some(empty_output_fallback),
+                    )
+                    .await?;
+                    return Ok(ProtocolProcessResult::Success(1));
                 }
 
                 if Self::should_handle_protocol_error_as_raw_output(&err) {
@@ -545,19 +677,34 @@ impl ChatRunner {
                         protocol_retry_attempt,
                         "retries exhausted; reporting protocol parse failure"
                     );
-                    self.emit_protocol_error_message(
+                    self.emit_protocol_notice(
+                        ProtocolNoticeArgs {
+                            session_id,
+                            session_agent_id,
+                            agent_id,
+                            run_id,
+                            agent_name,
+                            output_is_empty,
+                        },
+                        &err,
+                    );
+                    self.persist_raw_agent_message_and_work_record(
                         session_id,
                         session_agent_id,
                         agent_id,
                         run_id,
                         agent_name,
                         source_message_id,
-                        &err,
-                        output_is_empty,
+                        client_message_id,
+                        chain_depth,
+                        prompt_language,
                         latest_assistant,
+                        error_info,
+                        token_usage,
+                        Some(empty_output_fallback),
                     )
                     .await?;
-                    return Ok(ProtocolProcessResult::ProtocolFailure);
+                    return Ok(ProtocolProcessResult::Success(1));
                 }
 
                 self.emit_protocol_error_message(
@@ -580,10 +727,15 @@ impl ChatRunner {
         let mut workflow_generate_plan_check = false;
         let mut workflow_generate_content = String::new();
         let mut workflow_generate_design_doc_paths: Option<Vec<String>> = None;
+        let mut conclusion_display_fallback: Option<String> = None;
+        let mut record_display_fallback: Option<String> = None;
 
         for message in &protocol_messages {
             match &message.message_type {
                 AgentProtocolMessageType::Record => {
+                    if record_display_fallback.is_none() {
+                        record_display_fallback = Some(message.content.clone());
+                    }
                     let created_at = Utc::now().to_rfc3339();
                     let entry = SharedBlackboardEntry {
                         session_id,
@@ -602,6 +754,11 @@ impl ChatRunner {
                     .await?;
                 }
                 AgentProtocolMessageType::Artifact | AgentProtocolMessageType::Conclusion => {
+                    if matches!(&message.message_type, AgentProtocolMessageType::Conclusion)
+                        && conclusion_display_fallback.is_none()
+                    {
+                        conclusion_display_fallback = Some(message.content.clone());
+                    }
                     let Some(item_type) = Self::protocol_work_item_type(&message.message_type)
                     else {
                         continue;
@@ -674,6 +831,7 @@ impl ChatRunner {
                 run_id,
                 session_agent_id,
                 source_message_id,
+                client_message_id,
                 chain_depth,
                 target,
                 index,
@@ -724,6 +882,30 @@ impl ChatRunner {
             }
 
             send_count += 1;
+        }
+
+        if send_count == 0
+            && let Some((fallback_type, fallback_content)) = conclusion_display_fallback
+                .map(|content| ("conclusion", content))
+                .or_else(|| record_display_fallback.map(|content| ("record", content)))
+        {
+            self.persist_protocol_display_fallback_message(
+                session_id,
+                session_agent_id,
+                agent_id,
+                run_id,
+                source_message_id,
+                client_message_id,
+                chain_depth,
+                prompt_language,
+                fallback_type,
+                fallback_content,
+                error_content,
+                error_type,
+                token_usage,
+            )
+            .await?;
+            send_count = 1;
         }
 
         if workflow_generate_detected {
@@ -1063,9 +1245,11 @@ impl ChatRunner {
             return Ok(());
         }
 
+        let member_names = chat::member_name_overrides_for_session(pool, session_id).await?;
         let mut agents = Vec::with_capacity(session_agents.len());
         for session_agent in &session_agents {
-            if let Some(agent) = ChatAgent::find_by_id(pool, session_agent.agent_id).await? {
+            if let Some(mut agent) = ChatAgent::find_by_id(pool, session_agent.agent_id).await? {
+                chat::apply_effective_agent_name(&mut agent, &member_names);
                 agents.push(agent);
             }
         }

@@ -4,7 +4,7 @@ name: Performance Benchmarker
 description: Expert performance testing and optimization specialist focused on measuring,
   analyzing, and improving system performance across all applications and infrastructure
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

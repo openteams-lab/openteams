@@ -3,12 +3,18 @@
     "CLAUDE_CODE": {
       "DEFAULT": {
         "CLAUDE_CODE": {
+          "model": "default",
           "dangerously_skip_permissions": true
         }
       },
       "PLAN": {
         "CLAUDE_CODE": {
           "plan": true
+        }
+      },
+      "BEST": {
+        "CLAUDE_CODE": {
+          "model": "best"
         }
       },
       "OPUS": {
@@ -21,19 +27,39 @@
           "model": "sonnet"
         }
       },
+      "HAIKU": {
+        "CLAUDE_CODE": {
+          "model": "haiku"
+        }
+      },
+      "SONNET_1M": {
+        "CLAUDE_CODE": {
+          "model": "sonnet[1m]"
+        }
+      },
+      "OPUS_1M": {
+        "CLAUDE_CODE": {
+          "model": "opus[1m]"
+        }
+      },
+      "OPUSPLAN": {
+        "CLAUDE_CODE": {
+          "model": "opusplan"
+        }
+      },
       "OPUS_4_6": {
         "CLAUDE_CODE": {
-          "model": "claude-opus-4-6"
+          "model": "opus"
         }
       },
       "SONNET_4_6": {
         "CLAUDE_CODE": {
-          "model": "claude-sonnet-4-6"
+          "model": "sonnet"
         }
       },
       "OPUS_4_7": {
         "CLAUDE_CODE": {
-          "model": "claude-opus-4-7"
+          "model": "opus"
         }
       },
       "APPROVALS": {
@@ -113,75 +139,42 @@
     "CODEX": {
       "DEFAULT": {
         "CODEX": {
-          "model": "gpt-5.4",
+          "model": "gpt-5.5",
           "sandbox": "danger-full-access",
           "model_reasoning_summary": "auto"
         }
       },
-      "HIGH": {
+      "GPT_5.3_CODEX_SPARK": {
+        "CODEX": {
+          "model": "gpt-5.3-codex-spark",
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
+        }
+      },
+      "GPT_5.4": {
         "CODEX": {
           "model": "gpt-5.4",
           "sandbox": "danger-full-access",
-          "model_reasoning_effort": "high",
           "model_reasoning_summary": "auto"
         }
       },
-      "GPT_5_4": {
+      "CODEX_AUTO_REVIEW": {
         "CODEX": {
-          "model": "gpt-5.4",
+          "model": "codex-auto-review",
           "sandbox": "danger-full-access",
           "model_reasoning_summary": "auto"
         }
       },
-      "GPT_5_4_HIGH": {
-        "CODEX": {
-          "model": "gpt-5.4",
-          "sandbox": "danger-full-access",
-          "model_reasoning_effort": "high",
-          "model_reasoning_summary": "auto"
-        }
-      },
-      "GPT_5_5": {
+      "GPT_5.5": {
         "CODEX": {
           "model": "gpt-5.5",
           "sandbox": "danger-full-access",
           "model_reasoning_summary": "auto"
         }
       },
-      "GPT_5_5_HIGH": {
+      "GPT_5.4_MINI": {
         "CODEX": {
-          "model": "gpt-5.5",
-          "sandbox": "danger-full-access",
-          "model_reasoning_effort": "high",
-          "model_reasoning_summary": "auto"
-        }
-      },
-      "GPT_5_3_CODEX": {
-        "CODEX": {
-          "model": "gpt-5.3-codex",
-          "sandbox": "danger-full-access",
-          "model_reasoning_summary": "auto"
-        }
-      },
-      "GPT_5_3_CODEX_HIGH": {
-        "CODEX": {
-          "model": "gpt-5.3-codex",
-          "sandbox": "danger-full-access",
-          "model_reasoning_effort": "high",
-          "model_reasoning_summary": "auto"
-        }
-      },
-      "APPROVALS": {
-        "CODEX": {
-          "model": "gpt-5.4",
-          "sandbox": "workspace-write",
-          "ask_for_approval": "unless-trusted",
-          "model_reasoning_summary": "auto"
-        }
-      },
-      "MAX": {
-        "CODEX": {
-          "model": "gpt-5.1-codex-max",
+          "model": "gpt-5.4-mini",
           "sandbox": "danger-full-access",
           "model_reasoning_summary": "auto"
         }
@@ -470,13 +463,13 @@
       "CLAUDE_SONNET_4_6": {
         "DROID": {
           "autonomy": "skip-permissions-unsafe",
-          "model": "claude-sonnet-4-6-20260202"
+          "model": "sonnet-20260202"
         }
       },
       "CLAUDE_OPUS_4_6": {
         "DROID": {
           "autonomy": "skip-permissions-unsafe",
-          "model": "claude-opus-4-6-20260114"
+          "model": "opus-20260114"
         }
       },
       "CLAUDE_SONNET_4_5": {
@@ -508,9 +501,39 @@
       "DEFAULT": {
         "KIMI_CODE": {}
       },
+      "moonshot-cn/kimi-k2.6,thinking": {
+        "KIMI_CODE": {
+          "append_prompt": null,
+          "model": "moonshot-cn/kimi-k2.6,thinking"
+        }
+      },
+      "moonshot-cn/kimi-k2.5,thinking": {
+        "KIMI_CODE": {
+          "append_prompt": null,
+          "model": "moonshot-cn/kimi-k2.5,thinking"
+        }
+      },
+      "moonshot-cn/kimi-k2.5": {
+        "KIMI_CODE": {
+          "append_prompt": null,
+          "model": "moonshot-cn/kimi-k2.5"
+        }
+      },
+      "kimi-code/kimi-for-coding,thinking": {
+        "KIMI_CODE": {
+          "append_prompt": null,
+          "model": "kimi-code/kimi-for-coding,thinking"
+        }
+      },
+      "kimi-code/kimi-for-coding": {
+        "KIMI_CODE": {
+          "append_prompt": null,
+          "model": "kimi-code/kimi-for-coding"
+        }
+      },
       "KIMI_K2_5": {
         "KIMI_CODE": {
-          "model": "moonshot-cn/kimi-k2.5"
+          "model": "moonshot-cn/kimi-k2.6"
         }
       },
       "KIMI_K2_6": {

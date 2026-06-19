@@ -18,6 +18,13 @@
         "null"
       ]
     },
+    "thinking_effort": {
+      "description": "Per-run Qwen Code reasoning effort: off, low, medium, high, max, or a numeric token budget",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "yolo": {
       "type": [
         "boolean",

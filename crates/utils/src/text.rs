@@ -23,6 +23,17 @@ pub fn short_uuid(u: &Uuid) -> String {
     full.chars().take(4).collect() // grab the first 4 chars
 }
 
+pub fn strip_whitespace(content: &str) -> String {
+    content.chars().filter(|ch| !ch.is_whitespace()).collect()
+}
+
+pub fn sanitize_member_handle(content: &str) -> String {
+    content
+        .chars()
+        .filter(|ch| ch.is_alphanumeric() || *ch == '_' || *ch == '-')
+        .collect()
+}
+
 pub fn truncate_to_char_boundary(content: &str, max_len: usize) -> &str {
     if content.len() <= max_len {
         return content;
@@ -42,6 +53,25 @@ pub fn truncate_to_char_boundary(content: &str, max_len: usize) -> &str {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn strip_whitespace_removes_ascii_and_unicode_spaces() {
+        use super::strip_whitespace;
+
+        assert_eq!(strip_whitespace(" Codex Agent "), "CodexAgent");
+        assert_eq!(strip_whitespace("前端　成员\t1"), "前端成员1");
+    }
+
+    #[test]
+    fn sanitize_member_handle_keeps_only_routable_characters() {
+        use super::sanitize_member_handle;
+
+        assert_eq!(
+            sanitize_member_handle(" @Agentic Identity & Trust Architect "),
+            "AgenticIdentityTrustArchitect"
+        );
+        assert_eq!(sanitize_member_handle("前端-成员_1"), "前端-成员_1");
+    }
 
     #[test]
     fn test_truncate_to_char_boundary() {

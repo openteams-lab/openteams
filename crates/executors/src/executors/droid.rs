@@ -14,6 +14,9 @@ use crate::{
     env::ExecutionEnv,
     executors::{AppendPrompt, ExecutorError, SpawnedChild, StandardCodingAgentExecutor},
     logs::utils::EntryIndexProvider,
+    model_discovery::{
+        ProviderKind, cli_model_commands, discover_from_sources, runner_config_paths,
+    },
 };
 
 pub mod normalize_logs;
@@ -67,7 +70,7 @@ pub struct Droid {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(
         title = "Model",
-        description = "Model to use (e.g., gpt-5.3-codex, claude-sonnet-4-6-20260202, gpt-5-2025-08-07, claude-opus-4-6-20260114, claude-haiku-4-5-20251001, glm-4.6)"
+        description = "Model to use (e.g., gpt-5.2-codex, sonnet, gpt-5-2025-08-07, opus, claude-haiku-4-5-20251001, glm-4.6)"
     )]
     pub model: Option<String>,
 
@@ -140,6 +143,28 @@ async fn spawn_droid(
 
 #[async_trait]
 impl StandardCodingAgentExecutor for Droid {
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        let config_paths = runner_config_paths([
+            self.default_mcp_config_path(),
+            dirs::home_dir().map(|home| home.join(".factory").join("config.json")),
+            dirs::home_dir().map(|home| home.join(".factory").join("settings.json")),
+        ]);
+        discover_from_sources(
+            current_dir,
+            env,
+            &self.cmd,
+            self.model.as_deref(),
+            config_paths,
+            cli_model_commands("droid", &self.cmd),
+            &[ProviderKind::OpenAiCompatible],
+        )
+        .await
+    }
+
     async fn spawn(
         &self,
         current_dir: &Path,

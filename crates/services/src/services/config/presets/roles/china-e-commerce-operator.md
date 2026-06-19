@@ -5,7 +5,7 @@ description: Expert China e-commerce operations specialist covering Taobao, Tmal
   Pinduoduo, and JD ecosystems with deep expertise in product listing optimization,
   live commerce, store operations, 618/Double 11 campaigns, and cross-platform strategy.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#E74C3C'

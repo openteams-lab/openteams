@@ -90,7 +90,7 @@ npx/*/*.tgz
 # Development ports file
 .dev-ports.json
 
-dev_assets
+dev_assets*
 /frontend/.env.sentry-build-plugin
 .ssh
 

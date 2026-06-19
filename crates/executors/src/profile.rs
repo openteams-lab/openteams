@@ -18,7 +18,10 @@ use crate::executors::{
 /// – "DEFAULT" is kept as-is  
 /// – everything else is converted to SCREAMING_SNAKE_CASE
 pub fn canonical_variant_key<S: AsRef<str>>(raw: S) -> String {
-    let key = raw.as_ref();
+    let key = raw
+        .as_ref()
+        .strip_prefix("AUTO_MODEL_")
+        .unwrap_or_else(|| raw.as_ref());
     if key.eq_ignore_ascii_case("DEFAULT") {
         "DEFAULT".to_string()
     } else if key.contains('/') {
@@ -495,33 +498,27 @@ mod tests {
     };
 
     #[test]
-    fn default_profiles_use_gpt_5_4_for_codex() {
+    fn default_profiles_include_supported_codex_models() {
         let profiles = ExecutorConfigs::from_defaults();
 
-        let default_codex = profiles
-            .get_coding_agent(&ExecutorProfileId::new(BaseCodingAgent::Codex))
-            .expect("codex default profile should exist");
-        let gpt_5_4_codex = profiles
-            .get_coding_agent(&ExecutorProfileId::with_variant(
-                BaseCodingAgent::Codex,
-                "GPT_5_4".to_string(),
-            ))
-            .expect("codex GPT_5_4 profile should exist");
+        assert_codex_model(&profiles, "DEFAULT", "gpt-5.5");
+        assert_codex_model(&profiles, "GPT_5.3_CODEX_SPARK", "gpt-5.3-codex-spark");
+        assert_codex_model(&profiles, "GPT_5.4", "gpt-5.4");
+        assert_codex_model(&profiles, "CODEX_AUTO_REVIEW", "codex-auto-review");
+        assert_codex_model(&profiles, "GPT_5.5", "gpt-5.5");
+        assert_codex_model(&profiles, "GPT_5.4_MINI", "gpt-5.4-mini");
 
-        let assert_model = |agent: CodingAgent| match agent {
-            CodingAgent::Codex(Codex {
-                model,
-                model_reasoning_summary,
-                ..
-            }) => {
-                assert_eq!(model.as_deref(), Some("gpt-5.4"));
-                assert_eq!(model_reasoning_summary, Some(ReasoningSummary::Auto));
-            }
-            other => panic!("expected codex profile, got {other:?}"),
-        };
-
-        assert_model(default_codex);
-        assert_model(gpt_5_4_codex);
+        for variant in ["HIGH", "APPROVALS", "MAX", "GPT_5.2", "GPT_5.3_CODEX"] {
+            assert!(
+                profiles
+                    .get_coding_agent(&ExecutorProfileId::with_variant(
+                        BaseCodingAgent::Codex,
+                        variant.to_string(),
+                    ))
+                    .is_none(),
+                "codex {variant} profile should not exist"
+            );
+        }
     }
 
     #[test]
@@ -530,16 +527,67 @@ mod tests {
     }
 
     #[test]
+    fn canonical_variant_key_strips_legacy_auto_model_prefix() {
+        assert_eq!(
+            canonical_variant_key("AUTO_MODEL_opencode/glm-5-free"),
+            "opencode/glm-5-free"
+        );
+        assert_eq!(canonical_variant_key("AUTO_MODEL_GPT_5_2"), "GPT_5_2");
+    }
+
+    #[test]
     fn default_profiles_include_new_model_variants() {
         let profiles = ExecutorConfigs::from_defaults();
 
-        assert_codex_model(&profiles, "GPT_5_5", "gpt-5.5");
-        assert_codex_model(&profiles, "GPT_5_5_HIGH", "gpt-5.5");
-        assert_claude_model(&profiles, "OPUS_4_6", "claude-opus-4-6");
-        assert_claude_model(&profiles, "SONNET_4_6", "claude-sonnet-4-6");
-        assert_claude_model(&profiles, "OPUS_4_7", "claude-opus-4-7");
-        assert_kimi_model(&profiles, "KIMI_K2_5", "moonshot-cn/kimi-k2.5");
+        assert_claude_model(&profiles, "DEFAULT", "default");
+        assert_claude_model(&profiles, "BEST", "best");
+        assert_claude_model(&profiles, "OPUS", "opus");
+        assert_claude_model(&profiles, "SONNET", "sonnet");
+        assert_claude_model(&profiles, "HAIKU", "haiku");
+        assert_claude_model(&profiles, "SONNET_1M", "sonnet[1m]");
+        assert_claude_model(&profiles, "OPUS_1M", "opus[1m]");
+        assert_claude_model(&profiles, "OPUSPLAN", "opusplan");
+        assert_claude_model(&profiles, "OPUS_4_6", "opus");
+        assert_claude_model(&profiles, "SONNET_4_6", "sonnet");
+        assert_claude_model(&profiles, "OPUS_4_7", "opus");
+        assert_kimi_model(
+            &profiles,
+            "moonshot-cn/kimi-k2.6,thinking",
+            "moonshot-cn/kimi-k2.6,thinking",
+        );
+        assert_kimi_model(
+            &profiles,
+            "moonshot-cn/kimi-k2.5,thinking",
+            "moonshot-cn/kimi-k2.5,thinking",
+        );
+        assert_kimi_model(&profiles, "moonshot-cn/kimi-k2.5", "moonshot-cn/kimi-k2.5");
+        assert_kimi_model(
+            &profiles,
+            "kimi-code/kimi-for-coding,thinking",
+            "kimi-code/kimi-for-coding,thinking",
+        );
+        assert_kimi_model(
+            &profiles,
+            "kimi-code/kimi-for-coding",
+            "kimi-code/kimi-for-coding",
+        );
+        assert_kimi_model(&profiles, "KIMI_K2_5", "moonshot-cn/kimi-k2.6");
         assert_kimi_model(&profiles, "KIMI_K2_6", "moonshot-cn/kimi-k2.6");
+    }
+
+    fn assert_claude_model(profiles: &ExecutorConfigs, variant: &str, expected: &str) {
+        match profiles
+            .get_coding_agent(&ExecutorProfileId::with_variant(
+                BaseCodingAgent::ClaudeCode,
+                variant.to_string(),
+            ))
+            .unwrap_or_else(|| panic!("claude code {variant} profile should exist"))
+        {
+            CodingAgent::ClaudeCode(ClaudeCode { model, .. }) => {
+                assert_eq!(model.as_deref(), Some(expected));
+            }
+            other => panic!("expected claude code profile, got {other:?}"),
+        }
     }
 
     fn assert_codex_model(profiles: &ExecutorConfigs, variant: &str, expected: &str) {
@@ -559,21 +607,6 @@ mod tests {
                 assert_eq!(model_reasoning_summary, Some(ReasoningSummary::Auto));
             }
             other => panic!("expected codex profile, got {other:?}"),
-        }
-    }
-
-    fn assert_claude_model(profiles: &ExecutorConfigs, variant: &str, expected: &str) {
-        match profiles
-            .get_coding_agent(&ExecutorProfileId::with_variant(
-                BaseCodingAgent::ClaudeCode,
-                variant.to_string(),
-            ))
-            .unwrap_or_else(|| panic!("claude code {variant} profile should exist"))
-        {
-            CodingAgent::ClaudeCode(ClaudeCode { model, .. }) => {
-                assert_eq!(model.as_deref(), Some(expected));
-            }
-            other => panic!("expected claude code profile, got {other:?}"),
         }
     }
 

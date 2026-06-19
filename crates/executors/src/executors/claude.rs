@@ -50,7 +50,7 @@ use crate::{
 };
 
 const CLAUDE_CODE_ROUTER_BASE_COMMAND: &str = "npx -y @musistudio/claude-code-router@2.0.0 code";
-const CLAUDE_CODE_BASE_COMMAND: &str = "npx -y @anthropic-ai/claude-code@2.1.74";
+const CLAUDE_CODE_BASE_COMMAND: &str = "npx -y @anthropic-ai/claude-code@2.1.161";
 
 fn base_command(claude_code_router: bool) -> &'static str {
     if claude_code_router {
@@ -75,6 +75,8 @@ pub struct ClaudeCode {
     pub approvals: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dangerously_skip_permissions: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -119,6 +121,9 @@ impl ClaudeCode {
         }
         if let Some(model) = &self.model {
             builder = builder.extend_params(["--model", model]);
+        }
+        if let Some(effort) = &self.effort {
+            builder = builder.extend_params(["--effort", effort]);
         }
         builder = builder.extend_params([
             "--verbose",
@@ -189,6 +194,14 @@ impl ClaudeCode {
 impl StandardCodingAgentExecutor for ClaudeCode {
     fn use_approvals(&mut self, approvals: Arc<dyn ExecutorApprovalService>) {
         self.approvals_service = Some(approvals);
+    }
+
+    async fn list_models(
+        &self,
+        _current_dir: &Path,
+        _env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        Ok(None)
     }
 
     async fn spawn(
@@ -436,7 +449,6 @@ pub struct ClaudeLogProcessor {
     input_tokens: u32,
     output_tokens: u32,
     cache_read_tokens: u32,
-    cache_write_tokens: u32,
 }
 
 impl ClaudeLogProcessor {
@@ -459,7 +471,6 @@ impl ClaudeLogProcessor {
             input_tokens: 0,
             output_tokens: 0,
             cache_read_tokens: 0,
-            cache_write_tokens: 0,
         }
     }
 
@@ -1373,13 +1384,11 @@ impl ClaudeLogProcessor {
                         let input_tokens = usage.input_tokens.unwrap_or(0);
                         let output_tokens = usage.output_tokens.unwrap_or(0);
                         let cache_read = usage.cache_read_input_tokens.unwrap_or(0);
-                        let cache_write = usage.cache_creation_input_tokens.unwrap_or(0);
                         let total_tokens = input_tokens + output_tokens;
                         self.context_tokens_used = total_tokens as u32;
                         self.input_tokens = input_tokens as u32;
                         self.output_tokens = output_tokens as u32;
                         self.cache_read_tokens = cache_read as u32;
-                        self.cache_write_tokens = cache_write as u32;
 
                         patches.push(self.add_token_usage_entry(entry_index_provider));
                     }
@@ -1600,8 +1609,27 @@ impl ClaudeLogProcessor {
                 model_context_window: self.main_model_context_window,
                 input_tokens: Some(self.input_tokens),
                 output_tokens: Some(self.output_tokens),
+                reasoning_output_tokens: None,
                 cache_read_tokens: Some(self.cache_read_tokens),
-                cache_write_tokens: Some(self.cache_write_tokens).filter(|&v| v > 0),
+                runtime_agent: Some(
+                    match self.strategy {
+                        HistoryStrategy::Default => "claude_code",
+                        HistoryStrategy::AmpResume => "amp",
+                    }
+                    .to_string(),
+                ),
+                runtime_model_id: self
+                    .main_model_name
+                    .clone()
+                    .or_else(|| self.model_name.clone()),
+                provider_id: Some("anthropic".to_string()),
+                runtime_thread_id: None,
+                usage_scope: Some("turn_delta".to_string()),
+                snapshot_total_tokens: None,
+                snapshot_input_tokens: None,
+                snapshot_output_tokens: None,
+                snapshot_reasoning_output_tokens: None,
+                snapshot_cache_read_tokens: None,
                 is_estimated: false,
             }),
             content: format!(
@@ -2011,8 +2039,6 @@ pub struct ClaudeUsage {
     pub input_tokens: Option<u64>,
     #[serde(default)]
     pub output_tokens: Option<u64>,
-    #[serde(default, rename = "cache_creation_input_tokens")]
-    pub cache_creation_input_tokens: Option<u64>,
     #[serde(default, rename = "cache_read_input_tokens")]
     pub cache_read_input_tokens: Option<u64>,
     #[serde(default)]
@@ -2273,6 +2299,7 @@ mod tests {
             plan: None,
             approvals: None,
             model: None,
+            effort: None,
             append_prompt: AppendPrompt::default(),
             dangerously_skip_permissions: None,
             cmd: crate::command::CmdOverrides {

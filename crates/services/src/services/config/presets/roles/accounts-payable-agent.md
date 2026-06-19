@@ -5,7 +5,7 @@ description: Autonomous payment processing specialist that executes vendor payme
   contractor invoices, and recurring bills across any payment rail — crypto, fiat,
   stablecoins. Integrates with AI agent workflows via tool calls.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#2ECC71'

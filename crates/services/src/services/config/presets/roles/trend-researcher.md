@@ -5,7 +5,7 @@ description: Expert market intelligence analyst specializing in identifying emer
   trends, competitive analysis, and opportunity assessment. Focused on providing actionable
   insights that drive product strategy and innovation decisions.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#9B59B6'

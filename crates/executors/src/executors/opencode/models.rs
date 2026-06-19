@@ -121,10 +121,10 @@ pub(super) async fn maybe_emit_token_usage(context: &EventStreamContext<'_>, eve
     let output_tokens = tokens.output;
     let cache_read_tokens = tokens.cache.as_ref().map(|cache| cache.read).unwrap_or(0);
 
-    // Only count input + output tokens, exclude cache.read (not billable)
+    // Keep runtime semantics: total is input + output; cache is charged separately.
     let total_tokens = input_tokens + output_tokens;
 
-    if total_tokens == 0 {
+    if total_tokens == 0 && cache_read_tokens == 0 {
         return;
     }
 
@@ -146,10 +146,6 @@ pub(super) async fn maybe_emit_token_usage(context: &EventStreamContext<'_>, eve
         _ => 0,
     };
 
-    if model_context_window == 0 {
-        return;
-    }
-
     let _ = context
         .log_writer
         .log_event(&OpencodeExecutorEvent::TokenUsage {
@@ -158,6 +154,8 @@ pub(super) async fn maybe_emit_token_usage(context: &EventStreamContext<'_>, eve
             input_tokens: Some(input_tokens),
             output_tokens: Some(output_tokens),
             cache_read_tokens: Some(cache_read_tokens),
+            provider_id: provider_id.map(str::to_string),
+            runtime_model_id: model_id.map(str::to_string),
         })
         .await;
 }

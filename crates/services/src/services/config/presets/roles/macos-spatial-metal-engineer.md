@@ -4,7 +4,7 @@ name: macOS Spatial/Metal Engineer
 description: Native Swift and Metal specialist building high-performance 3D rendering
   systems and spatial computing experiences for macOS and Vision Pro
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#3B82F6'

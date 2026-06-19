@@ -5,7 +5,7 @@ description: Specialist in search term analysis, negative keyword architecture, 
   query-to-intent mapping. Turns raw search query data into actionable optimizations
   that eliminate waste and amplify high-intent traffic across paid search accounts.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

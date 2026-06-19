@@ -1,6 +1,7 @@
 pub mod agents;
 pub mod messages;
 pub mod presets;
+pub mod queues;
 pub mod runs;
 pub mod sessions;
 pub mod skills;
@@ -43,6 +44,19 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             "/agents/{session_agent_id}/stop",
             axum::routing::post(sessions::stop_session_agent),
         )
+        .route("/queue", get(queues::list_session_queue))
+        .route(
+            "/queue/{queue_id}",
+            axum::routing::delete(queues::delete_queue_item),
+        )
+        .route(
+            "/agents/{session_agent_id}/queue",
+            get(queues::list_member_queue),
+        )
+        .route(
+            "/agents/{session_agent_id}/queue/continue",
+            axum::routing::post(queues::continue_member_queue),
+        )
         .route(
             "/messages",
             get(messages::get_messages).post(messages::create_message),
@@ -52,6 +66,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             "/workflow/generate-plan-and-run",
             axum::routing::post(workflow::generate_plan_and_run),
         )
+        .route("/workflow/status", get(workflow::get_workflow_status))
         .route(
             "/workflow/plans/{plan_id}/execute",
             axum::routing::post(workflow::execute_plan),
@@ -75,6 +90,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route(
             "/workflow-steps/{step_id}/transcripts",
             get(workflow::get_step_transcripts),
+        )
+        .route(
+            "/workflow-steps/{step_id}/token-usage",
+            get(workflow::get_step_token_usage),
         )
         .route(
             "/workflow-steps/{step_id}/input",
@@ -239,7 +258,9 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
                 axum::routing::post(sessions::validate_workspace_path_endpoint),
             )
             .route("/runs/{run_id}/log", get(runs::get_run_log))
+            .route("/runs/{run_id}/activity", get(runs::get_run_activity))
             .route("/runs/{run_id}/diff", get(runs::get_run_diff))
+            .route("/runs/{run_id}/files", get(runs::get_run_files))
             .route(
                 "/runs/{run_id}/untracked",
                 get(runs::get_run_untracked_file),

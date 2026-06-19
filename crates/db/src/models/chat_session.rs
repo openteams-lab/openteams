@@ -27,6 +27,7 @@ pub struct ChatSession {
     pub team_protocol_enabled: bool,
     pub default_workspace_path: Option<String>,
     pub chat_input_mode: Option<String>,
+    pub project_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub archived_at: Option<DateTime<Utc>>,
@@ -36,6 +37,7 @@ pub struct ChatSession {
 pub struct CreateChatSession {
     pub title: Option<String>,
     pub workspace_path: Option<String>,
+    pub project_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -68,7 +70,16 @@ impl ChatSession {
     pub async fn find_all(
         pool: &SqlitePool,
         status: Option<ChatSessionStatus>,
+        project_id: Option<Uuid>,
     ) -> Result<Vec<Self>, sqlx::Error> {
+        if let Some(project_id) = project_id {
+            let mut sessions = Self::find_by_project(pool, project_id).await?;
+            if let Some(status) = status {
+                sessions.retain(|session| session.status == status);
+            }
+            return Ok(sessions);
+        }
+
         let sessions = if let Some(status) = status {
             sqlx::query_as!(
                 ChatSession,
@@ -83,6 +94,7 @@ impl ChatSession {
                           team_protocol_enabled as "team_protocol_enabled!: bool",
                           default_workspace_path,
                           chat_input_mode,
+                          project_id as "project_id: Uuid",
                           created_at as "created_at!: DateTime<Utc>",
                           updated_at as "updated_at!: DateTime<Utc>",
                           archived_at as "archived_at: DateTime<Utc>"
@@ -107,6 +119,7 @@ impl ChatSession {
                           team_protocol_enabled as "team_protocol_enabled!: bool",
                           default_workspace_path,
                           chat_input_mode,
+                          project_id as "project_id: Uuid",
                           created_at as "created_at!: DateTime<Utc>",
                           updated_at as "updated_at!: DateTime<Utc>",
                           archived_at as "archived_at: DateTime<Utc>"
@@ -134,6 +147,7 @@ impl ChatSession {
                       team_protocol_enabled as "team_protocol_enabled!: bool",
                       default_workspace_path,
                       chat_input_mode,
+                      project_id as "project_id: Uuid",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>",
                       archived_at as "archived_at: DateTime<Utc>"
@@ -145,6 +159,36 @@ impl ChatSession {
         .await
     }
 
+    pub async fn find_by_project(
+        pool: &SqlitePool,
+        project_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            ChatSession,
+            r#"SELECT id as "id!: Uuid",
+                      title,
+                      status as "status!: ChatSessionStatus",
+                      lead_agent_id as "lead_agent_id: Uuid",
+                      summary_text,
+                      archive_ref,
+                      last_seen_diff_key,
+                      team_protocol,
+                      team_protocol_enabled as "team_protocol_enabled!: bool",
+                      default_workspace_path,
+                      chat_input_mode,
+                      project_id as "project_id: Uuid",
+                      created_at as "created_at!: DateTime<Utc>",
+                      updated_at as "updated_at!: DateTime<Utc>",
+                      archived_at as "archived_at: DateTime<Utc>"
+               FROM chat_sessions
+               WHERE project_id = $1
+               ORDER BY updated_at DESC"#,
+            project_id
+        )
+        .fetch_all(pool)
+        .await
+    }
+
     pub async fn create(
         pool: &SqlitePool,
         data: &CreateChatSession,
@@ -152,8 +196,8 @@ impl ChatSession {
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as!(
             ChatSession,
-            r#"INSERT INTO chat_sessions (id, title, status, default_workspace_path)
-               VALUES ($1, $2, $3, $4)
+            r#"INSERT INTO chat_sessions (id, title, status, default_workspace_path, project_id)
+               VALUES ($1, $2, $3, $4, $5)
                RETURNING id as "id!: Uuid",
                          title,
                          status as "status!: ChatSessionStatus",
@@ -165,13 +209,15 @@ impl ChatSession {
                          team_protocol_enabled as "team_protocol_enabled!: bool",
                          default_workspace_path,
                          chat_input_mode,
+                         project_id as "project_id: Uuid",
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>",
                          archived_at as "archived_at: DateTime<Utc>""#,
             id,
             data.title,
             ChatSessionStatus::Active,
-            data.workspace_path
+            data.workspace_path,
+            data.project_id
         )
         .fetch_one(pool)
         .await
@@ -244,6 +290,7 @@ impl ChatSession {
                          team_protocol_enabled as "team_protocol_enabled!: bool",
                          default_workspace_path,
                          chat_input_mode,
+                         project_id as "project_id: Uuid",
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>",
                          archived_at as "archived_at: DateTime<Utc>""#,
@@ -275,9 +322,154 @@ impl ChatSession {
     }
 
     pub async fn delete(pool: &SqlitePool, id: Uuid) -> Result<u64, sqlx::Error> {
+        // Clear soft references whose foreign keys lack ON DELETE handling
+        // (project_work_item_execution_links, project_delivery_records and
+        // github_operation_audits reference chat_sessions without a cascade
+        // rule), otherwise deleting a session linked to those rows fails.
+        sqlx::query(
+            "UPDATE project_work_item_execution_links SET session_id = NULL WHERE session_id = ?1",
+        )
+        .bind(id)
+        .execute(pool)
+        .await?;
+        sqlx::query(
+            "UPDATE project_delivery_records SET source_session_id = NULL WHERE source_session_id = ?1",
+        )
+        .bind(id)
+        .execute(pool)
+        .await?;
+        sqlx::query(
+            "UPDATE github_operation_audits SET session_id = NULL WHERE session_id = ?1",
+        )
+        .bind(id)
+        .execute(pool)
+        .await?;
+
         let result = sqlx::query!("DELETE FROM chat_sessions WHERE id = $1", id)
             .execute(pool)
             .await?;
         Ok(result.rows_affected())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sqlx::SqlitePool;
+    use uuid::Uuid;
+
+    use super::{ChatSession, ChatSessionStatus, CreateChatSession};
+
+    async fn setup_pool() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("create sqlite memory pool");
+
+        sqlx::query(
+            r#"
+            CREATE TABLE chat_sessions (
+                id BLOB PRIMARY KEY,
+                title TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                lead_agent_id BLOB,
+                summary_text TEXT,
+                archive_ref TEXT,
+                last_seen_diff_key TEXT,
+                team_protocol TEXT,
+                team_protocol_enabled BOOLEAN NOT NULL DEFAULT 0,
+                default_workspace_path TEXT,
+                chat_input_mode TEXT,
+                project_id BLOB,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                archived_at TEXT
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("create chat_sessions table");
+
+        pool
+    }
+
+    #[tokio::test]
+    async fn find_all_filters_by_project_id_and_status() {
+        let pool = setup_pool().await;
+        let project_id = Uuid::new_v4();
+        let other_project_id = Uuid::new_v4();
+        let matching_id = Uuid::new_v4();
+        let archived_id = Uuid::new_v4();
+
+        ChatSession::create(
+            &pool,
+            &CreateChatSession {
+                title: Some("matching".to_string()),
+                workspace_path: None,
+                project_id: Some(project_id),
+            },
+            matching_id,
+        )
+        .await
+        .expect("create matching session");
+        ChatSession::create(
+            &pool,
+            &CreateChatSession {
+                title: Some("other".to_string()),
+                workspace_path: None,
+                project_id: Some(other_project_id),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create other project session");
+        ChatSession::create(
+            &pool,
+            &CreateChatSession {
+                title: Some("legacy".to_string()),
+                workspace_path: None,
+                project_id: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create legacy session");
+        ChatSession::create(
+            &pool,
+            &CreateChatSession {
+                title: Some("archived".to_string()),
+                workspace_path: None,
+                project_id: Some(project_id),
+            },
+            archived_id,
+        )
+        .await
+        .expect("create archived session");
+        sqlx::query("UPDATE chat_sessions SET status = 'archived' WHERE id = ?1")
+            .bind(archived_id)
+            .execute(&pool)
+            .await
+            .expect("archive session");
+
+        let project_sessions = ChatSession::find_all(&pool, None, Some(project_id))
+            .await
+            .expect("list project sessions");
+        assert_eq!(project_sessions.len(), 2);
+        assert!(
+            project_sessions
+                .iter()
+                .all(|s| s.project_id == Some(project_id))
+        );
+
+        let active_project_sessions =
+            ChatSession::find_all(&pool, Some(ChatSessionStatus::Active), Some(project_id))
+                .await
+                .expect("list active project sessions");
+        assert_eq!(active_project_sessions.len(), 1);
+        assert_eq!(active_project_sessions[0].id, matching_id);
+
+        let all_sessions = ChatSession::find_all(&pool, None, None)
+            .await
+            .expect("list all sessions");
+        assert_eq!(all_sessions.len(), 4);
     }
 }

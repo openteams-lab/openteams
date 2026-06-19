@@ -4,7 +4,7 @@ name: SRE (Site Reliability Engineer)
 description: Expert site reliability engineer specializing in SLOs, error budgets,
   observability, chaos engineering, and toil reduction for production systems at scale.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

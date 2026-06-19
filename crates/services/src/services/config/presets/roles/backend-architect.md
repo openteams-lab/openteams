@@ -5,7 +5,7 @@ description: Senior backend architect specializing in scalable system design, da
   architecture, API development, and cloud infrastructure. Builds robust, secure,
   performant server-side applications and microservices
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#3498DB'

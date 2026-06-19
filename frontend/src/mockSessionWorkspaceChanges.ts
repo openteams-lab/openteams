@@ -1,0 +1,221 @@
+import type { WorkspaceChangesResponse } from '@/types';
+
+export const mockSessionWorkspaceChanges: Record<
+  string,
+  WorkspaceChangesResponse
+> = {
+  'sess-1': {
+    workspace_path: 'e:/workspace/projectSS/openteams-new-frontend',
+    is_git_repo: true,
+    error: null,
+    changes: {
+      modified: [
+        {
+          path: 'src/App.tsx',
+          additions: 311,
+          deletions: 149,
+          unified_diff: null,
+          has_diff: true,
+        },
+        {
+          path: 'src/components/DialogManager.tsx',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+        {
+          path: 'src/components/DropdownsWorkspace.tsx',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+        {
+          path: 'src/components/FreeChatWorkspace.tsx',
+          additions: 9,
+          deletions: 146,
+          unified_diff: null,
+          has_diff: true,
+        },
+        {
+          path: 'src/components/OnboardingPro.tsx',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+        {
+          path: 'src/components/ProjectSidebar.tsx',
+          additions: 5,
+          deletions: 5,
+          unified_diff: null,
+          has_diff: true,
+        },
+        {
+          path: 'src/components/SettingsWorkspace.tsx',
+          additions: 4,
+          deletions: 4,
+          unified_diff: null,
+          has_diff: true,
+        },
+        {
+          path: 'src/components/WorkflowWorkspace.tsx',
+          additions: 1,
+          deletions: 1,
+          unified_diff: null,
+          has_diff: true,
+        },
+        {
+          path: 'src/context/WorkspaceContext.tsx',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+        {
+          path: 'src/mockApiData.ts',
+          additions: 57,
+          deletions: 2,
+          unified_diff: null,
+          has_diff: true,
+        },
+        {
+          path: 'src/types.ts',
+          additions: 1,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: true,
+        },
+      ],
+      added: [
+        {
+          path: '.openteams/specs/2026-05-29-project-sidebar-design.html',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+        {
+          path: '.openteams/specs/linear-sidebar-reference.png',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+        {
+          path: 'docs/HARDCODE_AUDIT.md',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+        {
+          path: 'docs/HARDCODE_REFACTOR.md',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+        {
+          path: 'src/components/DrawerWorkspace.tsx',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+        {
+          path: 'src/components/ProjectSidebar.test.tsx',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+        {
+          path: 'src/data.ts',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+        {
+          path: 'src/lib/mockFrontendApi.ts',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+      ],
+      deleted: [{ path: 'src/components/SessionIconPickerPage.tsx' }],
+      untracked: [],
+    },
+  },
+  'sess-2': {
+    workspace_path: 'e:/workspace/projectSS/openteams-new-frontend',
+    is_git_repo: true,
+    error: null,
+    changes: {
+      modified: [
+        {
+          path: 'src/components/SettingsWorkspace.tsx',
+          additions: 18,
+          deletions: 6,
+          unified_diff: null,
+          has_diff: true,
+        },
+        {
+          path: 'src/mockApiData.ts',
+          additions: 22,
+          deletions: 3,
+          unified_diff: null,
+          has_diff: true,
+        },
+      ],
+      added: [
+        {
+          path: 'src/pages/GitHubRepositoryPage.tsx',
+          additions: 12,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: true,
+        },
+      ],
+      deleted: [],
+      untracked: [],
+    },
+  },
+  'sess-3': {
+    workspace_path: 'e:/workspace/projectSS/openteams-new-frontend',
+    is_git_repo: true,
+    error: null,
+    changes: {
+      modified: [
+        {
+          path: 'src/App.tsx',
+          additions: 42,
+          deletions: 11,
+          unified_diff: null,
+          has_diff: true,
+        },
+        {
+          path: 'src/components/ProjectSidebar.tsx',
+          additions: 7,
+          deletions: 2,
+          unified_diff: null,
+          has_diff: true,
+        },
+      ],
+      added: [],
+      deleted: [],
+      untracked: [
+        {
+          path: 'dist/index.html',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+      ],
+    },
+  },
+};

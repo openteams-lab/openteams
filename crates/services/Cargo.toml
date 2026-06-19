@@ -60,3 +60,9 @@ tiktoken-rs = "0.6"
 sys-locale = "0.3"
 which = "7.0"
 pathdiff = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+
+[target.'cfg(not(windows))'.dependencies]
+keyring = { version = "3.6.3", default-features = false, features = ["apple-native", "linux-native-sync-persistent"] }

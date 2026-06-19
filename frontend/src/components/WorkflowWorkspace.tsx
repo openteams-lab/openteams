@@ -1,0 +1,33 @@
+import React from 'react';
+import { FreeChatWorkspace } from '@/components/FreeChatWorkspace';
+import type { SourceControlDiffArea } from '@/types';
+
+interface WorkflowWorkspaceProps {
+  onOpenDiffTab?: (
+    sessionId: string,
+    filePath: string,
+    status: string,
+    unifiedDiff: string,
+  ) => void;
+  onOpenSourceControlDiffTab?: (
+    projectId: string,
+    sessionId: string,
+    filePath: string,
+    area: SourceControlDiffArea,
+  ) => void;
+}
+
+export const WorkflowWorkspace: React.FC<WorkflowWorkspaceProps> = ({
+  onOpenDiffTab,
+  onOpenSourceControlDiffTab,
+}) => {
+  return (
+    <div className="h-full w-full bg-transparent overflow-hidden font-sans text-xs select-none">
+      <FreeChatWorkspace
+        embedded
+        onOpenDiffTab={onOpenDiffTab}
+        onOpenSourceControlDiffTab={onOpenSourceControlDiffTab}
+      />
+    </div>
+  );
+};

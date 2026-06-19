@@ -6,7 +6,7 @@ description: Expert in conversion tracking architecture, tag management, and att
   Tag, and server-side implementations. Ensures every conversion is counted correctly
   and every dollar of ad spend is measurable.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

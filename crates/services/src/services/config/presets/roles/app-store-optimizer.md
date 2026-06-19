@@ -4,7 +4,7 @@ name: App Store Optimizer
 description: Expert app store marketing specialist focused on App Store Optimization
   (ASO), conversion rate optimization, and app discoverability
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#3498DB'

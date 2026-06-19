@@ -4,7 +4,7 @@ name: Game Audio Engineer
 description: Interactive audio specialist - Masters FMOD/Wwise integration, adaptive
   music systems, spatial audio, and audio performance budgeting across all game engines
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6366F1'

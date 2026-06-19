@@ -23,10 +23,12 @@ use deployment::Deployment;
 use serde::Deserialize;
 use services::services::{
     chat::{ChatAttachmentMeta, emit_user_message_workflow_analytics},
-    workflow_analytics,
-    workflow_runtime::{
-        WorkflowCardProjection, WorkflowCardState, WorkflowCardStep,
-        build_workflow_card_projection, build_workflow_card_projection_lightweight,
+    workflow::{
+        workflow_analytics,
+        workflow_runtime::{
+            WorkflowCardProjection, WorkflowCardState, WorkflowCardStep,
+            build_workflow_card_projection, build_workflow_card_projection_lightweight,
+        },
     },
 };
 use tokio::{fs, fs::File};
@@ -476,12 +478,7 @@ pub(super) async fn build_execution_workflow_card_projection(
         .ok_or_else(|| ApiError::BadRequest("Workflow revision was not found.".to_string()))?;
     let revisions = WorkflowPlanRevision::find_by_plan(pool, plan.id).await?;
     let session_agents = ChatSessionAgent::find_all_for_session(pool, message.session_id).await?;
-    let mut agents = Vec::with_capacity(session_agents.len());
-    for session_agent in &session_agents {
-        if let Some(agent) = ChatAgent::find_by_id(pool, session_agent.agent_id).await? {
-            agents.push(agent);
-        }
-    }
+    let agents = load_effective_agents_for_route(pool, message.session_id, &session_agents).await?;
     let workflow_sessions = WorkflowAgentSession::find_by_execution(pool, execution.id).await?;
     let steps = WorkflowStep::find_by_execution(pool, execution.id).await?;
     let edges = WorkflowStepEdge::find_by_execution(pool, execution.id).await?;
@@ -542,12 +539,7 @@ pub(super) async fn build_execution_workflow_card_projection_lightweight(
         .ok_or_else(|| ApiError::BadRequest("Workflow revision was not found.".to_string()))?;
     let revisions = WorkflowPlanRevision::find_by_plan(pool, plan.id).await?;
     let session_agents = ChatSessionAgent::find_all_for_session(pool, message.session_id).await?;
-    let mut agents = Vec::with_capacity(session_agents.len());
-    for session_agent in &session_agents {
-        if let Some(agent) = ChatAgent::find_by_id(pool, session_agent.agent_id).await? {
-            agents.push(agent);
-        }
-    }
+    let agents = load_effective_agents_for_route(pool, message.session_id, &session_agents).await?;
     let workflow_sessions = WorkflowAgentSession::find_by_execution(pool, execution.id).await?;
     let steps = WorkflowStep::find_summary_by_execution(pool, execution.id).await?;
     let edges =
@@ -613,25 +605,26 @@ async fn build_plan_workflow_card_projection(
     let parsed_plan: WorkflowPlanJson = serde_json::from_str(&revision.plan_json)
         .map_err(|err| ApiError::BadRequest(err.to_string()))?;
     let session_agents = ChatSessionAgent::find_all_for_session(pool, message.session_id).await?;
-    let mut agents = Vec::with_capacity(session_agents.len());
-    for session_agent in &session_agents {
-        if let Some(agent) = ChatAgent::find_by_id(pool, session_agent.agent_id).await? {
-            agents.push(agent);
-        }
-    }
+    let agents = load_effective_agents_for_route(pool, message.session_id, &session_agents).await?;
     let agent_views = session_agents
         .iter()
         .filter_map(|session_agent| {
             let agent = agents
                 .iter()
                 .find(|item| item.id == session_agent.agent_id)?;
-            Some(services::services::workflow_runtime::WorkflowCardAgent {
-                session_agent_id: session_agent.id.to_string(),
-                workflow_agent_session_id: None,
-                agent_id: agent.id.to_string(),
-                name: agent.name.clone(),
-            })
+            Some(
+                services::services::workflow::workflow_runtime::WorkflowCardAgent {
+                    session_agent_id: session_agent.id.to_string(),
+                    workflow_agent_session_id: None,
+                    agent_id: agent.id.to_string(),
+                    name: agent.name.clone(),
+                },
+            )
         })
+        .collect::<Vec<_>>();
+    let agent_name_by_id: std::collections::HashMap<String, String> = agent_views
+        .iter()
+        .map(|agent| (agent.agent_id.clone(), agent.name.clone()))
         .collect();
     let step_views: Vec<WorkflowCardStep> = parsed_plan
         .nodes
@@ -653,7 +646,12 @@ async fn build_plan_workflow_card_projection(
             max_retry: node.data.max_retry.unwrap_or(1) as i32,
             loop_key: node.data.loop_key.clone(),
             latest_review: None,
-            agent_name: node.data.agent_id.clone(),
+            agent_name: node
+                .data
+                .agent_id
+                .as_ref()
+                .and_then(|agent_id| agent_name_by_id.get(agent_id).cloned())
+                .or_else(|| node.data.agent_id.clone()),
             summary_text: None,
             content: None,
         })
@@ -692,6 +690,23 @@ async fn build_plan_workflow_card_projection(
         is_terminal: false,
         has_transcripts: None,
     })
+}
+
+async fn load_effective_agents_for_route(
+    pool: &sqlx::SqlitePool,
+    session_id: Uuid,
+    session_agents: &[ChatSessionAgent],
+) -> Result<Vec<ChatAgent>, ApiError> {
+    let member_names =
+        services::services::chat::member_name_overrides_for_session(pool, session_id).await?;
+    let mut agents = Vec::with_capacity(session_agents.len());
+    for session_agent in session_agents {
+        if let Some(mut agent) = ChatAgent::find_by_id(pool, session_agent.agent_id).await? {
+            services::services::chat::apply_effective_agent_name(&mut agent, &member_names);
+            agents.push(agent);
+        }
+    }
+    Ok(agents)
 }
 
 pub async fn delete_message(

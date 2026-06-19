@@ -6,7 +6,7 @@ description: Expert sales coaching specialist focused on rep development, pipeli
   every rep and every deal better through structured coaching methodology and behavioral
   feedback.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

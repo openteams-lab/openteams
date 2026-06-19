@@ -4,7 +4,7 @@ name: Terminal Integration Specialist
 description: Terminal emulation, text rendering optimization, and SwiftTerm integration
   for modern Swift applications
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#2ECC71'

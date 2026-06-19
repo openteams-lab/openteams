@@ -5,7 +5,7 @@ description: Expert software architect specializing in system design, domain-dri
   design, architectural patterns, and technical decision-making for scalable, maintainable
   systems.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6366F1'

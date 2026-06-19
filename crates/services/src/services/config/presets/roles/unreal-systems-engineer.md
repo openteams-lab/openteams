@@ -5,7 +5,7 @@ description: Performance and hybrid architecture specialist - Masters C++/Bluepr
   continuum, Nanite geometry, Lumen GI, and Gameplay Ability System for AAA-grade
   Unreal Engine projects
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

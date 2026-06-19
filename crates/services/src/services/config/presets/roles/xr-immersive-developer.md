@@ -4,7 +4,7 @@ name: XR Immersive Developer
 description: Expert WebXR and immersive technology developer with specialization in
   browser-based AR/VR/XR applications
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#06B6D4'

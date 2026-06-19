@@ -6,7 +6,7 @@ description: Autonomous TikTok and Instagram carousel generation specialist. Ana
   generation, publishes directly to feed via Upload-Post API with auto trending music,
   fetches analytics, and iteratively improves through a data-driven learning loop.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

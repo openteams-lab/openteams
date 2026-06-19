@@ -27,6 +27,9 @@ use crate::{
         plain_text_processor::PlainTextLogProcessor,
         utils::{ConversationPatch, EntryIndexProvider},
     },
+    model_discovery::{
+        ProviderKind, cli_model_commands, discover_from_sources, runner_config_paths,
+    },
 };
 
 mod mcp;
@@ -41,7 +44,7 @@ pub struct CursorAgent {
     pub force: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(
-        description = "auto, sonnet-4.6, sonnet-4.5, sonnet-4.5-thinking, gpt-5.3-codex, gpt-5, opus-4.6, opus-4.1, grok, composer-1"
+        description = "auto, sonnet-4.6, sonnet-4.5, sonnet-4.5-thinking, gpt-5.2-codex, gpt-5, opus-4.6, opus-4.1, grok, composer-1"
     )]
     pub model: Option<String>,
     #[serde(flatten)]
@@ -71,6 +74,28 @@ impl CursorAgent {
 
 #[async_trait]
 impl StandardCodingAgentExecutor for CursorAgent {
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        let config_paths = runner_config_paths([
+            self.default_mcp_config_path(),
+            dirs::home_dir().map(|home| home.join(".cursor").join("settings.json")),
+            dirs::home_dir().map(|home| home.join(".cursor").join("settings.jsonc")),
+        ]);
+        discover_from_sources(
+            current_dir,
+            env,
+            &self.cmd,
+            self.model.as_deref(),
+            config_paths,
+            cli_model_commands(Self::base_command(), &self.cmd),
+            &[ProviderKind::OpenAiCompatible],
+        )
+        .await
+    }
+
     async fn spawn(
         &self,
         current_dir: &Path,

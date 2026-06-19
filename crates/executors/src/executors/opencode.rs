@@ -1,4 +1,9 @@
-use std::{io, path::Path, sync::Arc, time::Duration};
+use std::{
+    io,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
@@ -67,10 +72,16 @@ struct OpencodeServer {
     child: Option<AsyncGroupChild>,
     base_url: String,
     server_password: ServerPassword,
+    startup_command: String,
+    stderr_lines: Arc<tokio::sync::Mutex<Vec<String>>>,
+    stderr_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl Drop for OpencodeServer {
     fn drop(&mut self) {
+        if let Some(task) = self.stderr_task.take() {
+            task.abort();
+        }
         // kill the process properly using the kill helper as the native kill_on_drop doesn't work reliably causing orphaned processes and memory leaks
         if let Some(mut child) = self.child.take() {
             tokio::spawn(async move {
@@ -80,10 +91,29 @@ impl Drop for OpencodeServer {
     }
 }
 
+impl OpencodeServer {
+    async fn stderr_tail(&self) -> String {
+        let lines = self.stderr_lines.lock().await;
+        format_server_log_tail(&lines)
+    }
+
+    async fn shutdown(mut self) {
+        if let Some(mut child) = self.child.take() {
+            if let Err(err) = workspace_utils::process::kill_process_group(&mut child).await {
+                tracing::warn!("Failed to stop OpenCode discovery server: {}", err);
+            }
+        }
+        if let Some(task) = self.stderr_task.take() {
+            let _ = tokio::time::timeout(Duration::from_millis(800), task).await;
+        }
+    }
+}
+
 type ServerPassword = String;
+const MAX_SERVER_LOG_LINES: usize = 200;
 
 impl Opencode {
-    const BASE_COMMAND: &'static str = "npx -y opencode-ai@1.2.24";
+    const BASE_COMMAND: &'static str = "npx -y opencode-ai@1.15.13";
 
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
         let builder = CommandBuilder::new(Self::BASE_COMMAND)
@@ -105,24 +135,48 @@ impl Opencode {
     ) -> Result<Vec<String>, ExecutorError> {
         let server = self.spawn_server(current_dir, env).await?;
         let directory = current_dir.to_string_lossy().to_string();
-        let client = reqwest::Client::builder()
-            .default_headers(build_default_headers(&directory, &server.server_password))
-            .build()
-            .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
-        wait_for_health(&client, &server.base_url).await?;
-        let providers = list_providers(&client, &server.base_url, &directory).await?;
-        let mut models = Vec::new();
+        let result = async {
+            let client = reqwest::Client::builder()
+                .default_headers(build_default_headers(&directory, &server.server_password))
+                .build()
+                .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
+            wait_for_health(&client, &server.base_url).await?;
+            let providers = list_providers(&client, &server.base_url, &directory).await?;
+            let mut models = Vec::new();
 
-        for provider in providers.all {
-            for model_id in provider.models.keys() {
-                models.push(format!("{}/{}", provider.id, model_id));
+            for provider in providers.all {
+                for model_id in provider.models.keys() {
+                    models.push(format!("{}/{}", provider.id, model_id));
+                }
             }
-        }
 
-        models.sort();
-        models.dedup();
-        Ok(models)
+            models.sort();
+            models.dedup();
+            Ok(models)
+        }
+        .await;
+
+        let result = match result {
+            Ok(models) => Ok(models),
+            Err(err) => {
+                let server_logs = server.stderr_tail().await;
+                tracing::error!(
+                    error = %err,
+                    opencode_startup_command = %server.startup_command,
+                    opencode_server_logs = %server_logs,
+                    "OpenCode model discovery failed"
+                );
+                Err(opencode_server_error(
+                    err,
+                    &server.startup_command,
+                    &server_logs,
+                ))
+            }
+        };
+
+        server.shutdown().await;
+        result
     }
 
     /// Common boilerplate for spawning an OpenCode server process.
@@ -130,11 +184,17 @@ impl Opencode {
         &self,
         current_dir: &Path,
         env: &ExecutionEnv,
-    ) -> Result<(AsyncGroupChild, ServerPassword), ExecutorError> {
+    ) -> Result<(AsyncGroupChild, ServerPassword, String), ExecutorError> {
         let command_parts = self.build_command_builder()?.build_initial()?;
         let (program_path, args) = command_parts.into_resolved().await?;
 
         let server_password = generate_server_password();
+        let startup_command = format_command_for_log(&program_path, &args);
+        tracing::info!(
+            opencode_startup_command = %startup_command,
+            current_dir = %current_dir.display(),
+            "Starting OpenCode server process"
+        );
 
         let mut command = Command::new(program_path);
         command
@@ -156,7 +216,7 @@ impl Opencode {
 
         let child = command.group_spawn()?;
 
-        Ok((child, server_password))
+        Ok((child, server_password, startup_command))
     }
 
     /// Handles process spawning, waiting for the server URL
@@ -165,17 +225,34 @@ impl Opencode {
         current_dir: &Path,
         env: &ExecutionEnv,
     ) -> Result<OpencodeServer, ExecutorError> {
-        let (mut child, server_password) = self.spawn_server_process(current_dir, env).await?;
+        let (mut child, server_password, startup_command) =
+            self.spawn_server_process(current_dir, env).await?;
         let server_stdout = child.inner().stdout.take().ok_or_else(|| {
             ExecutorError::Io(std::io::Error::other("OpenCode server missing stdout"))
         })?;
+        let (stderr_lines, stderr_task) = collect_server_stderr(child.inner().stderr.take());
 
-        let base_url = wait_for_server_url(server_stdout, None).await?;
+        let base_url = match wait_for_server_url(server_stdout, None).await {
+            Ok(base_url) => base_url,
+            Err(err) => {
+                let server_logs = {
+                    let lines = stderr_lines.lock().await;
+                    format_server_log_tail(&lines)
+                };
+                if let Some(task) = stderr_task {
+                    task.abort();
+                }
+                return Err(opencode_server_error(err, &startup_command, &server_logs));
+            }
+        };
 
         Ok(OpencodeServer {
             child: Some(child),
             base_url,
             server_password,
+            startup_command,
+            stderr_lines,
+            stderr_task,
         })
     }
 
@@ -193,7 +270,8 @@ impl Opencode {
             self.append_prompt.combine_prompt(prompt)
         };
 
-        let (mut child, server_password) = self.spawn_server_process(current_dir, env).await?;
+        let (mut child, server_password, _startup_command) =
+            self.spawn_server_process(current_dir, env).await?;
         let server_stdout = child.inner().stdout.take().ok_or_else(|| {
             ExecutorError::Io(std::io::Error::other("OpenCode server missing stdout"))
         })?;
@@ -279,6 +357,118 @@ impl Opencode {
     }
 }
 
+fn collect_server_stderr(
+    stderr: Option<tokio::process::ChildStderr>,
+) -> (
+    Arc<tokio::sync::Mutex<Vec<String>>>,
+    Option<tokio::task::JoinHandle<()>>,
+) {
+    let lines = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+    let Some(stderr) = stderr else {
+        return (lines, None);
+    };
+
+    let task_lines = Arc::clone(&lines);
+    let task = tokio::spawn(async move {
+        let mut stderr_lines = tokio::io::BufReader::new(stderr).lines();
+        loop {
+            match stderr_lines.next_line().await {
+                Ok(Some(line)) => {
+                    tracing::debug!(line = %line, "OpenCode server stderr");
+                    let mut captured = task_lines.lock().await;
+                    captured.push(line);
+                    if captured.len() > MAX_SERVER_LOG_LINES {
+                        let excess = captured.len() - MAX_SERVER_LOG_LINES;
+                        captured.drain(0..excess);
+                    }
+                }
+                Ok(None) => break,
+                Err(err) => {
+                    tracing::debug!("Failed to read OpenCode server stderr: {err}");
+                    break;
+                }
+            }
+        }
+    });
+
+    (lines, Some(task))
+}
+
+fn format_server_log_tail(captured: &[String]) -> String {
+    captured
+        .iter()
+        .rev()
+        .take(80)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn opencode_server_error(
+    err: ExecutorError,
+    startup_command: &str,
+    server_logs: &str,
+) -> ExecutorError {
+    let mut message = format!("{err}\nOpenCode startup command:\n{startup_command}");
+    if !server_logs.trim().is_empty() {
+        message.push_str("\nOpenCode server logs:\n");
+        message.push_str(server_logs);
+    }
+    ExecutorError::Io(io::Error::other(message))
+}
+
+fn format_command_for_log(program: &PathBuf, args: &[String]) -> String {
+    let mut parts = Vec::with_capacity(args.len() + 1);
+    parts.push(quote_command_part(&program.display().to_string()));
+
+    let mut redact_next = false;
+    for arg in args {
+        let formatted = if redact_next {
+            redact_next = false;
+            "<redacted>".to_string()
+        } else if let Some(redacted) = redact_sensitive_arg(arg) {
+            if !arg.contains('=') {
+                redact_next = true;
+            }
+            redacted
+        } else {
+            arg.clone()
+        };
+        parts.push(quote_command_part(&formatted));
+    }
+
+    parts.join(" ")
+}
+
+fn redact_sensitive_arg(arg: &str) -> Option<String> {
+    let lower = arg.to_ascii_lowercase();
+    let is_sensitive =
+        lower.contains("key") || lower.contains("token") || lower.contains("password");
+    if !is_sensitive {
+        return None;
+    }
+
+    match arg.split_once('=') {
+        Some((name, _value)) => Some(format!("{name}=<redacted>")),
+        None => Some(arg.to_string()),
+    }
+}
+
+fn quote_command_part(value: &str) -> String {
+    if value.is_empty()
+        || value
+            .chars()
+            .any(|ch| ch.is_whitespace() || matches!(ch, '"' | '\''))
+    {
+        format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+    } else {
+        value.to_string()
+    }
+}
+
 fn format_tail(captured: Vec<String>) -> String {
     captured
         .into_iter()
@@ -345,6 +535,16 @@ async fn wait_for_server_url(
 impl StandardCodingAgentExecutor for Opencode {
     fn use_approvals(&mut self, approvals: Arc<dyn ExecutorApprovalService>) {
         self.approvals = Some(approvals);
+    }
+
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        Opencode::list_models(self, current_dir, env)
+            .await
+            .map(Some)
     }
 
     async fn available_slash_commands(

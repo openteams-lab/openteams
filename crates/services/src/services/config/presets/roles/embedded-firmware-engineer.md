@@ -4,7 +4,7 @@ name: Embedded Firmware Engineer
 description: Specialist in bare-metal and RTOS firmware - ESP32/ESP-IDF, PlatformIO,
   Arduino, ARM Cortex-M, STM32 HAL/LL, Nordic nRF5/nRF Connect SDK, FreeRTOS, Zephyr
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

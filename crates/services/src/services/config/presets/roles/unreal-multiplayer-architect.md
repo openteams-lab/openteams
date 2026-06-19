@@ -5,7 +5,7 @@ description: Unreal Engine networking specialist - Masters Actor replication, Ga
   architecture, server-authoritative gameplay, network prediction, and dedicated server
   setup for UE5
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#E74C3C'

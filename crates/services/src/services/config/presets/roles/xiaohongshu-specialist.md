@@ -5,7 +5,7 @@ description: Expert Xiaohongshu marketing specialist focused on lifestyle conten
   trend-driven strategies, and authentic community engagement. Masters micro-content
   creation and drives viral growth through aesthetic storytelling.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

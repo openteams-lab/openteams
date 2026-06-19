@@ -6,7 +6,7 @@ description: Senior paid media strategist specializing in large-scale search, sh
   platforms. Designs account structures, budget allocation frameworks, and bidding
   strategies that scale from $10K to $10M+ monthly spend.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

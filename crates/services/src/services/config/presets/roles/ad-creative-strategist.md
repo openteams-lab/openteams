@@ -6,7 +6,7 @@ description: Paid media creative specialist focused on ad copywriting, RSA optim
   and programmatic platforms. Bridges the gap between performance data and persuasive
   messaging.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#F39C12'

@@ -5,7 +5,7 @@ description: Godot 4 visual effects specialist - Masters the Godot Shading Langu
   (GLSL-like), VisualShader editor, CanvasItem and Spatial shaders, post-processing,
   and performance optimization for 2D/3D effects
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#9B59B6'

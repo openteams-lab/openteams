@@ -5,7 +5,7 @@ description: Expert infrastructure specialist focused on system reliability, per
   optimization, and technical operations management. Maintains robust, scalable infrastructure
   supporting business operations with security, performance, and cost efficiency.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

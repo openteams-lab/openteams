@@ -7,7 +7,7 @@ description: Full-spectrum study abroad planning expert covering the US, UK, Can
   standardized test planning, visa preparation, and overseas life adaptation, helping
   Chinese students craft personalized end-to-end study abroad plans.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

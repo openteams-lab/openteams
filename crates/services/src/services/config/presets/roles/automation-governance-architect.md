@@ -4,7 +4,7 @@ name: Automation Governance Architect
 description: Governance-first architect for business automations (n8n-first) who audits
   value, risk, and maintainability before implementation.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#00FFFF'

@@ -163,7 +163,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -174,7 +174,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -837,8 +837,8 @@ checksum = "e9b18233253483ce2f65329a24072ec414db782531bdbb7d0bbc4bd2ce6b7e21"
 
 [[package]]
 name = "codex-app-server-protocol"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "anyhow",
  "clap",
@@ -847,7 +847,7 @@ dependencies = [
  "codex-shell-command",
  "codex-utils-absolute-path",
  "inventory",
- "rmcp 0.15.0",
+ "rmcp 1.7.0",
  "schemars 0.8.22",
  "serde",
  "serde_json",
@@ -861,8 +861,8 @@ dependencies = [
 
 [[package]]
 name = "codex-async-utils"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "async-trait",
  "tokio",
@@ -871,8 +871,8 @@ dependencies = [
 
 [[package]]
 name = "codex-execpolicy"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "anyhow",
  "clap",
@@ -887,8 +887,8 @@ dependencies = [
 
 [[package]]
 name = "codex-experimental-api-macros"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -897,8 +897,8 @@ dependencies = [
 
 [[package]]
 name = "codex-network-proxy"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -927,8 +927,8 @@ dependencies = [
 
 [[package]]
 name = "codex-protocol"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "chardetng",
  "chrono",
@@ -938,7 +938,6 @@ dependencies = [
  "codex-utils-absolute-path",
  "codex-utils-image",
  "codex-utils-string",
- "codex-utils-template",
  "encoding_rs",
  "globset",
  "icu_decimal",
@@ -960,12 +959,13 @@ dependencies = [
  "tracing",
  "ts-rs 11.1.0",
  "uuid",
+ "wildmatch",
 ]
 
 [[package]]
 name = "codex-shell-command"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "base64 0.22.1",
  "codex-protocol",
@@ -983,8 +983,8 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-absolute-path"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "dirs 6.0.0",
  "dunce",
@@ -995,8 +995,8 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-cache"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "lru 0.16.3",
  "sha1",
@@ -1005,8 +1005,8 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-home-dir"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "codex-utils-absolute-path",
  "dirs 6.0.0",
@@ -1014,8 +1014,8 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-image"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "base64 0.22.1",
  "codex-utils-cache",
@@ -1027,24 +1027,21 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-rustls-provider"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "rustls",
 ]
 
 [[package]]
 name = "codex-utils-string"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
+version = "0.136.0"
+source = "git+https://github.com/openai/codex.git?rev=rust-v0.136.0#7ca611348db9446711ed16ed81c84095e3721cee"
 dependencies = [
  "regex-lite",
+ "serde",
+ "serde_json",
 ]
-
-[[package]]
-name = "codex-utils-template"
-version = "0.125.0"
-source = "git+https://github.com/openai/codex.git?rev=rust-v0.125.0#637f7dd6d737f3961e6bf32fbb3861c4953269c5"
 
 [[package]]
 name = "color_quant"
@@ -1470,6 +1467,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "dbus"
+version = "0.9.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b942602992bb7acfd1f51c49811c58a610ef9181b6e66f3e519d79b540a3bf73"
+dependencies = [
+ "libc",
+ "libdbus-sys",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "dbus-secret-service"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "708b509edf7889e53d7efb0ffadd994cc6c2345ccb62f55cfd6b0682165e4fa6"
+dependencies = [
+ "dbus",
+ "zeroize",
+]
+
+[[package]]
 name = "debugid"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1691,7 +1709,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1978,7 +1996,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2456,8 +2474,8 @@ dependencies = [
  "libc",
  "log",
  "rustversion",
- "windows-link 0.1.3",
- "windows-result 0.3.4",
+ "windows-link 0.2.1",
+ "windows-result 0.4.1",
 ]
 
 [[package]]
@@ -3271,7 +3289,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3408,6 +3426,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "keyring"
+version = "3.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eebcc3aff044e5944a8fbaf69eb277d11986064cba30c468730e8b9909fb551c"
+dependencies = [
+ "dbus-secret-service",
+ "linux-keyutils",
+ "log",
+ "security-framework 2.11.1",
+ "security-framework 3.6.0",
+ "zeroize",
+]
+
+[[package]]
 name = "kqueue"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3497,6 +3529,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d"
 
 [[package]]
+name = "libdbus-sys"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "328c4789d42200f1eeec05bd86c9c13c7f091d2ba9a6ea35acdf51f31bc0f043"
+dependencies = [
+ "pkg-config",
+]
+
+[[package]]
 name = "libgit2-sys"
 version = "0.18.3+1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3557,6 +3598,16 @@ dependencies = [
  "libc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "linux-keyutils"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83270a18e9f90d0707c41e9f35efada77b64c0e6f3f1810e71c8368a864d5590"
+dependencies = [
+ "bitflags 2.11.0",
+ "libc",
 ]
 
 [[package]]
@@ -3884,7 +3935,7 @@ dependencies = [
  "openssl-probe",
  "openssl-sys",
  "schannel",
- "security-framework",
+ "security-framework 3.6.0",
  "security-framework-sys",
  "tempfile",
 ]
@@ -4044,7 +4095,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4412,7 +4463,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.45.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5428,9 +5479,9 @@ dependencies = [
 
 [[package]]
 name = "rmcp"
-version = "0.15.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bef41ebc9ebed2c1b1d90203e9d1756091e8a00bbc3107676151f39868ca0ee"
+checksum = "0810a9f717d9828f475fe1f629f4c305c8464b7f496c3a854b58d29e65f4058e"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -5438,7 +5489,7 @@ dependencies = [
  "futures",
  "pastey",
  "pin-project-lite",
- "rmcp-macros 0.15.0",
+ "rmcp-macros 1.7.0",
  "schemars 1.2.1",
  "serde",
  "serde_json",
@@ -5463,9 +5514,9 @@ dependencies = [
 
 [[package]]
 name = "rmcp-macros"
-version = "0.15.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e88ad84b8b6237a934534a62b379a5be6388915663c0cc598ceb9b3292bbbfe"
+checksum = "6aefac48c364756e97f04c0401ba3231e8607882c7c1d92da0437dc16307904d"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -5568,7 +5619,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5596,7 +5647,7 @@ dependencies = [
  "openssl-probe",
  "rustls-pki-types",
  "schannel",
- "security-framework",
+ "security-framework 3.6.0",
 ]
 
 [[package]]
@@ -5819,6 +5870,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
 dependencies = [
  "zeroize",
+]
+
+[[package]]
+name = "security-framework"
+version = "2.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "897b2245f0b511c87893af39b033e5ca9cce68824c4d7e7630b5a1d339658d02"
+dependencies = [
+ "bitflags 2.11.0",
+ "core-foundation 0.9.4",
+ "core-foundation-sys",
+ "libc",
+ "security-framework-sys",
 ]
 
 [[package]]
@@ -6183,6 +6247,7 @@ dependencies = [
  "sentry",
  "serde",
  "serde_json",
+ "serde_with",
  "services",
  "sha2",
  "shlex",
@@ -6195,6 +6260,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml",
+ "tower",
  "tower-http 0.5.2",
  "tracing",
  "tracing-appender",
@@ -6230,6 +6296,7 @@ dependencies = [
  "git2",
  "ignore",
  "json-patch",
+ "keyring",
  "moka",
  "notify",
  "notify-debouncer-full",
@@ -6261,6 +6328,7 @@ dependencies = [
  "utils",
  "uuid",
  "which 7.0.3",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6316,7 +6384,7 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b1fdf65dd6331831494dd616b30351c38e96e45921a27745cf98490458b90bb"
 dependencies = [
- "dirs 5.0.1",
+ "dirs 6.0.0",
 ]
 
 [[package]]
@@ -6936,7 +7004,7 @@ dependencies = [
  "getrandom 0.4.1",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8000,6 +8068,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "wildmatch"
+version = "2.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29333c3ea1ba8b17211763463ff24ee84e41c78224c16b001cd907e663a38c68"
+
+[[package]]
 name = "winapi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8021,7 +8095,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8169,15 +8243,6 @@ dependencies = [
 
 [[package]]
 name = "windows-sys"
-version = "0.45.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75283be5efb2831d37ea142365f009c02ec203cd29a3ebecbc093d52315b66d0"
-dependencies = [
- "windows-targets 0.42.2",
-]
-
-[[package]]
-name = "windows-sys"
 version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "677d2418bec65e3338edb076e806bc1ec15693c5d0104683f2efe857f61056a9"
@@ -8219,21 +8284,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
 dependencies = [
  "windows-link 0.2.1",
-]
-
-[[package]]
-name = "windows-targets"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e5180c00cd44c9b1c88adb3693291f1cd93605ded80c250a75d472756b4d071"
-dependencies = [
- "windows_aarch64_gnullvm 0.42.2",
- "windows_aarch64_msvc 0.42.2",
- "windows_i686_gnu 0.42.2",
- "windows_i686_msvc 0.42.2",
- "windows_x86_64_gnu 0.42.2",
- "windows_x86_64_gnullvm 0.42.2",
- "windows_x86_64_msvc 0.42.2",
 ]
 
 [[package]]
@@ -8304,12 +8354,6 @@ dependencies = [
 
 [[package]]
 name = "windows_aarch64_gnullvm"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "597a5118570b68bc08d8d59125332c54f1ba9d9adeedeef5b99b02ba2b0698f8"
-
-[[package]]
-name = "windows_aarch64_gnullvm"
 version = "0.48.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b38e32f0abccf9987a4e3079dfb67dcd799fb61361e53e2882c3cbaf0d905d8"
@@ -8328,12 +8372,6 @@ checksum = "a9d8416fa8b42f5c947f8482c43e7d89e73a173cead56d044f6a56104a6d1b53"
 
 [[package]]
 name = "windows_aarch64_msvc"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e08e8864a60f06ef0d0ff4ba04124db8b0fb3be5776a5cd47641e942e58c4d43"
-
-[[package]]
-name = "windows_aarch64_msvc"
 version = "0.48.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc35310971f3b2dbbf3f0690a219f40e2d9afcf64f9ab7cc1be722937c26b4bc"
@@ -8349,12 +8387,6 @@ name = "windows_aarch64_msvc"
 version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9d782e804c2f632e395708e99a94275910eb9100b2114651e04744e9b125006"
-
-[[package]]
-name = "windows_i686_gnu"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c61d927d8da41da96a81f029489353e68739737d3beca43145c8afec9a31a84f"
 
 [[package]]
 name = "windows_i686_gnu"
@@ -8388,12 +8420,6 @@ checksum = "fa7359d10048f68ab8b09fa71c3daccfb0e9b559aed648a8f95469c27057180c"
 
 [[package]]
 name = "windows_i686_msvc"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44d840b6ec649f480a41c8d80f9c65108b92d89345dd94027bfe06ac444d1060"
-
-[[package]]
-name = "windows_i686_msvc"
 version = "0.48.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f55c233f70c4b27f66c523580f78f1004e8b5a8b659e05a4eb49d4166cca406"
@@ -8409,12 +8435,6 @@ name = "windows_i686_msvc"
 version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e7ac75179f18232fe9c285163565a57ef8d3c89254a30685b57d83a38d326c2"
-
-[[package]]
-name = "windows_x86_64_gnu"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8de912b8b8feb55c064867cf047dda097f92d51efad5b491dfb98f6bbb70cb36"
 
 [[package]]
 name = "windows_x86_64_gnu"
@@ -8436,12 +8456,6 @@ checksum = "9c3842cdd74a865a8066ab39c8a7a473c0778a3f29370b5fd6b4b9aa7df4a499"
 
 [[package]]
 name = "windows_x86_64_gnullvm"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26d41b46a36d453748aedef1486d5c7a85db22e56aff34643984ea85514e94a3"
-
-[[package]]
-name = "windows_x86_64_gnullvm"
 version = "0.48.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b7b52767868a23d5bab768e390dc5f5c55825b6d30b86c844ff2dc7414044cc"
@@ -8457,12 +8471,6 @@ name = "windows_x86_64_gnullvm"
 version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ffa179e2d07eee8ad8f57493436566c7cc30ac536a3379fdf008f47f6bb7ae1"
-
-[[package]]
-name = "windows_x86_64_msvc"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9aec5da331524158c6d1a4ac0ab1541149c0b9505fde06423b02f5ef0106b9f0"
 
 [[package]]
 name = "windows_x86_64_msvc"
@@ -8800,6 +8808,20 @@ name = "zeroize"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
+dependencies = [
+ "zeroize_derive",
+]
+
+[[package]]
+name = "zeroize_derive"
+version = "1.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85a5b4158499876c763cb03bc4e49185d3cccbabb15b33c627f7884f43db852e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.116",
+]
 
 [[package]]
 name = "zerotrie"

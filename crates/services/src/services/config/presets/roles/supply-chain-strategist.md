@@ -6,7 +6,7 @@ description: Expert supply chain management and procurement strategy specialist 
   chain digitalization. Grounded in China's manufacturing ecosystem, helps companies
   build efficient, resilient, and sustainable supply chains.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#3498DB'

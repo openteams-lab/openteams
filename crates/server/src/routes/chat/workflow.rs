@@ -28,21 +28,29 @@ use db::models::{
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use services::services::{
-    config, workflow_analytics,
-    workflow_compiler::WorkflowCompiler,
-    workflow_orchestrator::WorkflowOrchestrator,
-    workflow_runtime::{
-        WorkflowCardAgent, WorkflowCardProjection, build_plan_generation_prompt,
-        extract_json_payload, resolve_lead_agent, resolve_workflow_goal,
-        resolve_workflow_response_language_instruction, run_workflow_agent_prompt,
+    build_stats::token_cost_stats::TokenCostStatsService,
+    chat, config,
+    workflow::{
+        workflow_analytics,
+        workflow_compiler::WorkflowCompiler,
+        workflow_orchestrator::WorkflowOrchestrator,
+        workflow_runtime::{
+            WorkflowCardAgent, WorkflowCardProjection, build_plan_generation_prompt,
+            extract_json_payload, resolve_lead_agent, resolve_workflow_goal,
+            resolve_workflow_response_language_instruction, run_workflow_agent_prompt,
+        },
+        workflow_validator,
     },
-    workflow_validator,
 };
 use ts_rs::TS;
 use utils::{assets::config_path, response::ApiResponse};
 use uuid::Uuid;
 
-use crate::{DeploymentImpl, error::ApiError};
+use crate::{
+    DeploymentImpl,
+    error::ApiError,
+    routes::build_stats::{WorkflowStepTokenEntry, WorkflowStepTokenUsageResponse},
+};
 
 #[derive(Debug, Deserialize, TS)]
 pub struct GeneratePlanAndRunRequest {
@@ -59,6 +67,33 @@ pub struct GeneratePlanAndRunResponse {
 pub struct RetryPlanGenerationResponse {
     pub status: String,
     pub message_id: Uuid,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WorkflowSessionStatusResponse {
+    pub has_running_workflow: bool,
+}
+
+fn is_sidebar_running_workflow_status(status: &WorkflowExecutionStatus) -> bool {
+    matches!(status, WorkflowExecutionStatus::Running)
+}
+
+pub async fn get_workflow_status(
+    Extension(session): Extension<ChatSession>,
+    State(deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<WorkflowSessionStatusResponse>>, ApiError> {
+    let executions =
+        WorkflowExecution::find_generation_blocking_by_session(&deployment.db().pool, session.id)
+            .await?;
+    let has_running_workflow = executions
+        .iter()
+        .any(|execution| is_sidebar_running_workflow_status(&execution.status));
+
+    Ok(ResponseJson(ApiResponse::success(
+        WorkflowSessionStatusResponse {
+            has_running_workflow,
+        },
+    )))
 }
 
 pub async fn generate_plan_and_run(
@@ -102,15 +137,7 @@ pub async fn generate_plan_and_run(
         ));
     }
 
-    let mut agents = Vec::with_capacity(session_agents.len());
-    for session_agent in &session_agents {
-        let agent = ChatAgent::find_by_id(pool, session_agent.agent_id)
-            .await?
-            .ok_or_else(|| {
-                ApiError::BadRequest("Session agent is missing its agent record.".to_string())
-            })?;
-        agents.push(agent);
-    }
+    let agents = load_effective_agents_for_route(pool, session.id, &session_agents).await?;
 
     let (lead_agent, lead_session_agent) = resolve_lead_agent(&session, &session_agents, &agents)
         .map_err(|err| ApiError::BadRequest(err.to_string()))?;
@@ -778,6 +805,26 @@ pub async fn get_step_transcripts(
     list_transcript_response(pool, &session, execution.id, scoped_query).await
 }
 
+pub async fn get_step_token_usage(
+    Extension(session): Extension<ChatSession>,
+    State(deployment): State<DeploymentImpl>,
+    axum::extract::Path((_session_id, step_id)): axum::extract::Path<(Uuid, Uuid)>,
+) -> Result<ResponseJson<ApiResponse<WorkflowStepTokenUsageResponse>>, ApiError> {
+    let pool = &deployment.db().pool;
+    let (_step, _execution) = load_step_for_session(pool, &session, step_id).await?;
+    let project_id = session.project_id.ok_or_else(|| {
+        ApiError::BadRequest("Session is not associated with a project.".to_string())
+    })?;
+    let usage = TokenCostStatsService::new()
+        .workflow_step_token_usage(pool, project_id, &step_id.to_string())
+        .await?
+        .map(WorkflowStepTokenEntry::from);
+
+    Ok(ResponseJson(ApiResponse::success(
+        WorkflowStepTokenUsageResponse { usage },
+    )))
+}
+
 pub async fn submit_step_input(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
@@ -1256,7 +1303,7 @@ async fn list_transcript_response(
         )
         .await?;
     let session_agents = ChatSessionAgent::find_all_for_session(pool, session.id).await?;
-    let agents = load_agents_for_route(pool, &session_agents).await?;
+    let agents = load_effective_agents_for_route(pool, session.id, &session_agents).await?;
     let step_key_by_id: HashMap<Uuid, String> = steps
         .iter()
         .map(|step| (step.id, step.step_key.clone()))
@@ -1487,15 +1534,44 @@ pub async fn resolve_approval(
         .into_response())
 }
 
-async fn load_agents_for_route(
+async fn load_effective_agents_for_route(
     pool: &sqlx::SqlitePool,
+    session_id: Uuid,
     session_agents: &[ChatSessionAgent],
 ) -> Result<Vec<ChatAgent>, ApiError> {
+    let member_names = chat::member_name_overrides_for_session(pool, session_id).await?;
     let mut agents = Vec::with_capacity(session_agents.len());
     for sa in session_agents {
-        if let Some(agent) = ChatAgent::find_by_id(pool, sa.agent_id).await? {
-            agents.push(agent);
-        }
+        let mut agent = ChatAgent::find_by_id(pool, sa.agent_id)
+            .await?
+            .ok_or_else(|| {
+                ApiError::BadRequest("Session agent is missing its agent record.".to_string())
+            })?;
+        chat::apply_effective_agent_name(&mut agent, &member_names);
+        agents.push(agent);
     }
     Ok(agents)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sidebar_running_workflow_status_only_counts_running() {
+        assert!(is_sidebar_running_workflow_status(
+            &WorkflowExecutionStatus::Running
+        ));
+
+        for status in [
+            WorkflowExecutionStatus::Pending,
+            WorkflowExecutionStatus::Failed,
+            WorkflowExecutionStatus::Paused,
+            WorkflowExecutionStatus::Recompiling,
+            WorkflowExecutionStatus::Completed,
+            WorkflowExecutionStatus::Waiting,
+        ] {
+            assert!(!is_sidebar_running_workflow_status(&status));
+        }
+    }
 }

@@ -5,7 +5,7 @@ pub mod review;
 pub mod session;
 pub mod slash_commands;
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     env,
     path::{Path, PathBuf},
     sync::Arc,
@@ -22,6 +22,12 @@ pub fn codex_home() -> Option<PathBuf> {
         return Some(PathBuf::from(codex_home));
     }
     dirs::home_dir().map(|home| home.join(".codex"))
+}
+
+fn codex_model_cache_paths() -> Vec<PathBuf> {
+    codex_home()
+        .map(|home| vec![home.join("models_cache.json")])
+        .unwrap_or_default()
 }
 
 use async_trait::async_trait;
@@ -54,6 +60,10 @@ use crate::{
         SpawnedChild, StandardCodingAgentExecutor,
     },
     logs::utils::patch,
+    model_discovery::{
+        ProviderKind, cli_model_commands, discover_from_sources, model_slugs_from_models_json,
+        read_config_value, runner_config_paths,
+    },
     skill_config::NativeSkillConfigBackend,
     stdout_dup::create_stdout_pipe_writer,
 };
@@ -201,6 +211,56 @@ impl StandardCodingAgentExecutor for Codex {
         })))
     }
 
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        let config_paths = runner_config_paths([
+            self.default_mcp_config_path(),
+            codex_home().map(|home| home.join("config.json")),
+        ]);
+        let mut models = BTreeSet::new();
+        if let Some(discovered) = discover_from_sources(
+            current_dir,
+            env,
+            &self.cmd,
+            self.model.as_deref(),
+            config_paths,
+            cli_model_commands(Self::BASE_COMMAND, &self.cmd),
+            &[ProviderKind::OpenAiCompatible],
+        )
+        .await?
+        {
+            models.extend(discovered);
+        }
+
+        for cache_path in codex_model_cache_paths() {
+            match read_config_value(&cache_path).await {
+                Ok(Some(value)) => {
+                    let slugs = model_slugs_from_models_json(&value);
+                    if !slugs.is_empty() {
+                        models.extend(slugs);
+                        break;
+                    }
+                }
+                Ok(None) => {}
+                Err(err) => {
+                    tracing::debug!(
+                        "Failed to read Codex model cache at {}: {err}",
+                        cache_path.display()
+                    );
+                }
+            }
+        }
+
+        if models.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(models.into_iter().collect()))
+        }
+    }
+
     async fn spawn(
         &self,
         current_dir: &Path,
@@ -293,7 +353,7 @@ impl StandardCodingAgentExecutor for Codex {
 }
 
 impl Codex {
-    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.125.0";
+    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.136.0";
 
     pub fn base_command() -> &'static str {
         Self::BASE_COMMAND
@@ -463,9 +523,12 @@ impl Codex {
                 };
                 let response = client.resume_thread(params).await?;
                 tracing::debug!(
-                    "resuming session using rollout file {}, response {:?}",
-                    rollout_path.display(),
-                    response
+                    rollout_path = %rollout_path.display(),
+                    thread_id = %response.thread.id,
+                    turns = response.thread.turns.len(),
+                    model = %response.model,
+                    model_provider = %response.model_provider,
+                    "resumed session using rollout file"
                 );
                 let thread_id = response.thread.id;
                 client.register_session(&thread_id).await?;

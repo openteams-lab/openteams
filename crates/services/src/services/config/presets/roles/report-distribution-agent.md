@@ -4,7 +4,7 @@ name: Report Distribution Agent
 description: AI agent that automates distribution of consolidated sales reports to
   representatives based on territorial parameters
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

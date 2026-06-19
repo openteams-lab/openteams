@@ -2,7 +2,7 @@ use axum::{Json, Router, extract::State, response::Json as ResponseJson, routing
 use db::models::workflow_transcript::WorkflowTranscript;
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
-use services::services::{
+use services::services::workflow::{
     workflow_iteration::UserIterationFeedbackDetail, workflow_orchestrator::WorkflowOrchestrator,
 };
 use ts_rs::TS;

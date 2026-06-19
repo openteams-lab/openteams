@@ -16,6 +16,9 @@ use crate::{
         claude::{ClaudeLogProcessor, HistoryStrategy},
     },
     logs::{stderr_processor::normalize_stderr_logs, utils::EntryIndexProvider},
+    model_discovery::{
+        ProviderKind, cli_model_commands, discover_from_sources, runner_config_paths,
+    },
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS, JsonSchema)]
@@ -39,7 +42,7 @@ pub struct Amp {
 }
 
 impl Amp {
-    const BASE_COMMAND: &'static str = "npx -y @sourcegraph/amp@0.0.1773273801-g50314c";
+    const BASE_COMMAND: &'static str = "npx -y @sourcegraph/amp@0.0.1780464815-g688406";
 
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
         let mut builder =
@@ -56,6 +59,24 @@ impl Amp {
 
 #[async_trait]
 impl StandardCodingAgentExecutor for Amp {
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        let config_paths = runner_config_paths([self.default_mcp_config_path()]);
+        discover_from_sources(
+            current_dir,
+            env,
+            &self.cmd,
+            self.model.as_deref(),
+            config_paths,
+            cli_model_commands(Self::BASE_COMMAND, &self.cmd),
+            &[ProviderKind::OpenAiCompatible],
+        )
+        .await
+    }
+
     async fn spawn(
         &self,
         current_dir: &Path,

@@ -5,7 +5,7 @@ description: Expert Instagram marketing specialist focused on visual storytellin
   community building, and multi-format content optimization. Masters aesthetic development
   and drives meaningful engagement.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

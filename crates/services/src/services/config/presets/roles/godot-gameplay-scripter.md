@@ -4,7 +4,7 @@ name: Godot Gameplay Scripter
 description: Composition and signal integrity specialist - Masters GDScript 2.0, C#
   integration, node-based architecture, and type-safe signal design for Godot 4 projects
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#9B59B6'

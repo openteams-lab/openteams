@@ -144,11 +144,20 @@ pub trait Deployment: Clone + Send + Sync + 'static {
                             display_name: repo.name,
                             git_repo_path: repo_path.clone(),
                         }],
+                        description: None,
+                        status: None,
+                        default_workspace_path: None,
+                        active_repo_id: None,
                     };
 
                     match self
                         .project()
-                        .create_project(&self.db().pool, self.repo(), create_data.clone())
+                        .create_project(
+                            &self.db().pool,
+                            self.repo(),
+                            create_data.clone(),
+                            self.user_id(),
+                        )
                         .await
                     {
                         Ok(project) => {

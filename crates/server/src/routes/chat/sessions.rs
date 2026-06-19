@@ -19,6 +19,7 @@ use db::models::{
     chat_run::ChatRun,
     chat_session::{ChatSession, ChatSessionStatus, CreateChatSession, UpdateChatSession},
     chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
+    member_execution_config::MemberExecutionConfig,
 };
 use deployment::Deployment;
 use git::{Commit, DiffTarget, GitCli, GitService};
@@ -26,7 +27,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use services::services::{
     analytics_events::{AnalyticsProjector, DomainEvent},
-    workflow_analytics::{self, hash_user_id},
+    chat::create_session_with_project_members,
+    workflow::workflow_analytics::{self, hash_user_id},
 };
 use sqlx::FromRow;
 use ts_rs::TS;
@@ -42,13 +44,15 @@ use crate::{DeploymentImpl, error::ApiError};
 #[derive(Debug, Deserialize, TS)]
 pub struct ChatSessionListQuery {
     pub status: Option<ChatSessionStatus>,
+    pub project_id: Option<Uuid>,
 }
 
 pub async fn get_sessions(
     State(deployment): State<DeploymentImpl>,
     Query(query): Query<ChatSessionListQuery>,
 ) -> Result<ResponseJson<ApiResponse<Vec<ChatSession>>>, ApiError> {
-    let sessions = ChatSession::find_all(&deployment.db().pool, query.status).await?;
+    let sessions =
+        ChatSession::find_all(&deployment.db().pool, query.status, query.project_id).await?;
     Ok(ResponseJson(ApiResponse::success(sessions)))
 }
 
@@ -62,7 +66,9 @@ pub async fn create_session(
     State(deployment): State<DeploymentImpl>,
     Json(payload): Json<CreateChatSession>,
 ) -> Result<ResponseJson<ApiResponse<ChatSession>>, ApiError> {
-    let session = ChatSession::create(&deployment.db().pool, &payload, Uuid::new_v4()).await?;
+    let session =
+        create_session_with_project_members(&deployment.db().pool, &payload, Uuid::new_v4())
+            .await?;
     let user_id_hash = hash_user_id(deployment.user_id());
     workflow_analytics::track_session_created(
         workflow_analytics::analytics_if_enabled(
@@ -190,7 +196,7 @@ pub struct WorkspaceChanges {
     pub modified: Vec<WorkspaceChangedFile>,
     pub added: Vec<WorkspaceChangedFile>,
     pub deleted: Vec<WorkspacePathEntry>,
-    pub untracked: Vec<WorkspacePathEntry>,
+    pub untracked: Vec<WorkspaceChangedFile>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
@@ -233,6 +239,35 @@ struct WorkRecordJsonLine {
 #[derive(Debug, Clone)]
 struct PlainWorkspaceObservedPath {
     existed_after_run: bool,
+}
+
+fn is_output_text_only_observed_source(source: &str) -> bool {
+    let mut saw_output_text = false;
+    let mut saw_other_source = false;
+    for part in source
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+    {
+        if part.eq_ignore_ascii_case("output_text") {
+            saw_output_text = true;
+        } else {
+            saw_other_source = true;
+        }
+    }
+    saw_output_text && !saw_other_source
+}
+
+fn is_artifact_observed_source(source: &str) -> bool {
+    source
+        .split(',')
+        .any(|part| part.trim().eq_ignore_ascii_case("artifact_record"))
+}
+
+fn is_openteams_relative_path(path: &str) -> bool {
+    PathBuf::from(path).components().next().is_some_and(|component| {
+        matches!(component, Component::Normal(part) if part == ".openteams")
+    })
 }
 
 static INLINE_CODE_PATH_RE: LazyLock<Regex> =
@@ -325,7 +360,9 @@ fn build_workspace_changes(
         }
 
         if untracked_paths.contains(&path) {
-            changes.untracked.push(WorkspacePathEntry { path });
+            changes
+                .untracked
+                .push(diff_to_workspace_changed_file(diff, path, include_diff));
             continue;
         }
 
@@ -418,6 +455,14 @@ fn normalize_workspace_relative_path(
     raw: &str,
     workspace_root: &std::path::Path,
 ) -> Option<String> {
+    normalize_workspace_relative_path_with_options(raw, workspace_root, false)
+}
+
+fn normalize_workspace_relative_path_with_options(
+    raw: &str,
+    workspace_root: &std::path::Path,
+    allow_internal_runtime_path: bool,
+) -> Option<String> {
     let trimmed = raw
         .trim()
         .trim_matches(|ch: char| {
@@ -439,7 +484,7 @@ fn normalize_workspace_relative_path(
         candidate
     };
 
-    if is_internal_openteams_runtime_path(&relative) {
+    if !allow_internal_runtime_path && is_internal_openteams_runtime_path(&relative) {
         return None;
     }
 
@@ -459,9 +504,17 @@ fn normalize_workspace_relative_path(
     Some(normalized.join("/"))
 }
 
-fn extract_workspace_paths_from_text(
+fn extract_workspace_paths_from_artifact_text(
     text: &str,
     workspace_root: &std::path::Path,
+) -> HashSet<String> {
+    extract_workspace_paths_from_text_with_options(text, workspace_root, true)
+}
+
+fn extract_workspace_paths_from_text_with_options(
+    text: &str,
+    workspace_root: &std::path::Path,
+    allow_internal_runtime_path: bool,
 ) -> HashSet<String> {
     let mut candidates = Vec::new();
 
@@ -477,7 +530,13 @@ fn extract_workspace_paths_from_text(
 
     candidates
         .into_iter()
-        .filter_map(|candidate| normalize_workspace_relative_path(&candidate, workspace_root))
+        .filter_map(|candidate| {
+            normalize_workspace_relative_path_with_options(
+                &candidate,
+                workspace_root,
+                allow_internal_runtime_path,
+            )
+        })
         .collect()
 }
 
@@ -535,6 +594,295 @@ fn parse_diff_patch_paths(patch: &str, workspace_root: &std::path::Path) -> Hash
     }
 
     paths
+}
+
+/// Classification of a single file's change within a git diff patch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DiffFileStatus {
+    Added,
+    Deleted,
+    Modified,
+}
+
+/// One file block parsed from a run-scoped git diff patch.
+#[derive(Debug, Clone)]
+struct RunDiffBlock {
+    path: String,
+    status: DiffFileStatus,
+    additions: usize,
+    deletions: usize,
+    text: String,
+}
+
+/// Extracts the relative path from a `diff --git a/<old> b/<new>` header line.
+/// Returns the raw (un-normalized) path so the caller can resolve it against a
+/// workspace root.
+fn diff_block_path(line: &str) -> Option<String> {
+    let rest = line.strip_prefix("diff --git a/")?;
+    let (old_path, new_path) = rest.split_once(" b/")?;
+    let preferred = if new_path.trim() == "/dev/null" {
+        old_path
+    } else {
+        new_path
+    };
+    Some(preferred.trim().to_string())
+}
+
+fn classify_diff_block(text: &str) -> DiffFileStatus {
+    // The mode markers always appear within the first few header lines.
+    if text
+        .lines()
+        .take(8)
+        .any(|line| line.starts_with("new file mode"))
+    {
+        DiffFileStatus::Added
+    } else if text
+        .lines()
+        .take(8)
+        .any(|line| line.starts_with("deleted file mode"))
+    {
+        DiffFileStatus::Deleted
+    } else {
+        // Renames, copies, mode changes and plain modifications all render as
+        // "modified" in the changes panel.
+        DiffFileStatus::Modified
+    }
+}
+
+/// Counts `+`/`-` content lines inside the hunk bodies of a single file block.
+/// File headers (`--- a/x`, `+++ b/x`) and `\ No newline` markers are skipped.
+fn count_diff_block_changes(text: &str) -> (usize, usize) {
+    let mut additions = 0usize;
+    let mut deletions = 0usize;
+    let mut in_hunk = false;
+
+    for line in text.lines() {
+        if line.starts_with("@@") {
+            in_hunk = true;
+            continue;
+        }
+        if !in_hunk {
+            continue;
+        }
+        // Defensive guard: file headers never appear inside hunks, but skip them
+        // regardless to avoid miscounting a stray `+++`/`---`.
+        if line.starts_with("+++") || line.starts_with("---") {
+            continue;
+        }
+        if line.starts_with('+') {
+            additions += 1;
+        } else if line.starts_with('-') {
+            deletions += 1;
+        }
+    }
+
+    (additions, deletions)
+}
+
+/// Splits a multi-file git diff patch into per-file blocks with status and
+/// `+`/`-` counts. Paths are returned raw (repo-relative); callers normalize
+/// them against the workspace root.
+fn parse_run_diff_blocks(patch: &str) -> Vec<RunDiffBlock> {
+    let mut raw_blocks: Vec<(String, String)> = Vec::new();
+    let mut current: Option<(String, String)> = None;
+
+    for line in patch.split_inclusive('\n') {
+        if let Some(path) = diff_block_path(line)
+            && current.is_none()
+        {
+            current = Some((path, String::new()));
+        } else if let Some(path) = diff_block_path(line) {
+            if let Some((prev_path, prev_text)) = current.take()
+                && !prev_text.trim().is_empty()
+            {
+                raw_blocks.push((prev_path, prev_text));
+            }
+            current = Some((path, String::new()));
+        }
+
+        if let Some((_, text)) = current.as_mut() {
+            text.push_str(line);
+        }
+    }
+
+    if let Some((path, text)) = current
+        && !text.trim().is_empty()
+    {
+        raw_blocks.push((path, text));
+    }
+
+    raw_blocks
+        .into_iter()
+        .map(|(path, text)| {
+            let status = classify_diff_block(&text);
+            let (additions, deletions) = count_diff_block_changes(&text);
+            RunDiffBlock {
+                path,
+                status,
+                additions,
+                deletions,
+                text,
+            }
+        })
+        .collect()
+}
+
+/// Normalizes a path extracted from a git diff header. Diff paths are
+/// authoritative (produced by git), so unlike `normalize_workspace_relative_path`
+/// this does not apply the "looks like a path" free-text heuristic — it only
+/// cleans path components, strips a workspace prefix for absolute paths, and
+/// filters internal `.openteams` runtime artifacts.
+fn normalize_diff_path(raw: &str, workspace_root: &std::path::Path) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed.contains("://") {
+        return None;
+    }
+
+    let candidate = PathBuf::from(trimmed);
+    let relative = if candidate.is_absolute() {
+        candidate.strip_prefix(workspace_root).ok()?
+    } else {
+        candidate.as_path()
+    };
+
+    if is_internal_openteams_runtime_path(relative) {
+        return None;
+    }
+
+    let mut normalized = Vec::new();
+    for component in relative.components() {
+        match component {
+            Component::Normal(part) => normalized.push(part.to_string_lossy().to_string()),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return None,
+        }
+    }
+
+    if normalized.is_empty() {
+        return None;
+    }
+
+    Some(normalized.join("/"))
+}
+
+/// Reads the captured content of an untracked file written during a run, if a
+/// run-scoped untracked snapshot directory still holds it.
+fn read_run_untracked_content(run: &ChatRun, rel_path: &str) -> Option<String> {
+    for dir in run_scoped_untracked_dirs(run) {
+        let candidate = dir.join(rel_path);
+        if let Ok(content) = std::fs::read_to_string(&candidate) {
+            return Some(content);
+        }
+    }
+    None
+}
+
+/// Builds the structured per-run changed-file list for a single chat run.
+///
+/// This is the per-run counterpart of `collect_workspace_changes`: it inspects
+/// the run's captured git diff patch (`{prefix}_diff.patch`), classifies each
+/// touched file, counts `+`/`-` lines, then augments the result with newly
+/// created untracked files recorded in the run's `meta.json` and untracked
+/// snapshot directories.
+///
+/// Returns an empty `WorkspaceChanges` when no run-scoped diff data exists
+/// (e.g. non-git workspaces, runs created before change capture, or runs that
+/// made no tracked changes).
+pub(crate) fn collect_run_files(run: &ChatRun, include_diff: bool) -> WorkspaceChanges {
+    let mut changes = empty_workspace_changes();
+    let workspace_root = run
+        .workspace_path
+        .as_deref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let root = workspace_root.as_path();
+
+    let mut covered: HashSet<String> = HashSet::new();
+
+    if let Some(patch) = read_first_existing_file(&run_scoped_diff_paths(run)) {
+        for block in parse_run_diff_blocks(&patch) {
+            let Some(path) = normalize_diff_path(&block.path, root) else {
+                continue;
+            };
+            if !covered.insert(path.clone()) {
+                continue;
+            }
+
+            match block.status {
+                DiffFileStatus::Added => changes.added.push(WorkspaceChangedFile {
+                    path,
+                    additions: block.additions,
+                    deletions: block.deletions,
+                    unified_diff: if include_diff {
+                        Some(block.text.clone())
+                    } else {
+                        None
+                    },
+                    has_diff: true,
+                }),
+                DiffFileStatus::Deleted => changes.deleted.push(WorkspacePathEntry { path }),
+                DiffFileStatus::Modified => changes.modified.push(WorkspaceChangedFile {
+                    path,
+                    additions: block.additions,
+                    deletions: block.deletions,
+                    unified_diff: if include_diff {
+                        Some(block.text.clone())
+                    } else {
+                        None
+                    },
+                    has_diff: true,
+                }),
+            }
+        }
+    }
+
+    // Augment with newly-created untracked files and artifact-only paths
+    // recorded in the run metadata. Artifact paths are run-scoped deliverables;
+    // they intentionally appear in the message-bottom run file list even when
+    // they live under ignored directories such as `.openteams/`.
+    let meta_paths = load_run_meta_observed_paths(run);
+    for entry in meta_paths {
+        let is_untracked = entry
+            .source
+            .split(',')
+            .any(|source| source.trim() == "git_untracked");
+        let is_artifact = is_artifact_observed_source(&entry.source);
+        if !is_untracked && !is_artifact {
+            continue;
+        }
+        let Some(path) =
+            normalize_workspace_relative_path_with_options(&entry.path, root, is_artifact)
+        else {
+            continue;
+        };
+        if covered.contains(&path) {
+            continue;
+        }
+
+        let (additions, has_diff, unified_diff) = match read_run_untracked_content(run, &path) {
+            Some(content) => {
+                let additions = content.lines().count().max(1);
+                let unified = include_diff.then_some(content);
+                (additions, true, unified)
+            }
+            None => (0, false, None),
+        };
+        covered.insert(path.clone());
+        changes.untracked.push(WorkspaceChangedFile {
+            path,
+            additions,
+            deletions: 0,
+            unified_diff,
+            has_diff,
+        });
+    }
+
+    changes.modified.sort_by(|a, b| a.path.cmp(&b.path));
+    changes.added.sort_by(|a, b| a.path.cmp(&b.path));
+    changes.deleted.sort_by(|a, b| a.path.cmp(&b.path));
+    changes.untracked.sort_by(|a, b| a.path.cmp(&b.path));
+
+    changes
 }
 
 fn collect_relative_file_paths(root: &std::path::Path) -> HashSet<String> {
@@ -652,7 +1000,18 @@ fn collect_session_plain_observed_paths(
     for run in runs {
         let meta_paths = load_run_meta_observed_paths(run);
         for entry in meta_paths {
-            if let Some(path) = normalize_workspace_relative_path(&entry.path, workspace_path) {
+            if is_output_text_only_observed_source(&entry.source) {
+                continue;
+            }
+            let is_artifact = is_artifact_observed_source(&entry.source);
+            if let Some(path) = normalize_workspace_relative_path_with_options(
+                &entry.path,
+                workspace_path,
+                is_artifact,
+            ) {
+                if is_artifact && is_openteams_relative_path(&path) {
+                    continue;
+                }
                 let state = observed.entry(path).or_insert(PlainWorkspaceObservedPath {
                     existed_after_run: false,
                 });
@@ -663,17 +1022,11 @@ fn collect_session_plain_observed_paths(
         for record in work_records.iter().filter(|record| {
             record.run_id == run.id && record.message_type.eq_ignore_ascii_case("artifact")
         }) {
-            for path in extract_workspace_paths_from_text(&record.content, workspace_path) {
-                observed.entry(path).or_insert(PlainWorkspaceObservedPath {
-                    existed_after_run: false,
-                });
-            }
-        }
-
-        if let Some(output_path) = run.output_path.as_deref()
-            && let Ok(content) = std::fs::read_to_string(output_path)
-        {
-            for path in extract_workspace_paths_from_text(&content, workspace_path) {
+            for path in extract_workspace_paths_from_artifact_text(&record.content, workspace_path)
+            {
+                if is_openteams_relative_path(&path) {
+                    continue;
+                }
                 observed.entry(path).or_insert(PlainWorkspaceObservedPath {
                     existed_after_run: false,
                 });
@@ -1250,6 +1603,32 @@ pub async fn get_session_workspace_changes(
         ApiError::BadRequest(format!("Failed to inspect workspace changes: {err}"))
     })?;
 
+    let (modified_count, added_count, deleted_count, untracked_count) = response
+        .changes
+        .as_ref()
+        .map(|changes| {
+            (
+                changes.modified.len(),
+                changes.added.len(),
+                changes.deleted.len(),
+                changes.untracked.len(),
+            )
+        })
+        .unwrap_or((0, 0, 0, 0));
+    tracing::debug!(
+        session_id = %session.id,
+        workspace_path,
+        include_diff,
+        is_git_repo = response.is_git_repo,
+        has_changes = response.changes.is_some(),
+        modified_count,
+        added_count,
+        deleted_count,
+        untracked_count,
+        error = ?response.error,
+        "[chat_sessions] Returning session workspace changes"
+    );
+
     let diff_file_count = response
         .changes
         .as_ref()
@@ -1356,6 +1735,8 @@ pub async fn create_session_agent(
             agent_id: payload.agent_id,
             workspace_path,
             allowed_skill_ids,
+            project_member_id: None,
+            execution_config: MemberExecutionConfig::default(),
         },
         Uuid::new_v4(),
     )
@@ -1826,6 +2207,7 @@ mod tests {
             team_protocol_enabled: false,
             default_workspace_path: default_workspace_path.map(str::to_string),
             chat_input_mode: None,
+            project_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
             archived_at: None,
@@ -1859,6 +2241,209 @@ mod tests {
             retention_summary_json: None,
             created_at,
         }
+    }
+
+    #[test]
+    fn parse_run_diff_blocks_classifies_status_and_counts_changes() {
+        let patch = "\
+diff --git a/src/modified.rs b/src/modified.rs
+index 1111111..2222222 100644
+--- a/src/modified.rs
++++ b/src/modified.rs
+@@ -1,3 +1,4 @@
+ context
+-old
++new
++added
+ context
+diff --git a/src/added.txt b/src/added.txt
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/src/added.txt
+@@ -0,0 +1,2 @@
++hello
++world
+diff --git a/src/gone.rs b/src/gone.rs
+deleted file mode 100644
+index 4444444..0000000
+--- a/src/gone.rs
++++ /dev/null
+@@ -1,2 +0,0 @@
+-line one
+-line two
+";
+
+        let blocks = parse_run_diff_blocks(patch);
+        assert_eq!(blocks.len(), 3);
+
+        assert_eq!(blocks[0].path, "src/modified.rs");
+        assert_eq!(blocks[0].status, DiffFileStatus::Modified);
+        assert_eq!(blocks[0].additions, 2);
+        assert_eq!(blocks[0].deletions, 1);
+
+        assert_eq!(blocks[1].path, "src/added.txt");
+        assert_eq!(blocks[1].status, DiffFileStatus::Added);
+        assert_eq!(blocks[1].additions, 2);
+        assert_eq!(blocks[1].deletions, 0);
+
+        assert_eq!(blocks[2].path, "src/gone.rs");
+        assert_eq!(blocks[2].status, DiffFileStatus::Deleted);
+        assert_eq!(blocks[2].additions, 0);
+        assert_eq!(blocks[2].deletions, 2);
+    }
+
+    #[test]
+    fn count_diff_block_changes_ignores_file_headers() {
+        let block = "\
+diff --git a/x b/x
+--- a/x
++++ b/x
+@@ -1,1 +1,1 @@
+-a
++b
+";
+        let (additions, deletions) = count_diff_block_changes(block);
+        assert_eq!(additions, 1);
+        assert_eq!(deletions, 1);
+    }
+
+    #[test]
+    fn normalize_diff_path_rejects_parent_dirs_and_runtime_artifacts() {
+        let root = Path::new("/workspace");
+        assert_eq!(
+            normalize_diff_path("src/lib/foo.rs", root).as_deref(),
+            Some("src/lib/foo.rs")
+        );
+        assert_eq!(normalize_diff_path("../escape.rs", root), None);
+        assert_eq!(
+            normalize_diff_path(".openteams/runs/x/secret.txt", root),
+            None
+        );
+        assert_eq!(normalize_diff_path("", root), None);
+    }
+
+    #[test]
+    fn collect_run_files_reads_patch_and_untracked_snapshot() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let run_dir = tempdir.path().join("run-record");
+        let workspace = tempdir.path().join("workspace");
+        let session_agent_id = Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap();
+        let prefix = format!("session_agent_{session_agent_id}_run_0002");
+        fs::create_dir_all(run_dir.join(format!("{prefix}_untracked/src/new")))
+            .expect("create untracked snapshot dir");
+        fs::create_dir_all(&workspace).expect("create workspace");
+
+        // Run-scoped patch covering a modified + added file.
+        let patch = "\
+diff --git a/src/modified.rs b/src/modified.rs
+index 1111111..2222222 100644
+--- a/src/modified.rs
++++ b/src/modified.rs
+@@ -1,2 +1,2 @@
+-keep
++changed
+diff --git a/src/created.txt b/src/created.txt
+new file mode 100644
+--- /dev/null
++++ b/src/created.txt
+@@ -0,0 +1,3 @@
++a
++b
++c
+";
+        fs::write(run_dir.join(format!("{prefix}_diff.patch")), patch).expect("write patch");
+
+        // Untracked snapshot for a brand-new file not present in the patch.
+        fs::write(
+            run_dir
+                .join(format!("{prefix}_untracked"))
+                .join("src/new/file.ts"),
+            "export const x = 1;\nexport const y = 2;\n",
+        )
+        .expect("write untracked snapshot");
+
+        // meta.json records an untracked file and an artifact-only `.openteams`
+        // file so collect_run_files picks both up for the run-scoped list.
+        fs::write(
+            run_dir.join("meta.json"),
+            "{\"workspace_observed_paths\":[{\"path\":\"src/new/file.ts\",\"source\":\"git_untracked\",\"existed_after_run\":true},{\"path\":\".openteams/context/demo/report.md\",\"source\":\"artifact_record\",\"existed_after_run\":true}]}",
+        )
+        .expect("write meta");
+
+        let run = ChatRun {
+            id: Uuid::new_v4(),
+            session_id: Uuid::new_v4(),
+            session_agent_id,
+            workspace_path: Some(workspace.to_string_lossy().to_string()),
+            run_index: 2,
+            run_dir: run_dir.to_string_lossy().to_string(),
+            input_path: None,
+            output_path: None,
+            raw_log_path: None,
+            meta_path: Some(run_dir.join("meta.json").to_string_lossy().to_string()),
+            log_state: ChatRunLogState::Tail,
+            artifact_state: ChatRunArtifactState::Full,
+            log_truncated: false,
+            log_capture_degraded: false,
+            pruned_at: None,
+            prune_reason: None,
+            retention_summary_json: None,
+            created_at: Utc::now(),
+        };
+
+        let changes = collect_run_files(&run, false);
+
+        let modified_paths: Vec<_> = changes.modified.iter().map(|f| f.path.as_str()).collect();
+        let added_paths: Vec<_> = changes.added.iter().map(|f| f.path.as_str()).collect();
+        let untracked_paths: Vec<_> = changes.untracked.iter().map(|f| f.path.as_str()).collect();
+
+        assert_eq!(modified_paths, vec!["src/modified.rs"]);
+        assert_eq!(changes.modified[0].additions, 1);
+        assert_eq!(changes.modified[0].deletions, 1);
+        assert_eq!(added_paths, vec!["src/created.txt"]);
+        assert_eq!(changes.added[0].additions, 3);
+        assert_eq!(
+            untracked_paths,
+            vec![".openteams/context/demo/report.md", "src/new/file.ts"]
+        );
+        assert_eq!(changes.untracked[0].additions, 0);
+        assert!(!changes.untracked[0].has_diff);
+        assert_eq!(changes.untracked[1].additions, 2);
+        assert!(changes.untracked[1].has_diff);
+    }
+
+    #[test]
+    fn collect_run_files_returns_empty_when_no_patch() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let run_dir = tempdir.path().join("run-record");
+        fs::create_dir_all(&run_dir).expect("create run dir");
+        let run = ChatRun {
+            id: Uuid::new_v4(),
+            session_id: Uuid::new_v4(),
+            session_agent_id: Uuid::new_v4(),
+            workspace_path: None,
+            run_index: 1,
+            run_dir: run_dir.to_string_lossy().to_string(),
+            input_path: None,
+            output_path: None,
+            raw_log_path: None,
+            meta_path: None,
+            log_state: ChatRunLogState::Tail,
+            artifact_state: ChatRunArtifactState::Full,
+            log_truncated: false,
+            log_capture_degraded: false,
+            pruned_at: None,
+            prune_reason: None,
+            retention_summary_json: None,
+            created_at: Utc::now(),
+        };
+
+        let changes = collect_run_files(&run, true);
+        assert!(changes.modified.is_empty());
+        assert!(changes.added.is_empty());
+        assert!(changes.deleted.is_empty());
+        assert!(changes.untracked.is_empty());
     }
 
     #[test]
@@ -1959,7 +2544,7 @@ mod tests {
     }
 
     #[test]
-    fn build_workspace_changes_splits_untracked_from_added() {
+    fn build_workspace_changes_keeps_untracked_diff_payloads() {
         let changes = build_workspace_changes(
             vec![
                 Diff {
@@ -2023,11 +2608,17 @@ mod tests {
                 path: "src/old.ts".to_string()
             }]
         );
-        assert_eq!(
-            changes.untracked,
-            vec![WorkspacePathEntry {
-                path: "tmp/debug.log".to_string()
-            }]
+        assert_eq!(changes.untracked.len(), 1);
+        assert_eq!(changes.untracked[0].path, "tmp/debug.log");
+        assert_eq!(changes.untracked[0].additions, 1);
+        assert_eq!(changes.untracked[0].deletions, 0);
+        assert!(changes.untracked[0].has_diff);
+        assert!(
+            changes.untracked[0]
+                .unified_diff
+                .as_deref()
+                .unwrap_or_default()
+                .contains("+debug")
         );
     }
 
@@ -2102,11 +2693,16 @@ mod tests {
                 .iter()
                 .all(|entry| entry.path != "outside.txt")
         );
-        assert_eq!(
-            changes.untracked,
-            vec![WorkspacePathEntry {
-                path: "untracked.txt".to_string()
-            }]
+        assert_eq!(changes.untracked.len(), 1);
+        assert_eq!(changes.untracked[0].path, "untracked.txt");
+        assert_eq!(changes.untracked[0].additions, 1);
+        assert!(changes.untracked[0].has_diff);
+        assert!(
+            changes.untracked[0]
+                .unified_diff
+                .as_deref()
+                .unwrap_or_default()
+                .contains("+untracked")
         );
     }
 
@@ -2157,7 +2753,7 @@ mod tests {
         fs::create_dir_all(&run_dir).expect("create run dir");
         fs::write(
             run_dir.join("meta.json"),
-            r#"{"workspace_observed_paths":[{"path":"plain.txt","source":"output_text","existed_after_run":true}]}"#,
+            r#"{"workspace_observed_paths":[{"path":"plain.txt","source":"artifact_record","existed_after_run":true}]}"#,
         )
         .expect("write meta");
         let run = test_run(
@@ -2184,6 +2780,45 @@ mod tests {
                     .iter()
                     .any(|entry| entry.path == "plain.txt")
         );
+        assert!(response.error.is_none());
+    }
+
+    #[test]
+    fn collect_workspace_changes_ignores_output_text_manifest_entries() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let workspace_path = tempdir.path();
+        fs::write(workspace_path.join("plain.txt"), "plain\n").expect("write plain file");
+
+        let session_id = Uuid::new_v4();
+        let session_agent_id = Uuid::new_v4();
+        let run_dir = tempdir.path().join("run-record");
+        fs::create_dir_all(&run_dir).expect("create run dir");
+        fs::write(
+            run_dir.join("meta.json"),
+            r#"{"workspace_observed_paths":[{"path":"plain.txt","source":"output_text","existed_after_run":true}]}"#,
+        )
+        .expect("write meta");
+        let run = test_run(
+            session_id,
+            session_agent_id,
+            1,
+            &run_dir,
+            Utc::now() - chrono::Duration::minutes(1),
+        );
+
+        let response = collect_workspace_changes(
+            session_id,
+            &workspace_path.to_string_lossy(),
+            true,
+            vec![run],
+        );
+
+        assert!(!response.is_git_repo);
+        let changes = response.changes.expect("plain changes present");
+        assert!(changes.modified.is_empty());
+        assert!(changes.added.is_empty());
+        assert!(changes.deleted.is_empty());
+        assert!(changes.untracked.is_empty());
         assert!(response.error.is_none());
     }
 
@@ -2264,7 +2899,7 @@ mod tests {
     }
 
     #[test]
-    fn collect_workspace_changes_merges_artifact_paths_with_git_meta_and_allows_user_openteams_files()
+    fn collect_workspace_changes_merges_artifact_paths_but_excludes_openteams_artifacts()
      {
         let tempdir = tempfile::tempdir().expect("create tempdir");
         let repo_path = tempdir.path().join("repo");
@@ -2349,7 +2984,7 @@ mod tests {
             format!(
                 concat!(
                     "{{\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved `binaries/test.txt`.\"}}\n",
-                    "{{\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved `.openteams/test.txt`, `.openteams/context/demo/messages.jsonl`, and `.openteams/context/demo/independent-mode-discussion-proposal.md`.\"}}\n"
+                    "{{\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved `.openteams/test.txt`, `.openteams/context/demo/messages.jsonl`, `.openteams/context/demo/attachments/message-1/input.txt`, and `.openteams/context/demo/independent-mode-discussion-proposal.md`.\"}}\n"
                 ),
                 run_id = run.id
             ),
@@ -2378,9 +3013,9 @@ mod tests {
 
         assert!(all_paths.contains(&"tracked.txt"));
         assert!(all_paths.contains(&"binaries/test.txt"));
-        assert!(all_paths.contains(&".openteams/test.txt"));
+        assert!(!all_paths.contains(&".openteams/test.txt"));
         assert!(
-            all_paths.contains(&".openteams/context/demo/independent-mode-discussion-proposal.md")
+            !all_paths.contains(&".openteams/context/demo/independent-mode-discussion-proposal.md")
         );
         assert!(!all_paths.contains(&".openteams/context/demo/messages.jsonl"));
         assert!(!all_paths.contains(&".openteams/context/demo/attachments/message-1/input.txt"));

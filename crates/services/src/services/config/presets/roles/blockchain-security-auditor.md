@@ -5,7 +5,7 @@ description: Expert smart contract security auditor specializing in vulnerabilit
   detection, formal verification, exploit analysis, and comprehensive audit report
   writing for DeFi protocols and blockchain applications.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#E74C3C'

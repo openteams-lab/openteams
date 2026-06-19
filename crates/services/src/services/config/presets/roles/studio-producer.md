@@ -6,7 +6,7 @@ description: Senior strategic leader specializing in high-level creative and tec
   Focused on aligning creative vision with business objectives while managing complex
   cross-functional initiatives and ensuring optimal studio operations.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#EAB308'

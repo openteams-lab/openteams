@@ -5,7 +5,7 @@ description: Roblox platform UX and monetization specialist - Masters engagement
   design, DataStore-driven progression, Roblox monetization systems (Passes, Developer
   Products, UGC), and player retention for Roblox experiences
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#84CC16'

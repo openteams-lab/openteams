@@ -49,7 +49,7 @@ rm -rf "$NPX_PACKAGE_DIR/dist"
 mkdir -p "$NPX_PACKAGE_DIR/dist/$PLATFORM"
 
 echo "🏗️ Building frontend..."
-(cd frontend && npm run build)
+(cd frontend && pnpm run build)
 
 echo "🏗️ Building Rust binaries..."
 cargo build --release --manifest-path Cargo.toml

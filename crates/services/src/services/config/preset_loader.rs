@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use anyhow::{Context, Result, anyhow, bail};
 use serde::Deserialize;
-use utils::path::home_directory;
+use utils::{path::home_directory, text::sanitize_member_handle};
 
 use crate::services::config::versions::v9::{ChatMemberPreset, ChatPresetsConfig, ChatTeamPreset};
 
@@ -788,7 +788,7 @@ impl PresetLoader {
         let preset = Self::parse_role_preset_markdown(path, raw)?;
         Ok(ChatMemberPreset {
             id: preset.id,
-            name: preset.name,
+            name: sanitize_member_handle(&preset.name),
             description: preset.description,
             runner_type: preset.runner_type,
             recommended_model: preset.recommended_model,
@@ -1006,7 +1006,7 @@ selected_skill_ids:
   - skill_a
   - skill_b
 runner_type: codex
-recommended_model: gpt-5.3-codex
+recommended_model: gpt-5.2-codex
 tools_enabled:
   shell: true
 ---
@@ -1055,7 +1055,7 @@ Coordinate with design before shipping."#
             vec!["skill_a".to_string(), "skill_b".to_string()]
         );
         assert_eq!(parsed.runner_type.as_deref(), Some("codex"));
-        assert_eq!(parsed.recommended_model.as_deref(), Some("gpt-5.3-codex"));
+        assert_eq!(parsed.recommended_model.as_deref(), Some("gpt-5.2-codex"));
         assert_eq!(parsed.tools_enabled, serde_json::json!({ "shell": true }));
     }
 
@@ -1134,6 +1134,30 @@ Coordinate tightly and document every handoff.
                 preset.id
             );
         }
+    }
+
+    #[test]
+    fn load_builtin_presets_strips_spaces_from_member_names() {
+        let presets = PresetLoader::load_builtin_presets();
+
+        assert!(presets.members.iter().all(|preset| {
+            preset
+                .name
+                .chars()
+                .all(|ch| ch.is_alphanumeric() || ch == '_' || ch == '-')
+        }));
+        let auditor = presets
+            .members
+            .iter()
+            .find(|preset| preset.id == "accessibility-auditor")
+            .expect("accessibility auditor preset should exist");
+        assert_eq!(auditor.name, "AccessibilityAuditor");
+        let trust_architect = presets
+            .members
+            .iter()
+            .find(|preset| preset.id == "agentic-identity-trust-architect")
+            .expect("trust architect preset should exist");
+        assert_eq!(trust_architect.name, "AgenticIdentityTrustArchitect");
     }
 
     #[test]

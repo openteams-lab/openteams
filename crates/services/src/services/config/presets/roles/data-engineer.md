@@ -6,7 +6,7 @@ description: Expert data engineer specializing in building reliable data pipelin
   Spark, dbt, streaming systems, and cloud data platforms to turn raw data into trusted,
   analytics-ready assets.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

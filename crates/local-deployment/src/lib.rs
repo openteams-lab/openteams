@@ -152,9 +152,21 @@ impl Deployment for LocalDeployment {
             .run_startup_retention_janitor()
             .await
             .map_err(|err| DeploymentError::Other(err.into()))?;
+        {
+            let chat_runner = chat_runner.clone();
+            tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(60 * 60)).await;
+                    if let Err(err) = chat_runner.run_activity_retention_janitor().await {
+                        tracing::warn!(?err, "Chat run activity retention janitor failed");
+                    }
+                }
+            });
+        }
 
         if let Err(err) =
-            services::services::workflow_runtime::run_workflow_retention_janitor(&db.pool).await
+            services::services::workflow::workflow_runtime::run_workflow_retention_janitor(&db.pool)
+                .await
         {
             tracing::warn!(?err, "Workflow retention janitor failed during startup");
         }
@@ -299,6 +311,66 @@ impl Deployment for LocalDeployment {
 }
 
 impl LocalDeployment {
+    #[doc(hidden)]
+    pub async fn new_for_test_pool(db: DBService) -> Result<Self, DeploymentError> {
+        let config = Arc::new(RwLock::new(Config::default()));
+        let analytics_enabled = Arc::new(AtomicBool::new(false));
+        let user_id = "test-user".to_string();
+        let analytics = None;
+        let git = GitService::new();
+        let project = ProjectService::new();
+        let repo = RepoService::new();
+        let msg_stores = Arc::new(RwLock::new(HashMap::new()));
+        let filesystem = FilesystemService::new();
+        let events_msg_store = Arc::new(MsgStore::new());
+        let events_entry_count = Arc::new(RwLock::new(0));
+        let image = ImageService::new(db.clone().pool)?;
+        let approvals = Approvals::new(msg_stores.clone());
+        let queued_message_service = QueuedMessageService::new();
+        let chat_runner =
+            ChatRunner::with_analytics(db.clone(), analytics.clone(), analytics_enabled.clone());
+        let oauth_credentials = Arc::new(OAuthCredentials::new(credentials_path()));
+        let profile_cache = Arc::new(RwLock::new(None));
+        let auth_context = AuthContext::new(oauth_credentials, profile_cache);
+        let container = LocalContainerService::new(
+            db.clone(),
+            msg_stores,
+            config.clone(),
+            git.clone(),
+            image.clone(),
+            None,
+            approvals.clone(),
+            queued_message_service.clone(),
+        )
+        .await;
+        let events = EventService::new(db.clone(), events_msg_store, events_entry_count);
+        let file_search_cache = Arc::new(FileSearchCache::new());
+        let pty = PtyService::new();
+
+        Ok(Self {
+            config,
+            user_id,
+            db,
+            analytics,
+            analytics_enabled,
+            container,
+            git,
+            project,
+            repo,
+            image,
+            filesystem,
+            events,
+            file_search_cache,
+            approvals,
+            chat_runner,
+            queued_message_service,
+            remote_client: Err(RemoteClientNotConfigured),
+            auth_context,
+            pty,
+            cli_manager: Arc::new(OnceLock::new()),
+        })
+    }
+
     pub fn analytics_enabled(&self) -> bool {
         self.analytics_enabled.load(Ordering::Relaxed)
     }

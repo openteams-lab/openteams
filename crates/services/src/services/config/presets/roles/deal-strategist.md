@@ -5,7 +5,7 @@ description: Senior deal strategist specializing in MEDDPICC qualification, comp
   positioning, and win planning for complex B2B sales cycles. Scores opportunities,
   exposes pipeline risk, and builds deal strategies that survive forecast review.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

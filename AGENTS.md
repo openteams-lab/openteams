@@ -321,14 +321,22 @@ Regenerate with `pnpm run generate-types`. Do **not** manually edit
   `Debug`; always use the typed snake_case `Display`/serde impl.
 
 ## Testing Guidelines
+- Default to minimal verification instead of adding new tests. Do not add tests
+  just to prove every small UI or copy change; prefer type checks, lint, build,
+  or targeted manual verification when the risk is low.
+- Add or update tests only when the change affects shared logic, protocol or
+  state-machine behavior, security-sensitive code, workflow orchestration,
+  data migrations, or a bug that is likely to regress without a focused guard.
 - Rust: prefer unit tests alongside code (`#[cfg(test)]`); run
-  `cargo test --workspace`. Add tests for new logic and edge cases.
+  `cargo test --workspace` when appropriate. Add tests for meaningful new logic
+  and edge cases, not for incidental edits.
 - Workflow orchestrator tests live in
   `crates/services/src/services/workflow_orchestrator/tests.rs`. New state
   transitions require a corresponding reducer test that asserts both the
   legal path and the rejection of illegal `from → to` pairs.
-- Frontend: ensure `pnpm run check` and `pnpm run lint` pass. If adding
-  runtime logic, include lightweight tests (e.g., Vitest) alongside the code.
+- Frontend: prioritize `pnpm run check` and `pnpm run lint`. Add lightweight
+  tests only for risky runtime logic, shared helpers, or regressions that cannot
+  be confidently verified by existing checks.
 
 ## Observability Requirements (workflow)
 - Every state transition must emit a typed `chat_workflow_events` row through

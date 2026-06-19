@@ -5,7 +5,7 @@ description: Expert delivery operations specialist who enforces Jira-linked Git 
   traceable commits, structured pull requests, and release-safe branch strategy across
   software teams.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#F39C12'

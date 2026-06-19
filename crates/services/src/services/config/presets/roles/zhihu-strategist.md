@@ -5,7 +5,7 @@ description: Expert Zhihu marketing specialist focused on thought leadership, co
   credibility, and knowledge-driven engagement. Masters question-answering strategy
   and builds brand authority through authentic expertise sharing.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

@@ -5,7 +5,7 @@ use thiserror::Error;
 use ts_rs::TS;
 use uuid::Uuid;
 
-use super::project_repo::CreateProjectRepo;
+use super::{project_path::ProjectPath, project_repo::CreateProjectRepo};
 
 #[derive(Debug, Error)]
 pub enum ProjectError {
@@ -23,6 +23,10 @@ pub struct Project {
     pub name: String,
     pub default_agent_working_dir: Option<String>,
     pub remote_project_id: Option<Uuid>,
+    pub description: Option<String>,
+    pub status: Option<String>,
+    pub default_workspace_path: Option<String>,
+    pub active_repo_id: Option<Uuid>,
     #[ts(type = "Date")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "Date")]
@@ -33,11 +37,27 @@ pub struct Project {
 pub struct CreateProject {
     pub name: String,
     pub repositories: Vec<CreateProjectRepo>,
+    pub description: Option<String>,
+    pub status: Option<String>,
+    pub default_workspace_path: Option<String>,
+    pub active_repo_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize, TS)]
 pub struct UpdateProject {
     pub name: Option<String>,
+    pub description: Option<String>,
+    pub status: Option<String>,
+    pub default_workspace_path: Option<String>,
+    pub active_repo_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectDetails {
+    pub project: Project,
+    pub paths: Vec<ProjectPath>,
+    pub member_count: i64,
+    pub session_count: i64,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -71,6 +91,10 @@ impl Project {
                       name,
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
+                      description,
+                      status,
+                      default_workspace_path,
+                      active_repo_id as "active_repo_id: Uuid",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -88,6 +112,10 @@ impl Project {
             SELECT p.id as "id!: Uuid", p.name,
                    p.default_agent_working_dir,
                    p.remote_project_id as "remote_project_id: Uuid",
+                   p.description,
+                   p.status,
+                   p.default_workspace_path,
+                   p.active_repo_id as "active_repo_id: Uuid",
                    p.created_at as "created_at!: DateTime<Utc>", p.updated_at as "updated_at!: DateTime<Utc>"
             FROM projects p
             WHERE p.id IN (
@@ -111,6 +139,10 @@ impl Project {
                       name,
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
+                      description,
+                      status,
+                      default_workspace_path,
+                      active_repo_id as "active_repo_id: Uuid",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -128,6 +160,10 @@ impl Project {
                       name,
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
+                      description,
+                      status,
+                      default_workspace_path,
+                      active_repo_id as "active_repo_id: Uuid",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -148,6 +184,10 @@ impl Project {
                       name,
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
+                      description,
+                      status,
+                      default_workspace_path,
+                      active_repo_id as "active_repo_id: Uuid",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -168,18 +208,30 @@ impl Project {
             Project,
             r#"INSERT INTO projects (
                     id,
-                    name
+                    name,
+                    description,
+                    status,
+                    default_workspace_path,
+                    active_repo_id
                 ) VALUES (
-                    $1, $2
+                    $1, $2, $3, $4, $5, $6
                 )
                 RETURNING id as "id!: Uuid",
                           name,
                           default_agent_working_dir,
                           remote_project_id as "remote_project_id: Uuid",
+                          description,
+                          status,
+                          default_workspace_path,
+                          active_repo_id as "active_repo_id: Uuid",
                           created_at as "created_at!: DateTime<Utc>",
                           updated_at as "updated_at!: DateTime<Utc>""#,
             project_id,
             data.name,
+            data.description,
+            data.status,
+            data.default_workspace_path,
+            data.active_repo_id,
         )
         .fetch_one(executor)
         .await
@@ -195,23 +247,73 @@ impl Project {
             .ok_or(sqlx::Error::RowNotFound)?;
 
         let name = payload.name.clone().unwrap_or(existing.name);
+        let description = payload.description.clone().or(existing.description);
+        let status = payload.status.clone().or(existing.status);
+        let default_workspace_path = payload
+            .default_workspace_path
+            .clone()
+            .or(existing.default_workspace_path);
+        let active_repo_id = payload.active_repo_id.or(existing.active_repo_id);
 
         sqlx::query_as!(
             Project,
             r#"UPDATE projects
-               SET name = $2
+               SET name = $2,
+                   description = $3,
+                   status = $4,
+                   default_workspace_path = $5,
+                   active_repo_id = $6,
+                   updated_at = datetime('now', 'subsec')
                WHERE id = $1
                RETURNING id as "id!: Uuid",
                          name,
                          default_agent_working_dir,
                          remote_project_id as "remote_project_id: Uuid",
+                         description,
+                         status,
+                         default_workspace_path,
+                         active_repo_id as "active_repo_id: Uuid",
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>""#,
             id,
             name,
+            description,
+            status,
+            default_workspace_path,
+            active_repo_id,
         )
         .fetch_one(pool)
         .await
+    }
+
+    pub async fn find_with_details(
+        pool: &SqlitePool,
+        id: Uuid,
+    ) -> Result<Option<ProjectDetails>, sqlx::Error> {
+        let Some(project) = Self::find_by_id(pool, id).await? else {
+            return Ok(None);
+        };
+
+        let paths = ProjectPath::find_by_project(pool, id).await?;
+        let member_count = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) as "count!: i64" FROM project_members WHERE project_id = $1"#,
+            id
+        )
+        .fetch_one(pool)
+        .await?;
+        let session_count = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) as "count!: i64" FROM chat_sessions WHERE project_id = $1"#,
+            id
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(Some(ProjectDetails {
+            project,
+            paths,
+            member_count,
+            session_count,
+        }))
     }
 
     pub async fn set_remote_project_id(

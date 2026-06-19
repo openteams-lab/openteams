@@ -4,7 +4,7 @@ name: Code Reviewer
 description: Expert code reviewer who provides constructive, actionable feedback focused
   on correctness, maintainability, security, and performance — not style preferences.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#9B59B6'

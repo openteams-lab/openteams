@@ -5,7 +5,7 @@ description: Expert Kuaishou marketing strategist specializing in short-video co
   for China's lower-tier city markets, live commerce operations, community trust building,
   and grassroots audience growth on 快手.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

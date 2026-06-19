@@ -7,7 +7,7 @@ description: 'Knowledge-base steward in the spirit of Niklas Luhmann''s Zettelka
   knowledge-base building, note linking, complex task breakdown, and cross-domain
   decision support.'
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#008080'

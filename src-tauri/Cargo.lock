@@ -1980,7 +1980,7 @@ dependencies = [
 
 [[package]]
 name = "openteams-desktop"
-version = "0.3.22"
+version = "0.4.6"
 dependencies = [
  "directories",
  "portpicker",

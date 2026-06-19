@@ -6,7 +6,7 @@ description: Veteran livestream e-commerce coach specializing in host training a
   script design, product sequencing, paid-vs-organic traffic balancing, conversion
   closing techniques, and real-time data-driven optimization.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

@@ -6,7 +6,7 @@ description: Revenue operations analyst specializing in pipeline health diagnost
   CRM data into actionable pipeline intelligence that surfaces risks before they become
   missed quarters.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

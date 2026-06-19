@@ -1,0 +1,6 @@
+{
+  "name": "OpenTeams",
+  "description": "Linear-style design workspace for collaborating with a team of AI agents to plan, build, and ship features.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

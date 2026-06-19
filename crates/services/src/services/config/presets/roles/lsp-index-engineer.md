@@ -4,7 +4,7 @@ name: LSP/Index Engineer
 description: Language Server Protocol specialist building unified code intelligence
   systems through LSP client orchestration and semantic indexing
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#F39C12'

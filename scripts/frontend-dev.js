@@ -4,7 +4,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..");
-const frontendPort = process.env.FRONTEND_PORT || "3000";
+const frontendPort = process.env.FRONTEND_PORT || "3003";
 
 const child = spawn(
   `pnpm --dir frontend run dev -- --host --port ${frontendPort}`,

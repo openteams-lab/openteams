@@ -5,7 +5,7 @@ description: Expert WeChat Official Account (OA) strategist specializing in cont
   marketing, subscriber engagement, and conversion optimization. Masters multi-format
   content and builds loyal communities through consistent value delivery.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

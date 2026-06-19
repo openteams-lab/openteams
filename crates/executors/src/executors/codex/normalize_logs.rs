@@ -14,13 +14,12 @@ use codex_protocol::{
     openai_models::ReasoningEffort,
     plan_tool::{StepStatus, UpdatePlanArgs},
     protocol::{
-        AgentMessageDeltaEvent, AgentMessageEvent, AgentReasoningDeltaEvent, AgentReasoningEvent,
-        AgentReasoningSectionBreakEvent, ApplyPatchApprovalRequestEvent, BackgroundEventEvent,
-        ErrorEvent, EventMsg, ExecApprovalRequestEvent, ExecCommandBeginEvent, ExecCommandEndEvent,
-        ExecCommandOutputDeltaEvent, ExecOutputStream, FileChange as CodexProtoFileChange,
-        McpInvocation, McpToolCallBeginEvent, McpToolCallEndEvent, PatchApplyBeginEvent,
-        PatchApplyEndEvent, StreamErrorEvent, ViewImageToolCallEvent, WarningEvent,
-        WebSearchBeginEvent, WebSearchEndEvent,
+        AgentMessageEvent, AgentReasoningEvent, AgentReasoningSectionBreakEvent,
+        ApplyPatchApprovalRequestEvent, ErrorEvent, EventMsg, ExecApprovalRequestEvent,
+        ExecCommandBeginEvent, ExecCommandEndEvent, ExecCommandOutputDeltaEvent, ExecOutputStream,
+        FileChange as CodexProtoFileChange, McpInvocation, McpToolCallBeginEvent,
+        McpToolCallEndEvent, PatchApplyBeginEvent, PatchApplyEndEvent, StreamErrorEvent,
+        ViewImageToolCallEvent, WarningEvent, WebSearchBeginEvent, WebSearchEndEvent,
     },
 };
 use futures::StreamExt;
@@ -60,6 +59,10 @@ trait ToNormalizedEntryOpt {
 struct CodexNotificationParams {
     #[serde(rename = "msg")]
     msg: EventMsg,
+}
+
+fn nonnegative_i64_to_u32(value: i64) -> u32 {
+    u32::try_from(value.max(0)).unwrap_or(u32::MAX)
 }
 
 #[derive(Default)]
@@ -263,6 +266,16 @@ struct LogState {
     mcp_tools: HashMap<String, McpToolState>,
     patches: HashMap<String, PatchState>,
     web_searches: HashMap<String, WebSearchState>,
+    current_model_id: Option<String>,
+    current_provider_id: Option<String>,
+    current_thread_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ModelRuntimeContext {
+    model_id: Option<String>,
+    provider_id: Option<String>,
+    thread_id: Option<String>,
 }
 
 enum StreamingTextKind {
@@ -280,6 +293,21 @@ impl LogState {
             mcp_tools: HashMap::new(),
             patches: HashMap::new(),
             web_searches: HashMap::new(),
+            current_model_id: None,
+            current_provider_id: None,
+            current_thread_id: None,
+        }
+    }
+
+    fn update_model_context(&mut self, context: ModelRuntimeContext) {
+        if let Some(model_id) = context.model_id {
+            self.current_model_id = Some(model_id);
+        }
+        if let Some(provider_id) = context.provider_id {
+            self.current_provider_id = Some(provider_id);
+        }
+        if let Some(thread_id) = context.thread_id {
+            self.current_thread_id = Some(thread_id);
         }
     }
 
@@ -547,7 +575,9 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
             }
 
             if let Ok(response) = serde_json::from_str::<JSONRPCResponse>(&line) {
-                handle_jsonrpc_response(response, &msg_store, &entry_index);
+                if let Some(context) = handle_jsonrpc_response(response, &msg_store, &entry_index) {
+                    state.update_model_context(context);
+                }
                 continue;
             }
 
@@ -590,6 +620,14 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
             match event {
                 EventMsg::SessionConfigured(payload) => {
                     msg_store.push_session_id(payload.session_id.to_string());
+                    state.update_model_context(ModelRuntimeContext {
+                        model_id: Some(payload.model.clone()),
+                        provider_id: state
+                            .current_provider_id
+                            .clone()
+                            .or_else(|| Some("openai".to_string())),
+                        thread_id: Some(payload.session_id.to_string()),
+                    });
                     handle_model_params(
                         payload.model,
                         payload.reasoning_effort,
@@ -597,19 +635,9 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                         &entry_index,
                     );
                 }
-                EventMsg::AgentMessageDelta(AgentMessageDeltaEvent { delta }) => {
-                    state.thinking = None;
-                    let (entry, index, is_new) = state.assistant_message_append(delta);
-                    upsert_normalized_entry(&msg_store, index, entry, is_new);
-                }
                 EventMsg::AgentMessageContentDelta(event) => {
                     state.thinking = None;
                     let (entry, index, is_new) = state.assistant_message_append(event.delta);
-                    upsert_normalized_entry(&msg_store, index, entry, is_new);
-                }
-                EventMsg::AgentReasoningDelta(AgentReasoningDeltaEvent { delta }) => {
-                    state.assistant = None;
-                    let (entry, index, is_new) = state.thinking_append(delta);
                     upsert_normalized_entry(&msg_store, index, entry, is_new);
                 }
                 EventMsg::ReasoningContentDelta(event) => {
@@ -684,6 +712,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     changes,
                     reason: _,
                     grant_root: _,
+                    ..
                 }) => {
                     state.assistant = None;
                     state.thinking = None;
@@ -753,6 +782,7 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     source: _,
                     interaction_input: _,
                     process_id: _,
+                    ..
                 }) => {
                     state.assistant = None;
                     state.thinking = None;
@@ -827,18 +857,6 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                             command_state.to_normalized_entry(),
                         );
                     }
-                }
-                EventMsg::BackgroundEvent(BackgroundEventEvent { message }) => {
-                    add_normalized_entry(
-                        &msg_store,
-                        &entry_index,
-                        NormalizedEntry {
-                            timestamp: None,
-                            entry_type: NormalizedEntryType::SystemMessage,
-                            content: format!("Background event: {message}"),
-                            metadata: None,
-                        },
-                    );
                 }
                 EventMsg::StreamError(StreamErrorEvent {
                     message,
@@ -1143,11 +1161,12 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 EventMsg::TokenCount(payload) => {
                     if let Some(info) = payload.info {
                         let last = &info.last_token_usage;
+                        let total = &info.total_token_usage;
                         // Billable tokens = input + output (excluding cached_input_tokens)
-                        let billable_tokens = (last.input_tokens + last.output_tokens) as u32;
-                        let input = last.input_tokens as u32;
-                        let output = last.output_tokens as u32;
-                        let cache_read = last.cached_input_tokens as u32;
+                        let input = nonnegative_i64_to_u32(last.input_tokens);
+                        let output = nonnegative_i64_to_u32(last.output_tokens);
+                        let billable_tokens = input + output;
+                        let cache_read = nonnegative_i64_to_u32(last.cached_input_tokens);
 
                         add_normalized_entry(
                             &msg_store,
@@ -1163,8 +1182,33 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                                             as u32,
                                         input_tokens: Some(input),
                                         output_tokens: Some(output),
+                                        reasoning_output_tokens: Some(nonnegative_i64_to_u32(
+                                            last.reasoning_output_tokens,
+                                        )),
                                         cache_read_tokens: Some(cache_read),
-                                        cache_write_tokens: None,
+                                        runtime_agent: Some("codex".to_string()),
+                                        runtime_model_id: state.current_model_id.clone(),
+                                        provider_id: state
+                                            .current_provider_id
+                                            .clone()
+                                            .or_else(|| Some("openai".to_string())),
+                                        runtime_thread_id: state.current_thread_id.clone(),
+                                        usage_scope: Some("turn_delta".to_string()),
+                                        snapshot_total_tokens: Some(nonnegative_i64_to_u32(
+                                            total.total_tokens,
+                                        )),
+                                        snapshot_input_tokens: Some(nonnegative_i64_to_u32(
+                                            total.input_tokens,
+                                        )),
+                                        snapshot_output_tokens: Some(nonnegative_i64_to_u32(
+                                            total.output_tokens,
+                                        )),
+                                        snapshot_reasoning_output_tokens: Some(
+                                            nonnegative_i64_to_u32(total.reasoning_output_tokens),
+                                        ),
+                                        snapshot_cache_read_tokens: Some(nonnegative_i64_to_u32(
+                                            total.cached_input_tokens,
+                                        )),
                                         // Now accurate: input + output only
                                         is_estimated: false,
                                     },
@@ -1192,24 +1236,38 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                     );
                 }
                 EventMsg::AgentReasoningRawContent(..)
-                | EventMsg::AgentReasoningRawContentDelta(..)
+                | EventMsg::ThreadSettingsApplied(..)
+                | EventMsg::ThreadGoalUpdated(..)
                 | EventMsg::ThreadRolledBack(..)
                 | EventMsg::TurnStarted(..)
                 | EventMsg::UserMessage(..)
                 | EventMsg::TurnDiff(..)
-                | EventMsg::GetHistoryEntryResponse(..)
-                | EventMsg::McpListToolsResponse(..)
                 | EventMsg::McpStartupComplete(..)
                 | EventMsg::McpStartupUpdate(..)
+                | EventMsg::GuardianWarning(..)
+                | EventMsg::GuardianAssessment(..)
+                | EventMsg::ModelReroute(..)
+                | EventMsg::ModelVerification(..)
+                | EventMsg::RealtimeConversationStarted(..)
+                | EventMsg::RealtimeConversationRealtime(..)
+                | EventMsg::RealtimeConversationClosed(..)
+                | EventMsg::RealtimeConversationSdp(..)
+                | EventMsg::RealtimeConversationListVoicesResponse(..)
+                | EventMsg::RequestPermissions(..)
+                | EventMsg::RequestUserInput(..)
+                | EventMsg::DynamicToolCallRequest(..)
+                | EventMsg::DynamicToolCallResponse(..)
+                | EventMsg::ImageGenerationBegin(..)
+                | EventMsg::ImageGenerationEnd(..)
+                | EventMsg::PatchApplyUpdated(..)
                 | EventMsg::DeprecationNotice(..)
-                | EventMsg::UndoCompleted(..)
-                | EventMsg::UndoStarted(..)
                 | EventMsg::RawResponseItem(..)
                 | EventMsg::ItemStarted(..)
                 | EventMsg::ItemCompleted(..)
+                | EventMsg::HookStarted(..)
+                | EventMsg::HookCompleted(..)
+                | EventMsg::PlanDelta(..)
                 | EventMsg::ReasoningRawContentDelta(..)
-                | EventMsg::ListSkillsResponse(..)
-                | EventMsg::SkillsUpdateAvailable
                 | EventMsg::TurnAborted(..)
                 | EventMsg::ShutdownComplete
                 | EventMsg::EnteredReviewMode(..)
@@ -1224,10 +1282,9 @@ pub fn normalize_logs(msg_store: Arc<MsgStore>, worktree_path: &Path) {
                 | EventMsg::CollabWaitingBegin(..)
                 | EventMsg::CollabWaitingEnd(..)
                 | EventMsg::CollabCloseBegin(..)
-                | EventMsg::CollabCloseEnd(..) => {}
-                _ => {
-                    // Handle any new or untracked event types silently
-                }
+                | EventMsg::CollabCloseEnd(..)
+                | EventMsg::CollabResumeBegin(..)
+                | EventMsg::CollabResumeEnd(..) => {}
             }
         }
     });
@@ -1286,7 +1343,8 @@ fn handle_jsonrpc_request(
         | ServerRequest::McpServerElicitationRequest { .. }
         | ServerRequest::PermissionsRequestApproval { .. }
         | ServerRequest::DynamicToolCall { .. }
-        | ServerRequest::ChatgptAuthTokensRefresh { .. } => {}
+        | ServerRequest::ChatgptAuthTokensRefresh { .. }
+        | ServerRequest::AttestationGenerate { .. } => {}
     }
 }
 
@@ -1422,7 +1480,10 @@ fn handle_server_notification(
         }
         ServerNotification::ThreadTokenUsageUpdated(payload) => {
             let last = payload.token_usage.last;
-            let billable_tokens = (last.input_tokens + last.output_tokens) as u32;
+            let total = payload.token_usage.total;
+            let input = nonnegative_i64_to_u32(last.input_tokens);
+            let output = nonnegative_i64_to_u32(last.output_tokens);
+            let billable_tokens = input + output;
             add_normalized_entry(
                 msg_store,
                 entry_index,
@@ -1435,10 +1496,29 @@ fn handle_server_notification(
                             .model_context_window
                             .unwrap_or_default()
                             as u32,
-                        input_tokens: Some(last.input_tokens as u32),
-                        output_tokens: Some(last.output_tokens as u32),
-                        cache_read_tokens: Some(last.cached_input_tokens as u32),
-                        cache_write_tokens: None,
+                        input_tokens: Some(input),
+                        output_tokens: Some(output),
+                        reasoning_output_tokens: Some(nonnegative_i64_to_u32(
+                            last.reasoning_output_tokens,
+                        )),
+                        cache_read_tokens: Some(nonnegative_i64_to_u32(last.cached_input_tokens)),
+                        runtime_agent: Some("codex".to_string()),
+                        runtime_model_id: state.current_model_id.clone(),
+                        provider_id: state
+                            .current_provider_id
+                            .clone()
+                            .or_else(|| Some("openai".to_string())),
+                        runtime_thread_id: state.current_thread_id.clone(),
+                        usage_scope: Some("turn_delta".to_string()),
+                        snapshot_total_tokens: Some(nonnegative_i64_to_u32(total.total_tokens)),
+                        snapshot_input_tokens: Some(nonnegative_i64_to_u32(total.input_tokens)),
+                        snapshot_output_tokens: Some(nonnegative_i64_to_u32(total.output_tokens)),
+                        snapshot_reasoning_output_tokens: Some(nonnegative_i64_to_u32(
+                            total.reasoning_output_tokens,
+                        )),
+                        snapshot_cache_read_tokens: Some(nonnegative_i64_to_u32(
+                            total.cached_input_tokens,
+                        )),
                         is_estimated: false,
                     }),
                     content: format!(
@@ -1463,6 +1543,7 @@ fn handle_server_notification(
             );
         }
         ServerNotification::ModelRerouted(payload) => {
+            state.current_model_id = Some(payload.to_model.clone());
             add_normalized_entry(
                 msg_store,
                 entry_index,
@@ -1901,8 +1982,9 @@ fn handle_jsonrpc_response(
     response: JSONRPCResponse,
     msg_store: &Arc<MsgStore>,
     entry_index: &EntryIndexProvider,
-) {
+) -> Option<ModelRuntimeContext> {
     let result = response.result;
+    let context = model_runtime_context_from_value(&result);
 
     if let Ok(response) = serde_json::from_value::<ThreadStartResponse>(result.clone()) {
         let ThreadStartResponse {
@@ -1914,7 +1996,7 @@ fn handle_jsonrpc_response(
         push_session_id_from_thread(thread.id, thread.path, msg_store);
 
         handle_model_params(model, reasoning_effort, msg_store, entry_index);
-        return;
+        return context;
     }
 
     if let Ok(response) = serde_json::from_value::<ThreadResumeResponse>(result.clone()) {
@@ -1927,10 +2009,37 @@ fn handle_jsonrpc_response(
         push_session_id_from_thread(thread.id, thread.path, msg_store);
 
         handle_model_params(model, reasoning_effort, msg_store, entry_index);
-        return;
+        return context;
     }
 
-    handle_jsonrpc_thread_response_value(&result, msg_store, entry_index);
+    handle_jsonrpc_thread_response_value(&result, msg_store, entry_index).or(context)
+}
+
+fn model_runtime_context_from_value(result: &Value) -> Option<ModelRuntimeContext> {
+    let model_id = result
+        .get("model")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let provider_id = result
+        .get("modelProvider")
+        .or_else(|| result.get("model_provider"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let thread_id = result
+        .get("thread")
+        .and_then(|thread| thread.get("id"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+
+    if model_id.is_none() && provider_id.is_none() && thread_id.is_none() {
+        None
+    } else {
+        Some(ModelRuntimeContext {
+            model_id,
+            provider_id,
+            thread_id,
+        })
+    }
 }
 
 fn handle_model_params(
@@ -1961,9 +2070,9 @@ fn handle_jsonrpc_thread_response_value(
     result: &Value,
     msg_store: &Arc<MsgStore>,
     entry_index: &EntryIndexProvider,
-) {
+) -> Option<ModelRuntimeContext> {
     let Some(thread) = result.get("thread") else {
-        return;
+        return None;
     };
 
     let thread_id = thread
@@ -1985,7 +2094,7 @@ fn handle_jsonrpc_thread_response_value(
     }
 
     let Some(model) = result.get("model").and_then(Value::as_str) else {
-        return;
+        return model_runtime_context_from_value(result);
     };
     let reasoning_effort = result
         .get("reasoningEffort")
@@ -1993,6 +2102,7 @@ fn handle_jsonrpc_thread_response_value(
         .and_then(|value| serde_json::from_value::<ReasoningEffort>(value).ok());
 
     handle_model_params(model.to_string(), reasoning_effort, msg_store, entry_index);
+    model_runtime_context_from_value(result)
 }
 
 fn push_session_id_from_thread(
@@ -2387,6 +2497,7 @@ mod tests {
             "params": {
                 "threadId": "thread-1",
                 "turnId": "turn-1",
+                "startedAtMs": 0,
                 "item": {
                     "type": "fileChange",
                     "id": "patch-1",
@@ -2504,12 +2615,15 @@ mod tests {
             }),
         };
 
-        handle_jsonrpc_response(response, &msg_store, &entry_index);
+        let context =
+            handle_jsonrpc_response(response, &msg_store, &entry_index).expect("model context");
 
         assert_eq!(
             session_id_from_history(&msg_store).as_deref(),
             Some("88d1d63d-b84e-4f3d-9d87-1fb21839379d")
         );
+        assert_eq!(context.model_id.as_deref(), Some("gpt-5-codex"));
+        assert_eq!(context.provider_id.as_deref(), Some("openai"));
     }
 
     #[test]

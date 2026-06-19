@@ -5,7 +5,7 @@ description: Expert growth strategist specializing in rapid user acquisition thr
   data-driven experimentation. Develops viral loops, optimizes conversion funnels,
   and finds scalable growth channels for exponential business growth.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#2ECC71'

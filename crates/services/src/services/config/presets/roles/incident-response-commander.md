@@ -5,7 +5,7 @@ description: Expert incident commander specializing in production incident manag
   structured response coordination, post-mortem facilitation, SLO/SLI tracking, and
   on-call process design for reliable engineering organizations.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

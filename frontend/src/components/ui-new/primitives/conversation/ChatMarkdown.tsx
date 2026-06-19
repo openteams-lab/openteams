@@ -166,6 +166,15 @@ function isExternalHref(href: string): boolean {
   return /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(href) && !href.startsWith('file://');
 }
 
+const markdownElementProps = <
+  T extends { key?: unknown; node?: unknown; ref?: unknown },
+>(
+  props: T
+) => {
+  const { key: _key, node: _node, ref: _ref, ...rest } = props;
+  return rest;
+};
+
 export function ChatMarkdown({
   content,
   maxWidth = '800px',
@@ -217,7 +226,7 @@ export function ChatMarkdown({
 
         return (
           <a
-            {...props}
+            {...markdownElementProps(props)}
             href={resolvedHref}
             className={cn(
               'font-medium text-blue-600 underline decoration-blue-300 underline-offset-2 transition-colors hover:text-blue-700 hover:decoration-blue-500',
@@ -234,7 +243,7 @@ export function ChatMarkdown({
       p({ children, className: paragraphClassName, ...props }) {
         return (
           <p
-            {...props}
+            {...markdownElementProps(props)}
             className={cn('my-2 first:mt-0 last:mb-0', paragraphClassName)}
           >
             {children}
@@ -244,7 +253,7 @@ export function ChatMarkdown({
       h1({ children, className: headingClassName, ...props }) {
         return (
           <h1
-            {...props}
+            {...markdownElementProps(props)}
             className={cn(
               'mb-2 mt-3 text-base font-semibold leading-6 text-slate-900 first:mt-0',
               headingClassName
@@ -257,7 +266,7 @@ export function ChatMarkdown({
       h2({ children, className: headingClassName, ...props }) {
         return (
           <h2
-            {...props}
+            {...markdownElementProps(props)}
             className={cn(
               'mb-2 mt-3 text-[0.98em] font-semibold leading-6 text-slate-900 first:mt-0',
               headingClassName
@@ -270,7 +279,7 @@ export function ChatMarkdown({
       h3({ children, className: headingClassName, ...props }) {
         return (
           <h3
-            {...props}
+            {...markdownElementProps(props)}
             className={cn(
               'mb-1.5 mt-3 text-[0.95em] font-semibold leading-5 text-slate-800 first:mt-0',
               headingClassName
@@ -283,7 +292,7 @@ export function ChatMarkdown({
       h4({ children, className: headingClassName, ...props }) {
         return (
           <h4
-            {...props}
+            {...markdownElementProps(props)}
             className={cn(
               'mb-1.5 mt-2 text-[0.92em] font-semibold leading-5 text-slate-800 first:mt-0',
               headingClassName
@@ -296,7 +305,7 @@ export function ChatMarkdown({
       h5({ children, className: headingClassName, ...props }) {
         return (
           <h5
-            {...props}
+            {...markdownElementProps(props)}
             className={cn(
               'mb-1 mt-2 text-[0.9em] font-semibold leading-5 text-slate-700 first:mt-0',
               headingClassName
@@ -309,7 +318,7 @@ export function ChatMarkdown({
       h6({ children, className: headingClassName, ...props }) {
         return (
           <h6
-            {...props}
+            {...markdownElementProps(props)}
             className={cn(
               'mb-1 mt-2 text-[0.85em] font-semibold uppercase leading-5 tracking-normal text-slate-600 first:mt-0',
               headingClassName
@@ -322,7 +331,7 @@ export function ChatMarkdown({
       ul({ children, className: listClassName, ...props }) {
         return (
           <ul
-            {...props}
+            {...markdownElementProps(props)}
             className={cn('my-2 list-disc space-y-1 pl-5', listClassName)}
           >
             {children}
@@ -332,7 +341,7 @@ export function ChatMarkdown({
       ol({ children, className: listClassName, ...props }) {
         return (
           <ol
-            {...props}
+            {...markdownElementProps(props)}
             className={cn('my-2 list-decimal space-y-1 pl-5', listClassName)}
           >
             {children}
@@ -342,7 +351,7 @@ export function ChatMarkdown({
       li({ children, className: itemClassName, ...props }) {
         return (
           <li
-            {...props}
+            {...markdownElementProps(props)}
             className={cn(
               'pl-1 marker:text-slate-500 [&>p]:my-0',
               itemClassName
@@ -355,7 +364,7 @@ export function ChatMarkdown({
       blockquote({ children, className: quoteClassName, ...props }) {
         return (
           <blockquote
-            {...props}
+            {...markdownElementProps(props)}
             className={cn(
               'my-3 rounded-r-lg border-l-4 border-slate-300 bg-slate-50 px-4 py-2 text-slate-600',
               quoteClassName
@@ -368,7 +377,7 @@ export function ChatMarkdown({
       code({ children, className: codeClassName, ...props }) {
         return (
           <code
-            {...props}
+            {...markdownElementProps(props)}
             className={cn(
               'rounded-md border border-slate-200/80 bg-slate-100 px-1.5 py-0.5 font-mono text-[0.92em] font-medium text-slate-800',
               codeClassName
@@ -381,7 +390,7 @@ export function ChatMarkdown({
       pre({ children, className: preClassName, ...props }) {
         return (
           <pre
-            {...props}
+            {...markdownElementProps(props)}
             className={cn(
               'my-3 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950 p-3 text-xs leading-5 text-slate-100 shadow-inner',
               '[&_code]:!border-0 [&_code]:!bg-transparent [&_code]:!p-0 [&_code]:!text-inherit',
@@ -396,7 +405,7 @@ export function ChatMarkdown({
         return (
           <div className="my-3 overflow-x-auto rounded-lg border border-slate-200">
             <table
-              {...props}
+              {...markdownElementProps(props)}
               className={cn(
                 'w-full border-collapse text-left text-[0.95em]',
                 tableClassName
@@ -410,7 +419,7 @@ export function ChatMarkdown({
       th({ children, className: cellClassName, ...props }) {
         return (
           <th
-            {...props}
+            {...markdownElementProps(props)}
             className={cn(
               'border-b border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-700',
               cellClassName
@@ -423,7 +432,7 @@ export function ChatMarkdown({
       td({ children, className: cellClassName, ...props }) {
         return (
           <td
-            {...props}
+            {...markdownElementProps(props)}
             className={cn('border-t border-slate-100 px-3 py-2', cellClassName)}
           >
             {children}
@@ -432,13 +441,16 @@ export function ChatMarkdown({
       },
       hr({ className: hrClassName, ...props }) {
         return (
-          <hr {...props} className={cn('my-4 border-slate-200', hrClassName)} />
+          <hr
+            {...markdownElementProps(props)}
+            className={cn('my-4 border-slate-200', hrClassName)}
+          />
         );
       },
       img({ className: imageClassName, alt, ...props }) {
         return (
           <img
-            {...props}
+            {...markdownElementProps(props)}
             alt={alt ?? ''}
             className={cn(
               'my-3 max-w-full rounded-lg border border-slate-200',
@@ -465,10 +477,10 @@ export function ChatMarkdown({
               title="Copy as Markdown"
               onClick={handleCopy}
               data-copied="false"
-              className="group/copy pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white/95 text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700 data-[copied=true]:border-emerald-200 data-[copied=true]:text-emerald-600"
+              className="chat-markdown-copy-button pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
             >
-              <Clipboard className="h-4 w-4 group-data-[copied=true]/copy:hidden" />
-              <Check className="hidden h-4 w-4 group-data-[copied=true]/copy:block" />
+              <Clipboard className="chat-markdown-copy-clipboard h-4 w-4" />
+              <Check className="chat-markdown-copy-check h-4 w-4" />
             </button>
           </div>
         </div>

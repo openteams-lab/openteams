@@ -8,7 +8,7 @@ description: 'Specialist in self-healing data pipelines — uses air-gapped loca
   data engineer — a surgical specialist for when your data is broken and the pipeline
   can''t stop.'
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#2ECC71'

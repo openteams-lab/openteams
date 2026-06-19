@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use executors::logs::TokenUsageInfo;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, QueryBuilder, Sqlite, SqlitePool, Type};
 use ts_rs::TS;
@@ -32,6 +33,11 @@ pub struct ChatRunRetentionSummary {
     pub error_type: Option<String>,
     pub assistant_excerpt: Option<String>,
     pub total_tokens: Option<u32>,
+    pub token_usage: Option<TokenUsageInfo>,
+    pub workflow_execution_id: Option<Uuid>,
+    pub workflow_agent_session_id: Option<Uuid>,
+    pub workflow_step_id: Option<Uuid>,
+    pub workflow_step_key: Option<String>,
     pub log_bytes_total: Option<u64>,
     pub log_bytes_persisted: Option<u64>,
     pub live_bytes_dropped: Option<u64>,
@@ -555,6 +561,7 @@ mod tests {
             &CreateChatSession {
                 title: Some("test".to_string()),
                 workspace_path: None,
+                project_id: None,
             },
             Uuid::new_v4(),
         )
@@ -568,6 +575,7 @@ mod tests {
                 system_prompt: Some(String::new()),
                 tools_enabled: Some(serde_json::json!({})),
                 model_name: None,
+                owner_project_id: None,
             },
             Uuid::new_v4(),
         )
@@ -580,6 +588,9 @@ mod tests {
                 agent_id: agent.id,
                 workspace_path: Some("/workspace/a".to_string()),
                 allowed_skill_ids: Vec::new(),
+                project_member_id: None,
+                execution_config:
+                    crate::models::member_execution_config::MemberExecutionConfig::default(),
             },
             Uuid::new_v4(),
         )

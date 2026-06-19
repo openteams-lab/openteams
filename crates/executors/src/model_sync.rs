@@ -5,7 +5,11 @@ use std::{
 
 use crate::{
     env::ExecutionEnv,
-    executors::{BaseCodingAgent, CodingAgent, StandardCodingAgentExecutor},
+    executors::{
+        BaseCodingAgent, CodingAgent, StandardCodingAgentExecutor,
+        codex::ReasoningEffort as CodexReasoningEffort,
+        droid::ReasoningEffortLevel as DroidReasoningEffort,
+    },
     profile::{ExecutorConfig, ExecutorConfigs, ProfileError, canonical_variant_key},
 };
 
@@ -51,14 +55,15 @@ async fn discover_models(
             continue;
         }
 
-        if let CodingAgent::Opencode(opencode) = base {
-            match opencode.list_models(current_dir, env).await {
-                Ok(models) => {
+        match base.list_models(current_dir, env).await {
+            Ok(Some(models)) => {
+                if !models.is_empty() {
                     updates.insert(*executor, models);
                 }
-                Err(err) => {
-                    tracing::debug!("Failed to list models for {executor}: {err}");
-                }
+            }
+            Ok(None) => {}
+            Err(err) => {
+                tracing::debug!("Failed to list models for {executor}: {err}");
             }
         }
     }
@@ -207,19 +212,109 @@ pub fn with_model(config: &CodingAgent, model: &str) -> Option<CodingAgent> {
     }
 }
 
+pub fn with_member_execution_overrides(
+    config: &CodingAgent,
+    model_name: Option<&str>,
+    thinking_effort: Option<&str>,
+    model_variant: Option<&str>,
+) -> CodingAgent {
+    let mut next = config.clone();
+
+    if let Some(model) = model_name.and_then(non_empty)
+        && let Some(updated) = with_model(&next, model)
+    {
+        next = updated;
+    }
+
+    if let Some(updated) = with_thinking_or_variant(
+        &next,
+        thinking_effort.and_then(non_empty),
+        model_variant.and_then(non_empty),
+    ) {
+        next = updated;
+    }
+
+    next
+}
+
+fn with_thinking_or_variant(
+    config: &CodingAgent,
+    thinking_effort: Option<&str>,
+    model_variant: Option<&str>,
+) -> Option<CodingAgent> {
+    match config {
+        CodingAgent::ClaudeCode(base) => {
+            let effort = thinking_effort?;
+            let mut next = base.clone();
+            next.effort = Some(effort.to_string());
+            Some(CodingAgent::ClaudeCode(next))
+        }
+        CodingAgent::Codex(base) => {
+            let effort = parse_codex_reasoning_effort(thinking_effort?)?;
+            let mut next = base.clone();
+            next.model_reasoning_effort = Some(effort);
+            Some(CodingAgent::Codex(next))
+        }
+        CodingAgent::Droid(base) => {
+            let effort = parse_droid_reasoning_effort(thinking_effort?)?;
+            let mut next = base.clone();
+            next.reasoning_effort = Some(effort);
+            Some(CodingAgent::Droid(next))
+        }
+        CodingAgent::Opencode(base) => {
+            let variant = model_variant.or(thinking_effort)?;
+            let mut next = base.clone();
+            next.variant = Some(variant.to_string());
+            Some(CodingAgent::Opencode(next))
+        }
+        CodingAgent::OpenTeamsCli(base) => {
+            let variant = model_variant.or(thinking_effort)?;
+            let mut next = base.clone();
+            next.variant = Some(variant.to_string());
+            Some(CodingAgent::OpenTeamsCli(next))
+        }
+        CodingAgent::Gemini(base) => {
+            let effort = thinking_effort?;
+            let mut next = base.clone();
+            next.thinking_effort = Some(effort.to_string());
+            Some(CodingAgent::Gemini(next))
+        }
+        CodingAgent::QwenCode(base) => {
+            let effort = thinking_effort?;
+            let mut next = base.clone();
+            next.thinking_effort = Some(effort.to_string());
+            Some(CodingAgent::QwenCode(next))
+        }
+        _ => None,
+    }
+}
+
+fn non_empty(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
+    }
+}
+
+fn parse_codex_reasoning_effort(value: &str) -> Option<CodexReasoningEffort> {
+    serde_json::from_value(serde_json::Value::String(value.trim().to_ascii_lowercase())).ok()
+}
+
+fn parse_droid_reasoning_effort(value: &str) -> Option<DroidReasoningEffort> {
+    serde_json::from_value(serde_json::Value::String(value.trim().to_ascii_lowercase())).ok()
+}
+
 fn auto_variant_key(model: &str) -> String {
-    format!(
-        "{}{}",
-        AUTO_MODEL_VARIANT_PREFIX,
-        canonical_variant_key(model)
-    )
+    canonical_variant_key(model)
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
         executors::{AppendPrompt, CodingAgent},
-        model_sync::{supports_model, with_model},
+        model_sync::{supports_model, with_member_execution_overrides, with_model},
     };
 
     #[test]
@@ -238,5 +333,122 @@ mod tests {
         };
 
         assert_eq!(config.model.as_deref(), Some("kimi-k2.5"));
+    }
+
+    fn agent_from_json(value: serde_json::Value) -> CodingAgent {
+        serde_json::from_value(value).expect("deserialize coding agent")
+    }
+
+    #[test]
+    fn auto_model_variant_keys_do_not_use_legacy_prefix() {
+        assert_eq!(
+            super::auto_variant_key("opencode/glm-5-free"),
+            "opencode/glm-5-free"
+        );
+        assert_eq!(super::auto_variant_key("gpt-5.2-codex"), "GPT_5.2_CODEX");
+    }
+
+    #[test]
+    fn model_sync_replaces_legacy_auto_model_prefix_keys() {
+        let mut config = crate::profile::ExecutorConfig::new_with_default(agent_from_json(
+            serde_json::json!({ "OPENCODE": {} }),
+        ));
+        let legacy_key = "AUTO_MODEL_opencode/glm-5-free".to_string();
+        let base = config.get_default().unwrap().clone();
+        config.configurations.insert(
+            legacy_key.clone(),
+            super::with_model(&base, "opencode/glm-5-free").unwrap(),
+        );
+
+        let changed =
+            super::upsert_model_variants(&mut config, &["opencode/glm-5-free".to_string()]);
+
+        assert!(changed);
+        assert!(!config.configurations.contains_key(&legacy_key));
+        assert!(config.configurations.contains_key("opencode/glm-5-free"));
+    }
+
+    #[test]
+    fn member_overrides_map_thinking_to_supported_executors() {
+        let claude = with_member_execution_overrides(
+            &agent_from_json(serde_json::json!({ "CLAUDE_CODE": {} })),
+            Some("claude-sonnet-4"),
+            Some("high"),
+            None,
+        );
+        let CodingAgent::ClaudeCode(claude) = claude else {
+            panic!("expected ClaudeCode");
+        };
+        assert_eq!(claude.model.as_deref(), Some("claude-sonnet-4"));
+        assert_eq!(claude.effort.as_deref(), Some("high"));
+
+        let codex = with_member_execution_overrides(
+            &agent_from_json(serde_json::json!({ "CODEX": {} })),
+            Some("gpt-5.2-codex"),
+            Some("xhigh"),
+            None,
+        );
+        let CodingAgent::Codex(codex) = codex else {
+            panic!("expected Codex");
+        };
+        assert_eq!(codex.model.as_deref(), Some("gpt-5.2-codex"));
+        assert!(codex.model_reasoning_effort.is_some());
+
+        let droid = with_member_execution_overrides(
+            &agent_from_json(serde_json::json!({ "DROID": {} })),
+            None,
+            Some("dynamic"),
+            None,
+        );
+        let CodingAgent::Droid(droid) = droid else {
+            panic!("expected Droid");
+        };
+        assert!(droid.reasoning_effort.is_some());
+
+        let opencode = with_member_execution_overrides(
+            &agent_from_json(serde_json::json!({ "OPENCODE": {} })),
+            Some("openai/gpt-5.2-codex"),
+            Some("ignored-effort"),
+            Some("thinking-high"),
+        );
+        let CodingAgent::Opencode(opencode) = opencode else {
+            panic!("expected Opencode");
+        };
+        assert_eq!(opencode.model.as_deref(), Some("openai/gpt-5.2-codex"));
+        assert_eq!(opencode.variant.as_deref(), Some("thinking-high"));
+
+        let openteams_cli = with_member_execution_overrides(
+            &agent_from_json(serde_json::json!({ "OPEN_TEAMS_CLI": {} })),
+            Some("openai/gpt-5.2-codex"),
+            Some("thinking-high"),
+            None,
+        );
+        let CodingAgent::OpenTeamsCli(openteams_cli) = openteams_cli else {
+            panic!("expected OpenTeamsCli");
+        };
+        assert_eq!(openteams_cli.model.as_deref(), Some("openai/gpt-5.2-codex"));
+        assert_eq!(openteams_cli.variant.as_deref(), Some("thinking-high"));
+
+        let gemini = with_member_execution_overrides(
+            &agent_from_json(serde_json::json!({ "GEMINI": {} })),
+            None,
+            Some("high"),
+            None,
+        );
+        let CodingAgent::Gemini(gemini) = gemini else {
+            panic!("expected Gemini");
+        };
+        assert_eq!(gemini.thinking_effort.as_deref(), Some("high"));
+
+        let qwen = with_member_execution_overrides(
+            &agent_from_json(serde_json::json!({ "QWEN_CODE": {} })),
+            None,
+            Some("max"),
+            None,
+        );
+        let CodingAgent::QwenCode(qwen) = qwen else {
+            panic!("expected QwenCode");
+        };
+        assert_eq!(qwen.thinking_effort.as_deref(), Some("max"));
     }
 }

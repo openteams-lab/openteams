@@ -1,9 +1,14 @@
-use axum::{Extension, Json, extract::State, response::Json as ResponseJson};
+use axum::{
+    Extension, Json,
+    extract::{Query, State},
+    response::Json as ResponseJson,
+};
 use db::models::{
     chat_agent::{ChatAgent, CreateChatAgent, UpdateChatAgent},
     chat_session_agent::ChatSessionAgent,
 };
 use deployment::Deployment;
+use serde::Deserialize;
 use serde_json::Value;
 use utils::response::ApiResponse;
 use uuid::Uuid;
@@ -11,6 +16,11 @@ use uuid::Uuid;
 use crate::{DeploymentImpl, error::ApiError};
 
 const EXECUTOR_PROFILE_VARIANT_KEY: &str = "executor_profile_variant";
+
+#[derive(Debug, Deserialize)]
+pub struct AgentListQuery {
+    pub project_id: Option<Uuid>,
+}
 
 fn extract_executor_profile_variant(tools_enabled: &Value) -> Option<&str> {
     tools_enabled
@@ -40,8 +50,10 @@ fn agent_execution_identity_changed(agent: &ChatAgent, payload: &UpdateChatAgent
 
 pub async fn get_agents(
     State(deployment): State<DeploymentImpl>,
+    Query(query): Query<AgentListQuery>,
 ) -> Result<ResponseJson<ApiResponse<Vec<ChatAgent>>>, ApiError> {
-    let agents = ChatAgent::find_all(&deployment.db().pool).await?;
+    let agents =
+        ChatAgent::find_visible_for_project(&deployment.db().pool, query.project_id).await?;
     Ok(ResponseJson(ApiResponse::success(agents)))
 }
 
@@ -111,6 +123,7 @@ mod tests {
             system_prompt: "system".to_string(),
             tools_enabled: sqlx::types::Json(tools_enabled),
             model_name: model_name.map(str::to_string),
+            owner_project_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

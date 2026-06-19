@@ -5,7 +5,7 @@ description: Open-world and environment specialist - Masters UE5 World Partition
   Landscape, procedural foliage, HLOD, and large-scale level streaming for seamless
   open-world experiences
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#2ECC71'

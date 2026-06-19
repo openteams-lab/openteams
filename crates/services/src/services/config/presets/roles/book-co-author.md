@@ -5,7 +5,7 @@ description: Strategic thought-leadership book collaborator for founders, expert
   and operators turning voice notes, fragments, and positioning into structured first-person
   chapters.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'

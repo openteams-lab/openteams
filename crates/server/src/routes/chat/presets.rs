@@ -14,7 +14,7 @@ use services::services::{
 };
 use sqlx::{FromRow, types::Json as SqlxJson};
 use ts_rs::TS;
-use utils::{assets::config_path, response::ApiResponse};
+use utils::{assets::config_path, response::ApiResponse, text::sanitize_member_handle};
 use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError};
@@ -391,7 +391,7 @@ fn model_from_coding_agent(coding_agent: &CodingAgent) -> Option<String> {
 }
 
 fn normalize_member_name(value: &str) -> String {
-    let normalized = value.split_whitespace().collect::<Vec<_>>().join("_");
+    let normalized = sanitize_member_handle(value);
     if normalized.is_empty() {
         "member".to_string()
     } else {
@@ -514,6 +514,7 @@ mod tests {
             team_protocol_enabled,
             default_workspace_path: Some("/workspace/default".to_string()),
             chat_input_mode: None,
+            project_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
             archived_at: None,
@@ -636,11 +637,11 @@ mod tests {
                 .iter()
                 .map(|member| member.name.as_str())
                 .collect::<Vec<_>>(),
-            vec!["Backend_Engineer", "backend_engineer_2"]
+            vec!["BackendEngineer", "backendengineer_2"]
         );
         assert_eq!(
             response.team.member_ids,
-            vec!["delivery_backend_engineer", "delivery_backend_engineer_2"]
+            vec!["delivery_backendengineer", "delivery_backendengineer_2"]
         );
 
         let imported_names = response
@@ -702,7 +703,7 @@ mod tests {
         let mut row = test_row("backend");
         row.model_name = Some("explicit-model".to_string());
         row.runner_type = "codex".to_string();
-        row.tools_enabled = SqlxJson(json!({ "executor_profile_variant": "GPT_5_5" }));
+        row.tools_enabled = SqlxJson(json!({ "executor_profile_variant": "GPT_5.5" }));
 
         let response = build_preset_snapshot(
             &session,
@@ -725,7 +726,7 @@ mod tests {
         let mut row = test_row("backend");
         row.model_name = None;
         row.runner_type = "codex".to_string();
-        row.tools_enabled = SqlxJson(json!({ "executor_profile_variant": "GPT_5_5" }));
+        row.tools_enabled = SqlxJson(json!({ "executor_profile_variant": "GPT_5.5" }));
 
         let response = build_preset_snapshot(
             &session,

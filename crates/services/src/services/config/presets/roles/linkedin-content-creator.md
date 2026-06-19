@@ -6,7 +6,7 @@ description: Expert LinkedIn content strategist focused on thought leadership, p
   and culture to drive inbound opportunities for founders, job seekers, developers,
   and anyone building a professional presence.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

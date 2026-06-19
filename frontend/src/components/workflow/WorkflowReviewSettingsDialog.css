@@ -1,0 +1,95 @@
+.workflow-review-settings-dialog-overlay {
+  --wrs-modal-overlay-bg: rgba(1, 1, 2, 0.58);
+}
+
+body[data-mode="light"] .workflow-review-settings-dialog-overlay {
+  --wrs-modal-overlay-bg: rgba(248, 250, 252, 0.84);
+}
+
+.workflow-review-settings-dialog {
+  --wrs-panel-bg: #111214;
+  --wrs-panel-border: rgba(255, 255, 255, 0.1);
+  --wrs-panel-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.5),
+    0 24px 80px rgba(0, 0, 0, 0.36),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --wrs-panel-highlight: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.34),
+    transparent
+  );
+  --wrs-chrome-bg: rgba(255, 255, 255, 0.025);
+  --wrs-section-border: rgba(255, 255, 255, 0.08);
+  --wrs-section-heading: rgba(255, 255, 255, 0.7);
+  --wrs-section-caption: rgba(255, 255, 255, 0.35);
+  --wrs-close-text: rgba(255, 255, 255, 0.35);
+  --wrs-close-hover-bg: rgba(255, 255, 255, 0.06);
+  --wrs-close-hover-text: #ffffff;
+  --wrs-row-hover-bg: #161618;
+  --wrs-row-title: #c1c1c1;
+  --wrs-icon-active: rgba(139, 149, 233, 0.8);
+  --wrs-icon-active-fill: rgba(94, 106, 210, 0.1);
+  --wrs-icon-muted: rgba(255, 255, 255, 0.2);
+  --wrs-toggle-active-bg: rgba(94, 106, 210, 0.14);
+  --wrs-toggle-active-text: #f4f5ff;
+  --wrs-toggle-active-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --wrs-toggle-inactive-text: rgba(255, 255, 255, 0.4);
+  --wrs-toggle-inactive-hover-bg: rgba(255, 255, 255, 0.045);
+  --wrs-toggle-inactive-hover-text: rgba(255, 255, 255, 0.68);
+  --wrs-tooltip-bg: #111214;
+  --wrs-tooltip-border: rgba(255, 255, 255, 0.08);
+  --wrs-tooltip-text: #ffffff;
+  --wrs-tooltip-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+  --wrs-cancel-text: rgba(255, 255, 255, 0.48);
+  --wrs-cancel-hover-text: #ffffff;
+  --wrs-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.workflow-review-settings-dialog::before {
+  background: var(--wrs-panel-highlight);
+}
+
+body[data-mode="light"] .workflow-review-settings-dialog {
+  --wrs-panel-bg: #ffffff;
+  --wrs-panel-border: rgba(15, 23, 42, 0.1);
+  --wrs-panel-shadow:
+    0 12px 30px rgba(15, 23, 42, 0.1),
+    0 24px 70px rgba(15, 23, 42, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --wrs-panel-highlight: linear-gradient(
+    90deg,
+    transparent,
+    rgba(94, 106, 210, 0.2),
+    transparent
+  );
+  --wrs-chrome-bg: rgba(248, 250, 252, 0.82);
+  --wrs-section-border: rgba(15, 23, 42, 0.08);
+  --wrs-section-heading: #4b5563;
+  --wrs-section-caption: #8b95a1;
+  --wrs-close-text: rgba(15, 23, 42, 0.48);
+  --wrs-close-hover-bg: rgba(15, 23, 42, 0.06);
+  --wrs-close-hover-text: #111827;
+  --wrs-row-hover-bg: #f6f7fa;
+  --wrs-row-title: #252a34;
+  --wrs-icon-active: rgba(79, 95, 200, 0.9);
+  --wrs-icon-active-fill: rgba(94, 106, 210, 0.12);
+  --wrs-icon-muted: rgba(15, 23, 42, 0.24);
+  --wrs-toggle-active-bg: rgba(94, 106, 210, 0.12);
+  --wrs-toggle-active-text: #3945a9;
+  --wrs-toggle-active-shadow:
+    inset 0 0 0 1px rgba(94, 106, 210, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  --wrs-toggle-inactive-text: #687182;
+  --wrs-toggle-inactive-hover-bg: rgba(15, 23, 42, 0.05);
+  --wrs-toggle-inactive-hover-text: #111827;
+  --wrs-tooltip-bg: #ffffff;
+  --wrs-tooltip-border: #dfe3ea;
+  --wrs-tooltip-text: #111827;
+  --wrs-tooltip-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  --wrs-cancel-text: #6b7280;
+  --wrs-cancel-hover-text: #111827;
+  --wrs-primary-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}

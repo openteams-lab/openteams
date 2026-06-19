@@ -5,7 +5,7 @@ description: Expert application security engineer specializing in threat modelin
   vulnerability assessment, secure code review, and security architecture design for
   modern web and cloud-native applications.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#E74C3C'

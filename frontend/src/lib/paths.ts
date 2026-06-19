@@ -1,10 +1,6 @@
 export const paths = {
-  projects: () => '/local-projects',
-  projectTasks: (projectId: string) => `/local-projects/${projectId}/tasks`,
-  task: (projectId: string, taskId: string) =>
-    `/local-projects/${projectId}/tasks/${taskId}`,
-  attempt: (projectId: string, taskId: string, attemptId: string) =>
-    `/local-projects/${projectId}/tasks/${taskId}/attempts/${attemptId}`,
-  attemptFull: (projectId: string, taskId: string, attemptId: string) =>
-    `/local-projects/${projectId}/tasks/${taskId}/attempts/${attemptId}/full`,
+  projectList: () => '/projects',
+  projectDetail: (projectId: string) => `/projects/${projectId}`,
+  projectMembers: (projectId: string) => `/projects/${projectId}/members`,
+  projectSessions: (projectId: string) => `/projects/${projectId}/sessions`,
 };

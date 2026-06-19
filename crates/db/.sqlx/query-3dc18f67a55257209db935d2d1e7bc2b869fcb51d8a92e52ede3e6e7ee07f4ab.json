@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO project_delivery_events (\n                    id,\n                    project_id,\n                    session_id,\n                    workflow_execution_id,\n                    step_id,\n                    event_type,\n                    title,\n                    source\n               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n               RETURNING id as \"id!: Uuid\",\n                         project_id as \"project_id!: Uuid\",\n                         session_id as \"session_id: Uuid\",\n                         workflow_execution_id as \"workflow_execution_id: Uuid\",\n                         step_id as \"step_id: Uuid\",\n                         event_type as \"event_type!: ProjectDeliveryEventType\",\n                         title,\n                         source,\n                         created_at as \"created_at!: DateTime<Utc>\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "project_id!: Uuid",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "session_id: Uuid",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "workflow_execution_id: Uuid",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "step_id: Uuid",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "event_type!: ProjectDeliveryEventType",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "title",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "source",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 8,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "3dc18f67a55257209db935d2d1e7bc2b869fcb51d8a92e52ede3e6e7ee07f4ab"
+}

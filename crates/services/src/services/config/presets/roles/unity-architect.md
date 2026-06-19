@@ -4,7 +4,7 @@ name: Unity Architect
 description: Data-driven modularity specialist - Masters ScriptableObjects, decoupled
   systems, and single-responsibility component design for scalable Unity projects
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#3498DB'

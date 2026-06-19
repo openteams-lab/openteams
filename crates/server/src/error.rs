@@ -283,6 +283,7 @@ impl From<ProjectServiceError> for ApiError {
             ProjectServiceError::GitError(msg) => {
                 ApiError::BadRequest(format!("Git operation failed: {}", msg))
             }
+            ProjectServiceError::MemberInitializationFailed(msg) => ApiError::BadRequest(msg),
         }
     }
 }

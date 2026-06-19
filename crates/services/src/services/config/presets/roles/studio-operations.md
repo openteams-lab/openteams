@@ -6,7 +6,7 @@ description: Expert operations manager specializing in day-to-day studio efficie
   maintaining productivity standards, and supporting all teams with the tools and
   processes needed for success.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#2ECC71'

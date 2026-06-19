@@ -5,7 +5,7 @@ description: Senior pre-sales engineer specializing in technical discovery, demo
   POC scoping, competitive battlecards, and bridging product capabilities to business
   outcomes. Wins the technical decision so the deal can close.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

@@ -37,9 +37,12 @@ pub async fn launch_codex_review(
             };
             let response = client.resume_thread(params).await?;
             tracing::debug!(
-                "resuming session for review using rollout file {}, response {:?}",
-                rollout_path.display(),
-                response
+                rollout_path = %rollout_path.display(),
+                thread_id = %response.thread.id,
+                turns = response.thread.turns.len(),
+                model = %response.model,
+                model_provider = %response.model_provider,
+                "resumed session for review using rollout file"
             );
             response.thread.id
         }

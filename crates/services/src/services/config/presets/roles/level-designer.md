@@ -4,7 +4,7 @@ name: Level Designer
 description: Spatial storytelling and flow specialist - Masters layout theory, pacing
   architecture, encounter design, and environmental narrative across all game engines
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#008080'

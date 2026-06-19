@@ -22,6 +22,9 @@ use crate::{
         stderr_processor::normalize_stderr_logs,
         utils::{EntryIndexProvider, patch::ConversationPatch},
     },
+    model_discovery::{
+        ProviderKind, cli_model_commands, discover_from_sources, runner_config_paths,
+    },
     stdout_dup,
 };
 
@@ -281,6 +284,28 @@ async fn spawn_kimi(
 
 #[async_trait]
 impl StandardCodingAgentExecutor for KimiCode {
+    async fn list_models(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<String>>, ExecutorError> {
+        let config_paths = runner_config_paths([
+            self.default_mcp_config_path(),
+            dirs::home_dir().map(|home| home.join(".kimi").join("config.json")),
+            dirs::home_dir().map(|home| home.join(".kimi").join("settings.json")),
+        ]);
+        discover_from_sources(
+            current_dir,
+            env,
+            &self.cmd,
+            self.model.as_deref(),
+            config_paths,
+            cli_model_commands(Self::base_command(), &self.cmd),
+            &[ProviderKind::OpenAiCompatible],
+        )
+        .await
+    }
+
     async fn spawn(
         &self,
         current_dir: &Path,

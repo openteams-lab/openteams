@@ -60,6 +60,7 @@ fn test_agent(name: &str, system_prompt: &str) -> ChatAgent {
         runner_type: "codex".to_string(),
         system_prompt: system_prompt.to_string(),
         model_name: None,
+        owner_project_id: None,
         tools_enabled: sqlx::types::Json(json!({})),
         created_at: Utc::now(),
         updated_at: Utc::now(),
@@ -107,6 +108,7 @@ async fn setup_chat_runner_db() -> DBService {
                 team_protocol_enabled INTEGER DEFAULT 0,
                 default_workspace_path TEXT,
                 chat_input_mode TEXT,
+                project_id BLOB,
                 lead_agent_id TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
@@ -136,6 +138,8 @@ async fn setup_chat_runner_db() -> DBService {
                 pty_session_key TEXT,
                 agent_session_id TEXT,
                 agent_message_id TEXT,
+                project_member_id BLOB,
+                execution_config TEXT NOT NULL DEFAULT '{}',
                 allowed_skill_ids TEXT NOT NULL DEFAULT '[]',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
@@ -207,6 +211,7 @@ async fn insert_test_chat_agent(db: &DBService, name: &str) -> ChatAgent {
             system_prompt: Some(format!("You are {name}.")),
             tools_enabled: Some(json!({})),
             model_name: None,
+            owner_project_id: None,
         },
         Uuid::new_v4(),
     )
@@ -226,6 +231,8 @@ async fn insert_test_session_agent(
             agent_id,
             workspace_path: None,
             allowed_skill_ids: Vec::new(),
+            project_member_id: None,
+            execution_config: db::models::member_execution_config::MemberExecutionConfig::default(),
         },
         Uuid::new_v4(),
     )
@@ -249,7 +256,7 @@ fn empty_log_forwarders() -> RunLogForwarders {
 }
 
 #[tokio::test]
-async fn default_route_for_unmentioned_user_message_uses_first_session_agent() {
+async fn default_route_ignores_unmentioned_free_mode_user_messages() {
     let db = setup_chat_runner_db().await;
     let runner = ChatRunner::new(db.clone());
     let session_id = Uuid::new_v4();
@@ -260,6 +267,27 @@ async fn default_route_for_unmentioned_user_message_uses_first_session_agent() {
     tokio::time::sleep(std::time::Duration::from_millis(2)).await;
     insert_test_session_agent(&db, session_id, second_agent.id).await;
     let message = test_message("please handle this", json!({}));
+
+    let default_mention = runner
+        .resolve_default_mention_for_unmentioned_user_message(&session, &message)
+        .await
+        .expect("resolve default mention");
+
+    assert_eq!(default_mention, None);
+}
+
+#[tokio::test]
+async fn default_route_for_unmentioned_workflow_message_uses_lead_agent() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    let session = insert_test_chat_session(&db, session_id).await;
+    let first_agent = insert_test_chat_agent(&db, "first").await;
+    let second_agent = insert_test_chat_agent(&db, "second").await;
+    insert_test_session_agent(&db, session_id, first_agent.id).await;
+    tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+    insert_test_session_agent(&db, session_id, second_agent.id).await;
+    let message = test_message("please plan this", json!({ "chat_input_mode": "workflow" }));
 
     let default_mention = runner
         .resolve_default_mention_for_unmentioned_user_message(&session, &message)
@@ -326,11 +354,39 @@ fn parse_token_usage_from_codex_token_count_line() {
 }
 
 #[test]
+fn parse_token_usage_from_codex_token_count_line_keeps_model() {
+    let line = r#"{"method":"codex/event/token_count","params":{"msg":{"model":"gpt-5-codex","provider_id":"openai","thread_id":"thread-1","info":{"last_token_usage":{"input_tokens":100,"output_tokens":50},"model_context_window":258400}}}}"#;
+    let usage = ChatRunner::parse_token_usage_from_stdout_line(line).expect("usage");
+    assert_eq!(usage.total_tokens, 150);
+    assert_eq!(usage.runtime_model_id.as_deref(), Some("gpt-5-codex"));
+    assert_eq!(usage.provider_id.as_deref(), Some("openai"));
+    assert_eq!(usage.runtime_thread_id.as_deref(), Some("thread-1"));
+}
+
+#[test]
 fn parse_token_usage_from_plain_token_usage_line() {
     let line = r#"{"type":"token_usage","total_tokens":14596,"model_context_window":258400}"#;
     let usage = ChatRunner::parse_token_usage_from_stdout_line(line).expect("usage");
     assert_eq!(usage.total_tokens, 14596);
     assert_eq!(usage.model_context_window, 258400);
+}
+
+#[test]
+fn parse_token_usage_from_gemini_acp_quota_line() {
+    let line = r#"{"type":"token_usage","total_tokens":168,"model_context_window":0,"input_tokens":123,"output_tokens":45,"runtime_agent":"gemini","runtime_model_id":"gemini-3-pro-preview","provider_id":"google","usage_scope":"turn_delta"}"#;
+    let usage = ChatRunner::parse_token_usage_from_stdout_line(line).expect("usage");
+    assert_eq!(usage.total_tokens, 168);
+    assert_eq!(usage.model_context_window, 0);
+    assert_eq!(usage.input_tokens, Some(123));
+    assert_eq!(usage.output_tokens, Some(45));
+    assert_eq!(usage.runtime_agent.as_deref(), Some("gemini"));
+    assert_eq!(
+        usage.runtime_model_id.as_deref(),
+        Some("gemini-3-pro-preview")
+    );
+    assert_eq!(usage.provider_id.as_deref(), Some("google"));
+    assert_eq!(usage.usage_scope.as_deref(), Some("turn_delta"));
+    assert!(!usage.is_estimated);
 }
 
 #[test]
@@ -730,11 +786,14 @@ async fn stop_agent_without_run_control_recovers_agent_to_idle() {
             session_agent_id: emitted_session_agent_id,
             agent_id: emitted_agent_id,
             state,
+            run_id,
             started_at,
         } => {
             assert_eq!(emitted_session_agent_id, session_agent_id);
             assert_eq!(emitted_agent_id, agent_id);
             assert_eq!(state, ChatSessionAgentState::Idle);
+            // Recovering an agent with no in-memory run control carries no run id.
+            assert_eq!(run_id, None);
             assert_eq!(started_at, None);
         }
         other => panic!("unexpected event: {other:?}"),
@@ -971,6 +1030,7 @@ async fn process_agent_protocol_output_requests_retry_for_first_json_shape_failu
             "coder",
             Uuid::new_v4(),
             Uuid::new_v4(),
+            None,
             0,
             ResolvedPromptLanguage {
                 setting: "english",
@@ -980,6 +1040,7 @@ async fn process_agent_protocol_output_requests_retry_for_first_json_shape_failu
             r#"{"type":"send","to":"you","content":"object is not allowed"}"#,
             None,
             None,
+            false,
             None,
             0,
         )
@@ -1000,7 +1061,7 @@ async fn process_agent_protocol_output_requests_retry_for_first_json_shape_failu
 }
 
 #[tokio::test]
-async fn process_agent_protocol_output_reports_error_after_retry_exhaustion() {
+async fn process_agent_protocol_output_uses_raw_output_after_retry_exhaustion() {
     let db = setup_chat_runner_db().await;
     let runner = ChatRunner::new(db.clone());
     let session_id = Uuid::new_v4();
@@ -1015,6 +1076,7 @@ async fn process_agent_protocol_output_reports_error_after_retry_exhaustion() {
             "coder",
             run_id,
             Uuid::new_v4(),
+            None,
             0,
             ResolvedPromptLanguage {
                 setting: "english",
@@ -1024,32 +1086,239 @@ async fn process_agent_protocol_output_reports_error_after_retry_exhaustion() {
             "still not json",
             None,
             None,
+            false,
             None,
             MAX_PROTOCOL_PARSE_RETRIES,
         )
         .await
         .expect("process protocol output");
 
-    assert!(matches!(
-        result,
-        super::ProtocolProcessResult::ProtocolFailure
-    ));
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
 
     let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
         .await
         .expect("list messages");
     assert_eq!(messages.len(), 1);
-    assert_eq!(messages[0].sender_type, ChatSenderType::System);
-    assert!(messages[0].content.contains("could not be processed"));
-    assert_eq!(
-        messages[0].meta["protocol_error"]["code"],
-        json!("invalid_json")
-    );
-    assert_eq!(
-        messages[0].meta["protocol_error"]["raw_output"],
-        json!("still not json")
-    );
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].content, "still not json");
+    assert_eq!(messages[0].meta["protocol"]["mode"], json!("raw_fallback"));
     assert_eq!(messages[0].meta["run_id"], json!(run_id));
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_uses_conclusion_when_no_send() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            None,
+            0,
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            r#"[{"type":"record","content":"shared fact"},{"type":"conclusion","content":"done"}]"#,
+            None,
+            None,
+            false,
+            None,
+            0,
+        )
+        .await
+        .expect("process protocol output");
+
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].content, "done");
+    assert_eq!(messages[0].meta["protocol"]["type"], json!("conclusion"));
+    assert_eq!(
+        messages[0].meta["protocol"]["mode"],
+        json!("display_fallback")
+    );
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_uses_record_when_no_send_or_conclusion() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            None,
+            0,
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            r#"[{"type":"record","content":"shared fact"}]"#,
+            None,
+            None,
+            false,
+            None,
+            0,
+        )
+        .await
+        .expect("process protocol output");
+
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].content, "shared fact");
+    assert_eq!(messages[0].meta["protocol"]["type"], json!("record"));
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_persists_error_when_output_empty() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            None,
+            0,
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            "",
+            Some("CLI failed before writing output"),
+            None,
+            false,
+            None,
+            0,
+        )
+        .await
+        .expect("process protocol output");
+
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].content, "CLI failed before writing output");
+    assert_eq!(messages[0].meta["protocol"]["output_is_empty"], json!(true));
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_persists_failure_hint_when_output_empty() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            None,
+            0,
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            "",
+            None,
+            None,
+            false,
+            None,
+            0,
+        )
+        .await
+        .expect("process protocol output");
+
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].content, "Agent运行失败");
+    assert_eq!(messages[0].meta["protocol"]["output_is_empty"], json!(true));
+    assert_eq!(messages[0].meta["i18n"]["key"], json!("agent.runFailed"));
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_persists_stopped_hint_when_stopped_empty() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            None,
+            0,
+            ResolvedPromptLanguage {
+                setting: "simplified_chinese",
+                code: "zh-Hans",
+                instruction: "You MUST respond in Simplified Chinese.",
+            },
+            "",
+            None,
+            None,
+            true,
+            None,
+            0,
+        )
+        .await
+        .expect("process protocol output");
+
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].content, "Agent停止运行");
+    assert_eq!(messages[0].meta["protocol"]["output_is_empty"], json!(true));
+    assert_eq!(messages[0].meta["i18n"]["key"], json!("agent.stopped"));
 }
 
 #[test]
@@ -1179,8 +1448,18 @@ fn build_protocol_send_message_meta_includes_token_usage() {
         model_context_window: 128000,
         input_tokens: Some(1536),
         output_tokens: Some(512),
+        reasoning_output_tokens: None,
         cache_read_tokens: Some(256),
-        cache_write_tokens: None,
+        runtime_agent: Some("codex".to_string()),
+        runtime_model_id: Some("gpt-5".to_string()),
+        provider_id: Some("openai".to_string()),
+        runtime_thread_id: Some("thread-1".to_string()),
+        usage_scope: Some("turn_delta".to_string()),
+        snapshot_total_tokens: None,
+        snapshot_input_tokens: None,
+        snapshot_output_tokens: None,
+        snapshot_reasoning_output_tokens: None,
+        snapshot_cache_read_tokens: None,
         is_estimated: false,
     };
 
@@ -1189,6 +1468,7 @@ fn build_protocol_send_message_meta_includes_token_usage() {
         Uuid::nil(),
         Uuid::nil(),
         Uuid::nil(),
+        Some("client-message-1"),
         0,
         "you",
         0,
@@ -1201,6 +1481,7 @@ fn build_protocol_send_message_meta_includes_token_usage() {
     assert_eq!(meta["protocol"]["type"], json!("send"));
     assert_eq!(meta["protocol"]["to"], json!("you"));
     assert_eq!(meta["protocol"]["intent"], json!("reply"));
+    assert_eq!(meta["client_message_id"], json!("client-message-1"));
     assert_eq!(
         meta["token_usage"]["total_tokens"],
         json!(token_usage.total_tokens)
@@ -1337,6 +1618,42 @@ fn build_exact_markdown_prompt_includes_team_protocol_section_when_empty() {
 }
 
 #[test]
+fn artifact_path_extraction_allows_explicit_openteams_runtime_paths() {
+    let paths = super::extract_workspace_paths_from_artifact_text(
+        "Saved `.openteams/context/demo/messages.jsonl`, `.openteams/context/demo/attachments/message-1/input.txt`, and `src/app.ts`.",
+        Path::new(r"E:\workspace\projectSS\MainPage2"),
+    );
+
+    assert!(paths.contains(&".openteams/context/demo/messages.jsonl".to_string()));
+    assert!(paths.contains(&".openteams/context/demo/attachments/message-1/input.txt".to_string()));
+    assert!(paths.contains(&"src/app.ts".to_string()));
+}
+
+#[test]
+fn file_change_refresh_excludes_openteams_artifact_paths() {
+    let changes = ChatRunner::file_change_entries_from_observed(&[
+        super::WorkspaceObservedPathEntry {
+            path: ".openteams/context/demo/report.md".to_string(),
+            source: "artifact_record".to_string(),
+            existed_after_run: true,
+            modified_at: None,
+        },
+        super::WorkspaceObservedPathEntry {
+            path: "src/app.ts".to_string(),
+            source: "git_diff".to_string(),
+            existed_after_run: true,
+            modified_at: None,
+        },
+    ]);
+
+    let paths = changes
+        .iter()
+        .map(|entry| entry.path.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(paths, vec!["src/app.ts"]);
+}
+
+#[test]
 fn build_exact_markdown_prompt_matches_expected_input_template() {
     let session_id = Uuid::parse_str("1475cda0-6f11-464e-a61a-7dc81217810e").expect("uuid");
     let message_id = Uuid::parse_str("88bd7b05-1ba3-407c-8ca3-a52f14c8aced").expect("uuid");
@@ -1349,6 +1666,7 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
             runner_type: "codex".to_string(),
             system_prompt: "You are the team \"Full-stack Engineer\". Your goal is to ship complete user-facing capabilities by aligning backend contracts, frontend behavior, and operational reliability.\n\n\n".to_string(),
             model_name: None,
+            owner_project_id: None,
             tools_enabled: sqlx::types::Json(json!({})),
             created_at,
             updated_at: created_at,
@@ -1746,6 +2064,90 @@ async fn capture_git_diff_skips_patch_when_diff_matches_run_baseline() {
     );
 }
 
+#[tokio::test]
+async fn capture_git_diff_records_only_paths_changed_since_run_baseline() {
+    let tempdir = tempfile::tempdir().expect("create tempdir");
+    let repo_path = tempdir.path().join("repo");
+    let git = GitService::new();
+    git.initialize_repo_with_main_branch(&repo_path)
+        .expect("init repo");
+
+    std::fs::write(repo_path.join("other_session.txt"), "base\n")
+        .expect("write other file");
+    std::fs::write(repo_path.join("current_session.txt"), "base\n")
+        .expect("write current file");
+    git.commit(&repo_path, "baseline").expect("commit baseline");
+
+    std::fs::write(repo_path.join("other_session.txt"), "other dirty\n")
+        .expect("modify other file");
+    let baseline = ChatRunner::capture_tracked_git_diff_snapshot(&repo_path).await;
+    assert!(
+        baseline
+            .as_deref()
+            .is_some_and(|diff| diff.contains("other_session.txt"))
+    );
+
+    std::fs::write(repo_path.join("current_session.txt"), "current dirty\n")
+        .expect("modify current file");
+
+    let run_dir = tempdir.path().join("run-record");
+    tokio::fs::create_dir_all(&run_dir)
+        .await
+        .expect("create run dir");
+    let session_agent_id = Uuid::new_v4();
+
+    let diff_info = ChatRunner::capture_git_diff(
+        &repo_path,
+        &run_dir,
+        session_agent_id,
+        1,
+        baseline.as_deref(),
+    )
+    .await
+    .expect("capture current-session diff");
+
+    assert_eq!(
+        diff_info.observed_paths,
+        vec!["current_session.txt".to_string()]
+    );
+
+    let patch = std::fs::read_to_string(run_dir.join(format!(
+        "{}_diff.patch",
+        ChatRunner::run_records_prefix(session_agent_id, 1)
+    )))
+    .expect("read filtered patch");
+    assert!(patch.contains("current_session.txt"));
+    assert!(!patch.contains("other_session.txt"));
+}
+
+#[tokio::test]
+async fn capture_untracked_files_can_be_filtered_against_run_baseline() {
+    let tempdir = tempfile::tempdir().expect("create tempdir");
+    let repo_path = tempdir.path().join("repo");
+    let git = GitService::new();
+    git.initialize_repo_with_main_branch(&repo_path)
+        .expect("init repo");
+
+    std::fs::write(repo_path.join("tracked.txt"), "base\n").expect("write tracked");
+    git.commit(&repo_path, "baseline").expect("commit baseline");
+
+    std::fs::write(repo_path.join("other_session_new.txt"), "other\n")
+        .expect("write other untracked");
+    let baseline = ChatRunner::capture_untracked_file_snapshot(&repo_path).await;
+    assert_eq!(baseline, vec!["other_session_new.txt".to_string()]);
+
+    std::fs::write(repo_path.join("current_session_new.txt"), "current\n")
+        .expect("write current untracked");
+    let after = ChatRunner::capture_untracked_file_snapshot(&repo_path).await;
+    let baseline_set = baseline.iter().collect::<std::collections::HashSet<_>>();
+    let filtered = after
+        .into_iter()
+        .filter(|path| !baseline_set.contains(path))
+        .collect::<Vec<_>>();
+
+    assert_eq!(filtered, vec!["current_session_new.txt".to_string()]);
+}
+
 #[test]
 fn resolve_session_team_protocol_returns_enabled_session_content_only() {
     let now = Utc::now();
@@ -1761,6 +2163,7 @@ fn resolve_session_team_protocol_returns_enabled_session_content_only() {
         team_protocol_enabled: true,
         default_workspace_path: None,
         chat_input_mode: None,
+        project_id: None,
         created_at: now,
         updated_at: now,
         archived_at: None,
@@ -1787,6 +2190,7 @@ fn resolve_session_team_protocol_ignores_disabled_or_empty_session_content() {
         team_protocol_enabled: false,
         default_workspace_path: None,
         chat_input_mode: None,
+        project_id: None,
         created_at: now,
         updated_at: now,
         archived_at: None,
@@ -1803,6 +2207,7 @@ fn resolve_session_team_protocol_ignores_disabled_or_empty_session_content() {
         team_protocol_enabled: true,
         default_workspace_path: None,
         chat_input_mode: None,
+        project_id: None,
         created_at: now,
         updated_at: now,
         archived_at: None,

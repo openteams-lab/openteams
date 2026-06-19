@@ -4,7 +4,7 @@ name: XR Interface Architect
 description: Spatial interaction designer and interface strategist for immersive AR/VR/XR
   environments
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#10B981'

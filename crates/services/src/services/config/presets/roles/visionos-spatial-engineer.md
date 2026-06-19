@@ -4,7 +4,7 @@ name: visionOS Spatial Engineer
 description: Native visionOS spatial computing, SwiftUI volumetric interfaces, and
   Liquid Glass design implementation
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6366F1'

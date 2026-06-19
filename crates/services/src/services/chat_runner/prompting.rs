@@ -218,32 +218,6 @@ impl ChatRunner {
         Ok(skills)
     }
 
-    pub(super) fn parse_executor_profile_id(
-        &self,
-        agent: &ChatAgent,
-    ) -> Result<ExecutorProfileId, ChatRunnerError> {
-        let executor = self.parse_runner_type(agent)?;
-        let variant = Self::extract_executor_profile_variant(&agent.tools_enabled.0);
-        Ok(match variant {
-            Some(variant) => ExecutorProfileId::with_variant(executor, variant),
-            None => ExecutorProfileId::new(executor),
-        })
-    }
-
-    pub(super) fn extract_executor_profile_variant(
-        tools_enabled: &serde_json::Value,
-    ) -> Option<String> {
-        let variant = tools_enabled
-            .as_object()
-            .and_then(|value| value.get(EXECUTOR_PROFILE_VARIANT_KEY))
-            .and_then(serde_json::Value::as_str)?
-            .trim();
-        if variant.is_empty() || variant.eq_ignore_ascii_case("DEFAULT") {
-            return None;
-        }
-        Some(canonical_variant_key(variant))
-    }
-
     pub(super) fn sanitize_sender_token(value: &str, fallback: &str) -> String {
         let sanitized = value
             .chars()
@@ -363,6 +337,80 @@ impl ChatRunner {
         Some(diff)
     }
 
+    fn diff_header_path(line: &str, workspace_path: &Path) -> Option<String> {
+        let rest = line.strip_prefix("diff --git a/")?;
+        let (old_path, new_path) = rest.split_once(" b/")?;
+        let preferred = if new_path.trim() == "/dev/null" {
+            old_path
+        } else {
+            new_path
+        };
+        normalize_workspace_observed_path(preferred, workspace_path)
+    }
+
+    fn split_git_diff_by_path(
+        diff: &str,
+        workspace_path: &Path,
+    ) -> BTreeMap<String, String> {
+        let mut patches = BTreeMap::<String, String>::new();
+        let mut current_path: Option<String> = None;
+        let mut current_patch = String::new();
+
+        for line in diff.split_inclusive('\n') {
+            if let Some(next_path) = Self::diff_header_path(line, workspace_path) {
+                if let Some(path) = current_path.take()
+                    && !current_patch.trim().is_empty()
+                {
+                    patches.insert(path, std::mem::take(&mut current_patch));
+                }
+                current_path = Some(next_path);
+            }
+
+            if current_path.is_some() {
+                current_patch.push_str(line);
+            }
+        }
+
+        if let Some(path) = current_path
+            && !current_patch.trim().is_empty()
+        {
+            patches.insert(path, current_patch);
+        }
+
+        patches
+    }
+
+    fn filter_git_diff_against_baseline(
+        diff: &str,
+        baseline_diff: Option<&str>,
+        workspace_path: &Path,
+    ) -> (String, Vec<String>) {
+        let current_patches = Self::split_git_diff_by_path(diff, workspace_path);
+        let baseline_patches = baseline_diff
+            .map(|baseline| Self::split_git_diff_by_path(baseline, workspace_path))
+            .unwrap_or_default();
+
+        let mut filtered_diff = String::new();
+        let mut observed_paths = Vec::new();
+
+        for (path, patch) in current_patches {
+            if baseline_patches
+                .get(&path)
+                .is_some_and(|baseline_patch| baseline_patch == &patch)
+            {
+                continue;
+            }
+
+            filtered_diff.push_str(&patch);
+            if !filtered_diff.ends_with('\n') {
+                filtered_diff.push('\n');
+            }
+            observed_paths.push(path);
+        }
+
+        (filtered_diff, observed_paths)
+    }
+
     #[allow(dead_code)]
     pub(super) async fn capture_git_diff(
         workspace_path: &Path,
@@ -372,7 +420,9 @@ impl ChatRunner {
         baseline_diff: Option<&str>,
     ) -> Option<DiffInfo> {
         let diff = Self::capture_tracked_git_diff_snapshot(workspace_path).await?;
-        if baseline_diff == Some(diff.as_str()) {
+        let (diff, observed_paths) =
+            Self::filter_git_diff_against_baseline(&diff, baseline_diff, workspace_path);
+        if diff.trim().is_empty() || observed_paths.is_empty() {
             return None;
         }
 
@@ -385,40 +435,16 @@ impl ChatRunner {
             return None;
         }
 
-        let mut observed_paths = BTreeMap::<String, ()>::new();
-        for line in diff.lines() {
-            let Some(rest) = line.strip_prefix("diff --git a/") else {
-                continue;
-            };
-            let Some((old_path, new_path)) = rest.split_once(" b/") else {
-                continue;
-            };
-            let preferred = if new_path == "/dev/null" {
-                old_path
-            } else {
-                new_path
-            };
-            if let Some(path) = normalize_workspace_observed_path(preferred, workspace_path) {
-                observed_paths.insert(path, ());
-            }
-        }
-
         // Consider diff truncated if it's over 4KB (for UI display purposes)
         let truncated = diff.len() > 4000;
 
         Some(DiffInfo {
             _truncated: truncated,
-            observed_paths: observed_paths.into_keys().collect(),
+            observed_paths,
         })
     }
 
-    #[allow(dead_code)]
-    pub(super) async fn capture_untracked_files(
-        workspace_path: &Path,
-        _run_dir: &Path,
-        _session_agent_id: Uuid,
-        _run_index: i64,
-    ) -> Vec<String> {
+    pub(super) async fn capture_untracked_file_snapshot(workspace_path: &Path) -> Vec<String> {
         let output = Command::new("git")
             .arg("-C")
             .arg(workspace_path)
@@ -463,7 +489,19 @@ impl ChatRunner {
             }
         }
 
+        files.sort();
+        files.dedup();
         files
+    }
+
+    #[allow(dead_code)]
+    pub(super) async fn capture_untracked_files(
+        workspace_path: &Path,
+        _run_dir: &Path,
+        _session_agent_id: Uuid,
+        _run_index: i64,
+    ) -> Vec<String> {
+        Self::capture_untracked_file_snapshot(workspace_path).await
     }
 
     pub(super) async fn build_context_snapshot(
@@ -730,6 +768,8 @@ impl ChatRunner {
         }
 
         let agents = ChatAgent::find_all(&self.db.pool).await?;
+        let member_names =
+            chat::member_name_overrides_for_session(&self.db.pool, session_id).await?;
         let agent_map: HashMap<Uuid, ChatAgent> =
             agents.into_iter().map(|agent| (agent.id, agent)).collect();
 
@@ -766,7 +806,10 @@ impl ChatRunner {
             summaries.push(SessionAgentSummary {
                 session_agent_id: session_agent.id,
                 agent_id: agent.id,
-                name: agent.name.clone(),
+                name: chat::effective_agent_name(
+                    agent,
+                    member_names.get(&agent.id).map(String::as_str),
+                ),
                 runner_type: agent.runner_type.clone(),
                 state: session_agent.state,
                 description,
@@ -781,15 +824,6 @@ impl ChatRunner {
         }
 
         Ok(summaries)
-    }
-
-    /// Escape special characters for TOML string values
-    pub(super) fn escape_toml_string(s: &str) -> String {
-        s.replace('\\', "\\\\")
-            .replace('"', "\\\"")
-            .replace('\n', "\\n")
-            .replace('\r', "\\r")
-            .replace('\t', "\\t")
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1097,105 +1131,6 @@ impl ChatRunner {
         markdown
     }
 
-    #[allow(dead_code)]
-    pub(super) fn push_markdown_section(markdown: &mut String, level: usize, title: &str) {
-        let heading_level = level.clamp(1, 6);
-        markdown.push_str(&"#".repeat(heading_level));
-        markdown.push(' ');
-        markdown.push_str(title);
-        markdown.push_str("\n\n");
-    }
-
-    #[allow(dead_code)]
-    pub(super) fn push_markdown_field(markdown: &mut String, label: &str, value: &str) {
-        if value.contains('\n') {
-            Self::push_markdown_block_field(markdown, label, value, "text");
-            return;
-        }
-        markdown.push_str("- **");
-        markdown.push_str(label);
-        markdown.push_str("**: ");
-        markdown.push_str(value);
-        markdown.push('\n');
-    }
-
-    #[allow(dead_code)]
-    pub(super) fn push_markdown_bool_field(markdown: &mut String, label: &str, value: bool) {
-        markdown.push_str("- **");
-        markdown.push_str(label);
-        markdown.push_str("**: ");
-        markdown.push_str(if value { "true" } else { "false" });
-        markdown.push('\n');
-    }
-
-    #[allow(dead_code)]
-    pub(super) fn push_markdown_number_field(markdown: &mut String, label: &str, value: i64) {
-        markdown.push_str("- **");
-        markdown.push_str(label);
-        markdown.push_str("**: ");
-        markdown.push_str(&value.to_string());
-        markdown.push('\n');
-    }
-
-    #[allow(dead_code)]
-    pub(super) fn push_markdown_json_field<T>(markdown: &mut String, label: &str, value: &T)
-    where
-        T: Serialize + ?Sized,
-    {
-        let json = serde_json::to_string(value).expect("markdown JSON field should serialize");
-        markdown.push_str("- **");
-        markdown.push_str(label);
-        markdown.push_str("**: ");
-        markdown.push_str(&json);
-        markdown.push('\n');
-    }
-
-    pub(super) fn push_markdown_block_field(
-        markdown: &mut String,
-        label: &str,
-        value: &str,
-        language: &str,
-    ) {
-        markdown.push_str("- **");
-        markdown.push_str(label);
-        markdown.push_str("**:\n\n");
-
-        let fence = Self::markdown_fence_for_content(value);
-        markdown.push_str(&fence);
-        if !language.is_empty() {
-            markdown.push_str(language);
-        }
-        markdown.push('\n');
-        markdown.push_str(value);
-        if !value.ends_with('\n') {
-            markdown.push('\n');
-        }
-        markdown.push_str(&fence);
-        markdown.push_str("\n\n");
-    }
-
-    #[allow(dead_code)]
-    pub(super) fn set_trailing_newlines(markdown: &mut String, newline_count: usize) {
-        while markdown.ends_with('\n') {
-            markdown.pop();
-        }
-        markdown.push_str(&"\n".repeat(newline_count));
-    }
-
-    pub(super) fn markdown_fence_for_content(content: &str) -> String {
-        let mut longest_run = 0usize;
-        let mut current_run = 0usize;
-        for ch in content.chars() {
-            if ch == '`' {
-                current_run += 1;
-                longest_run = longest_run.max(current_run);
-            } else {
-                current_run = 0;
-            }
-        }
-        "`".repeat(longest_run.max(2) + 1)
-    }
-
     pub(super) fn resolve_prompt_language(
         message: &ChatMessage,
         configured_language: &UiLanguage,
@@ -1400,21 +1335,6 @@ impl ChatRunner {
         Some(Self::resolve_prompt_language_from_ui_language(
             &UiLanguage::En,
         ))
-    }
-
-    #[allow(dead_code)]
-    /// Get language code and instruction based on UiLanguage setting
-    pub(super) fn get_language_instruction(language: &UiLanguage) -> (&'static str, &'static str) {
-        match language {
-            UiLanguage::Browser => ("en", "You MUST respond in English."),
-            UiLanguage::En => ("en", "You MUST respond in English."),
-            UiLanguage::ZhHans => ("zh-Hans", "You MUST respond in Simplified Chinese."),
-            UiLanguage::ZhHant => ("zh-Hant", "You MUST respond in Traditional Chinese."),
-            UiLanguage::Ja => ("ja", "You MUST respond in Japanese."),
-            UiLanguage::Ko => ("ko", "You MUST respond in Korean."),
-            UiLanguage::Fr => ("fr", "You MUST respond in French."),
-            UiLanguage::Es => ("es", "You MUST respond in Spanish."),
-        }
     }
 
     pub(super) fn parse_agent_protocol_messages(
@@ -2055,6 +1975,7 @@ impl ChatRunner {
         run_id: Uuid,
         session_agent_id: Uuid,
         source_message_id: Uuid,
+        client_message_id: Option<&str>,
         chain_depth: u32,
         target: &str,
         index: usize,
@@ -2079,6 +2000,7 @@ impl ChatRunner {
             "run_id": run_id,
             "session_agent_id": session_agent_id,
             "source_message_id": source_message_id,
+            "client_message_id": client_message_id,
             "chain_depth": chain_depth + 1,
             "protocol": protocol_meta
         });
@@ -2089,8 +2011,18 @@ impl ChatRunner {
                 "model_context_window": token_usage.model_context_window,
                 "input_tokens": token_usage.input_tokens,
                 "output_tokens": token_usage.output_tokens,
+                "reasoning_output_tokens": token_usage.reasoning_output_tokens,
                 "cache_read_tokens": token_usage.cache_read_tokens,
-                "cache_write_tokens": token_usage.cache_write_tokens,
+                "runtime_agent": token_usage.runtime_agent,
+                "runtime_model_id": token_usage.runtime_model_id,
+                "provider_id": token_usage.provider_id,
+                "runtime_thread_id": token_usage.runtime_thread_id,
+                "usage_scope": token_usage.usage_scope,
+                "snapshot_total_tokens": token_usage.snapshot_total_tokens,
+                "snapshot_input_tokens": token_usage.snapshot_input_tokens,
+                "snapshot_output_tokens": token_usage.snapshot_output_tokens,
+                "snapshot_reasoning_output_tokens": token_usage.snapshot_reasoning_output_tokens,
+                "snapshot_cache_read_tokens": token_usage.snapshot_cache_read_tokens,
                 "is_estimated": token_usage.is_estimated,
             });
         }
@@ -2244,117 +2176,6 @@ impl ChatRunner {
                 }
             })
             .collect()
-    }
-
-    /// Legacy TOML-based user prompt builder kept for transition safety.
-    #[allow(dead_code)]
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn build_user_prompt(
-        &self,
-        agent: &ChatAgent,
-        message: &ChatMessage,
-        message_attachments: Option<&MessageAttachmentContext>,
-        reference: Option<&ReferenceContext>,
-    ) -> String {
-        let mut toml = String::new();
-
-        // 1. Envelope section
-        toml.push_str("[envelope]\n");
-        toml.push_str(&format!("session_id = \"{}\"\n", message.session_id));
-        let sender = Self::resolve_message_sender_identity(message);
-        toml.push_str(&format!(
-            "from = \"{}\"\n",
-            Self::escape_toml_string(&sender.address)
-        ));
-        toml.push_str(&format!(
-            "to = \"agent:{}\"\n",
-            Self::escape_toml_string(&agent.name)
-        ));
-        toml.push_str(&format!("message_id = \"{}\"\n", message.id));
-        toml.push_str(&format!("timestamp = \"{}\"\n\n", message.created_at));
-
-        // 2. Message section
-        toml.push_str("[message]\n");
-        toml.push_str(&format!(
-            "sender = \"{}\"\n",
-            Self::escape_toml_string(&sender.label)
-        ));
-        toml.push_str(&format!(
-            "content = \"\"\"\n{}\n\"\"\"\n",
-            message.content.trim()
-        ));
-
-        if let Some(reference) = reference {
-            toml.push_str("\n[message.reference]\n");
-            toml.push_str(
-                "note = \"User referenced the following historical message. Prioritize it.\"\n",
-            );
-            toml.push_str(&format!("message_id = \"{}\"\n", reference.message_id));
-            toml.push_str(&format!(
-                "sender = \"{}\"\n",
-                Self::escape_toml_string(&reference.sender_label)
-            ));
-            toml.push_str(&format!("sender_type = \"{:?}\"\n", reference.sender_type));
-            toml.push_str(&format!(
-                "created_at = \"{}\"\n",
-                Self::escape_toml_string(&reference.created_at)
-            ));
-            toml.push_str(&format!(
-                "content = \"\"\"\n{}\n\"\"\"\n",
-                reference.content.trim()
-            ));
-
-            if !reference.attachments.is_empty() {
-                for attachment in &reference.attachments {
-                    toml.push_str("\n[[message.reference.attachments]]\n");
-                    toml.push_str(&format!(
-                        "name = \"{}\"\n",
-                        Self::escape_toml_string(&attachment.name)
-                    ));
-                    toml.push_str(&format!(
-                        "kind = \"{}\"\n",
-                        Self::escape_toml_string(&attachment.kind)
-                    ));
-                    toml.push_str(&format!("size_bytes = {}\n", attachment.size_bytes));
-                    toml.push_str(&format!(
-                        "mime_type = \"{}\"\n",
-                        attachment.mime_type.as_deref().unwrap_or("unknown")
-                    ));
-                    toml.push_str(&format!(
-                        "local_path = \"{}\"\n",
-                        Self::escape_toml_string(&attachment.local_path)
-                    ));
-                }
-            }
-        }
-
-        // 3. Message attachments (optional)
-        if let Some(attachments_ctx) = message_attachments
-            && !attachments_ctx.attachments.is_empty()
-        {
-            for attachment in &attachments_ctx.attachments {
-                toml.push_str("\n[[message.attachments]]\n");
-                toml.push_str(&format!(
-                    "name = \"{}\"\n",
-                    Self::escape_toml_string(&attachment.name)
-                ));
-                toml.push_str(&format!(
-                    "kind = \"{}\"\n",
-                    Self::escape_toml_string(&attachment.kind)
-                ));
-                toml.push_str(&format!("size_bytes = {}\n", attachment.size_bytes));
-                toml.push_str(&format!(
-                    "mime_type = \"{}\"\n",
-                    attachment.mime_type.as_deref().unwrap_or("unknown")
-                ));
-                toml.push_str(&format!(
-                    "local_path = \"{}\"\n",
-                    Self::escape_toml_string(&attachment.local_path)
-                ));
-            }
-        }
-
-        toml
     }
 
     #[cfg(test)]

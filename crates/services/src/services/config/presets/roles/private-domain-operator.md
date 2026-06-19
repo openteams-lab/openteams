@@ -5,7 +5,7 @@ description: Expert in building enterprise WeChat (WeCom) private domain ecosyst
   with deep expertise in SCRM systems, segmented community operations, Mini Program
   commerce integration, user lifecycle management, and full-funnel conversion optimization.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#6B7280'

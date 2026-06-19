@@ -120,7 +120,7 @@ fn workflow_orchestrator_wires_state_review_and_retry_events() {
 
 #[test]
 fn chat_runner_wires_state_error_and_diff_events() {
-    let runner = read_repo_file("crates/services/src/services/chat_runner.rs");
+    let runner = read_repo_file("crates/services/src/services/chat_runner/lifecycle.rs");
     let runtime = read_repo_file("crates/services/src/services/chat_runner/runtime.rs");
 
     assert!(runner.contains("workflow_analytics::track_agent_state_changed("));

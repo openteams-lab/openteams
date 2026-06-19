@@ -5,7 +5,7 @@ description: Expert in collecting, analyzing, and synthesizing user feedback fro
   multiple channels to extract actionable product insights. Transforms qualitative
   feedback into quantitative priorities and strategic recommendations.
 runner_type: CLAUDE_CODE
-recommended_model: claude-opus-4-6
+recommended_model: opus
 tools_enabled:
   metadata:
     color: '#3498DB'

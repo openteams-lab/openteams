@@ -5,7 +5,7 @@ description: Signal-based outbound specialist who designs multi-channel prospect
   sequences, defines ICPs, and builds pipeline through research-driven personalization
   — not volume.
 runner_type: CLAUDE_CODE
-recommended_model: claude-sonnet-4-6
+recommended_model: sonnet
 tools_enabled:
   metadata:
     color: '#6B7280'
