@@ -155,8 +155,10 @@ fn extract_workspace_paths_from_text_with_options(
         }
     }
 
-    for token in text.split_whitespace() {
-        candidates.push(token.to_string());
+    if candidates.is_empty() {
+        for token in text.split_whitespace() {
+            candidates.push(token.to_string());
+        }
     }
 
     let mut deduped = BTreeMap::<String, ()>::new();

@@ -68,23 +68,102 @@ type MenuOption<TValue extends string> = {
   color?: string;
 };
 
-const statusMenuOptions: Array<MenuOption<ProjectWorkItemStatus>> = [
-  { value: 'blocked', label: 'Backlog', shortcut: '1' },
-  { value: 'open', label: 'Todo', shortcut: '2' },
-  { value: 'in_progress', label: 'In Progress', shortcut: '3' },
-  { value: 'ready_to_merge', label: 'Ready to Merge', shortcut: '4' },
-  { value: 'merging', label: 'Merging', shortcut: '5' },
-  { value: 'done', label: 'Done', shortcut: '6' },
-  { value: 'cancelled', label: 'Canceled', shortcut: '7' },
-  { value: 'duplicate', label: 'Duplicate', shortcut: '8' },
+type MenuOptionTemplate<TValue extends string> = Omit<
+  MenuOption<TValue>,
+  'label'
+> & {
+  fallback: string;
+  labelKey: string;
+};
+
+const statusMenuOptions: Array<MenuOptionTemplate<ProjectWorkItemStatus>> = [
+  {
+    value: 'blocked',
+    labelKey: 'issue.status.backlog',
+    fallback: 'Backlog',
+    shortcut: '1',
+  },
+  {
+    value: 'open',
+    labelKey: 'issue.status.todo',
+    fallback: 'Todo',
+    shortcut: '2',
+  },
+  {
+    value: 'in_progress',
+    labelKey: 'issue.status.in_progress',
+    fallback: 'In Progress',
+    shortcut: '3',
+  },
+  {
+    value: 'ready_to_merge',
+    labelKey: 'issue.status.ready_to_merge',
+    fallback: 'Ready to Merge',
+    shortcut: '4',
+  },
+  {
+    value: 'merging',
+    labelKey: 'issue.status.merging',
+    fallback: 'Merging',
+    shortcut: '5',
+  },
+  {
+    value: 'done',
+    labelKey: 'issue.status.done',
+    fallback: 'Done',
+    shortcut: '6',
+  },
+  {
+    value: 'cancelled',
+    labelKey: 'issue.status.cancelled',
+    fallback: 'Canceled',
+    shortcut: '7',
+  },
+  {
+    value: 'duplicate',
+    labelKey: 'issue.status.duplicate',
+    fallback: 'Duplicate',
+    shortcut: '8',
+  },
 ];
 
-const priorityMenuOptions: Array<MenuOption<ProjectWorkItemPriority>> = [
-  { value: 'urgent', label: 'Urgent', shortcut: '4' },
-  { value: 'high', label: 'High', shortcut: '3' },
-  { value: 'medium', label: 'Medium', shortcut: '2' },
-  { value: 'low', label: 'Low', shortcut: '1' },
+const priorityMenuOptions: Array<
+  MenuOptionTemplate<ProjectWorkItemPriority>
+> = [
+  {
+    value: 'urgent',
+    labelKey: 'issue.priority.urgent',
+    fallback: 'Urgent',
+    shortcut: '4',
+  },
+  {
+    value: 'high',
+    labelKey: 'issue.priority.high',
+    fallback: 'High',
+    shortcut: '3',
+  },
+  {
+    value: 'medium',
+    labelKey: 'issue.priority.medium',
+    fallback: 'Medium',
+    shortcut: '2',
+  },
+  {
+    value: 'low',
+    labelKey: 'issue.priority.low',
+    fallback: 'Low',
+    shortcut: '1',
+  },
 ];
+
+const buildTranslatedMenuOptions = <TValue extends string>(
+  tr: IssueDetailTranslator,
+  options: Array<MenuOptionTemplate<TValue>>,
+): Array<MenuOption<TValue>> =>
+  options.map(({ fallback, labelKey, ...option }) => ({
+    ...option,
+    label: tr(labelKey, fallback),
+  }));
 
 const buildLabelOptions = (
   tr: IssueDetailTranslator,
@@ -101,9 +180,6 @@ const buildLabelOptions = (
     shortcut: index < 9 ? String(index + 1) : '',
     color: labelColor(value),
   }));
-
-const projectChipLabel = (projectName: string) =>
-  projectName.trim() || 'Project';
 
 export function IssueCreateDialog({
   open,
@@ -135,7 +211,16 @@ export function IssueCreateDialog({
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const propertyMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const projectLabel = projectChipLabel(projectName);
+  const projectLabel =
+    projectName.trim() || tr('issue.createDialog.projectFallback', 'Project');
+  const translatedStatusOptions = useMemo(
+    () => buildTranslatedMenuOptions(tr, statusMenuOptions),
+    [tr],
+  );
+  const translatedPriorityOptions = useMemo(
+    () => buildTranslatedMenuOptions(tr, priorityMenuOptions),
+    [tr],
+  );
   const sessionOptions = useMemo<Array<MenuOption<string>>>(
     () =>
       sessions.map((session, index) => ({
@@ -149,11 +234,11 @@ export function IssueCreateDialog({
     (option) => option.value === sessionId,
   );
   const filteredStatusOptions = filterMenuOptions(
-    statusMenuOptions,
+    translatedStatusOptions,
     statusQuery,
   );
   const filteredPriorityOptions = filterMenuOptions(
-    priorityMenuOptions,
+    translatedPriorityOptions,
     priorityQuery,
   );
   const filteredSessionOptions = filterMenuOptions(
@@ -165,6 +250,7 @@ export function IssueCreateDialog({
     [availableLabels, labels, tr],
   );
   const filteredLabelOptions = filterMenuOptions(labelOptions, labelQuery);
+  const noResultsLabel = tr('issue.createDialog.noResults', 'No results');
 
   useEffect(() => {
     if (!open) return;
@@ -250,7 +336,7 @@ export function IssueCreateDialog({
       });
       onClose();
     } catch (createError) {
-      setError(issueCreateErrorMessage(createError));
+      setError(issueCreateErrorMessage(createError, tr));
     }
   };
 
@@ -299,7 +385,7 @@ export function IssueCreateDialog({
       `}</style>
 
       <form
-        aria-label="Create issue"
+        aria-label={tr('issue.createDialog.ariaLabel', 'Create issue')}
         className={`flex w-[min(780px,calc(100vw-32px))] flex-col overflow-visible rounded-[22px] border border-[var(--hairline-strong)] bg-[var(--surface-1)] shadow-[0_24px_64px_rgba(0,0,0,0.42)] transition-[height] duration-200 ${
           expanded
             ? 'h-[min(560px,calc(100vh-48px))]'
@@ -322,7 +408,7 @@ export function IssueCreateDialog({
               strokeWidth={2.4}
             />
             <h2 className="shrink-0 text-[16px] font-bold leading-none text-[var(--ink)]">
-              New issue
+              {tr('issue.createDialog.title', 'New issue')}
             </h2>
           </div>
 
@@ -330,8 +416,14 @@ export function IssueCreateDialog({
             <button
               aria-label={
                 expanded
-                  ? 'Collapse create issue dialog'
-                  : 'Expand create issue dialog'
+                  ? tr(
+                      'issue.createDialog.action.collapse',
+                      'Collapse create issue dialog',
+                    )
+                  : tr(
+                      'issue.createDialog.action.expand',
+                      'Expand create issue dialog',
+                    )
               }
               aria-pressed={expanded}
               className="flex h-8 w-8 items-center justify-center rounded-[8px] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
@@ -345,7 +437,10 @@ export function IssueCreateDialog({
               )}
             </button>
             <button
-              aria-label="Close create issue dialog"
+              aria-label={tr(
+                'issue.createDialog.action.close',
+                'Close create issue dialog',
+              )}
               className="flex h-8 w-8 items-center justify-center rounded-[8px] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
               disabled={submitting}
               type="button"
@@ -358,25 +453,31 @@ export function IssueCreateDialog({
 
         <main className="flex min-h-0 flex-1 flex-col px-6 pb-4 pt-4">
           <label className="sr-only" htmlFor="issue-create-title">
-            Issue title
+            {tr('issue.createDialog.titleLabel', 'Issue title')}
           </label>
           <textarea
             ref={titleRef}
             id="issue-create-title"
-            className="issue-create-title h-[38px] resize-none border-0 bg-transparent p-0 text-[26px] font-bold leading-[1.15] tracking-[-0.035em] text-[var(--ink)] outline-none"
-            placeholder="Issue title"
+            className="issue-create-title h-[38px] resize-none border-0 bg-transparent p-0 text-[26px] font-bold leading-[1.15] tracking-normal text-[var(--ink)] outline-none"
+            placeholder={tr(
+              'issue.createDialog.titlePlaceholder',
+              'Issue title',
+            )}
             rows={1}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
           />
 
           <label className="sr-only" htmlFor="issue-create-description">
-            Issue description
+            {tr('issue.createDialog.descriptionLabel', 'Issue description')}
           </label>
           <textarea
             id="issue-create-description"
             className="issue-create-description mt-2 min-h-[96px] flex-1 resize-none border-0 bg-transparent p-0 text-[16px] font-medium leading-[1.45] text-[var(--ink)] outline-none"
-            placeholder="Add description..."
+            placeholder={tr(
+              'issue.createDialog.descriptionPlaceholder',
+              'Add description...',
+            )}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
           />
@@ -386,14 +487,22 @@ export function IssueCreateDialog({
             className="mt-3 flex shrink-0 flex-wrap items-center gap-2"
           >
             <PropertyDropdown
+              emptyLabel={noResultsLabel}
               open={openMenu === 'status'}
               options={filteredStatusOptions}
               query={statusQuery}
-              searchPlaceholder="Change status..."
+              searchPlaceholder={tr(
+                'issue.detail.changeStatus',
+                'Change status...',
+              )}
               searchShortcut="S"
               selectedValue={status}
               triggerIcon={<StatusIcon status={status} />}
-              triggerLabel={statusLabel(status)}
+              triggerLabel={
+                translatedStatusOptions.find(
+                  (option) => option.value === status,
+                )?.label ?? status
+              }
               onOpenChange={(nextOpen) =>
                 setOpenMenu(nextOpen ? 'status' : null)
               }
@@ -409,14 +518,22 @@ export function IssueCreateDialog({
             />
 
             <PropertyDropdown
+              emptyLabel={noResultsLabel}
               open={openMenu === 'priority'}
               options={filteredPriorityOptions}
               query={priorityQuery}
-              searchPlaceholder="Change priority..."
+              searchPlaceholder={tr(
+                'issue.createDialog.changePriority',
+                'Change priority...',
+              )}
               searchShortcut="P"
               selectedValue={priority}
               triggerIcon={<PriorityIcon priority={priority} />}
-              triggerLabel={priorityLabel(priority)}
+              triggerLabel={
+                translatedPriorityOptions.find(
+                  (option) => option.value === priority,
+                )?.label ?? priority
+              }
               onOpenChange={(nextOpen) =>
                 setOpenMenu(nextOpen ? 'priority' : null)
               }
@@ -433,16 +550,27 @@ export function IssueCreateDialog({
 
             <PropertyDropdown
               emptyLabel={
-                sessionsLoading ? 'Loading sessions...' : 'No sessions found'
+                sessionsLoading
+                  ? tr('issue.detail.loadingSessions', 'Loading sessions...')
+                  : tr(
+                      'issue.createDialog.noSessionsFound',
+                      'No sessions found',
+                    )
               }
               open={openMenu === 'session'}
               options={filteredSessionOptions}
               query={sessionQuery}
-              searchPlaceholder="Link session..."
+              searchPlaceholder={tr(
+                'issue.detail.linkSessionPlaceholder',
+                'Link session...',
+              )}
               searchShortcut="L"
               selectedValue={sessionId}
               triggerIcon={<Box aria-hidden="true" className="h-3.5 w-3.5" />}
-              triggerLabel={selectedSession?.label ?? 'Session'}
+              triggerLabel={
+                selectedSession?.label ??
+                tr('issue.createDialog.session', 'Session')
+              }
               onOpenChange={(nextOpen) =>
                 setOpenMenu(nextOpen ? 'session' : null)
               }
@@ -483,7 +611,11 @@ export function IssueCreateDialog({
                     {formatFileSize(file.size)}
                   </span>
                   <button
-                    aria-label={`Remove ${file.name}`}
+                    aria-label={tr(
+                      'issue.createDialog.removeAttachment',
+                      'Remove {name}',
+                      { name: file.name },
+                    )}
                     className="ml-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-4)] hover:text-[var(--ink)]"
                     type="button"
                     onClick={() => removeAttachment(index)}
@@ -512,7 +644,7 @@ export function IssueCreateDialog({
               onChange={handleFileChange}
             />
             <button
-              aria-label="Attach files"
+              aria-label={tr('issue.createDialog.attachFiles', 'Attach files')}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface-4)] text-[var(--ink-subtle)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] active:scale-[0.98]"
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -526,7 +658,9 @@ export function IssueCreateDialog({
             disabled={submitting}
             type="submit"
           >
-            {submitting ? 'Creating...' : 'Create issue'}
+            {submitting
+              ? tr('issue.createDialog.status.creating', 'Creating...')
+              : tr('issue.createDialog.action.create', 'Create issue')}
           </button>
         </footer>
       </form>
@@ -535,7 +669,7 @@ export function IssueCreateDialog({
 }
 
 function PropertyDropdown<TValue extends string>({
-  emptyLabel = 'No results',
+  emptyLabel,
   open,
   options,
   query,
@@ -549,7 +683,7 @@ function PropertyDropdown<TValue extends string>({
   onSelect,
   renderOptionIcon,
 }: {
-  emptyLabel?: string;
+  emptyLabel: string;
   open: boolean;
   options: Array<MenuOption<TValue>>;
   query: string;
@@ -1091,34 +1225,22 @@ function labelKey(label: string) {
   return label.trim().toLowerCase();
 }
 
-function statusLabel(status: ProjectWorkItemStatus) {
-  if (status === 'open') return 'Todo';
-  if (status === 'in_progress') return 'In Progress';
-  if (status === 'blocked') return 'Backlog';
-  if (status === 'ready_to_merge') return 'Ready to Merge';
-  if (status === 'merging') return 'Merging';
-  if (status === 'done') return 'Done';
-  if (status === 'cancelled') return 'Canceled';
-  return 'Duplicate';
-}
-
-function priorityLabel(priority: ProjectWorkItemPriority) {
-  return (
-    priorityMenuOptions.find((option) => option.value === priority)?.label ??
-    priority
-  );
-}
-
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function issueCreateErrorMessage(error: unknown) {
+function issueCreateErrorMessage(
+  error: unknown,
+  tr: IssueDetailTranslator,
+) {
   if (error && typeof error === 'object' && 'message' in error) {
     const message = (error as { message?: unknown }).message;
     if (typeof message === 'string' && message.trim()) return message;
   }
-  return 'Issue could not be created. Please try again.';
+  return tr(
+    'issue.createDialog.error.createFailed',
+    'Issue could not be created. Please try again.',
+  );
 }

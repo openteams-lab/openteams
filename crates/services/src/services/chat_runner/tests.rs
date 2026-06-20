@@ -1627,6 +1627,7 @@ fn artifact_path_extraction_allows_explicit_openteams_runtime_paths() {
     assert!(paths.contains(&".openteams/context/demo/messages.jsonl".to_string()));
     assert!(paths.contains(&".openteams/context/demo/attachments/message-1/input.txt".to_string()));
     assert!(paths.contains(&"src/app.ts".to_string()));
+    assert_eq!(paths.len(), 3);
 }
 
 #[test]

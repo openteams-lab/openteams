@@ -17,6 +17,8 @@ export interface AgentFileRow {
   additions?: number;
   /** Deletions (-) for this file in the run, when known. */
   deletions?: number;
+  /** True when the run endpoint has inline diff content for this file. */
+  hasDiff?: boolean;
   status?: AgentFileStatus;
   /**
    * True when the path came from an artifact mention rather than the run's git
@@ -35,17 +37,20 @@ interface RunFileChanges {
     path: string;
     additions?: number;
     deletions?: number;
+    has_diff?: boolean;
   }>;
   added: Array<{
     path: string;
     additions?: number;
     deletions?: number;
+    has_diff?: boolean;
   }>;
   deleted: Array<{ path: string }>;
   untracked: Array<{
     path: string;
     additions?: number;
     deletions?: number;
+    has_diff?: boolean;
   }>;
 }
 
@@ -70,6 +75,7 @@ export const flattenRunFileChanges = (
       path: file.path,
       additions: file.additions,
       deletions: file.deletions,
+      hasDiff: file.has_diff,
       status: 'M',
     });
   }
@@ -78,17 +84,19 @@ export const flattenRunFileChanges = (
       path: file.path,
       additions: file.additions,
       deletions: file.deletions,
+      hasDiff: file.has_diff,
       status: 'A',
     });
   }
   for (const file of changes.deleted) {
-    rows.push({ path: file.path, status: 'D' });
+    rows.push({ path: file.path, hasDiff: false, status: 'D' });
   }
   for (const file of changes.untracked) {
     rows.push({
       path: file.path,
       additions: file.additions,
       deletions: file.deletions,
+      hasDiff: file.has_diff,
       status: 'U',
     });
   }
@@ -125,7 +133,7 @@ export const mergeArtifactPaths = (
     const key = normalizeArtifactPath(path);
     if (covered.has(key)) continue;
     covered.add(key);
-    merged.push({ path, supplementary: true });
+    merged.push({ path, hasDiff: false, supplementary: true });
   }
 
   return merged.sort((a, b) => {

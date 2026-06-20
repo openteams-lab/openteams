@@ -13,6 +13,7 @@ const locales = testLocales;
 const sourceFiles = [
   "./pages/IssuePage.tsx",
   "./pages/IssueDetailPage.tsx",
+  "./components/IssueCreateDialog.tsx",
 ] as const;
 const dynamicKeys = [
   "issue.linkDialog.provider.github.description",
@@ -23,6 +24,7 @@ const dynamicKeys = [
   "issue.linkDialog.provider.linear.name",
 ] as const;
 const localePrefixes = [
+  "issue.createDialog.",
   "issue.detail.",
   "issue.linkDialog.",
   "issue.importDialog.",
@@ -63,6 +65,7 @@ const requiredPlaceholders: Record<string, readonly string[]> = {
   "issue.linkDialog.toast.repoLinked.message": ["repoName"],
   "issue.linkDialog.toast.repoUnlinked.message": ["repoName"],
   "issue.importDialog.toast.imported.message": ["number"],
+  "issue.createDialog.removeAttachment": ["name"],
 };
 
 type Locale = (typeof locales)[number];
@@ -97,7 +100,7 @@ const usedIssueLocaleKeys = () => {
   for (const file of sourceFiles) {
     const text = readText(file);
     for (const match of text.matchAll(
-      /tr\(\s*["'](issue\.(?:detail|linkDialog|importDialog)\.[^"']+)["']/g,
+      /tr\(\s*["'](issue\.(?:createDialog|detail|linkDialog|importDialog)\.[^"']+)["']/g,
     )) {
       keys.add(match[1]);
     }
@@ -171,6 +174,35 @@ check(
   "Issue detail page removes known untranslated hardcoded strings",
   hardcodedMatches.length === 0,
   hardcodedMatches,
+);
+
+const issueCreateSource = readText("./components/IssueCreateDialog.tsx");
+const issueCreateHardcodedPatterns: Array<[string, RegExp]> = [
+  [
+    "literal create dialog aria labels",
+    /aria-label="(?:Create issue|Close create issue dialog|Attach files)"/,
+  ],
+  [
+    "literal create dialog placeholders",
+    /placeholder="(?:Issue title|Add description|Change status|Change priority|Link session)\.\.\."|placeholder="Issue title"/,
+  ],
+  [
+    "literal create dialog text nodes",
+    />\s*(?:New issue|Create issue|Creating\.\.\.|Issue title|Issue description|No sessions found|No results)\s*</,
+  ],
+  [
+    "literal remove attachment aria label",
+    /aria-label=\{`Remove \$\{file\.name\}`\}/,
+  ],
+];
+const createHardcodedMatches = issueCreateHardcodedPatterns
+  .filter(([, pattern]) => pattern.test(issueCreateSource))
+  .map(([label]) => label);
+
+check(
+  "Issue create dialog removes known untranslated hardcoded strings",
+  createHardcodedMatches.length === 0,
+  createHardcodedMatches,
 );
 
 for (const locale of locales) {

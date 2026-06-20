@@ -697,17 +697,25 @@ function WorkspaceLayout() {
 
   const renderActivePage = () => {
     if (activeTab?.kind === "diff") {
+      const workspacePath = projects.find(
+        (project) => project.id === selectedProjectId,
+      )?.default_workspace_path ?? undefined;
       return (
         <DiffViewTab
           filePath={activeTab.filePath}
           status={activeTab.status}
           unifiedDiff={activeTab.unified_diff}
+          workspacePath={workspacePath}
         />
       );
     }
     if (activeTab?.kind === "sc-diff") {
+      const workspacePath = projects.find(
+        (project) => project.id === activeTab.projectId,
+      )?.default_workspace_path ?? undefined;
       return (
         <DiffViewTab
+          workspacePath={workspacePath}
           sourceControlRef={{
             projectId: activeTab.projectId,
             sessionId: activeTab.sessionId,

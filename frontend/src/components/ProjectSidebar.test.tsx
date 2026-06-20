@@ -442,13 +442,28 @@ check(
   componentSource,
 );
 check(
-  "session context menu includes rename archive and delete actions",
+  "session context menu includes rename view id archive and delete actions",
   componentSource.includes('translate("sidebar.renameSession"') &&
+    componentSource.includes('translate("sidebar.viewSessionId"') &&
     componentSource.includes('translate("sidebar.archiveSession"') &&
     componentSource.includes('translate("sidebar.deleteSession"') &&
+    componentSource.includes("startViewSessionId(menuSession)") &&
     componentSource.includes("onRenameSession(renamingSession.id") &&
     componentSource.includes("onArchiveSession(session.id)") &&
     componentSource.includes("onDeleteSession(deletingSession.id)"),
+  componentSource,
+);
+check(
+  "session ID dialog shows and copies the selected session id",
+  componentSource.includes('aria-labelledby="view-session-id-dialog-title"') &&
+    componentSource.includes('id="view-session-id-value"') &&
+    componentSource.includes("value={viewingSession.id}") &&
+    componentSource.includes("navigator.clipboard.writeText(viewingSession.id)") &&
+    componentSource.includes("copyViewingSessionId()") &&
+    componentSource.includes("aria-label={copySessionIdLabel}") &&
+    componentSource.includes("inline-flex h-9 w-9") &&
+    componentSource.includes('translate("sidebar.copySessionId"') &&
+    componentSource.includes('translate("sidebar.sessionId"'),
   componentSource,
 );
 check(

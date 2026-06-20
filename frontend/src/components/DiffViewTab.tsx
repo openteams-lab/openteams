@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { FolderOpen } from "lucide-react";
 import { ScrollArea } from "@/components/ScrollArea";
-import { useWorkspace } from "@/context/WorkspaceContext";
-import { projectSourceControlApi } from "@/lib/api";
+import { filesystemApi, projectSourceControlApi } from "@/lib/api";
 import { parseUnifiedDiff, alignSplitLines } from "@/lib/parseDiff";
 import type { DiffLine, DiffHunk, SplitRow } from "@/lib/parseDiff";
 import type {
@@ -13,6 +13,7 @@ interface DiffViewTabProps {
   filePath?: string;
   status?: string;
   unifiedDiff?: string;
+  workspacePath?: string;
   sourceControlRef?: {
     projectId: string;
     sessionId: string;
@@ -157,6 +158,7 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
   filePath,
   status,
   unifiedDiff,
+  workspacePath,
   sourceControlRef,
 }) => {
   const [diffMode, setDiffMode] = useState<"unified" | "split">("unified");
@@ -165,11 +167,13 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
   );
   const [sourceDiffLoading, setSourceDiffLoading] = useState(false);
   const [sourceDiffError, setSourceDiffError] = useState<string | null>(null);
+  const [openExplorerError, setOpenExplorerError] = useState<string | null>(
+    null,
+  );
   const sourceProjectId = sourceControlRef?.projectId;
   const sourceSessionId = sourceControlRef?.sessionId;
   const sourceFilePath = sourceControlRef?.filePath;
   const sourceArea = sourceControlRef?.area;
-  const { sourceControlRefreshKey } = useWorkspace();
 
   useEffect(() => {
     if (!sourceProjectId || !sourceSessionId || !sourceFilePath || !sourceArea) {
@@ -205,13 +209,7 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [
-    sourceArea,
-    sourceControlRefreshKey,
-    sourceFilePath,
-    sourceProjectId,
-    sourceSessionId,
-  ]);
+  }, [sourceArea, sourceFilePath, sourceProjectId, sourceSessionId]);
 
   const effectiveFilePath =
     sourceDiff?.path ?? sourceFilePath ?? filePath ?? "";
@@ -219,6 +217,10 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
   const effectiveUnifiedDiff = sourceControlRef
     ? (sourceDiff?.unified_diff ?? "")
     : (unifiedDiff ?? "");
+
+  useEffect(() => {
+    setOpenExplorerError(null);
+  }, [effectiveFilePath]);
 
   const hunks = useMemo(
     () => parseUnifiedDiff(effectiveUnifiedDiff),
@@ -232,6 +234,35 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
         : countStats(hunks),
     [hunks, sourceDiff],
   );
+
+  const handleOpenInExplorer = useCallback(() => {
+    if (!effectiveFilePath) return;
+    setOpenExplorerError(null);
+    void filesystemApi
+      .openInExplorer(effectiveFilePath, workspacePath)
+      .then((response) => {
+        if (!response.ok) {
+          setOpenExplorerError(response.error ?? "Failed to open in Explorer");
+        }
+      })
+      .catch((error) => {
+        setOpenExplorerError(
+          error instanceof Error ? error.message : "Failed to open in Explorer",
+        );
+      });
+  }, [effectiveFilePath, workspacePath]);
+
+  const openExplorerButton = effectiveFilePath ? (
+    <button
+      type="button"
+      onClick={handleOpenInExplorer}
+      title="Open in file explorer"
+      aria-label="Open in file explorer"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[var(--hairline)] text-[var(--ink-subtle)] transition hover:bg-[var(--surface-1)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--primary)]"
+    >
+      <FolderOpen className="h-3.5 w-3.5" />
+    </button>
+  ) : null;
 
   if (sourceDiffLoading && !sourceDiff) {
     return (
@@ -272,9 +303,17 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
                 ? "File deleted - no diff content available"
                 : "No diff content available")}
           </span>
-          <span className="block font-mono text-[12px] text-[var(--ink-subtle)]">
-            {effectiveFilePath}
-          </span>
+          <div className="flex items-center justify-center gap-2">
+            <span className="block font-mono text-[12px] text-[var(--ink-subtle)]">
+              {effectiveFilePath}
+            </span>
+            {openExplorerButton}
+          </div>
+          {openExplorerError && (
+            <span className="block text-[12px] text-rose-500">
+              {openExplorerError}
+            </span>
+          )}
         </div>
       </div>
     );
@@ -286,9 +325,22 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
         className="diff-view-tab flex h-full w-full items-center justify-center"
         style={{ backgroundColor: DIFF_VIEW_COLORS.canvas }}
       >
-        <div className="text-[13px] text-[var(--ink-tertiary)]">
-          Diff too large to render (
-          {(effectiveUnifiedDiff.length / 1024).toFixed(0)} KB)
+        <div className="space-y-2 text-center">
+          <div className="text-[13px] text-[var(--ink-tertiary)]">
+            Diff too large to render (
+            {(effectiveUnifiedDiff.length / 1024).toFixed(0)} KB)
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <span className="block font-mono text-[12px] text-[var(--ink-subtle)]">
+              {effectiveFilePath}
+            </span>
+            {openExplorerButton}
+          </div>
+          {openExplorerError && (
+            <span className="block text-[12px] text-rose-500">
+              {openExplorerError}
+            </span>
+          )}
         </div>
       </div>
     );
@@ -332,34 +384,42 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
             </span>
           )}
         </div>
-        <div
-          className="flex items-center gap-0.5 rounded-md p-0.5"
-          style={{ backgroundColor: DIFF_VIEW_COLORS.separatorSolid }}
-        >
-          <button
-            type="button"
-            onClick={() => setDiffMode("unified")}
-            className={`px-2.5 py-1 rounded text-[12px] ${
-              diffMode === "unified"
-                ? "bg-[var(--surface-1)] text-[var(--ink)] font-medium"
-                : "bg-transparent text-[var(--ink-subtle)]"
-            }`}
+        <div className="flex shrink-0 items-center gap-2">
+          {openExplorerButton}
+          <div
+            className="flex items-center gap-0.5 rounded-md p-0.5"
+            style={{ backgroundColor: DIFF_VIEW_COLORS.separatorSolid }}
           >
-            Unified
-          </button>
-          <button
-            type="button"
-            onClick={() => setDiffMode("split")}
-            className={`px-2.5 py-1 rounded text-[12px] ${
-              diffMode === "split"
-                ? "bg-[var(--surface-1)] text-[var(--ink)] font-medium"
-                : "bg-transparent text-[var(--ink-subtle)]"
-            }`}
-          >
-            Split
-          </button>
+            <button
+              type="button"
+              onClick={() => setDiffMode("unified")}
+              className={`px-2.5 py-1 rounded text-[12px] ${
+                diffMode === "unified"
+                  ? "bg-[var(--surface-1)] text-[var(--ink)] font-medium"
+                  : "bg-transparent text-[var(--ink-subtle)]"
+              }`}
+            >
+              Unified
+            </button>
+            <button
+              type="button"
+              onClick={() => setDiffMode("split")}
+              className={`px-2.5 py-1 rounded text-[12px] ${
+                diffMode === "split"
+                  ? "bg-[var(--surface-1)] text-[var(--ink)] font-medium"
+                  : "bg-transparent text-[var(--ink-subtle)]"
+              }`}
+            >
+              Split
+            </button>
+          </div>
         </div>
       </div>
+      {openExplorerError && (
+        <div className="shrink-0 border-b border-[var(--hairline)] px-3 py-1 text-[12px] text-rose-500">
+          {openExplorerError}
+        </div>
+      )}
 
       <ScrollArea className="flex-1 min-h-0">
         {hunks.map((hunk, hunkIndex) => (

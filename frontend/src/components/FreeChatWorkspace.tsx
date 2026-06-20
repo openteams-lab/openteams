@@ -38,9 +38,11 @@ import { AgentMessageContent } from "@/components/AgentMessageContent";
 import { SessionSourceControlPanel } from "@/components/source-control/SessionSourceControlPanel";
 import {
   chatMessagesApi,
+  filesystemApi,
   sessionAgentsApi,
   projectWorkItemsApi,
 } from "@/lib/api";
+import type { AgentFileRow } from "@/lib/agentFileRows";
 import {
   CHAT_INPUT_PREFILL_EVENT,
   clearChatInputPrefill,
@@ -100,6 +102,11 @@ const statusTextTone: Record<RelatedFileStatus, string> = {
 };
 
 const hasLineStat = (value?: number) => typeof value === "number" && value > 0;
+
+const isOpenteamsPath = (path: string): boolean => {
+  const normalized = path.trim().replace(/\\/g, "/").replace(/^\.?\//, "");
+  return normalized.toLowerCase().split("/")[0] === ".openteams";
+};
 
 const allowedTextAttachmentExtensions = [
   ".txt",
@@ -814,6 +821,8 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     () => projects.find((project) => project.id === selectedProjectId),
     [projects, selectedProjectId],
   );
+  const currentWorkspacePath =
+    currentProject?.default_workspace_path ?? undefined;
   const sidebarMembers = members;
   const visibleSidebarMemberCount = getVisibleSidebarMemberCount(
     sidebarMembers.length,
@@ -1192,7 +1201,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
       resetWorkspaceChanges();
       return;
     }
-    const workspacePath = currentProject?.default_workspace_path;
+    const workspacePath = currentWorkspacePath;
     if (!workspacePath) {
       resetWorkspaceChanges();
       return;
@@ -1200,7 +1209,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     void refreshWorkspaceChanges(activeSessionId, workspacePath, true);
   }, [
     activeSessionId,
-    currentProject,
+    currentWorkspacePath,
     refreshWorkspaceChanges,
     resetWorkspaceChanges,
   ]);
@@ -1829,13 +1838,43 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     showToast(t("relatedFiles.noDiffOpenFile"));
   };
 
-  // Open an artifact file from an agent message. Prefers the inline diff when
-  // the workspace changes already carry one for that path, otherwise opens the
-  // source-control diff tab (lazy-loaded), falling back to opening the file.
-  const handleOpenArtifact = useCallback(
+  const openArtifactInExplorer = useCallback(
     (path: string) => {
+      void filesystemApi
+        .openInExplorer(path, currentWorkspacePath)
+        .then((response) => {
+          if (!response.ok) {
+            showToast(response.error ?? "Failed to open in Explorer");
+          }
+        })
+        .catch((error) => {
+          showToast(
+            error instanceof Error
+              ? error.message
+              : "Failed to open in Explorer",
+          );
+        });
+    },
+    [currentWorkspacePath, showToast],
+  );
+
+  // Open an artifact file from an agent message. Files without run diff data
+  // (including ignored `.openteams/` artifacts) open in Explorer directly.
+  const handleOpenArtifact = useCallback(
+    (file: AgentFileRow) => {
+      const path = file.path;
+      if (
+        isOpenteamsPath(path) ||
+        file.supplementary ||
+        file.hasDiff === false
+      ) {
+        openArtifactInExplorer(path);
+        return;
+      }
+
       const match = relatedFileChanges.find(
-        (file) => normalizeArtifactPath(file.path) === normalizeArtifactPath(path),
+        (candidate) =>
+          normalizeArtifactPath(candidate.path) === normalizeArtifactPath(path),
       );
       if (match && hasRelatedFileDiff(match) && onOpenDiffTab) {
         onOpenDiffTab(
@@ -1855,7 +1894,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
         );
         return;
       }
-      openFileInVSCode(path, { openAsDiff: false });
+      openArtifactInExplorer(path);
     },
     [
       relatedFileChanges,
@@ -1863,6 +1902,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
       onOpenSourceControlDiffTab,
       activeSessionId,
       selectedProjectId,
+      openArtifactInExplorer,
     ],
   );
 

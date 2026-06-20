@@ -361,6 +361,7 @@ struct RunMetaFile {
 
 #[derive(Debug, Deserialize)]
 struct WorkRecordJsonLine {
+    session_id: Uuid,
     run_id: Uuid,
     #[serde(default)]
     message_type: String,
@@ -400,9 +401,9 @@ fn is_artifact_observed_source(source: &str) -> bool {
 }
 
 fn is_openteams_relative_path(path: &str) -> bool {
-    PathBuf::from(path).components().next().is_some_and(|component| {
-        matches!(component, Component::Normal(part) if part == ".openteams")
-    })
+    PathBuf::from(path).components().next().is_some_and(
+        |component| matches!(component, Component::Normal(part) if part == ".openteams"),
+    )
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1312,7 +1313,10 @@ fn collect_paths_from_runs(
 
     let run_ids = runs.iter().map(|run| run.id).collect::<HashSet<_>>();
     for line in load_work_record_lines(session_id)? {
-        if !run_ids.contains(&line.run_id) || !line.message_type.eq_ignore_ascii_case("artifact") {
+        if line.session_id != session_id
+            || !run_ids.contains(&line.run_id)
+            || !line.message_type.eq_ignore_ascii_case("artifact")
+        {
             continue;
         }
         for path in extract_workspace_paths_from_text(&line.content, workspace_path) {

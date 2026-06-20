@@ -16,19 +16,24 @@ import type { ActivityLoadState, ChatRunActivityLine, Message } from "@/types";
 
 const ACTIVITY_LOAD_TIMEOUT_MS = 15000;
 /**
- * Module-level cache of per-run changed-file rows keyed by run id. A run's
- * captured diff is immutable once the run completes, so the rows are safe to
- * reuse across message re-renders and avoid refetching on every scroll.
+ * Module-level cache of per-run changed-file rows keyed by session id + run id.
+ * A run's captured diff is immutable once the run completes, so the rows are
+ * safe to reuse across message re-renders and avoid refetching on every scroll.
  */
 const runFileRowsCache = new Map<string, AgentFileRow[]>();
 const runFileRowsPending = new Map<string, Promise<AgentFileRow[]>>();
+
+const runFileRowsCacheKey = (
+  sessionId: string | undefined,
+  runId: string | undefined,
+): string | null => (runId ? `${sessionId ?? "unknown"}:${runId}` : null);
 
 interface AgentMessageContentProps {
   message: Message;
   t: (key: string, replacements?: Record<string, string | number>) => string;
   messageFontSize?: number;
   /** Open a file row (e.g. into a diff tab). */
-  onOpenArtifact?: (path: string) => void;
+  onOpenArtifact?: (file: AgentFileRow) => void;
 }
 
 const sortActivityLines = (
@@ -158,34 +163,36 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
 
   // ---- Per-run changed files ------------------------------------------------
   // The file list pinned to the message bottom is sourced from the run's own
-  // diff (GET /chat/runs/{run_id}/files). Results are cached per run id.
+  // diff (GET /chat/runs/{run_id}/files). Results are cached per session/run.
+  const cacheKey = runFileRowsCacheKey(message.sessionId, message.runId);
   const [runFileRows, setRunFileRows] = useState<AgentFileRow[]>(() =>
-    message.runId ? (runFileRowsCache.get(message.runId) ?? []) : [],
+    cacheKey ? (runFileRowsCache.get(cacheKey) ?? []) : [],
   );
 
   useEffect(() => {
-    if (isRunning || !message.runId) return;
+    const nextCacheKey = runFileRowsCacheKey(message.sessionId, message.runId);
+    if (isRunning || !message.runId || !nextCacheKey) return;
     const runId = message.runId;
-    const cached = runFileRowsCache.get(runId);
+    const cached = runFileRowsCache.get(nextCacheKey);
     if (cached) {
       setRunFileRows(cached);
       return;
     }
 
     let cancelled = false;
-    let pending = runFileRowsPending.get(runId);
+    let pending = runFileRowsPending.get(nextCacheKey);
     if (!pending) {
       pending = chatRunsApi
         .getFiles(runId, { includeDiff: false })
         .then((response) => {
           const rows = flattenRunFileChanges(response);
-          runFileRowsCache.set(runId, rows);
+          runFileRowsCache.set(nextCacheKey, rows);
           return rows;
         })
         .finally(() => {
-          runFileRowsPending.delete(runId);
+          runFileRowsPending.delete(nextCacheKey);
         });
-      runFileRowsPending.set(runId, pending);
+      runFileRowsPending.set(nextCacheKey, pending);
     }
 
     pending
@@ -200,7 +207,7 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [message.runId, isRunning]);
+  }, [message.sessionId, message.runId, isRunning]);
 
   const artifactPaths = useMemo(
     () =>

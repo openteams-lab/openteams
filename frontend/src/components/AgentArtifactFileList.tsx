@@ -11,7 +11,7 @@ const MAX_VISIBLE_ROWS = 50;
 
 interface AgentArtifactFileListProps {
   files: AgentFileRow[];
-  onOpen: (path: string) => void;
+  onOpen: (file: AgentFileRow) => void;
   title: string;
   moreLabel: (hiddenCount: number) => string;
 }
@@ -53,7 +53,7 @@ export const AgentArtifactFileList: React.FC<AgentArtifactFileListProps> = ({
             <button
               key={`${file.path}-${index}`}
               type="button"
-              onClick={() => onOpen(file.path)}
+              onClick={() => onOpen(file)}
               title={file.path}
               className="group/artifact flex min-h-9 w-full items-center gap-2 px-2 py-1 text-left transition-colors hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--primary)]"
             >
