@@ -97,6 +97,7 @@ type TeamMemberSidebarProps = {
 type TeamAddMemberButtonProps = {
   agents: BackendChatAgent[];
   members: ProjectMemberWithExecution[];
+  openRequestKey?: number;
   runtimeOptions: TeamAddableRuntime[];
   saving: boolean;
   t: TranslateFn;
@@ -113,6 +114,7 @@ type TeamAddableRuntime = {
 export function TeamAddMemberButton({
   agents,
   members,
+  openRequestKey,
   runtimeOptions,
   saving,
   t,
@@ -122,6 +124,7 @@ export function TeamAddMemberButton({
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
+  const previousOpenRequestKeyRef = useRef(openRequestKey);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -132,6 +135,15 @@ export function TeamAddMemberButton({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (openRequestKey === undefined) return;
+    if (previousOpenRequestKeyRef.current === openRequestKey) return;
+
+    previousOpenRequestKeyRef.current = openRequestKey;
+    setSearchQuery("");
+    setShowAddMenu(true);
+  }, [openRequestKey]);
 
   const availableAgents = useMemo(() => {
     const memberAgentIds = new Set(

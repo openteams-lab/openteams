@@ -24,6 +24,11 @@ const sidebarSource = readFileSync(
   new URL("./team/TeamMemberSidebar.tsx", import.meta.url),
   "utf8",
 );
+const appSource = readFileSync(new URL("../App.tsx", import.meta.url), "utf8");
+const teamNavigationSource = readFileSync(
+  new URL("../lib/teamNavigation.ts", import.meta.url),
+  "utf8",
+);
 const removeProjectMemberIndex = source.indexOf(
   "await projectApi.removeMember(selectedProjectId, member.id)",
 );
@@ -64,6 +69,21 @@ check(
     !sidebarSource.includes("const showRuntimeOptions") &&
     !sidebarSource.includes("showRuntimeOptions &&"),
   { source, sidebarSource },
+);
+
+check(
+  "member invite navigation opens the team page add-member menu",
+  appSource.includes("TEAM_MEMBER_INVITE_NAVIGATION_EVENT") &&
+    appSource.includes('openPageTab("team", getPageTabLabel("team"))') &&
+    source.includes("readTeamMemberInviteTarget()") &&
+    source.includes("clearTeamMemberInviteTarget()") &&
+    source.includes("setAddMemberMenuRequestId((current) => current + 1)") &&
+    source.includes("openRequestKey={addMemberMenuRequestId}") &&
+    sidebarSource.includes("openRequestKey?: number") &&
+    sidebarSource.includes("setShowAddMenu(true)") &&
+    teamNavigationSource.includes("window.sessionStorage.setItem") &&
+    teamNavigationSource.includes("openteams:navigate-team-member-invite"),
+  { appSource, source, sidebarSource, teamNavigationSource },
 );
 
 if (failures > 0) {

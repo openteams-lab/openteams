@@ -176,6 +176,8 @@ check(
     source.includes("h-12 -mb-2 items-start pb-2 pt-1.5") &&
     source.includes("h-10 items-center") &&
     source.includes("ChevronsRight") &&
+    source.includes("requestTeamMemberInviteNavigation({") &&
+    source.includes("projectId: selectedProjectId ?? undefined") &&
     !memberRailSource.includes('"..."') &&
     source.includes("selectedSidebarMemberId") &&
     source.includes("const selectedSidebarMember =") &&

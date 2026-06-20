@@ -59,6 +59,7 @@ import {
 } from "@/lib/linkedWorkItemsEvents";
 import { markPendingIssueStatusSync } from "@/lib/pendingIssueStatusSync";
 import { notifyBuildStatsUsageUpdated } from "@/lib/buildStatsEvents";
+import { requestTeamMemberInviteNavigation } from "@/lib/teamNavigation";
 import {
   flattenWorkspaceChanges,
   hasRelatedFileDiff,
@@ -93,6 +94,12 @@ interface FreeChatWorkspaceProps {
     area: SourceControlDiffArea,
   ) => void;
 }
+
+type AttachmentImagePreview = {
+  url: string;
+  name: string;
+  sizeBytes?: number;
+};
 
 const statusTextTone: Record<RelatedFileStatus, string> = {
   M: "text-amber-600",
@@ -788,6 +795,8 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     useState<QuotedMessageReference | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const [attachmentImagePreview, setAttachmentImagePreview] =
+    useState<AttachmentImagePreview | null>(null);
   const [relatedFilesWidth, setRelatedFilesWidth] = useState(
     RELATED_FILES_DEFAULT_WIDTH,
   );
@@ -980,6 +989,23 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
       return Object.fromEntries(entries);
     });
   }, [messages]);
+
+  useEffect(() => {
+    setAttachmentImagePreview(null);
+  }, [activeSessionId]);
+
+  useEffect(() => {
+    if (!attachmentImagePreview) return;
+
+    const handlePreviewKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAttachmentImagePreview(null);
+      }
+    };
+
+    document.addEventListener("keydown", handlePreviewKeyDown);
+    return () => document.removeEventListener("keydown", handlePreviewKeyDown);
+  }, [attachmentImagePreview]);
 
   const openRelatedFiles = () => {
     setWasRelatedFilesAutoCollapsed(false);
@@ -2100,6 +2126,53 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
           : "relative rounded-xl border border-[var(--hairline)] bg-[var(--canvas)] overflow-hidden font-sans text-xs select-none"
       }
     >
+      {attachmentImagePreview && (
+        <div
+          className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+          onClick={() => setAttachmentImagePreview(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={attachmentImagePreview.name}
+            className="flex max-h-[min(84vh,760px)] w-[min(92vw,960px)] flex-col overflow-hidden rounded-md border border-[var(--hairline-strong)] bg-[var(--surface-1)] text-[var(--ink)] shadow-[0_24px_80px_rgba(0,0,0,0.36)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex min-h-0 items-center gap-3 border-b border-[var(--hairline)] px-3 py-2">
+              <ImageIcon className="h-4 w-4 shrink-0 text-[var(--ink-tertiary)]" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12px] font-medium text-[var(--ink)]">
+                  {attachmentImagePreview.name}
+                </div>
+                {attachmentImagePreview.sizeBytes ? (
+                  <div className="font-mono text-[10px] text-[var(--ink-tertiary)]">
+                    {formatFileSize(attachmentImagePreview.sizeBytes)}
+                  </div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+                onClick={() => setAttachmentImagePreview(null)}
+                title={t("aria.closeTab")}
+                aria-label={t("aria.closeTab")}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-[var(--canvas)] p-3">
+              <img
+                src={attachmentImagePreview.url}
+                alt={attachmentImagePreview.name}
+                className="max-w-full rounded-sm object-contain"
+                style={{
+                  maxHeight: "calc(min(84vh, 760px) - 64px)",
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
       <div
         style={
           isRelatedFilesOpen
@@ -2258,6 +2331,47 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                           attachment.id,
                         );
                         const isImage = isImageChatAttachment(attachment);
+                        if (isImage) {
+                          return (
+                            <button
+                              key={attachment.id}
+                              type="button"
+                              className="group/attachment max-w-md rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] p-2 text-left text-[11px] text-[var(--ink-muted)] transition hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)]"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setAttachmentImagePreview({
+                                  url,
+                                  name: attachment.name,
+                                  sizeBytes: attachment.size_bytes,
+                                });
+                              }}
+                              title={attachment.name}
+                              aria-label={attachment.name}
+                            >
+                              <div className="flex min-w-0 items-center gap-2">
+                                <ImageIcon className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+                                <span
+                                  className="min-w-0 flex-1 truncate font-medium text-[var(--ink)]"
+                                  title={attachment.name}
+                                >
+                                  {attachment.name}
+                                </span>
+                                {attachment.size_bytes ? (
+                                  <span className="shrink-0 font-mono text-[10px] text-[var(--ink-tertiary)]">
+                                    {formatFileSize(attachment.size_bytes)}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <img
+                                src={url}
+                                alt={attachment.name}
+                                className="mt-2 max-h-44 max-w-full rounded-sm border border-[var(--hairline)] object-contain"
+                                loading="lazy"
+                              />
+                            </button>
+                          );
+                        }
+
                         return (
                           <a
                             key={attachment.id}
@@ -2268,11 +2382,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                             onClick={(event) => event.stopPropagation()}
                           >
                             <div className="flex min-w-0 items-center gap-2">
-                              {isImage ? (
-                                <ImageIcon className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
-                              ) : (
-                                <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
-                              )}
+                              <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
                               <span
                                 className="min-w-0 flex-1 truncate font-medium text-[var(--ink)]"
                                 title={attachment.name}
@@ -2285,14 +2395,6 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                                 </span>
                               ) : null}
                             </div>
-                            {isImage && (
-                              <img
-                                src={url}
-                                alt={attachment.name}
-                                className="mt-2 max-h-44 max-w-full rounded-sm border border-[var(--hairline)] object-contain"
-                                loading="lazy"
-                              />
-                            )}
                           </a>
                         );
                       })}
@@ -2759,7 +2861,11 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                 )}
                 <button
                   type="button"
-                  onClick={() => showToast(t("toast.memberInviteReady"))}
+                  onClick={() =>
+                    requestTeamMemberInviteNavigation({
+                      projectId: selectedProjectId ?? undefined,
+                    })
+                  }
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--ink-subtle)] transition hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
                   title={t("inviteMember")}
                   aria-label={t("inviteMember")}

@@ -52,6 +52,12 @@ import {
   storeIssueNavigationTarget,
   type IssueNavigationTarget,
 } from "@/lib/issueNavigation";
+import {
+  TEAM_MEMBER_INVITE_NAVIGATION_EVENT,
+  TEAM_MEMBER_INVITE_TARGET_CHANGED_EVENT,
+  storeTeamMemberInviteTarget,
+  type TeamMemberInviteNavigationTarget,
+} from "@/lib/teamNavigation";
 import { notifyLinkedWorkItemsChanged } from "@/lib/linkedWorkItemsEvents";
 import { mapSession } from "@/lib/mappers";
 import { mockFrontendApi } from "@/lib/mockFrontendApi";
@@ -823,17 +829,38 @@ function WorkspaceLayout() {
         new CustomEvent(ISSUE_NAVIGATION_TARGET_CHANGED_EVENT),
       );
     };
+    const handleNavigateTeamMemberInvite = (event: Event) => {
+      const target =
+        (event as CustomEvent<TeamMemberInviteNavigationTarget>).detail ?? {};
+
+      storeTeamMemberInviteTarget(target);
+      if (target.projectId && target.projectId !== selectedProjectId) {
+        setSelectedProjectId(target.projectId);
+      }
+      openPageTab("team", getPageTabLabel("team"));
+      window.dispatchEvent(
+        new CustomEvent(TEAM_MEMBER_INVITE_TARGET_CHANGED_EVENT),
+      );
+    };
     window.addEventListener(
       "openteams:navigate-session",
       handleNavigateSession,
     );
     window.addEventListener(ISSUE_NAVIGATION_EVENT, handleNavigateIssue);
+    window.addEventListener(
+      TEAM_MEMBER_INVITE_NAVIGATION_EVENT,
+      handleNavigateTeamMemberInvite,
+    );
     return () => {
       window.removeEventListener(
         "openteams:navigate-session",
         handleNavigateSession,
       );
       window.removeEventListener(ISSUE_NAVIGATION_EVENT, handleNavigateIssue);
+      window.removeEventListener(
+        TEAM_MEMBER_INVITE_NAVIGATION_EVENT,
+        handleNavigateTeamMemberInvite,
+      );
     };
   });
 

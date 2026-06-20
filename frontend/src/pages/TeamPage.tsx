@@ -1,5 +1,6 @@
 import {
   type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -19,6 +20,11 @@ import {
   skillsApi,
 } from "@/lib/api";
 import { McpConfigStrategyGeneral } from "@/lib/mcpConfigStrategy";
+import {
+  TEAM_MEMBER_INVITE_TARGET_CHANGED_EVENT,
+  clearTeamMemberInviteTarget,
+  readTeamMemberInviteTarget,
+} from "@/lib/teamNavigation";
 import type {
   AgentRuntimeReasoningCapability,
   AgentRuntimeStatus,
@@ -378,6 +384,8 @@ export function TeamPage() {
     null,
   );
   const [teamProtocolSuccess, setTeamProtocolSuccess] = useState(false);
+  const [addMemberMenuRequestId, setAddMemberMenuRequestId] = useState(0);
+  const addMemberActionRef = useRef<HTMLDivElement | null>(null);
   const loadRequestIdRef = useRef(0);
 
   const currentProject = useMemo(
@@ -485,6 +493,44 @@ export function TeamPage() {
       return [];
     }
   }, [mcpConfig, mcpLoading, mcpServersJson]);
+
+  const consumeTeamMemberInviteTarget = useCallback(() => {
+    if (!selectedProjectId || !teamDataReady) return;
+
+    const target = readTeamMemberInviteTarget();
+    if (!target) return;
+    if (target.projectId && target.projectId !== selectedProjectId) return;
+
+    clearTeamMemberInviteTarget();
+    setAddMemberMenuRequestId((current) => current + 1);
+    window.requestAnimationFrame(() => {
+      addMemberActionRef.current?.scrollIntoView({
+        block: "nearest",
+        inline: "nearest",
+      });
+    });
+  }, [selectedProjectId, teamDataReady]);
+
+  useEffect(() => {
+    consumeTeamMemberInviteTarget();
+  }, [consumeTeamMemberInviteTarget]);
+
+  useEffect(() => {
+    const handleTeamMemberInviteTargetChanged = () => {
+      consumeTeamMemberInviteTarget();
+    };
+
+    window.addEventListener(
+      TEAM_MEMBER_INVITE_TARGET_CHANGED_EVENT,
+      handleTeamMemberInviteTargetChanged,
+    );
+    return () => {
+      window.removeEventListener(
+        TEAM_MEMBER_INVITE_TARGET_CHANGED_EVENT,
+        handleTeamMemberInviteTargetChanged,
+      );
+    };
+  }, [consumeTeamMemberInviteTarget]);
 
   const load = async () => {
     const requestId = ++loadRequestIdRef.current;
@@ -1149,15 +1195,18 @@ export function TeamPage() {
         t={t}
         actions={
           teamDataReady ? (
-            <TeamAddMemberButton
-              agents={agents}
-              members={currentProjectMembers}
-              runtimeOptions={addableRuntimeOptions}
-              saving={saving}
-              onAddMember={addMember}
-              onCreateMember={createMemberFromRuntime}
-              t={t}
-            />
+            <div ref={addMemberActionRef}>
+              <TeamAddMemberButton
+                agents={agents}
+                members={currentProjectMembers}
+                openRequestKey={addMemberMenuRequestId}
+                runtimeOptions={addableRuntimeOptions}
+                saving={saving}
+                onAddMember={addMember}
+                onCreateMember={createMemberFromRuntime}
+                t={t}
+              />
+            </div>
           ) : null
         }
       />
