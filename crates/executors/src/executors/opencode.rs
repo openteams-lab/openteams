@@ -12,6 +12,7 @@ use futures::StreamExt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 use tokio::{io::AsyncBufReadExt, process::Command};
 use ts_rs::TS;
 use workspace_utils::msg_store::MsgStore;
@@ -407,23 +408,89 @@ fn apply_isolated_opencode_env(
     current_dir: &Path,
     package_version: &str,
 ) -> io::Result<()> {
-    let runtime_root = current_dir
-        .join(".openteams")
+    let runtime_root = openteams_home_dir()?
         .join("opencode")
         .join(format!(
             "opencode-ai-{}",
             sanitize_path_segment(package_version)
-        ));
+        ))
+        .join(workspace_runtime_key(current_dir));
     let data_home = runtime_root.join("data");
     let state_home = runtime_root.join("state");
+    let opencode_data_dir = data_home.join("opencode");
 
-    std::fs::create_dir_all(&data_home)?;
+    std::fs::create_dir_all(&opencode_data_dir)?;
     std::fs::create_dir_all(&state_home)?;
+    mirror_user_opencode_auth(&opencode_data_dir)?;
 
     command
         .env("XDG_DATA_HOME", data_home)
         .env("XDG_STATE_HOME", state_home);
     Ok(())
+}
+
+fn openteams_home_dir() -> io::Result<PathBuf> {
+    dirs::home_dir()
+        .map(|home| home.join(".openteams"))
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "home directory not found"))
+}
+
+fn workspace_runtime_key(current_dir: &Path) -> String {
+    let canonical = std::fs::canonicalize(current_dir).unwrap_or_else(|_| current_dir.to_path_buf());
+    let mut hasher = Sha256::new();
+    hasher.update(canonical.to_string_lossy().as_bytes());
+    let digest = hasher.finalize();
+    format!("{:x}", digest)[..16].to_string()
+}
+
+fn mirror_user_opencode_auth(isolated_opencode_data_dir: &Path) -> io::Result<()> {
+    let Some(source_auth) = user_opencode_auth_path() else {
+        return Ok(());
+    };
+    if !source_auth.exists() {
+        return Ok(());
+    }
+
+    let target_auth = isolated_opencode_data_dir.join("auth.json");
+    if source_auth == target_auth {
+        return Ok(());
+    }
+
+    let _ = std::fs::remove_file(&target_auth);
+    symlink_or_copy_file(&source_auth, &target_auth)
+}
+
+fn user_opencode_auth_path() -> Option<PathBuf> {
+    #[cfg(not(windows))]
+    {
+        let base_dirs = xdg::BaseDirectories::with_prefix("opencode");
+        base_dirs.get_data_home().map(|data| data.join("auth.json"))
+    }
+    #[cfg(windows)]
+    {
+        std::env::var("XDG_DATA_HOME")
+            .ok()
+            .map(PathBuf::from)
+            .or_else(|| dirs::data_local_dir())
+            .map(|data| data.join("opencode").join("auth.json"))
+    }
+}
+
+fn symlink_or_copy_file(source: &Path, target: &Path) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        if std::os::unix::fs::symlink(source, target).is_ok() {
+            return Ok(());
+        }
+    }
+    #[cfg(windows)]
+    {
+        if std::os::windows::fs::symlink_file(source, target).is_ok() {
+            return Ok(());
+        }
+    }
+
+    std::fs::copy(source, target).map(|_| ())
 }
 
 fn sanitize_path_segment(value: &str) -> String {
