@@ -242,33 +242,16 @@ struct PlainWorkspaceObservedPath {
     existed_after_run: bool,
 }
 
-fn is_output_text_only_observed_source(source: &str) -> bool {
-    let mut saw_output_text = false;
-    let mut saw_other_source = false;
-    for part in source
-        .split(',')
-        .map(str::trim)
-        .filter(|part| !part.is_empty())
-    {
-        if part.eq_ignore_ascii_case("output_text") {
-            saw_output_text = true;
-        } else {
-            saw_other_source = true;
-        }
-    }
-    saw_output_text && !saw_other_source
-}
-
 fn is_artifact_observed_source(source: &str) -> bool {
     source
         .split(',')
         .any(|part| part.trim().eq_ignore_ascii_case("artifact_record"))
 }
 
-fn is_openteams_relative_path(path: &str) -> bool {
-    PathBuf::from(path).components().next().is_some_and(
-        |component| matches!(component, Component::Normal(part) if part == ".openteams"),
-    )
+fn is_source_control_observed_source(source: &str) -> bool {
+    source.split(',').map(str::trim).any(|part| {
+        part.eq_ignore_ascii_case("git_diff") || part.eq_ignore_ascii_case("git_untracked")
+    })
 }
 
 static INLINE_CODE_PATH_RE: LazyLock<Regex> =
@@ -997,11 +980,7 @@ fn collect_session_git_path_union(
         let meta_paths = load_run_meta_observed_paths(run);
         let mut added_from_meta = false;
         for entry in meta_paths {
-            let is_git_source = entry
-                .source
-                .split(',')
-                .any(|source| matches!(source.trim(), "git_diff" | "git_untracked"));
-            if !is_git_source {
+            if !is_source_control_observed_source(&entry.source) {
                 continue;
             }
             if let Some(path) = normalize_workspace_relative_path(&entry.path, workspace_path) {
@@ -1027,48 +1006,22 @@ fn collect_session_git_path_union(
 }
 
 fn collect_session_plain_observed_paths(
-    session_id: Uuid,
     workspace_path: &std::path::Path,
     runs: &[ChatRun],
 ) -> BTreeMap<String, PlainWorkspaceObservedPath> {
-    let work_records = load_work_record_lines(session_id);
     let mut observed = BTreeMap::<String, PlainWorkspaceObservedPath>::new();
 
     for run in runs {
         let meta_paths = load_run_meta_observed_paths(run);
         for entry in meta_paths {
-            if is_output_text_only_observed_source(&entry.source) {
+            if !is_source_control_observed_source(&entry.source) {
                 continue;
             }
-            let is_artifact = is_artifact_observed_source(&entry.source);
-            if let Some(path) = normalize_workspace_relative_path_with_options(
-                &entry.path,
-                workspace_path,
-                is_artifact,
-            ) {
-                if is_artifact && is_openteams_relative_path(&path) {
-                    continue;
-                }
+            if let Some(path) = normalize_workspace_relative_path(&entry.path, workspace_path) {
                 let state = observed.entry(path).or_insert(PlainWorkspaceObservedPath {
                     existed_after_run: false,
                 });
                 state.existed_after_run |= entry.existed_after_run;
-            }
-        }
-
-        for record in work_records.iter().filter(|record| {
-            record.session_id == session_id
-                && record.run_id == run.id
-                && record.message_type.eq_ignore_ascii_case("artifact")
-        }) {
-            for path in extract_workspace_paths_from_artifact_text(&record.content, workspace_path)
-            {
-                if is_openteams_relative_path(&path) {
-                    continue;
-                }
-                observed.entry(path).or_insert(PlainWorkspaceObservedPath {
-                    existed_after_run: false,
-                });
             }
         }
     }
@@ -1135,7 +1088,6 @@ fn build_plain_workspace_changes(
 }
 
 fn collect_session_scoped_git_changes(
-    session_id: Uuid,
     workspace_path: &std::path::Path,
     runs: &[ChatRun],
     include_diff: bool,
@@ -1144,7 +1096,7 @@ fn collect_session_scoped_git_changes(
 
     // Also collect all observed paths (including those in .gitignore'd directories)
     // so we can fall back to plain file logic for files git cannot see.
-    let all_observed = collect_session_plain_observed_paths(session_id, workspace_path, runs);
+    let all_observed = collect_session_plain_observed_paths(workspace_path, runs);
     let first_run_at = runs.iter().map(|run| run.created_at).min();
 
     if session_paths.is_empty() {
@@ -1269,11 +1221,10 @@ fn collect_session_scoped_git_changes(
 }
 
 fn collect_session_scoped_plain_changes(
-    session_id: Uuid,
     workspace_path: &std::path::Path,
     runs: &[ChatRun],
 ) -> WorkspaceChangesResponse {
-    let observed = collect_session_plain_observed_paths(session_id, workspace_path, runs);
+    let observed = collect_session_plain_observed_paths(workspace_path, runs);
     let first_run_at = runs.iter().map(|run| run.created_at).min();
 
     WorkspaceChangesResponse {
@@ -1289,7 +1240,7 @@ fn collect_session_scoped_plain_changes(
 }
 
 fn collect_workspace_changes(
-    session_id: Uuid,
+    _session_id: Uuid,
     workspace_path: &str,
     include_diff: bool,
     runs: Vec<ChatRun>,
@@ -1317,10 +1268,10 @@ fn collect_workspace_changes(
     }
 
     if git2::Repository::open(&path).is_ok() {
-        return collect_session_scoped_git_changes(session_id, &path, &runs, include_diff);
+        return collect_session_scoped_git_changes(&path, &runs, include_diff);
     }
 
-    collect_session_scoped_plain_changes(session_id, &path, &runs)
+    collect_session_scoped_plain_changes(&path, &runs)
 }
 
 #[cfg(windows)]
@@ -2830,7 +2781,7 @@ new file mode 100644
     }
 
     #[test]
-    fn collect_workspace_changes_returns_non_git_changes_from_manifest() {
+    fn collect_workspace_changes_ignores_artifact_only_manifest_entries() {
         let tempdir = tempfile::tempdir().expect("create tempdir");
         let workspace_path = tempdir.path();
         fs::write(workspace_path.join("plain.txt"), "plain\n").expect("write plain file");
@@ -2862,13 +2813,71 @@ new file mode 100644
         assert!(!response.is_git_repo);
         let changes = response.changes.expect("plain changes present");
         assert!(
-            changes.added.iter().any(|entry| entry.path == "plain.txt")
-                || changes
-                    .modified
-                    .iter()
-                    .any(|entry| entry.path == "plain.txt")
+            changes.modified.is_empty(),
+            "artifact_record-only manifest entries must not appear as modified: {:?}",
+            changes.modified
         );
+        assert!(
+            changes.added.is_empty(),
+            "artifact_record-only manifest entries must not appear as added: {:?}",
+            changes.added
+        );
+        assert!(
+            changes.deleted.is_empty(),
+            "artifact_record-only manifest entries must not appear as deleted: {:?}",
+            changes.deleted
+        );
+        assert!(changes.untracked.is_empty());
         assert!(response.error.is_none());
+    }
+
+    #[test]
+    fn collect_workspace_changes_keeps_git_source_with_artifact_record_combo() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let repo_path = tempdir.path().join("repo");
+        let git = GitService::new();
+        git.initialize_repo_with_main_branch(&repo_path)
+            .expect("init repo");
+
+        fs::write(repo_path.join("tracked.txt"), "base\n").expect("write tracked");
+        git.commit(&repo_path, "baseline").expect("commit baseline");
+        fs::write(
+            repo_path.join("tracked.txt"),
+            "combined git and artifact source\n",
+        )
+        .expect("modify tracked");
+
+        let session_id = Uuid::new_v4();
+        let session_agent_id = Uuid::new_v4();
+        let run_dir = tempdir.path().join("run-record");
+        fs::create_dir_all(&run_dir).expect("create run dir");
+        fs::write(
+            run_dir.join("meta.json"),
+            r#"{"workspace_observed_paths":[{"path":"tracked.txt","source":"git_diff,artifact_record","existed_after_run":true}]}"#,
+        )
+        .expect("write meta");
+        let run = test_run(
+            session_id,
+            session_agent_id,
+            1,
+            &run_dir,
+            Utc::now() - chrono::Duration::minutes(1),
+        );
+
+        let response =
+            collect_workspace_changes(session_id, &repo_path.to_string_lossy(), true, vec![run]);
+
+        assert!(response.is_git_repo);
+        assert!(response.error.is_none());
+        let changes = response.changes.expect("changes present");
+        assert!(
+            changes
+                .modified
+                .iter()
+                .any(|entry| entry.path == "tracked.txt"),
+            "real Git diff must still surface when combined with artifact_record: {:?}",
+            changes.modified
+        );
     }
 
     #[test]
@@ -2911,7 +2920,7 @@ new file mode 100644
     }
 
     #[test]
-    fn collect_workspace_changes_marks_deleted_non_git_manifest_entries() {
+    fn collect_workspace_changes_ignores_deleted_non_git_manifest_entries() {
         let tempdir = tempfile::tempdir().expect("create tempdir");
         let session_id = Uuid::new_v4();
         let session_agent_id = Uuid::new_v4();
@@ -2939,12 +2948,14 @@ new file mode 100644
 
         assert!(!response.is_git_repo);
         let changes = response.changes.expect("plain changes present");
-        assert_eq!(
-            changes.deleted,
-            vec![WorkspacePathEntry {
-                path: "deleted.txt".to_string()
-            }]
+        assert!(
+            changes.deleted.is_empty(),
+            "artifact_record-only deleted entries must not pollute file changes: {:?}",
+            changes.deleted
         );
+        assert!(changes.modified.is_empty());
+        assert!(changes.added.is_empty());
+        assert!(changes.untracked.is_empty());
     }
 
     #[test]
@@ -2987,7 +2998,7 @@ new file mode 100644
     }
 
     #[test]
-    fn collect_workspace_changes_merges_artifact_paths_but_excludes_openteams_artifacts() {
+    fn collect_workspace_changes_excludes_work_records_artifacts_from_file_changes() {
         let tempdir = tempfile::tempdir().expect("create tempdir");
         let repo_path = tempdir.path().join("repo");
         let git = GitService::new();
@@ -3100,7 +3111,10 @@ new file mode 100644
             .collect::<Vec<_>>();
 
         assert!(all_paths.contains(&"tracked.txt"));
-        assert!(all_paths.contains(&"binaries/test.txt"));
+        assert!(
+            !all_paths.contains(&"binaries/test.txt"),
+            "work_records artifact paths must not pollute the file changes panel: {all_paths:?}"
+        );
         assert!(!all_paths.contains(&".openteams/test.txt"));
         assert!(
             !all_paths.contains(&".openteams/context/demo/independent-mode-discussion-proposal.md")

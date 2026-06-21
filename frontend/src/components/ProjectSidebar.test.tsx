@@ -176,6 +176,44 @@ const completedAgentSessionHtml = renderToStaticMarkup(
     onProjectAction={() => undefined}
   />,
 );
+const pendingWorkflowInputSessionHtml = renderToStaticMarkup(
+  <ProjectSidebar
+    shellOptions={mockShellOptions}
+    sessions={[
+      {
+        ...mockWorkspaceBootstrap.sessions[0],
+        hasPendingWorkflowInput: true,
+        pendingWorkflowInputId: "input-1",
+      },
+    ]}
+    activeSessionId="another-session"
+    activePage="workspace"
+    weeklyCost={mockWorkspaceBootstrap.defaults.weeklyCost}
+    onNavigate={() => undefined}
+    onSessionSelect={() => undefined}
+    onPrimaryAction={() => undefined}
+    onProjectAction={() => undefined}
+  />,
+);
+const pendingWorkflowReviewSessionHtml = renderToStaticMarkup(
+  <ProjectSidebar
+    shellOptions={mockShellOptions}
+    sessions={[
+      {
+        ...mockWorkspaceBootstrap.sessions[0],
+        hasPendingWorkflowReview: true,
+        pendingWorkflowReviewId: "review-1",
+      },
+    ]}
+    activeSessionId="another-session"
+    activePage="workspace"
+    weeklyCost={mockWorkspaceBootstrap.defaults.weeklyCost}
+    onNavigate={() => undefined}
+    onSessionSelect={() => undefined}
+    onPrimaryAction={() => undefined}
+    onProjectAction={() => undefined}
+  />,
+);
 const runningOrderedHtml = renderToStaticMarkup(
   <ProjectSidebar
     shellOptions={mockShellOptions}
@@ -271,6 +309,20 @@ check(
     completedAgentSessionHtml.includes("agent completed") &&
     !completedAgentSessionHtml.includes("animate-spin"),
   completedAgentSessionHtml,
+);
+check(
+  "renders pending workflow input sessions with non-running highlighted icon",
+  pendingWorkflowInputSessionHtml.includes("text-[var(--primary)]") &&
+    pendingWorkflowInputSessionHtml.includes("waiting for input") &&
+    !pendingWorkflowInputSessionHtml.includes("animate-spin"),
+  pendingWorkflowInputSessionHtml,
+);
+check(
+  "renders pending workflow review sessions with spinning activity icon",
+  pendingWorkflowReviewSessionHtml.includes("animate-spin") &&
+    pendingWorkflowReviewSessionHtml.includes("text-[var(--primary)]") &&
+    pendingWorkflowReviewSessionHtml.includes("waiting for review"),
+  pendingWorkflowReviewSessionHtml,
 );
 check(
   "moves running workflow sessions to the top of the collapsed session group",

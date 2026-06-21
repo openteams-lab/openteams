@@ -68,6 +68,10 @@ export const mapSession = (
     hasRunningAgent?: boolean;
     hasRunningWorkflow?: boolean;
     hasUnreadAgentCompletion?: boolean;
+    hasPendingWorkflowInput?: boolean;
+    pendingWorkflowInputId?: string | null;
+    hasPendingWorkflowReview?: boolean;
+    pendingWorkflowReviewId?: string | null;
   },
 ): Session => ({
   id: backend.id,
@@ -77,6 +81,10 @@ export const mapSession = (
   hasRunningAgent: opts?.hasRunningAgent,
   hasRunningWorkflow: opts?.hasRunningWorkflow,
   hasUnreadAgentCompletion: opts?.hasUnreadAgentCompletion,
+  hasPendingWorkflowInput: opts?.hasPendingWorkflowInput,
+  pendingWorkflowInputId: opts?.pendingWorkflowInputId ?? null,
+  hasPendingWorkflowReview: opts?.hasPendingWorkflowReview,
+  pendingWorkflowReviewId: opts?.pendingWorkflowReviewId ?? null,
 });
 
 export const mapSessions = (

@@ -19,6 +19,7 @@ use db::models::{
 use git::{GitCli, GitService};
 use serde_json::json;
 use sqlx::SqlitePool;
+use utils::assets::asset_dir;
 use uuid::Uuid;
 
 use super::source_control::{
@@ -315,8 +316,7 @@ async fn git_workspace_ignores_output_text_observed_paths() {
     )
     .await;
 
-    fs::write(repo_path.join("tracked.txt"), "mentioned in output only\n")
-        .expect("modify tracked");
+    fs::write(repo_path.join("tracked.txt"), "mentioned in output only\n").expect("modify tracked");
 
     let status = SourceControlService::new()
         .session_status(&pool, project.id, session_id, None)
@@ -365,12 +365,126 @@ async fn git_workspace_ignores_openteams_artifact_observed_paths() {
 }
 
 #[tokio::test]
+async fn git_workspace_ignores_artifact_only_observed_paths() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+    let session_id = seed_session_with_observed_source(
+        &pool,
+        project.id,
+        &repo_path,
+        &["tracked.txt"],
+        "artifact_record",
+    )
+    .await;
+
+    fs::write(repo_path.join("tracked.txt"), "recorded as artifact only\n")
+        .expect("modify tracked");
+
+    let status = SourceControlService::new()
+        .session_status(&pool, project.id, session_id, None)
+        .await
+        .expect("status");
+
+    let (changes, staged) = git_status_paths(&status);
+    assert!(
+        changes.is_empty(),
+        "artifact_record-only paths must not own source-control changes: {changes:?}"
+    );
+    assert!(staged.is_empty());
+}
+
+#[tokio::test]
+async fn git_workspace_keeps_git_source_with_artifact_record_combo() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+    let session_id = seed_session_with_observed_source(
+        &pool,
+        project.id,
+        &repo_path,
+        &["tracked.txt"],
+        "git_diff,artifact_record",
+    )
+    .await;
+
+    fs::write(
+        repo_path.join("tracked.txt"),
+        "combined git and artifact source\n",
+    )
+    .expect("modify tracked");
+
+    let status = SourceControlService::new()
+        .session_status(&pool, project.id, session_id, None)
+        .await
+        .expect("status");
+
+    let (changes, staged) = git_status_paths(&status);
+    assert_eq!(changes, vec!["tracked.txt"]);
+    assert!(staged.is_empty());
+}
+
+#[tokio::test]
+async fn git_workspace_ignores_work_records_artifact_paths() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+
+    fs::create_dir_all(repo_path.join("binaries")).expect("create binaries dir");
+    fs::write(repo_path.join("binaries").join("test.txt"), "baseline\n")
+        .expect("write tracked binary");
+    git_add(&repo_path, "binaries/test.txt");
+    GitService::new()
+        .commit(&repo_path, "track binaries test file")
+        .expect("commit binaries file");
+
+    let session_id = seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
+
+    let runs = ChatRun::list_for_session_workspace(&pool, session_id, &repo_path.to_string_lossy())
+        .await
+        .expect("list runs");
+    let run_id = runs.first().expect("seeded run").id;
+
+    let protocol_dir = asset_dir()
+        .join("chat")
+        .join(format!("session_{session_id}"))
+        .join("protocol");
+    fs::create_dir_all(&protocol_dir).expect("create protocol dir");
+    fs::write(
+        protocol_dir.join("work_records.jsonl"),
+        format!(
+            "{{\"session_id\":\"{session_id}\",\"run_id\":\"{run_id}\",\"message_type\":\"artifact\",\"content\":\"Saved binaries/test.txt.\"}}\n"
+        ),
+    )
+    .expect("write work records");
+
+    fs::write(repo_path.join("binaries").join("test.txt"), "updated\n")
+        .expect("modify binaries file");
+
+    let status = SourceControlService::new()
+        .session_status(&pool, project.id, session_id, None)
+        .await
+        .expect("status");
+
+    let session_asset_dir = asset_dir()
+        .join("chat")
+        .join(format!("session_{session_id}"));
+    let _ = fs::remove_dir_all(session_asset_dir);
+
+    let (changes, staged) = git_status_paths(&status);
+    assert!(
+        !changes.iter().any(|path| path == "binaries/test.txt"),
+        "work_records artifact paths must not own source-control changes: {changes:?}"
+    );
+    assert!(staged.is_empty());
+}
+
+#[tokio::test]
 async fn invalidating_session_caches_exposes_agent_file_changes() {
     let pool = setup_pool().await;
     let (_tempdir, repo_path) = setup_git_workspace();
     let project = seed_project(&pool, &repo_path).await;
-    let session_id =
-        seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
+    let session_id = seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
     let service = SourceControlService::new();
 
     let initial = service

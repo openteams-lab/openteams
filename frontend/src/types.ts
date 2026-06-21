@@ -52,6 +52,10 @@ export interface Session {
   hasRunningAgent?: boolean;
   hasRunningWorkflow?: boolean;
   hasUnreadAgentCompletion?: boolean;
+  hasPendingWorkflowInput?: boolean;
+  pendingWorkflowInputId?: string | null;
+  hasPendingWorkflowReview?: boolean;
+  pendingWorkflowReviewId?: string | null;
 }
 
 export interface ArtifactItem {
@@ -1160,6 +1164,8 @@ export type WorkflowCardState =
 
 export interface WorkflowSessionStatusResponse {
   has_running_workflow: boolean;
+  pending_workflow_input_id: string | null;
+  pending_workflow_review_id: string | null;
 }
 
 export interface WorkflowCardStep {

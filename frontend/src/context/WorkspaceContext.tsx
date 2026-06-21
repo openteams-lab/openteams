@@ -229,6 +229,8 @@ const RUNNING_AGENT_SESSION_IDS_STORAGE_KEY =
   'openteams-running-agent-session-ids';
 const UNREAD_AGENT_COMPLETION_SESSION_IDS_STORAGE_KEY =
   'openteams-unread-agent-completion-session-ids';
+const ACKED_WORKFLOW_INPUT_IDS_STORAGE_KEY =
+  'openteams-acked-workflow-input-ids';
 // WebSocket auto-reconnect backoff bounds (ms).
 const CHAT_STREAM_RECONNECT_BASE_DELAY_MS = 1000;
 const CHAT_STREAM_RECONNECT_MAX_DELAY_MS = 30000;
@@ -300,6 +302,8 @@ const hasRunningSessionAgent = (
 type SessionRunningIndicators = {
   hasRunningAgent: boolean;
   hasRunningWorkflow: boolean;
+  pendingWorkflowInputId: string | null;
+  pendingWorkflowReviewId: string | null;
 };
 
 const loadSessionRunningIndicators = async (
@@ -312,7 +316,11 @@ const loadSessionRunningIndicators = async (
         sessionAgentsApi.list(sessionId).catch(() => []),
         workflowApi
           .getSessionStatus(sessionId)
-          .catch(() => ({ has_running_workflow: false })),
+          .catch(() => ({
+            has_running_workflow: false,
+            pending_workflow_input_id: null,
+            pending_workflow_review_id: null,
+          })),
       ]);
       return [
         sessionId,
@@ -322,6 +330,10 @@ const loadSessionRunningIndicators = async (
             ignoredSessionAgentIds,
           ),
           hasRunningWorkflow: workflowStatus.has_running_workflow,
+          pendingWorkflowInputId:
+            workflowStatus.pending_workflow_input_id ?? null,
+          pendingWorkflowReviewId:
+            workflowStatus.pending_workflow_review_id ?? null,
         },
       ] as const;
     }),
@@ -1391,6 +1403,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const unreadAgentCompletionSessionIdsRef = useRef<Set<string>>(
     readSessionIdSet(UNREAD_AGENT_COMPLETION_SESSION_IDS_STORAGE_KEY),
   );
+  const acknowledgedWorkflowInputIdsRef = useRef<Set<string>>(
+    readSessionIdSet(ACKED_WORKFLOW_INPUT_IDS_STORAGE_KEY),
+  );
   const deferredQueuedMessageIdsRef = useRef<Set<string>>(new Set());
   const deferredQueuedClientMessageIdsRef = useRef<Set<string>>(new Set());
   const deferredQueuedUserMessagesRef = useRef<Map<string, Message>>(new Map());
@@ -1406,6 +1421,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     writeSessionIdSet(
       UNREAD_AGENT_COMPLETION_SESSION_IDS_STORAGE_KEY,
       unreadAgentCompletionSessionIdsRef.current,
+    );
+  }, []);
+  const persistWorkflowInputAcknowledgementStorage = useCallback(() => {
+    writeSessionIdSet(
+      ACKED_WORKFLOW_INPUT_IDS_STORAGE_KEY,
+      acknowledgedWorkflowInputIdsRef.current,
     );
   }, []);
 
@@ -1445,6 +1466,34 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     [persistAgentSessionActivityStorage],
   );
 
+  const acknowledgeWorkflowInput = useCallback(
+    (inputId: string | null | undefined) => {
+      if (!inputId || acknowledgedWorkflowInputIdsRef.current.has(inputId)) {
+        return;
+      }
+      acknowledgedWorkflowInputIdsRef.current.add(inputId);
+      persistWorkflowInputAcknowledgementStorage();
+    },
+    [persistWorkflowInputAcknowledgementStorage],
+  );
+
+  const syncSessionWorkflowInputIndicator = useCallback(
+    (
+      sessionId: string,
+      pendingWorkflowInputId: string | null | undefined,
+    ): boolean => {
+      if (!sessionId || !pendingWorkflowInputId) return false;
+      if (activeSessionIdRef.current === sessionId) {
+        acknowledgeWorkflowInput(pendingWorkflowInputId);
+        return false;
+      }
+      return !acknowledgedWorkflowInputIdsRef.current.has(
+        pendingWorkflowInputId,
+      );
+    },
+    [acknowledgeWorkflowInput],
+  );
+
   const clearUnreadAgentCompletion = useCallback(
     (sessionId: string) => {
       if (!sessionId) return;
@@ -1469,6 +1518,24 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     },
     [persistAgentSessionActivityStorage],
+  );
+
+  const clearPendingWorkflowInput = useCallback(
+    (sessionId: string) => {
+      if (!sessionId) return;
+      setSessionsAsync((prev) => {
+        let changed = false;
+        const data = prev.data.map((session) => {
+          if (session.id !== sessionId) return session;
+          acknowledgeWorkflowInput(session.pendingWorkflowInputId);
+          if (!session.hasPendingWorkflowInput) return session;
+          changed = true;
+          return { ...session, hasPendingWorkflowInput: false };
+        });
+        return changed ? { ...prev, data } : prev;
+      });
+    },
+    [acknowledgeWorkflowInput],
   );
 
   const rememberDeferredQueuedUserMessage = useCallback((message: Message) => {
@@ -1555,7 +1622,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     } catch {}
     clearUnreadAgentCompletion(activeSessionId);
-  }, [activeSessionId, clearUnreadAgentCompletion]);
+    clearPendingWorkflowInput(activeSessionId);
+  }, [activeSessionId, clearPendingWorkflowInput, clearUnreadAgentCompletion]);
 
   useEffect(() => {
     messagesRequestIdRef.current += 1;
@@ -1703,6 +1771,51 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     },
     [],
+  );
+  const setSessionWorkflowStatusIndicators = useCallback(
+    (
+      sessionId: string,
+      status: {
+        has_running_workflow: boolean;
+        pending_workflow_input_id?: string | null;
+        pending_workflow_review_id?: string | null;
+      },
+    ) => {
+      if (!sessionId) return;
+      const pendingWorkflowInputId = status.pending_workflow_input_id ?? null;
+      const pendingWorkflowReviewId = status.pending_workflow_review_id ?? null;
+      const hasPendingWorkflowInput = syncSessionWorkflowInputIndicator(
+        sessionId,
+        pendingWorkflowInputId,
+      );
+      const hasPendingWorkflowReview = Boolean(pendingWorkflowReviewId);
+      setSessionsAsync((prev) => {
+        let changed = false;
+        const data = prev.data.map((session) => {
+          if (
+            session.id !== sessionId ||
+            (session.hasRunningWorkflow === status.has_running_workflow &&
+              session.pendingWorkflowInputId === pendingWorkflowInputId &&
+              session.hasPendingWorkflowInput === hasPendingWorkflowInput &&
+              session.pendingWorkflowReviewId === pendingWorkflowReviewId &&
+              session.hasPendingWorkflowReview === hasPendingWorkflowReview)
+          ) {
+            return session;
+          }
+          changed = true;
+          return {
+            ...session,
+            hasRunningWorkflow: status.has_running_workflow,
+            pendingWorkflowInputId,
+            hasPendingWorkflowInput,
+            pendingWorkflowReviewId,
+            hasPendingWorkflowReview,
+          };
+        });
+        return changed ? { ...prev, data } : prev;
+      });
+    },
+    [syncSessionWorkflowInputIndicator],
   );
 
   const clearSessionScopedState = useCallback(() => {
@@ -1971,10 +2084,21 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         (session) => {
           const indicators = runningIndicators.get(session.id);
           const hasRunningAgent = indicators?.hasRunningAgent ?? false;
+          const pendingWorkflowInputId =
+            indicators?.pendingWorkflowInputId ?? null;
+          const pendingWorkflowReviewId =
+            indicators?.pendingWorkflowReviewId ?? null;
           return {
             ...session,
             hasRunningAgent,
             hasRunningWorkflow: indicators?.hasRunningWorkflow ?? false,
+            pendingWorkflowInputId,
+            hasPendingWorkflowInput: syncSessionWorkflowInputIndicator(
+              session.id,
+              pendingWorkflowInputId,
+            ),
+            pendingWorkflowReviewId,
+            hasPendingWorkflowReview: Boolean(pendingWorkflowReviewId),
             hasUnreadAgentCompletion: syncSessionAgentActivityIndicator(
               session.id,
               hasRunningAgent,
@@ -1990,6 +2114,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     clearSessionScopedState,
     syncActiveSessionSelection,
     syncSessionAgentActivityIndicator,
+    syncSessionWorkflowInputIndicator,
   ]);
 
   const refreshArchivedSessions = useCallback(async (): Promise<void> => {
@@ -2537,15 +2662,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!sessionId) return;
       try {
         const status = await workflowApi.getSessionStatus(sessionId);
-        setSessionWorkflowRunningIndicator(
-          sessionId,
-          status.has_running_workflow,
-        );
+        setSessionWorkflowStatusIndicators(sessionId, status);
       } catch {
         // Sidebar status is best-effort; card/message refresh remains primary.
       }
     },
-    [setSessionWorkflowRunningIndicator],
+    [setSessionWorkflowStatusIndicators],
   );
 
   const refreshSessionRunningIndicators = useCallback(
@@ -2566,13 +2688,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         );
       }
       if (workflowStatus) {
-        setSessionWorkflowRunningIndicator(
-          sessionId,
-          workflowStatus.has_running_workflow,
-        );
+        setSessionWorkflowStatusIndicators(sessionId, workflowStatus);
       }
     },
-    [setSessionRunningIndicator, setSessionWorkflowRunningIndicator],
+    [setSessionRunningIndicator, setSessionWorkflowStatusIndicators],
   );
 
   useEffect(() => {
@@ -2582,7 +2701,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       .filter(
         (session) =>
           session.id !== activeSessionId &&
-          Boolean(session.hasRunningAgent || session.hasRunningWorkflow),
+          Boolean(
+            session.hasRunningAgent ||
+              session.hasRunningWorkflow ||
+              session.hasPendingWorkflowInput ||
+              session.hasPendingWorkflowReview,
+          ),
       )
       .map((session) => session.id);
     if (runningSidebarSessionIds.length === 0) return;

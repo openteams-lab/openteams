@@ -136,9 +136,14 @@ const blankTeamId = "blank_team";
 const hasRunningSessionActivity = (session: Session): boolean =>
   Boolean(session.hasRunningAgent || session.hasRunningWorkflow);
 
+const hasSidebarPrioritySessionActivity = (session: Session): boolean =>
+  hasRunningSessionActivity(session) ||
+  Boolean(session.hasPendingWorkflowInput) ||
+  Boolean(session.hasPendingWorkflowReview);
+
 const prioritizeRunningSessions = (sessions: Session[]): Session[] => [
-  ...sessions.filter(hasRunningSessionActivity),
-  ...sessions.filter((session) => !hasRunningSessionActivity(session)),
+  ...sessions.filter(hasSidebarPrioritySessionActivity),
+  ...sessions.filter((session) => !hasSidebarPrioritySessionActivity(session)),
 ];
 
 const blankTeamOptions: DropdownSelectOption[] = [
@@ -2057,13 +2062,34 @@ export function ProjectSidebar({
                     activePage === "workspace" &&
                     session.id === activeSessionId;
                   const isRunning = hasRunningSessionActivity(session);
+                  const hasPendingWorkflowReview =
+                    !isRunning && Boolean(session.hasPendingWorkflowReview);
+                  const hasPendingWorkflowInput =
+                    !isRunning &&
+                    !hasPendingWorkflowReview &&
+                    Boolean(session.hasPendingWorkflowInput);
                   const hasUnreadAgentCompletion =
                     !isRunning && Boolean(session.hasUnreadAgentCompletion);
-                  const SessionIcon = isRunning ? LoaderCircle : Box;
+                  const SessionIcon =
+                    isRunning || hasPendingWorkflowReview
+                      ? LoaderCircle
+                      : hasPendingWorkflowInput
+                        ? CircleDot
+                        : Box;
                   const sessionLabel = isRunning
                     ? `${session.title} - ${translate(
                         "sidebar.sessionRunning",
                         "agent running",
+                      )}`
+                    : hasPendingWorkflowReview
+                    ? `${session.title} - ${translate(
+                        "sidebar.sessionWaitingReview",
+                        "waiting for review",
+                      )}`
+                    : hasPendingWorkflowInput
+                    ? `${session.title} - ${translate(
+                        "sidebar.sessionNeedsInput",
+                        "waiting for input",
                       )}`
                     : hasUnreadAgentCompletion
                     ? `${session.title} - ${translate(
@@ -2089,8 +2115,10 @@ export function ProjectSidebar({
                     >
                       <SessionIcon
                         className={`h-3.5 w-3.5 shrink-0 ${
-                          isRunning
+                          isRunning || hasPendingWorkflowReview
                             ? "animate-spin text-[var(--primary)]"
+                            : hasPendingWorkflowInput
+                            ? "text-[var(--primary)]"
                             : hasUnreadAgentCompletion
                             ? "text-[var(--primary)]"
                             : active

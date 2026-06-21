@@ -22,7 +22,7 @@ use db::models::{
     workflow_transcript::WorkflowTranscript,
     workflow_types::{
         ReviewVerdict, ReviewerType, WorkflowExecutionStatus, WorkflowPlanJson, WorkflowPlanStatus,
-        WorkflowRevisionEditor, WorkflowValidationStatus,
+        WorkflowRevisionEditor, WorkflowStepStatus, WorkflowValidationStatus,
     },
 };
 use deployment::Deployment;
@@ -42,6 +42,7 @@ use services::services::{
         workflow_validator,
     },
 };
+use sqlx::SqlitePool;
 use ts_rs::TS;
 use utils::{assets::config_path, response::ApiResponse};
 use uuid::Uuid;
@@ -72,10 +73,82 @@ pub struct RetryPlanGenerationResponse {
 #[derive(Debug, Serialize)]
 pub struct WorkflowSessionStatusResponse {
     pub has_running_workflow: bool,
+    pub pending_workflow_input_id: Option<String>,
+    pub pending_workflow_review_id: Option<String>,
 }
 
 fn is_sidebar_running_workflow_status(status: &WorkflowExecutionStatus) -> bool {
     matches!(status, WorkflowExecutionStatus::Running)
+}
+
+async fn find_pending_workflow_input_id(
+    pool: &SqlitePool,
+    executions: &[WorkflowExecution],
+) -> Result<Option<Uuid>, sqlx::Error> {
+    for execution in executions {
+        let input_id = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            SELECT t.id
+            FROM chat_workflow_transcripts t
+            INNER JOIN chat_workflow_steps s ON s.id = t.step_id
+            WHERE t.execution_id = ?1
+              AND t.entry_type = 'input_request'
+              AND s.status = ?2
+              AND (
+                t.meta_json IS NULL
+                OR json_valid(t.meta_json) = 0
+                OR json_extract(t.meta_json, '$.resolved') IS NULL
+                OR json_extract(t.meta_json, '$.resolved') = 0
+              )
+            ORDER BY t.created_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(execution.id)
+        .bind(WorkflowStepStatus::WaitingInput)
+        .fetch_optional(pool)
+        .await?;
+
+        if input_id.is_some() {
+            return Ok(input_id);
+        }
+    }
+
+    Ok(None)
+}
+
+async fn find_pending_workflow_review_id(
+    pool: &SqlitePool,
+    executions: &[WorkflowExecution],
+) -> Result<Option<Uuid>, sqlx::Error> {
+    for execution in executions {
+        let review_id = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            SELECT t.id
+            FROM chat_workflow_transcripts t
+            INNER JOIN chat_workflow_steps s ON s.id = t.step_id
+            WHERE t.execution_id = ?1
+              AND t.entry_type IN ('step_review', 'loop_review')
+              AND (
+                t.meta_json IS NULL
+                OR json_valid(t.meta_json) = 0
+                OR json_extract(t.meta_json, '$.resolved') IS NULL
+                OR json_extract(t.meta_json, '$.resolved') = 0
+              )
+            ORDER BY t.created_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(execution.id)
+        .fetch_optional(pool)
+        .await?;
+
+        if review_id.is_some() {
+            return Ok(review_id);
+        }
+    }
+
+    Ok(None)
 }
 
 pub async fn get_workflow_status(
@@ -88,10 +161,20 @@ pub async fn get_workflow_status(
     let has_running_workflow = executions
         .iter()
         .any(|execution| is_sidebar_running_workflow_status(&execution.status));
+    let pending_workflow_input_id =
+        find_pending_workflow_input_id(&deployment.db().pool, &executions)
+            .await?
+            .map(|id| id.to_string());
+    let pending_workflow_review_id =
+        find_pending_workflow_review_id(&deployment.db().pool, &executions)
+            .await?
+            .map(|id| id.to_string());
 
     Ok(ResponseJson(ApiResponse::success(
         WorkflowSessionStatusResponse {
             has_running_workflow,
+            pending_workflow_input_id,
+            pending_workflow_review_id,
         },
     )))
 }

@@ -357,11 +357,31 @@ check(
   source,
 );
 check(
-  'polls non-active running sessions so sidebar icons leave running state',
+  'workflow input highlights persist until the session is opened',
+  source.includes('ACKED_WORKFLOW_INPUT_IDS_STORAGE_KEY') &&
+    source.includes('acknowledgedWorkflowInputIdsRef') &&
+    source.includes('syncSessionWorkflowInputIndicator') &&
+    source.includes('hasPendingWorkflowInput') &&
+    source.includes('pendingWorkflowInputId') &&
+    source.includes('clearPendingWorkflowInput(activeSessionId)'),
+  source,
+);
+check(
+  'workflow review status is tracked for the sidebar activity icon',
+  source.includes('pending_workflow_review_id') &&
+    source.includes('pendingWorkflowReviewId') &&
+    source.includes('hasPendingWorkflowReview'),
+  source,
+);
+check(
+  'polls non-active running and waiting workflow sessions so sidebar icons update',
   source.includes('SIDEBAR_RUNNING_INDICATOR_POLL_MS') &&
     source.includes('runningSidebarSessionIds') &&
     source.includes('session.id !== activeSessionId') &&
-    source.includes('session.hasRunningAgent || session.hasRunningWorkflow') &&
+    source.includes('session.hasRunningAgent') &&
+    source.includes('session.hasRunningWorkflow') &&
+    source.includes('session.hasPendingWorkflowInput') &&
+    source.includes('session.hasPendingWorkflowReview') &&
     source.includes('refreshRunningSidebarSessions') &&
     source.includes('window.setInterval(') &&
     source.includes('refreshSessionRunningIndicators(sessionId)'),
