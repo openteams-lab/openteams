@@ -4,15 +4,18 @@ use axum::{
     response::Json as ResponseJson,
     routing::{get, post},
 };
-use db::models::chat_session::ChatSession;
-use db::models::chat_session_worktree::{SessionWorktree, SessionWorktreeMergeOperation};
+use db::models::{
+    chat_session::{ChatSession, ChatSessionWorktreeMode},
+    chat_session_worktree::{SessionWorktree, SessionWorktreeMergeOperation},
+};
 use deployment::Deployment;
 use serde::Deserialize;
 use services::services::session_worktree::{
-    ConflictFileContent, ConflictFileInfo, EnsureWorktreeInput, EnsureOutcome, MergeResult,
-    SessionWorktreeError, SessionWorktreeService,
+    ConflictFileContent, ConflictFileInfo, ConflictResolutionSide, EnsureOutcome,
+    EnsureWorktreeInput, MergeResult, SessionWorktreeError, SessionWorktreeService,
 };
 use utils::response::ApiResponse;
+use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError};
 
@@ -25,13 +28,11 @@ pub fn router() -> Router<DeploymentImpl> {
         .route("/retry-cleanup", post(retry_cleanup_worktree))
         .route("/merge-conflicts", get(list_merge_conflicts))
         .route(
-            "/merge-conflicts/{file_path}",
+            "/merge-conflicts/{*file_path}",
             get(get_merge_conflict_detail),
         )
-        .route(
-            "/merge-conflicts/{file_path}/resolve",
-            post(resolve_merge_conflict),
-        )
+        .route("/merge-conflicts/resolve", post(resolve_merge_conflict))
+        .route("/resolve", post(resolve_merge_conflict))
         .route("/merge/continue", post(continue_merge))
         .route("/merge/abort", post(abort_merge))
 }
@@ -62,7 +63,20 @@ pub struct MergeWorktreeRequest {
 
 #[derive(Debug, Default, Deserialize, ts_rs::TS)]
 pub struct ResolveConflictRequest {
-    pub content: String,
+    /// Relative path of the conflicted file to resolve, e.g. `src/main.rs`.
+    /// Moved from a path parameter to the body so Axum's catch-all
+    /// limitation (must be last segment) doesn't block nested paths in
+    /// the resolve endpoint.
+    pub path: String,
+    #[serde(default)]
+    #[ts(optional, type = "string | null")]
+    pub content: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub use_stage: Option<ConflictResolutionSide>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub delete_file: Option<bool>,
 }
 
 #[derive(Debug, Default, Deserialize, ts_rs::TS)]
@@ -77,14 +91,17 @@ pub struct ContinueMergeRequest {
 // -----------------------------------------------------------------
 
 /// GET /chat/sessions/{session_id}/worktree
-/// Returns the active session worktree row, or null if no worktree exists.
+/// Returns the most recent session worktree row regardless of status, or null
+/// if no worktree exists. This includes terminal states (`merged`,
+/// `cleanup_failed`, `archived`) so the UI can render read-only history and
+/// expose the retry-cleanup entry point.
 pub async fn get_worktree_status(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<Option<SessionWorktree>>>, ApiError> {
     let service = SessionWorktreeService::new(deployment.db().pool.clone());
     let worktree = service
-        .get_for_session(session.id)
+        .get_latest_for_session(session.id)
         .await
         .map_err(session_worktree_api_error)?;
     Ok(ResponseJson(ApiResponse::success(worktree)))
@@ -92,11 +109,21 @@ pub async fn get_worktree_status(
 
 /// POST /chat/sessions/{session_id}/worktree
 /// Lazily create (or return the existing) isolated worktree for the session.
+/// Only sessions with `worktree_mode == isolated` may create a worktree;
+/// `inherit` / `disabled` sessions are rejected to preserve the main-workspace
+/// behavior for sessions that have not opted into isolation.
 pub async fn prepare_worktree(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
     Json(payload): Json<PrepareWorktreeRequest>,
 ) -> Result<ResponseJson<ApiResponse<SessionWorktree>>, ApiError> {
+    if session.worktree_mode != ChatSessionWorktreeMode::Isolated {
+        return Err(ApiError::BadRequest(format!(
+            "Session worktree_mode is {0:?}, not 'isolated'. Enable isolated worktree mode before preparing a worktree.",
+            session.worktree_mode
+        )));
+    }
+
     let service = SessionWorktreeService::new(deployment.db().pool.clone());
 
     let base_workspace_path = payload
@@ -200,14 +227,15 @@ pub async fn list_merge_conflicts(
     Ok(ResponseJson(ApiResponse::success(files)))
 }
 
-/// GET /chat/sessions/{session_id}/worktree/merge-conflicts/{file_path}
+/// GET /chat/sessions/{session_id}/worktree/merge-conflicts/{*file_path}
 /// Read three-way conflict content from Git index stages for a single file.
+/// Uses a catch-all path segment so nested paths like `src/main.rs` match.
 pub async fn get_merge_conflict_detail(
     Extension(session): Extension<ChatSession>,
-    State(_deployment): State<DeploymentImpl>,
-    Path(file_path): Path<String>,
+    State(deployment): State<DeploymentImpl>,
+    Path((_session_id, file_path)): Path<(Uuid, String)>,
 ) -> Result<ResponseJson<ApiResponse<ConflictFileContent>>, ApiError> {
-    let service = SessionWorktreeService::new(_deployment.db().pool.clone());
+    let service = SessionWorktreeService::new(deployment.db().pool.clone());
     let content = service
         .read_conflict_file(session.id, &file_path)
         .await
@@ -215,17 +243,24 @@ pub async fn get_merge_conflict_detail(
     Ok(ResponseJson(ApiResponse::success(content)))
 }
 
-/// POST /chat/sessions/{session_id}/worktree/merge-conflicts/{file_path}/resolve
-/// Write resolved content and `git add` the file.
+/// POST /chat/sessions/{session_id}/worktree/merge-conflicts/resolve
+/// Write resolved content and `git add` the file. The file path is in the
+/// request body (not a path parameter) so nested paths like `src/main.rs`
+/// work without Axum catch-all limitations.
 pub async fn resolve_merge_conflict(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
-    Path(file_path): Path<String>,
     Json(payload): Json<ResolveConflictRequest>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
     let service = SessionWorktreeService::new(deployment.db().pool.clone());
     service
-        .resolve_conflict_file(session.id, &file_path, &payload.content)
+        .resolve_conflict_file(
+            session.id,
+            &payload.path,
+            payload.content.as_deref(),
+            payload.use_stage,
+            payload.delete_file.unwrap_or(false),
+        )
         .await
         .map_err(session_worktree_api_error)?;
     Ok(ResponseJson(ApiResponse::success(())))
@@ -280,14 +315,21 @@ pub fn session_worktree_api_error(err: SessionWorktreeError) -> ApiError {
         SessionWorktreeError::NoMergedWorktree(sid) => {
             ApiError::BadRequest(format!("Session {sid} has no merged worktree to clean up."))
         }
-        SessionWorktreeError::NoCleanupFailedWorktree(sid) => ApiError::BadRequest(format!(
-            "Session {sid} has no failed cleanup to retry."
-        )),
+        SessionWorktreeError::MergedCleanupRequiresDiscard(_) => ApiError::BadRequest(
+            "Merged worktrees are preserved after merge; use discard worktree to remove the path."
+                .to_string(),
+        ),
+        SessionWorktreeError::NoCleanupFailedWorktree(sid) => {
+            ApiError::BadRequest(format!("Session {sid} has no failed cleanup to retry."))
+        }
         SessionWorktreeError::SessionHasActiveWorktree(sid) => ApiError::Conflict(format!(
             "Session {sid} still has an active worktree; resolve it before cleanup."
         )),
         SessionWorktreeError::IllegalTransition {
-            session_id, from, to, ..
+            session_id,
+            from,
+            to,
+            ..
         } => ApiError::Conflict(format!(
             "Cannot transition session {session_id} worktree from {from} to {to}."
         )),
@@ -308,10 +350,9 @@ pub fn session_worktree_api_error(err: SessionWorktreeError) -> ApiError {
         SessionWorktreeError::NoMergeInProgress(sid) => {
             ApiError::BadRequest(format!("Session {sid} has no merge in progress."))
         }
-        SessionWorktreeError::UnresolvedConflicts(files) => ApiError::Conflict(format!(
-            "Unresolved conflicts remain: {}",
-            files.join(", ")
-        )),
+        SessionWorktreeError::UnresolvedConflicts(files) => {
+            ApiError::Conflict(format!("Unresolved conflicts remain: {}", files.join(", ")))
+        }
         SessionWorktreeError::GitCommand(msg) => {
             ApiError::BadRequest(format!("Git operation failed: {msg}"))
         }
