@@ -13,7 +13,7 @@ import {
   Terminal,
   type LucideIcon,
 } from 'lucide-react';
-import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
+import { ChatMarkdown } from '@/components/conversation/ChatMarkdown';
 import { cn } from '@/lib/utils';
 import './WorkflowAgentLogPanel.css';
 

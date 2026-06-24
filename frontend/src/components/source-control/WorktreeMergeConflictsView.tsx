@@ -23,7 +23,7 @@ import {
   WorktreeConflictChoiceCard,
   WorktreeMergeConflictFrame,
   WorktreeQuickActionButton,
-} from '@/components/ui-new/worktree/WorktreeMergeConflictSurface';
+} from '@/components/worktree/WorktreeMergeConflictSurface';
 
 export interface WorktreeMergeConflictsViewProps {
   sessionId: string;

@@ -65,7 +65,7 @@ check(
 
 check(
   "renders the ui-new merge history section for merged worktrees",
-  source.includes("@/pages/ui-new/worktree/WorktreeMergeHistorySection") &&
+  source.includes("@/pages/worktree/WorktreeMergeHistorySection") &&
     source.includes("<WorktreeMergeHistorySection") &&
     source.includes("showWorktreeHistory"),
   source,
@@ -79,7 +79,7 @@ check(
 
 check(
   "renders the ui-new merge conflicts section when conflict resolution is active",
-  source.includes("@/pages/ui-new/worktree/WorktreeMergeConflictsSection") &&
+  source.includes("@/pages/worktree/WorktreeMergeConflictsSection") &&
     source.includes("<WorktreeMergeConflictsSection") &&
     source.includes("showConflictResolution") &&
     source.includes('worktree?.status === "needs_conflict_resolution"'),

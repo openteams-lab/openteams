@@ -107,7 +107,7 @@ check(
 
 check(
   "uses ui-new worktree action button",
-  source.includes("@/components/ui-new/worktree/WorktreeActionButton") &&
+  source.includes("@/components/worktree/WorktreeActionButton") &&
     source.includes("<WorktreeActionButton"),
 );
 

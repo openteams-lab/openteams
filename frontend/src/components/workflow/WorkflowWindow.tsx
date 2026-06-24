@@ -31,7 +31,7 @@ import {
   formatNumber,
   formatPrice,
 } from '@/lib/buildStatsUtils';
-import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
+import { ChatMarkdown } from '@/components/conversation/ChatMarkdown';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { getWorkflowTranscriptRefetchInterval } from '@/lib/workflowRequestPolicy';
 import { WorkflowIterationFeedbackCard } from './WorkflowIterationFeedbackCard';

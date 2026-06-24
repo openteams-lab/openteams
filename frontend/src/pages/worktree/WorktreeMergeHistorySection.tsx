@@ -3,7 +3,7 @@ import React from 'react';
 import {
   WorktreeMergeHistoryPanel,
   type WorktreeMergeHistoryCommit,
-} from '@/components/ui-new/worktree/WorktreeMergeHistoryPanel';
+} from '@/components/worktree/WorktreeMergeHistoryPanel';
 import type { SessionWorktree } from '@/types';
 
 type WorktreeHistoryTranslator = (

@@ -13,7 +13,7 @@ import type {
   SessionWorktree,
   SessionWorktreeStatus,
 } from '@/types';
-import { WorktreeActionButton } from '@/components/ui-new/worktree/WorktreeActionButton';
+import { WorktreeActionButton } from '@/components/worktree/WorktreeActionButton';
 import { openInSystemFileManager } from '@/lib/systemFileManager';
 import { useWorkspace } from '@/context/WorkspaceContext';
 
