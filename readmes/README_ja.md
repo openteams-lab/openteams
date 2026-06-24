@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../frontend/public/Logo/logo_blue.svg" alt="OpenTeams" width="100">
+  <img src="../frontend/public/logos/logo_blue.svg" alt="OpenTeams" width="100">
 </div>
 
 <div align="center">
