@@ -29,7 +29,10 @@ import type {
   ChatRunActivityResponse,
   ChatRunRetentionListResponse,
   ChatSessionStatus,
+  ChatSessionWorktreeMode,
   Config,
+  ConflictFileContent,
+  ConflictFileInfo,
   ContinueQueuedMessageResponse,
   CreateChatAgent,
   CreateChatMessageRequest,
@@ -76,12 +79,16 @@ import type {
   RetryWorkflowPlanGenerationResponse,
   SessionWorkspacesResponse,
   SessionSourceControlStatus,
+  SessionWorktree,
+  SessionWorktreeMergeResult,
   SourceControlCommitError,
   SourceControlCommitRequest,
   SourceControlCommitResponse,
+  SourceControlDiffArea,
   SourceControlDiffRequest,
   SourceControlDiffResponse,
   SourceControlDiscardRequest,
+  SourceControlFile,
   SourceControlOperationResponse,
   SourceControlStageRequest,
   SourceControlUnstageRequest,
@@ -106,12 +113,12 @@ import type {
   WorkflowSessionStatusResponse,
   WorkflowStepTokenUsageResponse,
   WorkflowTranscriptEntry,
+  ValidateWorkspacePathResponse,
   WorkspaceChangesResponse,
 } from "@/types";
 import type {
   AddProjectMemberRequest,
   CreateProjectRequest,
-  CreateProjectSessionRequest,
   Project,
   ProjectDetail,
   ProjectMemberWithRuntime,
@@ -332,6 +339,15 @@ export const chatSessionsApi = {
     });
     return handleApiResponse<BackendChatSession>(r);
   },
+  validateWorkspacePath: async (
+    workspacePath: string,
+  ): Promise<ValidateWorkspacePathResponse> => {
+    const r = await makeRequest("/api/chat/validate-workspace-path", {
+      method: "POST",
+      body: JSON.stringify({ workspace_path: workspacePath }),
+    });
+    return handleApiResponse<ValidateWorkspacePathResponse>(r);
+  },
   update: async (
     sessionId: string,
     data: UpdateChatSession,
@@ -364,6 +380,20 @@ export const chatSessionsApi = {
   restore: async (sessionId: string): Promise<BackendChatSession> => {
     const r = await makeRequest(
       `/api/chat/sessions/${encodeURIComponent(sessionId)}/restore`,
+      { method: "POST" },
+    );
+    return handleApiResponse<BackendChatSession>(r);
+  },
+  pin: async (sessionId: string): Promise<BackendChatSession> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/pin`,
+      { method: "POST" },
+    );
+    return handleApiResponse<BackendChatSession>(r);
+  },
+  unpin: async (sessionId: string): Promise<BackendChatSession> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/unpin`,
       { method: "POST" },
     );
     return handleApiResponse<BackendChatSession>(r);
@@ -1167,6 +1197,15 @@ export const chatApi = {
   submitWorkflowIterationFeedback: workflowApi.submitIterationFeedback,
 };
 
+// Local request type for creating a project-scoped session. Uses the frontend
+// `ChatSessionWorktreeMode` string union (not the shared enum) so callers that
+// import from `@/types` can pass `worktree_mode` without a cast.
+export type CreateProjectSessionRequest = {
+  title: string | null;
+  workspace_path: string | null;
+  worktree_mode?: ChatSessionWorktreeMode;
+};
+
 // -----------------------------------------------------------------------------
 // Projects
 // -----------------------------------------------------------------------------
@@ -1369,6 +1408,160 @@ export const projectSourceControlApi = {
     >(r);
   },
 };
+
+// -----------------------------------------------------------------------------
+// Session worktree isolation
+// -----------------------------------------------------------------------------
+// Wraps `/api/chat/sessions/{session_id}/worktree/*`. The backend is the only
+// legal writer of `chat_session_worktrees.status`; these helpers are thin
+// pass-throughs so the UI stays in lock-step with the reducer's accepted
+// state transitions. See docs/session-worktree-isolation-design.md.
+
+export interface PrepareSessionWorktreeRequest {
+  base_workspace_path?: string | null;
+  base_branch?: string | null;
+}
+
+export interface MergeSessionWorktreeRequest {
+  commit_message?: string | null;
+  target_branch?: string | null;
+}
+
+export interface ResolveSessionWorktreeConflictRequest {
+  path: string;
+  content?: string | null;
+  use_stage?: 'current' | 'session' | null;
+  delete_file?: boolean;
+}
+
+export interface ContinueSessionWorktreeMergeRequest {
+  commit_message?: string | null;
+}
+
+export const chatSessionWorktreeApi = {
+  getStatus: async (
+    sessionId: string,
+  ): Promise<SessionWorktree | null> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/worktree`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<SessionWorktree | null>(r);
+  },
+  prepare: async (
+    sessionId: string,
+    request: PrepareSessionWorktreeRequest = {},
+  ): Promise<SessionWorktree> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/worktree`,
+      { method: "POST", body: jsonBody(request) },
+    );
+    return handleApiResponse<SessionWorktree>(r);
+  },
+  merge: async (
+    sessionId: string,
+    request: MergeSessionWorktreeRequest = {},
+  ): Promise<SessionWorktreeMergeResult> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/worktree/merge`,
+      { method: "POST", body: jsonBody(request) },
+    );
+    return handleApiResponse<SessionWorktreeMergeResult>(r);
+  },
+  discard: async (sessionId: string): Promise<SessionWorktree> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/worktree/discard`,
+      { method: "POST" },
+    );
+    return handleApiResponse<SessionWorktree>(r);
+  },
+  cleanup: async (sessionId: string): Promise<SessionWorktree> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/worktree/cleanup`,
+      { method: "POST" },
+    );
+    return handleApiResponse<SessionWorktree>(r);
+  },
+  retryCleanup: async (sessionId: string): Promise<SessionWorktree> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(
+        sessionId,
+      )}/worktree/retry-cleanup`,
+      { method: "POST" },
+    );
+    return handleApiResponse<SessionWorktree>(r);
+  },
+  forceRemove: async (sessionId: string): Promise<SessionWorktree> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(
+        sessionId,
+      )}/worktree/force-remove`,
+      { method: "POST" },
+    );
+    return handleApiResponse<SessionWorktree>(r);
+  },
+  listMergeConflicts: async (
+    sessionId: string,
+  ): Promise<ConflictFileInfo[]> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(
+        sessionId,
+      )}/worktree/merge-conflicts`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<ConflictFileInfo[]>(r);
+  },
+  getMergeConflictDetail: async (
+    sessionId: string,
+    filePath: string,
+  ): Promise<ConflictFileContent> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(
+        sessionId,
+      )}/worktree/merge-conflicts/${encodeConflictPath(filePath)}`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<ConflictFileContent>(r);
+  },
+  resolveMergeConflict: async (
+    sessionId: string,
+    request: ResolveSessionWorktreeConflictRequest,
+  ): Promise<void> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(
+        sessionId,
+      )}/worktree/merge-conflicts/resolve`,
+      { method: "POST", body: jsonBody(request) },
+    );
+    await handleApiResponse<void>(r);
+  },
+  continueMerge: async (
+    sessionId: string,
+    request: ContinueSessionWorktreeMergeRequest = {},
+  ): Promise<SessionWorktree> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/worktree/merge/continue`,
+      { method: "POST", body: jsonBody(request) },
+    );
+    return handleApiResponse<SessionWorktree>(r);
+  },
+  abortMerge: async (sessionId: string): Promise<SessionWorktree> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/worktree/merge/abort`,
+      { method: "POST" },
+    );
+    return handleApiResponse<SessionWorktree>(r);
+  },
+};
+
+// `merge-conflicts/{*file_path}` is a catch-all on the backend, so encode each
+// path segment while preserving the `/` separators for nested files such as
+// `src/main.rs`. Empty paths fall back to `/` so the request shape stays valid.
+const encodeConflictPath = (filePath: string): string =>
+  filePath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/") || "/";
 
 // -----------------------------------------------------------------------------
 // GitHub integration (local backend API only)
@@ -1901,6 +2094,7 @@ export const api = {
   skills: skillsApi,
   projects: projectApi,
   projectSourceControl: projectSourceControlApi,
+  chatSessionWorktree: chatSessionWorktreeApi,
   workflow: workflowApi,
   cliConfig: cliConfigApi,
   buildStats: buildStatsApi,

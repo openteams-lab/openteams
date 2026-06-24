@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use db::{self, DBService, models::execution_process::ExecutionProcess};
 use executors::approvals::{ExecutorApprovalError, ExecutorApprovalService};
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
@@ -12,7 +11,6 @@ use crate::services::{approvals::Approvals, notification::NotificationService};
 
 pub struct ExecutorApprovalBridge {
     approvals: Approvals,
-    db: DBService,
     notification_service: NotificationService,
     execution_process_id: Uuid,
 }
@@ -20,13 +18,12 @@ pub struct ExecutorApprovalBridge {
 impl ExecutorApprovalBridge {
     pub fn new(
         approvals: Approvals,
-        db: DBService,
+        _db: db::DBService,
         notification_service: NotificationService,
         execution_process_id: Uuid,
     ) -> Arc<Self> {
         Arc::new(Self {
             approvals,
-            db,
             notification_service,
             execution_process_id,
         })
@@ -42,8 +39,6 @@ impl ExecutorApprovalService for ExecutorApprovalBridge {
         tool_call_id: &str,
         cancel: CancellationToken,
     ) -> Result<ApprovalStatus, ExecutorApprovalError> {
-        super::ensure_task_in_review(&self.db.pool, self.execution_process_id).await;
-
         let request = ApprovalRequest::from_create(
             CreateApprovalRequest {
                 tool_name: tool_name.to_string(),
@@ -61,14 +56,9 @@ impl ExecutorApprovalService for ExecutorApprovalBridge {
 
         let approval_id = request.id.clone();
 
-        let task_name = ExecutionProcess::load_context(&self.db.pool, self.execution_process_id)
-            .await
-            .map(|ctx| ctx.task.title)
-            .unwrap_or_else(|_| "Unknown task".to_string());
-
         self.notification_service
             .notify(
-                &format!("Approval Needed: {}", task_name),
+                "Approval Needed",
                 &format!("Tool '{}' requires approval", tool_name),
             )
             .await;

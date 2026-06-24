@@ -585,6 +585,7 @@ export const SettingsWorkspace: React.FC = () => {
   };
 
   const menuItems = settingsOptions?.menu ?? [];
+  const isProviderSettingsTab = activeSettingsTab === 'providers';
   const getMenuSectionLabel = (section: string) =>
     translate(`settings.menu.section.${section.toLowerCase()}`, section);
   const getMenuItemLabel = (id: string, label: string) => {
@@ -700,7 +701,11 @@ export const SettingsWorkspace: React.FC = () => {
         </aside>
 
         {/* Right content manager */}
-        <main className="p-6 min-w-0 overflow-y-auto">
+        <main
+          className={`min-h-0 min-w-0 p-6 ${
+            isProviderSettingsTab ? 'overflow-hidden' : 'overflow-y-auto'
+          }`}
+        >
           {renderActiveSettingPanel()}
         </main>
       </div>

@@ -24,7 +24,9 @@ use ts_rs::TS;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
-use super::sessions::{WorkspaceChanges, collect_run_files};
+use super::sessions::{
+    WorkspaceChanges, collect_run_files, resolve_session_workspace_path_for_request,
+};
 use crate::{DeploymentImpl, error::ApiError};
 
 const DEFAULT_LOG_CHUNK_BYTES: u64 = 256 * 1024;
@@ -345,13 +347,28 @@ pub async fn get_run_files(
     };
 
     let include_diff = query.include_diff.unwrap_or(false);
-    let workspace_path = run.workspace_path.clone();
+    let workspace_path = if let Some(session) =
+        ChatSession::find_by_id(&deployment.db().pool, run.session_id).await?
+    {
+        match run.workspace_path.as_deref() {
+            Some(path) => {
+                resolve_session_workspace_path_for_request(&deployment.db().pool, &session, path)
+                    .await?
+                    .or_else(|| run.workspace_path.clone())
+            }
+            None => run.workspace_path.clone(),
+        }
+    } else {
+        run.workspace_path.clone()
+    };
     let is_git_repo = workspace_path
         .as_deref()
         .map(|path| git2::Repository::open(path).is_ok())
         .unwrap_or(false);
 
-    let changes = collect_run_files(&run, include_diff);
+    let mut effective_run = run.clone();
+    effective_run.workspace_path = workspace_path.clone();
+    let changes = collect_run_files(&effective_run, include_diff);
     tracing::debug!(
         run_id = %run_id,
         session_id = %run.session_id,

@@ -318,6 +318,17 @@ pub async fn run_workflow_step_agent_follow_up(
     .await
 }
 
+fn build_workspace_scoped_workflow_prompt(
+    prompt: &str,
+    workspace_path: &std::path::Path,
+) -> String {
+    format!(
+        "## Workspace\n- Active workspace path: `{}`.\n- Treat this active workspace path as the project repository for this turn. Run file reads, writes, and shell commands there unless the user explicitly asks for another path.\n\n{}",
+        workspace_path.display(),
+        prompt
+    )
+}
+
 async fn run_workflow_agent_prompt_inner(
     db: &DBService,
     session: &ChatSession,
@@ -330,15 +341,18 @@ async fn run_workflow_agent_prompt_inner(
     reset_to_message_id: Option<&str>,
     stream_context: Option<WorkflowRuntimeStreamContext>,
 ) -> Result<WorkflowAgentRunOutput, WorkflowRuntimeError> {
-    let workspace_path = resolve_workspace_path(session, agent, session_agent);
+    let workspace_path = resolve_workspace_path(db, session, agent, session_agent).await?;
     fs::create_dir_all(&workspace_path).await?;
+    let prompt = build_workspace_scoped_workflow_prompt(prompt, &workspace_path);
+    let mut effective_session_agent = session_agent.clone();
+    effective_session_agent.workspace_path = Some(workspace_path.to_string_lossy().to_string());
     save_debug_workflow_prompt(
         &workspace_path,
         session,
         agent,
-        session_agent,
+        &effective_session_agent,
         workflow_session,
-        prompt,
+        &prompt,
         step_id,
         resume_session_id.is_some(),
         stream_context.as_ref(),
@@ -348,9 +362,9 @@ async fn run_workflow_agent_prompt_inner(
     let runtime_run_record = start_workflow_runtime_run_record(
         db,
         session,
-        session_agent,
+        &effective_session_agent,
         &workspace_path,
-        prompt,
+        &prompt,
         stream_context.as_ref(),
     )
     .await?;
@@ -365,7 +379,7 @@ async fn run_workflow_agent_prompt_inner(
         env.insert("VK_WORKFLOW_RUN_ID", record.run_id.to_string());
     }
     let (_effective_execution, mut executor) =
-        build_effective_member_executor(agent, session_agent, &mut env)
+        build_effective_member_executor(agent, &effective_session_agent, &mut env)
             .map_err(|err| WorkflowRuntimeError::Io(std::io::Error::other(err.to_string())))?;
     executor.use_approvals(Arc::new(NoopExecutorApprovalService));
 
@@ -374,7 +388,7 @@ async fn run_workflow_agent_prompt_inner(
             executor
                 .spawn_follow_up(
                     workspace_path.as_path(),
-                    prompt,
+                    &prompt,
                     session_id,
                     reset_to_message_id,
                     &env,
@@ -383,7 +397,7 @@ async fn run_workflow_agent_prompt_inner(
         }
         None => {
             executor
-                .spawn(workspace_path.as_path(), prompt, &env)
+                .spawn(workspace_path.as_path(), &prompt, &env)
                 .await?
         }
     };

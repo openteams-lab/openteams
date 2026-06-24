@@ -31,7 +31,7 @@ import {
   formatNumber,
   formatPrice,
 } from '@/lib/buildStatsUtils';
-import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
+import { ChatMarkdown } from '@/components/conversation/ChatMarkdown';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { getWorkflowTranscriptRefetchInterval } from '@/lib/workflowRequestPolicy';
 import { WorkflowIterationFeedbackCard } from './WorkflowIterationFeedbackCard';
@@ -297,6 +297,73 @@ function parseWorkflowTranscriptTime(createdAt: string): Date {
   return new Date(normalized);
 }
 
+function getWorkflowReviewMergeKey(
+  entry: WorkflowTranscriptEntry
+): string | null {
+  if (!WORKFLOW_REVIEW_ENTRY_TYPES.has(entry.entry_type)) {
+    return null;
+  }
+
+  const stepIdentity = entry.step_id?.trim() || entry.step_key?.trim();
+  if (!stepIdentity) {
+    return null;
+  }
+
+  const meta = parseWorkflowTranscriptMeta(entry.meta_json);
+  const rawReviewerType =
+    typeof meta?.reviewer_type === 'string'
+      ? meta.reviewer_type.trim().toLowerCase()
+      : '';
+  const reviewerType =
+    rawReviewerType ||
+    (entry.entry_type === 'lead_review'
+      ? 'lead'
+      : entry.entry_type === 'step_review'
+        ? 'user'
+        : entry.entry_type);
+  const rawReviewRound = meta?.review_round;
+  const reviewRound =
+    typeof rawReviewRound === 'number'
+      ? String(rawReviewRound)
+      : typeof rawReviewRound === 'string'
+        ? rawReviewRound.trim()
+        : '';
+  if (!reviewerType || !reviewRound) {
+    return null;
+  }
+
+  return `${stepIdentity}::${reviewerType}::${reviewRound}`;
+}
+
+function getWorkflowTranscriptMergePriority(
+  entry: WorkflowTranscriptEntry
+): number {
+  if (!WORKFLOW_REVIEW_ENTRY_TYPES.has(entry.entry_type)) {
+    return 0;
+  }
+
+  const source = getTranscriptMetaSource(entry);
+  if (source === 'workflow_card_step_review') {
+    return 1;
+  }
+  if (source === 'workflow_step_review') {
+    return 2;
+  }
+  if (entry.workflow_agent_session_id) {
+    return 4;
+  }
+  return 3;
+}
+
+function chooseWorkflowTranscriptEntry(
+  current: WorkflowTranscriptEntry,
+  incoming: WorkflowTranscriptEntry
+): WorkflowTranscriptEntry {
+  const currentPriority = getWorkflowTranscriptMergePriority(current);
+  const incomingPriority = getWorkflowTranscriptMergePriority(incoming);
+  return incomingPriority >= currentPriority ? incoming : current;
+}
+
 function formatWorkflowLogTimestamp(createdAt: string): string {
   const date = parseWorkflowTranscriptTime(createdAt);
   if (Number.isNaN(date.getTime())) return '--:--:--';
@@ -312,10 +379,41 @@ function mergeAndSortTranscriptEntries(
   ...entryGroups: WorkflowTranscriptEntry[][]
 ): WorkflowTranscriptEntry[] {
   const mergedMap = new Map<string, WorkflowTranscriptEntry>();
+  const reviewEntryIdByKey = new Map<string, string>();
+
+  const setEntry = (entry: WorkflowTranscriptEntry) => {
+    mergedMap.set(entry.id, entry);
+    const reviewKey = getWorkflowReviewMergeKey(entry);
+    if (reviewKey) {
+      reviewEntryIdByKey.set(reviewKey, entry.id);
+    }
+  };
 
   for (const entries of entryGroups) {
     for (const entry of entries) {
-      mergedMap.set(entry.id, entry);
+      const existingById = mergedMap.get(entry.id);
+      if (existingById) {
+        setEntry(chooseWorkflowTranscriptEntry(existingById, entry));
+        continue;
+      }
+
+      const reviewKey = getWorkflowReviewMergeKey(entry);
+      const existingReviewId = reviewKey
+        ? reviewEntryIdByKey.get(reviewKey)
+        : undefined;
+      const existingReview = existingReviewId
+        ? mergedMap.get(existingReviewId)
+        : undefined;
+      if (existingReview) {
+        const selected = chooseWorkflowTranscriptEntry(existingReview, entry);
+        if (selected !== existingReview) {
+          mergedMap.delete(existingReview.id);
+          setEntry(selected);
+        }
+        continue;
+      }
+
+      setEntry(entry);
     }
   }
 
@@ -896,7 +994,6 @@ function InspectorCard({
                 key: `${entry.id}-${index}`,
                 timestamp: formatWorkflowLogTimestamp(entry.created_at),
                 content: line,
-                isError: /error|failed|fatal|exception/i.test(line),
               }));
             if (lines.length === 0) return groups;
             if (existing) {
@@ -909,7 +1006,7 @@ function InspectorCard({
               });
             }
             return groups;
-          }, new Map<string, { key: string; agentName: string; lines: Array<{ key: string; timestamp: string; content: string; isError: boolean }> }>())
+          }, new Map<string, { key: string; agentName: string; lines: Array<{ key: string; timestamp: string; content: string }> }>())
           .values()
       ),
     [agentName, step.id, streamEntries, t]

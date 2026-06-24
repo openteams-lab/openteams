@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronRight,
-  Info,
   Loader2,
   RefreshCw,
   ShieldAlert,
@@ -10,8 +9,11 @@ import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { ScrollArea } from "@/components/ScrollArea";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useSessionSourceControl } from "@/hooks/useSessionSourceControl";
+import { useSessionWorktree } from "@/hooks/useSessionWorktree";
+import { WorktreeMergeHistorySection } from "@/pages/ui-new/worktree/WorktreeMergeHistorySection";
 import { deliveryApi } from "@/lib/api";
 import type {
+  ChatSessionWorktreeMode,
   JsonValue,
   ProjectDeliveryRecord,
   SourceControlCommitResponse,
@@ -19,6 +21,11 @@ import type {
   SourceControlFile,
 } from "@/types";
 import { SourceControlFileRow } from "./SourceControlFileRow";
+import {
+  SessionWorktreeBadge,
+  type SessionWorktreeAction,
+} from "./SessionWorktreeBadge";
+import { WorktreeMergeConflictsSection } from "@/pages/ui-new/worktree/WorktreeMergeConflictsSection";
 import {
   buildSourceControlViewModel,
   sourceControlHasSharedFiles,
@@ -34,6 +41,7 @@ interface SessionSourceControlPanelProps {
   projectId: string | null;
   sessionId: string | null;
   enabled: boolean;
+  worktreeMode?: ChatSessionWorktreeMode;
   refreshKey?: number;
   fallbackRelatedFiles: React.ReactNode;
   linkedWorkItemIds?: string[];
@@ -58,6 +66,13 @@ interface SessionCommitSummary {
   sha: string;
   message: string;
 }
+
+export const refreshAfterWorktreeResolution = async (
+  refreshSourceControl: () => Promise<unknown>,
+  refreshWorktree: () => Promise<unknown>,
+) => {
+  await Promise.allSettled([refreshSourceControl(), refreshWorktree()]);
+};
 
 const actionErrorMessage = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
@@ -218,23 +233,38 @@ export const SessionSourceControlPanel: React.FC<
   projectId,
   sessionId,
   enabled,
-  refreshKey,
+  worktreeMode,
   fallbackRelatedFiles,
   linkedWorkItemIds = [],
   onOpenDiff,
 }) => {
-  const { t } = useWorkspace();
+  const { t, showToast } = useWorkspace();
   const {
     status,
     loading,
     error,
-    refresh,
+    refresh: refreshSourceControl,
     stage,
     unstage,
     discard,
     commit,
   } = useSessionSourceControl({ projectId, sessionId, enabled });
-  const lastRefreshKeyRef = useRef(refreshKey);
+  const worktreeEnabled = worktreeMode === "isolated";
+  const {
+    worktree,
+    loading: worktreeLoading,
+    error: worktreeError,
+    prepare,
+    merge: mergeWorktree,
+    discard: discardWorktree,
+    cleanup,
+    retryCleanup,
+    forceRemove,
+    refresh: refreshWorktree,
+  } = useSessionWorktree({
+    sessionId,
+    enabled: worktreeEnabled && enabled,
+  });
   const [commitMessage, setCommitMessage] = useState("");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -244,16 +274,12 @@ export const SessionSourceControlPanel: React.FC<
   const [commitListExpanded, setCommitListExpanded] = useState(true);
   const [confirmDialog, setConfirmDialog] =
     useState<SourceControlConfirmDialogState | null>(null);
-
-  useEffect(() => {
-    if (refreshKey === undefined || lastRefreshKeyRef.current === refreshKey) {
-      return;
-    }
-    lastRefreshKeyRef.current = refreshKey;
-    if (enabled) {
-      void refresh();
-    }
-  }, [enabled, refresh, refreshKey]);
+  const [showConflictResolution, setShowConflictResolution] = useState(false);
+  const [showWorktreeHistory, setShowWorktreeHistory] = useState(false);
+  const [worktreeBusy, setWorktreeBusy] = useState(false);
+  const [worktreeActionError, setWorktreeActionError] = useState<string | null>(
+    null,
+  );
 
   const viewModel = useMemo(
     () => buildSourceControlViewModel(status, t),
@@ -301,6 +327,24 @@ export const SessionSourceControlPanel: React.FC<
     };
   }, [enabled, projectId, sessionId]);
 
+  // Exit the conflict-resolution overlay automatically if the worktree
+  // transitions away from needs_conflict_resolution (e.g. another tab aborted
+  // or the backend cleaned up).
+  useEffect(() => {
+    if (
+      showConflictResolution &&
+      worktree?.status !== "needs_conflict_resolution"
+    ) {
+      setShowConflictResolution(false);
+    }
+  }, [showConflictResolution, worktree?.status]);
+
+  useEffect(() => {
+    if (worktree?.status !== "merged") {
+      setShowWorktreeHistory(false);
+    }
+  }, [worktree?.status]);
+
   if (!enabled || !projectId || !sessionId) {
     return <>{fallbackRelatedFiles}</>;
   }
@@ -308,6 +352,79 @@ export const SessionSourceControlPanel: React.FC<
   if (status?.mode === "plain") {
     return <>{fallbackRelatedFiles}</>;
   }
+
+  // When the user opens the conflict resolver, it takes over the entire panel
+  // until the merge continues or aborts.
+  if (
+    showConflictResolution &&
+    worktree?.status === "needs_conflict_resolution"
+  ) {
+    return (
+      <WorktreeMergeConflictsSection
+        sessionId={sessionId}
+        tr={tr}
+        onCompleted={() => {
+          setShowConflictResolution(false);
+          void refreshAfterWorktreeResolution(
+            refreshSourceControl,
+            refreshWorktree,
+          );
+        }}
+        onAbort={() => {
+          setShowConflictResolution(false);
+          void refreshAfterWorktreeResolution(
+            refreshSourceControl,
+            refreshWorktree,
+          );
+        }}
+      />
+    );
+  }
+
+  const handleWorktreeAction = async (action: SessionWorktreeAction) => {
+    if (worktreeBusy) return;
+    setWorktreeBusy(true);
+    setWorktreeActionError(null);
+    try {
+      switch (action) {
+        case "prepare":
+          await prepare();
+          break;
+        case "merge":
+          await mergeWorktree();
+          break;
+        case "discard":
+          await discardWorktree();
+          break;
+        case "cleanup":
+          await cleanup();
+          break;
+        case "retry-cleanup":
+          await retryCleanup();
+          break;
+        case "force-remove":
+          await forceRemove();
+          break;
+        case "resolve-conflicts":
+          setShowConflictResolution(true);
+          break;
+        case "view-history":
+          setShowWorktreeHistory(true);
+          break;
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setWorktreeActionError(message);
+      showToast(
+        tr("worktree.error.actionFailed", "Worktree action failed: {message}", {
+          message,
+        }),
+        "error",
+      );
+    } finally {
+      setWorktreeBusy(false);
+    }
+  };
 
   const runOperation = async (
     key: string,
@@ -478,10 +595,10 @@ export const SessionSourceControlPanel: React.FC<
   if (!status && !error) {
     return (
       <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
-        <div className="mb-2 flex items-center gap-2 text-[14px] font-semibold text-[var(--ink)]">
+        <div className="mb-3 flex items-center gap-2 text-[13px] font-medium text-[var(--ink)]">
           {title}
         </div>
-        <div className="flex items-center gap-2 rounded-md bg-[var(--surface-1)] px-3 py-3 text-[13px] text-[var(--ink-tertiary)]">
+        <div className="flex items-center gap-2 rounded-lg border border-[color-mix(in_srgb,var(--hairline)_72%,transparent)] bg-[color-mix(in_srgb,var(--surface-1)_76%,var(--canvas))] px-3 py-3 text-[12px] text-[var(--ink-tertiary)]">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           {tr("sourceControl.loading", "Loading source-control status...")}
         </div>
@@ -493,12 +610,12 @@ export const SessionSourceControlPanel: React.FC<
     return (
       <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-[14px] font-semibold text-[var(--ink)]">
+          <h2 className="text-[13px] font-medium text-[var(--ink)]">
             {title}
           </h2>
           <button
             type="button"
-            onClick={() => void refresh()}
+            onClick={() => void refreshSourceControl()}
             className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
             title={refreshLabel}
             aria-label={refreshLabel}
@@ -506,7 +623,7 @@ export const SessionSourceControlPanel: React.FC<
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="rounded-md bg-[var(--surface-1)] px-3 py-3 text-[13px] text-rose-500">
+        <div className="rounded-lg border border-[color-mix(in_srgb,var(--hairline)_72%,transparent)] bg-[color-mix(in_srgb,var(--surface-1)_76%,var(--canvas))] px-3 py-3 text-[12px] text-rose-500">
           {error.message}
         </div>
       </div>
@@ -523,14 +640,14 @@ export const SessionSourceControlPanel: React.FC<
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-10 shrink-0 items-center justify-between px-3">
+      <div className="flex h-9 shrink-0 items-center justify-between px-3">
         <div className="flex min-w-0 items-center gap-2">
-          <h2 className="truncate text-[14px] font-semibold text-[var(--ink)]">
+          <h2 className="truncate text-[13px] font-medium text-[var(--ink)]">
             {title}
           </h2>
           {viewModel.branch && (
             <span
-              className="truncate rounded-full bg-[var(--surface-3)] px-2 py-0.5 font-mono text-[11px] text-[var(--ink-tertiary)]"
+              className="truncate rounded border border-[color-mix(in_srgb,var(--hairline)_46%,transparent)] bg-transparent px-1.5 py-0.5 font-mono text-[10px] text-[var(--ink-tertiary)]"
               title={viewModel.branch}
             >
               {viewModel.branch}
@@ -539,7 +656,7 @@ export const SessionSourceControlPanel: React.FC<
         </div>
         <button
           type="button"
-          onClick={() => void refresh()}
+          onClick={() => void refreshSourceControl()}
           disabled={loading || Boolean(pendingAction)}
           className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-40"
           title={refreshLabel}
@@ -552,32 +669,57 @@ export const SessionSourceControlPanel: React.FC<
         </button>
       </div>
 
-      <ScrollArea className="flex-1 px-2 pb-2">
+      {worktreeEnabled && (
+        <>
+          <SessionWorktreeBadge
+            worktree={worktree}
+            pendingCreate={!worktree && !worktreeLoading}
+            busy={worktreeBusy}
+            onAction={(action) => void handleWorktreeAction(action)}
+            tr={tr}
+          />
+          {showWorktreeHistory && worktree?.status === "merged" && (
+            <WorktreeMergeHistorySection
+              worktree={worktree}
+              commits={sessionCommits}
+              tr={tr}
+              onClose={() => setShowWorktreeHistory(false)}
+            />
+          )}
+        </>
+      )}
+
+      <ScrollArea className="flex-1 px-3 pb-3">
         {externalStagedCount > 0 && (
-          <div className="mb-2 rounded-md bg-amber-500/10 px-3 py-2 text-[12px] text-amber-600">
-            <div className="flex items-center gap-1.5">
-              <Info className="h-3.5 w-3.5 shrink-0" />
+          <div className="mb-3 rounded-lg border border-[color-mix(in_srgb,var(--hairline)_72%,transparent)] bg-[color-mix(in_srgb,var(--surface-1)_76%,var(--canvas))] px-2.5 py-2 text-[11px] text-[var(--ink-tertiary)]">
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ink-tertiary)]" />
               <span>{externalStagedHint}</span>
             </div>
           </div>
         )}
-        {(viewModel.blockedReason || actionError) && (
-          <div className="mb-2 space-y-1">
+        {(viewModel.blockedReason || actionError || worktreeActionError) && (
+          <div className="mb-3 space-y-1">
             {viewModel.blockedReason && (
-              <div className="flex gap-2 rounded-md bg-[var(--surface-1)] px-3 py-2 text-[12px] text-amber-600">
-                <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <div className="flex gap-2 rounded-lg border border-[color-mix(in_srgb,var(--hairline)_72%,transparent)] bg-[color-mix(in_srgb,var(--surface-1)_76%,var(--canvas))] px-2.5 py-2 text-[11px] text-[var(--ink-tertiary)]">
+                <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ink-subtle)]" />
                 <span>{viewModel.blockedReason}</span>
               </div>
             )}
             {actionError && (
-              <div className="rounded-md bg-[var(--surface-1)] px-3 py-2 text-[12px] text-rose-500">
+              <div className="rounded-lg border border-[color-mix(in_srgb,#f43f5e_20%,var(--hairline))] bg-[color-mix(in_srgb,var(--surface-1)_76%,var(--canvas))] px-2.5 py-2 text-[11px] text-rose-500">
                 {actionError}
+              </div>
+            )}
+            {worktreeActionError && (
+              <div className="rounded-lg border border-[color-mix(in_srgb,#f43f5e_20%,var(--hairline))] bg-[color-mix(in_srgb,var(--surface-1)_76%,var(--canvas))] px-2.5 py-2 text-[11px] text-rose-500">
+                {worktreeActionError}
               </div>
             )}
           </div>
         )}
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           <SessionCommitList
             commits={sessionCommits}
             expanded={commitListExpanded}
@@ -586,13 +728,13 @@ export const SessionSourceControlPanel: React.FC<
             commitFallback={tr("sourceControl.commit.fallback", "Commit")}
           />
           {viewModel.sections.map((section) => (
-            <section key={section.id} className="space-y-1">
-              <div className="flex min-h-7 items-center justify-between gap-2 px-1">
+            <section key={section.id} className="space-y-1.5">
+              <div className="flex min-h-6 items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <h3 className="truncate text-[12px] font-semibold uppercase tracking-wide text-[var(--ink-subtle)]">
+                  <h3 className="truncate text-[13px] font-medium text-[var(--ink-subtle)]">
                     {section.title}
                   </h3>
-                  <span className="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--ink-tertiary)]">
+                  <span className="rounded border border-[color-mix(in_srgb,var(--hairline)_76%,transparent)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--ink-tertiary)]">
                     {section.files.length}
                   </span>
                 </div>
@@ -608,7 +750,7 @@ export const SessionSourceControlPanel: React.FC<
                 </div>
               </div>
               {section.files.length === 0 ? (
-                <div className="rounded-md bg-[var(--surface-1)] px-3 py-2 text-[13px] text-[var(--ink-tertiary)]">
+                <div className="rounded-lg border border-dashed border-[color-mix(in_srgb,var(--hairline)_72%,transparent)] px-3 py-2 text-[12px] text-[var(--ink-tertiary)]">
                   {section.emptyLabel}
                 </div>
               ) : (
@@ -635,12 +777,12 @@ export const SessionSourceControlPanel: React.FC<
       </ScrollArea>
 
       {viewModel.stagedPaths.length > 0 && (
-        <div className="shrink-0 border-t border-[var(--hairline)] p-2">
+        <div className="shrink-0 border-t border-[color-mix(in_srgb,var(--hairline)_72%,transparent)] p-3">
           <textarea
             value={commitMessage}
             onChange={(event) => setCommitMessage(event.target.value)}
             rows={2}
-            className="mb-2 min-h-14 w-full resize-none rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] px-2 py-1.5 text-[13px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)]"
+            className="mb-2 min-h-14 w-full resize-none rounded-lg border border-[color-mix(in_srgb,var(--hairline)_72%,transparent)] bg-[color-mix(in_srgb,var(--surface-1)_76%,var(--canvas))] px-2.5 py-1.5 text-[12px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-tertiary)] focus:border-[color-mix(in_srgb,var(--primary)_60%,var(--hairline))]"
             placeholder={tr("sourceControl.commitPlaceholder", "commit message")}
           />
           <button
@@ -651,7 +793,7 @@ export const SessionSourceControlPanel: React.FC<
               !viewModel.canCommit ||
               !commitMessage.trim()
             }
-            className="flex h-8 w-full items-center justify-center whitespace-nowrap rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:bg-[var(--surface-3)] disabled:text-[var(--ink-tertiary)] disabled:opacity-80"
+            className="flex h-7 w-full items-center justify-center whitespace-nowrap rounded-[6px] bg-[color-mix(in_srgb,var(--primary)_82%,var(--surface-1))] px-3 text-[12px] font-medium text-[var(--on-primary)] transition hover:bg-[var(--primary)] disabled:cursor-not-allowed disabled:bg-[var(--surface-3)] disabled:text-[var(--ink-tertiary)] disabled:opacity-80"
             title={
               !commitMessage.trim()
                 ? tr(

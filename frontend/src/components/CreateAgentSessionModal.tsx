@@ -4,6 +4,7 @@ import {
   Check,
   ChevronRight,
   GitBranch,
+  GitFork,
   Maximize2,
   Paperclip,
   X,
@@ -18,9 +19,19 @@ import {
   DropdownSelect,
   type DropdownSelectOption,
 } from '@/components/DropdownSelect';
-import { projectWorkItemsApi } from '@/lib/api';
+import { chatSessionsApi, projectWorkItemsApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import type { Member, ProjectWorkItem } from '@/types';
+import {
+  canUseIsolatedWorktree,
+  isolatedWorktreeModeOrUndefined,
+  nextIsolatedWorktreeSelection,
+  resolveCreateSessionWorktreeWorkspacePath,
+} from '@/components/worktreeWorkspaceGuard';
+import type {
+  ChatSessionWorktreeMode,
+  Member,
+  ProjectWorkItem,
+} from '@/types';
 import { createPortal } from 'react-dom';
 
 type CreateTaskMode = 'workflow' | 'freeChat';
@@ -29,6 +40,9 @@ interface CreateAgentSessionModalProps {
   open: boolean;
   projectId?: string;
   projectName?: string;
+  workspacePath?: string | null;
+  workflowWorkspacePath?: string | null;
+  memberWorkspacePaths?: Record<string, string | null>;
   members?: Member[];
   leadMember?: Member | null;
   t: (key: string, replacements?: Record<string, string | number>) => string;
@@ -42,6 +56,7 @@ interface CreateAgentSessionModalProps {
       memberAvatar?: string;
       memberModelName?: string;
       workItemId?: string;
+      worktreeMode?: ChatSessionWorktreeMode;
     },
   ) => void;
 }
@@ -60,6 +75,9 @@ export function CreateAgentSessionModal({
   open,
   projectId,
   projectName,
+  workspacePath,
+  workflowWorkspacePath,
+  memberWorkspacePaths = {},
   members = [],
   leadMember,
   t,
@@ -81,6 +99,8 @@ export function CreateAgentSessionModal({
   const [activeWorkItemOptionIndex, setActiveWorkItemOptionIndex] = useState(0);
   const [workItemQuery, setWorkItemQuery] = useState('');
   const [expanded, setExpanded] = useState(false);
+  const [isolateWorktree, setIsolateWorktree] = useState(false);
+  const [gitAvailable, setGitAvailable] = useState<boolean | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const workItemMenuRef = useRef<HTMLDivElement | null>(null);
   const workItemPortalRef = useRef<HTMLDivElement | null>(null);
@@ -97,6 +117,21 @@ export function CreateAgentSessionModal({
   const selectedWorkItem = workItems.find(
     (item) => item.id === selectedWorkItemId,
   );
+  const workspacePathForWorktree = useMemo(() => {
+    return resolveCreateSessionWorktreeWorkspacePath({
+      isPlanMode,
+      selectedMemberName: selectedMember?.name,
+      projectWorkspacePath: workspacePath,
+      workflowWorkspacePath,
+      memberWorkspacePaths,
+    });
+  }, [
+    isPlanMode,
+    memberWorkspacePaths,
+    selectedMember?.name,
+    workflowWorkspacePath,
+    workspacePath,
+  ]);
   const memberOptions = useMemo<DropdownSelectOption[]>(
     () =>
       selectableMembers.map((member) => ({
@@ -216,6 +251,52 @@ export function CreateAgentSessionModal({
     };
   }, [open, projectId]);
 
+  // Detect Git support for the exact workspace path that will be submitted.
+  // Repo integrations are not enough here: a project can have repos connected
+  // while its current workspace path is plain or missing.
+  useEffect(() => {
+    if (!open) {
+      setGitAvailable(null);
+      return;
+    }
+    const trimmedWorkspacePath = workspacePathForWorktree?.trim() ?? '';
+    if (!trimmedWorkspacePath) {
+      setGitAvailable(false);
+      setIsolateWorktree(false);
+      return;
+    }
+    let cancelled = false;
+    setGitAvailable(null);
+    void chatSessionsApi
+      .validateWorkspacePath(trimmedWorkspacePath)
+      .then((response) => {
+        if (cancelled) return;
+        const available = response.valid && response.is_git_repo;
+        setGitAvailable(available);
+        if (!available) setIsolateWorktree(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setGitAvailable(false);
+        setIsolateWorktree(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, workspacePathForWorktree]);
+
+  useEffect(() => {
+    if (canUseIsolatedWorktree(gitAvailable)) return;
+    setIsolateWorktree(false);
+  }, [gitAvailable]);
+
+  // Reset the worktree toggle whenever the composer closes so a prior choice
+  // does not leak into the next session creation (default = main workspace).
+  useEffect(() => {
+    if (open) return;
+    setIsolateWorktree(false);
+  }, [open]);
+
   useEffect(() => {
     if (!workItemMenuOpen) return;
     const handlePointerDown = (event: MouseEvent) => {
@@ -247,6 +328,10 @@ export function CreateAgentSessionModal({
       memberAvatar: selectedMember.avatar,
       memberModelName: selectedMember.modelName,
       workItemId: selectedWorkItemId || undefined,
+      worktreeMode: isolatedWorktreeModeOrUndefined(
+        isolateWorktree,
+        gitAvailable,
+      ),
     });
     onClose();
   };
@@ -522,6 +607,58 @@ export function CreateAgentSessionModal({
             >
               <GitBranch className="h-3 w-3" />
               <span>{translate(t, 'planMode', 'Plan mode')}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={!canUseIsolatedWorktree(gitAvailable)}
+              className={cn(
+                'flex items-center gap-1 rounded-full border px-2 py-1 text-[12px] font-medium transition',
+                isolateWorktree
+                  ? 'border-[var(--primary)] bg-[var(--primary-tint)] text-[var(--primary)] cursor-pointer'
+                  : 'border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-muted)] hover:bg-[var(--surface-3)] cursor-pointer',
+                !canUseIsolatedWorktree(gitAvailable) &&
+                  'cursor-not-allowed opacity-50 hover:bg-[var(--surface-2)]',
+              )}
+              title={
+                gitAvailable === null
+                  ? translate(
+                      t,
+                      'createSession.worktreeCheckingGit',
+                      'Checking Git workspace',
+                    )
+                  : gitAvailable === false
+                  ? translate(
+                      t,
+                      'createSession.worktreeRequiresGit',
+                      'Requires a Git workspace',
+                    )
+                  : translate(
+                      t,
+                      'createSession.isolateWorktree',
+                      'Isolate this session in a Git worktree',
+                    )
+              }
+              aria-pressed={isolateWorktree}
+              aria-label={translate(
+                t,
+                'createSession.isolateWorktree',
+                'Isolate this session in a Git worktree',
+              )}
+              onClick={() =>
+                setIsolateWorktree((current) =>
+                  nextIsolatedWorktreeSelection(current, gitAvailable),
+                )
+              }
+            >
+              <GitFork className="h-3 w-3" />
+              <span>
+                {translate(
+                  t,
+                  'createSession.isolateWorktree',
+                  'Isolate worktree',
+                )}
+              </span>
             </button>
 
             <div ref={workItemMenuRef} className="relative min-w-0">

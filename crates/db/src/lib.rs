@@ -1459,6 +1459,7 @@ mod tests {
                 title: Some("test".to_string()),
                 workspace_path: None,
                 project_id: None,
+                worktree_mode: None,
             },
             Uuid::new_v4(),
         )
@@ -1977,6 +1978,7 @@ mod tests {
                 title: Some("project session".to_string()),
                 workspace_path: Some("E:/workspace/project".to_string()),
                 project_id: Some(project.id),
+                worktree_mode: None,
             },
             Uuid::new_v4(),
         )
@@ -2124,6 +2126,7 @@ mod tests {
                 title: Some("delivery session".to_string()),
                 workspace_path: None,
                 project_id: Some(project.id),
+                worktree_mode: None,
             },
             Uuid::new_v4(),
         )
@@ -2315,6 +2318,7 @@ mod tests {
                 title: Some("workflow".to_string()),
                 workspace_path: None,
                 project_id: None,
+                worktree_mode: None,
             },
             Uuid::new_v4(),
         )

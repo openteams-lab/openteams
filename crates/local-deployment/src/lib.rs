@@ -38,9 +38,7 @@ use utils::{
 };
 
 use crate::{container::LocalContainerService, pty::PtyService};
-mod command;
 pub mod container;
-mod copy;
 pub mod pty;
 
 #[derive(Clone)]

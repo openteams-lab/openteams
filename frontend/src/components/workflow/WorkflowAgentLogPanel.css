@@ -122,14 +122,6 @@ body[data-mode="light"] .workflow-window-root .wf-log-group + .wf-log-group {
   width: 14px;
 }
 
-/* Error cross — Lucide icon */
-.wf-log-error-x-icon {
-  width: 10px;
-  height: 10px;
-  color: #e5484d;
-  stroke-width: 2.5;
-}
-
 /* Spinner — rotating ring */
 .wf-log-spinner {
   display: inline-block;
@@ -307,8 +299,4 @@ body[data-mode="light"] .workflow-window-root .wf-log-markdown pre {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.wf-log-task-content-text--error {
-  color: #e5484d;
 }

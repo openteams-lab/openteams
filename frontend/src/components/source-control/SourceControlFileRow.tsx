@@ -92,13 +92,13 @@ interface SourceControlFileRowProps {
 }
 
 const statusTone: Record<SourceControlFile["status"], string> = {
-  modified: "text-amber-600",
-  added: "text-emerald-600",
-  deleted: "text-rose-500",
-  untracked: "text-sky-500",
-  renamed: "text-violet-500",
-  copied: "text-cyan-500",
-  type_changed: "text-orange-500",
+  modified: "text-[color-mix(in_srgb,#f59e0b_62%,var(--ink-subtle))]",
+  added: "text-[color-mix(in_srgb,var(--success)_62%,var(--ink-subtle))]",
+  deleted: "text-[color-mix(in_srgb,#f43f5e_68%,var(--ink-subtle))]",
+  untracked: "text-[color-mix(in_srgb,#38bdf8_56%,var(--ink-subtle))]",
+  renamed: "text-[color-mix(in_srgb,var(--primary)_62%,var(--ink-subtle))]",
+  copied: "text-[color-mix(in_srgb,#22d3ee_54%,var(--ink-subtle))]",
+  type_changed: "text-[color-mix(in_srgb,#fb923c_58%,var(--ink-subtle))]",
 };
 
 const exactFileTypeIcons: Record<string, SimpleIcon> = {
@@ -272,7 +272,7 @@ export function SourceControlFileTypeIcon({ path }: { path: string }) {
       <svg
         aria-hidden="true"
         viewBox="0 0 24 24"
-        className="h-3 w-3 shrink-0 text-[var(--ink-tertiary)] opacity-85"
+        className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)] opacity-80"
         fill="currentColor"
       >
         <path d={simpleIcon.path} />
@@ -284,8 +284,8 @@ export function SourceControlFileTypeIcon({ path }: { path: string }) {
   return (
     <FallbackIcon
       aria-hidden="true"
-      className="h-3 w-3 shrink-0 text-[var(--ink-tertiary)] opacity-85"
-      strokeWidth={1.7}
+      className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)] opacity-80"
+      strokeWidth={1.5}
     />
   );
 }
@@ -306,7 +306,7 @@ function SourceControlIconButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex h-6 w-6 items-center justify-center rounded-sm text-[var(--ink-tertiary)] opacity-0 transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] focus:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--primary)] group-hover/source-file:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
+      className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[var(--ink-tertiary)] opacity-0 transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] focus:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--primary)] group-hover/source-file:opacity-100 disabled:cursor-not-allowed disabled:opacity-35"
       title={title}
       aria-label={title}
     >
@@ -334,13 +334,13 @@ function FileWarningIndicator({
 
   return (
     <span
-      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-sm ${
-        file.shared ? "text-amber-500" : "text-rose-500"
+      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] ${
+        file.shared ? "text-[var(--ink-subtle)]" : "text-rose-500"
       }`}
       title={title}
       aria-label={title}
     >
-      <ShieldAlert className="h-3.5 w-3.5" />
+      <ShieldAlert className="h-3.5 w-3.5" strokeWidth={1.5} />
     </span>
   );
 }
@@ -423,7 +423,7 @@ export const SourceControlFileRow: React.FC<SourceControlFileRowProps> = ({
 
   return (
     <div
-      className="group/source-file relative flex min-h-9 w-full min-w-0 items-center gap-2 rounded-md bg-[var(--surface-1)] px-2 py-1 text-left text-[13px] transition-colors hover:bg-[var(--surface-3)]"
+      className="group/source-file relative flex min-h-8 w-full min-w-0 items-center gap-2 rounded-lg border border-transparent bg-[color-mix(in_srgb,var(--surface-1)_76%,var(--canvas))] px-2 py-1 text-left text-[12px] transition-colors hover:border-[color-mix(in_srgb,var(--hairline)_72%,transparent)] hover:bg-[var(--surface-2)]"
       title={fullPath}
     >
       <div className="flex min-w-0 flex-1 items-center">
@@ -441,7 +441,7 @@ export const SourceControlFileRow: React.FC<SourceControlFileRowProps> = ({
         >
           <SourceControlFileTypeIcon path={file.path} />
           <span
-            className="min-w-0 flex-1 truncate font-mono text-[13px] text-[var(--ink)]"
+            className="min-w-0 flex-1 truncate font-mono text-[12px] text-[var(--ink-muted)]"
             title={fullPath}
           >
             {file.path}
@@ -452,7 +452,7 @@ export const SourceControlFileRow: React.FC<SourceControlFileRowProps> = ({
       <div className="flex w-10 shrink-0 items-center justify-end gap-1 transition-opacity group-hover/source-file:opacity-0 group-focus-within/source-file:opacity-0">
         <FileWarningIndicator file={file} t={t} />
         <span
-          className={`w-4 text-right font-mono text-[12px] font-semibold ${
+          className={`w-4 text-right font-mono text-[11px] font-medium ${
             statusTone[file.status]
           }`}
         >
@@ -460,7 +460,7 @@ export const SourceControlFileRow: React.FC<SourceControlFileRowProps> = ({
         </span>
       </div>
 
-      <div className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-end gap-0.5 rounded-sm bg-[var(--surface-3)] opacity-0 transition group-hover/source-file:pointer-events-auto group-hover/source-file:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
+      <div className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center justify-end gap-0.5 rounded-[6px] bg-[var(--surface-2)] opacity-0 transition group-hover/source-file:pointer-events-auto group-hover/source-file:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
         {area === "changes" ? (
           <>
             <SourceControlIconButton
@@ -471,7 +471,7 @@ export const SourceControlFileRow: React.FC<SourceControlFileRowProps> = ({
                 onStage(file);
               }}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
             </SourceControlIconButton>
             <SourceControlIconButton
               title={disabledTitle(
@@ -486,7 +486,7 @@ export const SourceControlFileRow: React.FC<SourceControlFileRowProps> = ({
                 onDiscard(file);
               }}
             >
-              <RotateCcw className="h-3.5 w-3.5" />
+              <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.5} />
             </SourceControlIconButton>
           </>
         ) : (
@@ -503,7 +503,7 @@ export const SourceControlFileRow: React.FC<SourceControlFileRowProps> = ({
               onUnstage(file);
             }}
           >
-            <Minus className="h-3.5 w-3.5" />
+            <Minus className="h-3.5 w-3.5" strokeWidth={1.5} />
           </SourceControlIconButton>
         )}
         <FileWarningIndicator file={file} t={t} />

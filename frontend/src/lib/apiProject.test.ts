@@ -2,7 +2,6 @@ import type {
   AddProjectMemberRequest,
   ChatSession,
   CreateProjectRequest,
-  CreateProjectSessionRequest,
   Project,
   ProjectDetail,
   ProjectMemberWithRuntime,
@@ -18,7 +17,11 @@ import type {
   UpdateChatSession,
 } from "@/types";
 import { readFileSync } from "node:fs";
-import { chatSessionsApi, projectApi } from "./api";
+import {
+  chatSessionsApi,
+  projectApi,
+  type CreateProjectSessionRequest,
+} from "./api";
 import { paths } from "./paths";
 
 type Equal<Actual, Expected> =

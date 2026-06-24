@@ -8,7 +8,6 @@ use db::{
     models::{
         project::{CreateProject, Project},
         project_repo::CreateProjectRepo,
-        workspace::WorkspaceError,
     },
 };
 use executors::executors::ExecutorError;
@@ -52,8 +51,6 @@ pub enum DeploymentError {
     GitServiceError(#[from] GitServiceError),
     #[error(transparent)]
     FilesystemWatcherError(#[from] FilesystemWatcherError),
-    #[error(transparent)]
-    Workspace(#[from] WorkspaceError),
     #[error(transparent)]
     Container(#[from] ContainerError),
     #[error(transparent)]

@@ -1,8 +1,5 @@
 use anyhow::Error as AnyhowError;
-use db::models::{
-    execution_process::ExecutionProcess, project::Project, scratch::Scratch, task::Task,
-    workspace::Workspace,
-};
+use db::models::{project::Project, scratch::Scratch};
 use serde::{Deserialize, Serialize};
 use sqlx::Error as SqlxError;
 use strum_macros::{Display, EnumString};
@@ -17,17 +14,11 @@ pub enum EventError {
     #[error(transparent)]
     Parse(#[from] serde_json::Error),
     #[error(transparent)]
-    Other(#[from] AnyhowError), // Catches any unclassified errors
+    Other(#[from] AnyhowError),
 }
 
 #[derive(EnumString, Display)]
 pub enum HookTables {
-    #[strum(to_string = "tasks")]
-    Tasks,
-    #[strum(to_string = "workspaces")]
-    Workspaces,
-    #[strum(to_string = "execution_processes")]
-    ExecutionProcesses,
     #[strum(to_string = "scratch")]
     Scratch,
     #[strum(to_string = "projects")]
@@ -37,25 +28,8 @@ pub enum HookTables {
 #[derive(Serialize, Deserialize, TS)]
 #[serde(tag = "type", content = "data", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RecordTypes {
-    Task(Task),
-    Workspace(Workspace),
-    ExecutionProcess(ExecutionProcess),
     Scratch(Scratch),
     Project(Project),
-    DeletedTask {
-        rowid: i64,
-        project_id: Option<Uuid>,
-        task_id: Option<Uuid>,
-    },
-    DeletedWorkspace {
-        rowid: i64,
-        task_id: Option<Uuid>,
-    },
-    DeletedExecutionProcess {
-        rowid: i64,
-        session_id: Option<Uuid>,
-        process_id: Option<Uuid>,
-    },
     DeletedScratch {
         rowid: i64,
         scratch_id: Option<Uuid>,

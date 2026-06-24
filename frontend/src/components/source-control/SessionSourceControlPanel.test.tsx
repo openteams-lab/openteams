@@ -4,6 +4,7 @@
 //     pnpm exec tsx src/components/source-control/SessionSourceControlPanel.test.tsx
 
 import { readFileSync } from "node:fs";
+import { refreshAfterWorktreeResolution } from "./SessionSourceControlPanel";
 
 let failures = 0;
 const check = (label: string, cond: boolean, detail?: unknown) => {
@@ -39,6 +40,105 @@ check(
     ),
   source,
 );
+
+check(
+  "accepts a worktreeMode prop",
+  source.includes("worktreeMode?: ChatSessionWorktreeMode") &&
+    source.includes("worktreeMode,"),
+  source,
+);
+
+check(
+  "uses the session worktree hook only when isolated",
+  source.includes('const worktreeEnabled = worktreeMode === "isolated";') &&
+    source.includes("useSessionWorktree") &&
+    source.includes("enabled: worktreeEnabled && enabled"),
+  source,
+);
+
+check(
+  "renders the worktree badge conditionally",
+  source.includes("{worktreeEnabled && (") &&
+    source.includes("<SessionWorktreeBadge"),
+  source,
+);
+
+check(
+  "renders the ui-new merge history section for merged worktrees",
+  source.includes("@/pages/worktree/WorktreeMergeHistorySection") &&
+    source.includes("<WorktreeMergeHistorySection") &&
+    source.includes("showWorktreeHistory"),
+  source,
+);
+
+check(
+  "does not render worktree UI when worktree is not enabled",
+  source.includes('worktreeMode === "isolated"'),
+  source,
+);
+
+check(
+  "renders the ui-new merge conflicts section when conflict resolution is active",
+  source.includes("@/pages/worktree/WorktreeMergeConflictsSection") &&
+    source.includes("<WorktreeMergeConflictsSection") &&
+    source.includes("showConflictResolution") &&
+    source.includes('worktree?.status === "needs_conflict_resolution"'),
+  source,
+);
+
+check(
+  "auto-exits conflict resolution when status changes away from needs_conflict_resolution",
+  source.includes(
+    'worktree?.status !== "needs_conflict_resolution"',
+  ) && source.includes("setShowConflictResolution(false)"),
+  source,
+);
+
+check(
+  "wires worktree actions through handleWorktreeAction",
+  source.includes("handleWorktreeAction") &&
+    source.includes('"prepare"') &&
+    source.includes('"merge"') &&
+    source.includes('"discard"') &&
+    source.includes('"cleanup"') &&
+    source.includes('"retry-cleanup"') &&
+    source.includes('"resolve-conflicts"') &&
+    source.includes('"view-history"'),
+  source,
+);
+
+check(
+  "displays worktree action errors alongside source-control errors",
+  source.includes("worktreeActionError") &&
+    source.includes("viewModel.blockedReason || actionError || worktreeActionError"),
+  source,
+);
+
+check(
+  "refreshes source-control after conflict resolution completes",
+  source.includes("onCompleted") &&
+    source.includes("setShowConflictResolution(false)") &&
+    source.includes("refreshAfterWorktreeResolution"),
+  source,
+);
+
+{
+  let sourceRefreshes = 0;
+  let worktreeRefreshes = 0;
+  await refreshAfterWorktreeResolution(
+    async () => {
+      sourceRefreshes += 1;
+    },
+    async () => {
+      worktreeRefreshes += 1;
+    },
+  );
+  check(
+    "refresh helper refreshes source-control and worktree state",
+    sourceRefreshes === 1 && worktreeRefreshes === 1,
+    { sourceRefreshes, worktreeRefreshes },
+  );
+}
 
 if (failures > 0) {
   // eslint-disable-next-line no-console

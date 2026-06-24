@@ -260,6 +260,7 @@ export function CustomProviderEditor({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(mode === 'create');
+  const [focusedModelKey, setFocusedModelKey] = useState<string | null>(null);
 
   const copy = (key: string, fallback: string) => {
     const value = t(key);
@@ -275,6 +276,7 @@ export function CustomProviderEditor({
     setBusyAction(null);
     setConfirmingDelete(false);
     setDetailsExpanded(mode === 'create');
+    setFocusedModelKey(null);
   }, [initialProvider, mode]);
 
   const existingModelIds = useMemo(
@@ -346,6 +348,7 @@ export function CustomProviderEditor({
       const nextModels = response.models
         .filter((model) => model.id.trim() && !existingModelIds.has(model.id))
         .map(emptyModelDraft);
+      setFocusedModelKey(nextModels[0]?.key ?? null);
       updateForm((current) => ({
         ...current,
         models: [...current.models, ...nextModels],
@@ -591,12 +594,14 @@ export function CustomProviderEditor({
               <button
                 type="button"
                 className={secondaryButtonClassName}
-                onClick={() =>
+                onClick={() => {
+                  const nextModel = emptyModelDraft();
+                  setFocusedModelKey(nextModel.key);
                   updateForm((current) => ({
                     ...current,
-                    models: [...current.models, emptyModelDraft()],
-                  }))
-                }
+                    models: [...current.models, nextModel],
+                  }));
+                }}
                 disabled={isBusy}
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -623,6 +628,7 @@ export function CustomProviderEditor({
                     busyAction={busyAction}
                     copy={copy}
                     isBusy={isBusy}
+                    focusOnRender={focusedModelKey === model.key}
                     model={model}
                     onRemove={() =>
                       updateForm((current) => ({

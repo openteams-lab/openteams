@@ -13,6 +13,8 @@ export type AgentFileStatus = 'M' | 'A' | 'D' | 'U';
 
 export interface AgentFileRow {
   path: string;
+  /** Absolute workspace root that this run/file row belongs to, when known. */
+  workspacePath?: string | null;
   /** Additions (+) for this file in the run, when known. */
   additions?: number;
   /** Deletions (-) for this file in the run, when known. */
@@ -55,6 +57,7 @@ interface RunFileChanges {
 }
 
 interface RunFileChangesPayload {
+  workspace_path?: string | null;
   changes?: RunFileChanges | null;
 }
 
@@ -68,11 +71,13 @@ export const flattenRunFileChanges = (
 ): AgentFileRow[] => {
   const changes = payload?.changes;
   if (!changes) return [];
+  const workspacePath = payload.workspace_path ?? null;
 
   const rows: AgentFileRow[] = [];
   for (const file of changes.modified) {
     rows.push({
       path: file.path,
+      workspacePath,
       additions: file.additions,
       deletions: file.deletions,
       hasDiff: file.has_diff,
@@ -82,6 +87,7 @@ export const flattenRunFileChanges = (
   for (const file of changes.added) {
     rows.push({
       path: file.path,
+      workspacePath,
       additions: file.additions,
       deletions: file.deletions,
       hasDiff: file.has_diff,
@@ -89,11 +95,12 @@ export const flattenRunFileChanges = (
     });
   }
   for (const file of changes.deleted) {
-    rows.push({ path: file.path, hasDiff: false, status: 'D' });
+    rows.push({ path: file.path, workspacePath, hasDiff: false, status: 'D' });
   }
   for (const file of changes.untracked) {
     rows.push({
       path: file.path,
+      workspacePath,
       additions: file.additions,
       deletions: file.deletions,
       hasDiff: file.has_diff,
@@ -123,6 +130,7 @@ export const flattenRunFileChanges = (
 export const mergeArtifactPaths = (
   runRows: AgentFileRow[],
   artifactPaths: string[],
+  workspacePath?: string | null,
 ): AgentFileRow[] => {
   const covered = new Set(
     runRows.map((row) => normalizeArtifactPath(row.path)),
@@ -133,7 +141,7 @@ export const mergeArtifactPaths = (
     const key = normalizeArtifactPath(path);
     if (covered.has(key)) continue;
     covered.add(key);
-    merged.push({ path, hasDiff: false, supplementary: true });
+    merged.push({ path, workspacePath, hasDiff: false, supplementary: true });
   }
 
   return merged.sort((a, b) => {

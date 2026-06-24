@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import os from "os"
 import path from "path"
-import { BashTool } from "../../src/tool/bash"
+import { BashTool, normalizeNulRedirects } from "../../src/tool/bash"
 import { Instance } from "../../src/project/instance"
 import { Filesystem } from "../../src/util/filesystem"
 import { tmpdir } from "../fixture/fixture"
@@ -400,4 +400,95 @@ describe("tool.bash truncation", () => {
       },
     })
   })
+})
+
+describe("tool.bash normalizeNulRedirects", () => {
+  const bash = "C:\\Program Files\\Git\\bin\\bash.exe"
+  const cmd = "C:\\Windows\\System32\\cmd.exe"
+
+  test("normalizes nul redirect targets on win32 with bash", () => {
+    expect(normalizeNulRedirects("rg foo 2>nul", bash, "win32")).toBe("rg foo 2>/dev/null")
+    expect(normalizeNulRedirects("rg foo >nul", bash, "win32")).toBe("rg foo >/dev/null")
+    expect(normalizeNulRedirects("rg foo >>nul", bash, "win32")).toBe("rg foo >>/dev/null")
+    expect(normalizeNulRedirects("rg foo &>nul", bash, "win32")).toBe("rg foo &>/dev/null")
+    expect(normalizeNulRedirects("rg foo 1>nul", bash, "win32")).toBe("rg foo 1>/dev/null")
+    expect(normalizeNulRedirects("rg foo 2>>nul", bash, "win32")).toBe("rg foo 2>>/dev/null")
+  })
+
+  test("handles whitespace between operator and nul", () => {
+    expect(normalizeNulRedirects("rg foo 2> nul", bash, "win32")).toBe("rg foo 2>/dev/null")
+    expect(normalizeNulRedirects("rg foo >  nul", bash, "win32")).toBe("rg foo >/dev/null")
+  })
+
+  test("normalizes multiple nul redirects in one command", () => {
+    expect(normalizeNulRedirects("rg foo 2>nul 1>>nul", bash, "win32")).toBe(
+      "rg foo 2>/dev/null 1>>/dev/null",
+    )
+  })
+
+  test("normalizes NUL case-insensitively", () => {
+    expect(normalizeNulRedirects("rg foo 2>NUL", bash, "win32")).toBe("rg foo 2>/dev/null")
+    expect(normalizeNulRedirects("rg foo 2>Nul", bash, "win32")).toBe("rg foo 2>/dev/null")
+  })
+
+  test("normalizes nul at end of piped command", () => {
+    expect(normalizeNulRedirects("rg foo 2>nul | head", bash, "win32")).toBe(
+      "rg foo 2>/dev/null | head",
+    )
+  })
+
+  test("does not touch non-nul redirect targets", () => {
+    expect(normalizeNulRedirects("rg foo 2>errors.txt", bash, "win32")).toBe("rg foo 2>errors.txt")
+    expect(normalizeNulRedirects("rg foo > /dev/null", bash, "win32")).toBe("rg foo > /dev/null")
+  })
+
+  test("does not touch nul that is not a redirect target", () => {
+    expect(normalizeNulRedirects("cat nul", bash, "win32")).toBe("cat nul")
+    expect(normalizeNulRedirects("echo nul", bash, "win32")).toBe("echo nul")
+  })
+
+  test("does not match nul as part of a longer filename", () => {
+    expect(normalizeNulRedirects("rg foo 2>nul.txt", bash, "win32")).toBe("rg foo 2>nul.txt")
+    expect(normalizeNulRedirects("rg foo 2>nullfile", bash, "win32")).toBe("rg foo 2>nullfile")
+  })
+
+  test("leaves commands unchanged on non-win32", () => {
+    expect(normalizeNulRedirects("rg foo 2>nul", "/bin/bash", "linux")).toBe("rg foo 2>nul")
+    expect(normalizeNulRedirects("rg foo 2>nul", "/bin/bash", "darwin")).toBe("rg foo 2>nul")
+  })
+
+  test("leaves commands unchanged under cmd.exe on win32", () => {
+    expect(normalizeNulRedirects("rg foo 2>nul", cmd, "win32")).toBe("rg foo 2>nul")
+  })
+
+  test("recognizes bash via /usr/bin/bash path (Git Bash SHELL env)", () => {
+    expect(normalizeNulRedirects("rg foo 2>nul", "/usr/bin/bash", "win32")).toBe(
+      "rg foo 2>/dev/null",
+    )
+  })
+})
+
+describe("tool.bash nul file creation", () => {
+  test.skipIf(process.platform !== "win32")(
+    "does not create a nul file in the workspace",
+    async () => {
+      await using tmp = await tmpdir({ git: true })
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const bash = await BashTool.init()
+          await bash.execute(
+            {
+              command: "echo hello 2>nul",
+              description: "Echo with nul redirect",
+            },
+            ctx,
+          )
+          const nulPath = path.join(tmp.path, "nul")
+          const exists = await Filesystem.exists(nulPath)
+          expect(exists).toBe(false)
+        },
+      })
+    },
+  )
 })

@@ -121,8 +121,13 @@ fn reveal_path_in_file_manager(path: String) -> Result<(), String> {
 }
 
 fn spawn_detached_command(command: &mut StdCommand) -> Result<(), std::io::Error> {
+    command.current_dir(safe_detached_command_cwd());
     let _child = command.spawn()?;
     Ok(())
+}
+
+fn safe_detached_command_cwd() -> PathBuf {
+    std::env::temp_dir()
 }
 
 #[cfg(target_os = "macos")]

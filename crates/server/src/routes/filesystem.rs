@@ -165,8 +165,13 @@ async fn resolve_open_target_path_for_open(
 }
 
 fn spawn_detached_command(command: &mut Command) -> Result<(), std::io::Error> {
+    command.current_dir(safe_detached_command_cwd());
     let _child = command.spawn()?;
     Ok(())
+}
+
+fn safe_detached_command_cwd() -> std::path::PathBuf {
+    std::env::temp_dir()
 }
 
 fn absolute_open_target_path(path: PathBuf) -> PathBuf {

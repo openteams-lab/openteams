@@ -20,8 +20,13 @@ const ACTIVITY_LOAD_TIMEOUT_MS = 15000;
  * A run's captured diff is immutable once the run completes, so the rows are
  * safe to reuse across message re-renders and avoid refetching on every scroll.
  */
-const runFileRowsCache = new Map<string, AgentFileRow[]>();
-const runFileRowsPending = new Map<string, Promise<AgentFileRow[]>>();
+interface RunFileRowsCacheEntry {
+  rows: AgentFileRow[];
+  workspacePath: string | null;
+}
+
+const runFileRowsCache = new Map<string, RunFileRowsCacheEntry>();
+const runFileRowsPending = new Map<string, Promise<RunFileRowsCacheEntry>>();
 
 const runFileRowsCacheKey = (
   sessionId: string | undefined,
@@ -166,7 +171,10 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
   // diff (GET /chat/runs/{run_id}/files). Results are cached per session/run.
   const cacheKey = runFileRowsCacheKey(message.sessionId, message.runId);
   const [runFileRows, setRunFileRows] = useState<AgentFileRow[]>(() =>
-    cacheKey ? (runFileRowsCache.get(cacheKey) ?? []) : [],
+    cacheKey ? (runFileRowsCache.get(cacheKey)?.rows ?? []) : [],
+  );
+  const [runWorkspacePath, setRunWorkspacePath] = useState<string | null>(() =>
+    cacheKey ? (runFileRowsCache.get(cacheKey)?.workspacePath ?? null) : null,
   );
 
   useEffect(() => {
@@ -175,7 +183,8 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
     const runId = message.runId;
     const cached = runFileRowsCache.get(nextCacheKey);
     if (cached) {
-      setRunFileRows(cached);
+      setRunFileRows(cached.rows);
+      setRunWorkspacePath(cached.workspacePath);
       return;
     }
 
@@ -186,8 +195,12 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
         .getFiles(runId, { includeDiff: false })
         .then((response) => {
           const rows = flattenRunFileChanges(response);
-          runFileRowsCache.set(nextCacheKey, rows);
-          return rows;
+          const entry = {
+            rows,
+            workspacePath: response.workspace_path ?? null,
+          };
+          runFileRowsCache.set(nextCacheKey, entry);
+          return entry;
         })
         .finally(() => {
           runFileRowsPending.delete(nextCacheKey);
@@ -196,13 +209,15 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
     }
 
     pending
-      .then((rows) => {
+      .then((entry) => {
         if (cancelled) return;
-        setRunFileRows(rows);
+        setRunFileRows(entry.rows);
+        setRunWorkspacePath(entry.workspacePath);
       })
       .catch(() => {
         if (cancelled) return;
         setRunFileRows([]);
+        setRunWorkspacePath(null);
       });
     return () => {
       cancelled = true;
@@ -218,8 +233,8 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
   );
 
   const fileRows = useMemo(
-    () => mergeArtifactPaths(runFileRows, artifactPaths),
-    [runFileRows, artifactPaths],
+    () => mergeArtifactPaths(runFileRows, artifactPaths, runWorkspacePath),
+    [runFileRows, artifactPaths, runWorkspacePath],
   );
 
   const panelLabels = {

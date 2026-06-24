@@ -104,7 +104,7 @@ impl Project {
         .await
     }
 
-    /// Find the most actively used projects based on recent task activity
+    /// Find the most actively used projects based on recent chat session activity.
     pub async fn find_most_active(pool: &SqlitePool, limit: i32) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             Project,
@@ -119,10 +119,10 @@ impl Project {
                    p.created_at as "created_at!: DateTime<Utc>", p.updated_at as "updated_at!: DateTime<Utc>"
             FROM projects p
             WHERE p.id IN (
-                SELECT DISTINCT t.project_id
-                FROM tasks t
-                INNER JOIN workspaces w ON w.task_id = t.id
-                ORDER BY w.updated_at DESC
+                SELECT DISTINCT cs.project_id
+                FROM chat_sessions cs
+                WHERE cs.project_id IS NOT NULL
+                ORDER BY cs.updated_at DESC
             )
             LIMIT $1
             "#,

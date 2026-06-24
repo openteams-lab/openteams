@@ -804,7 +804,7 @@ pub fn build_step_revision_prompt_with_schema(
     prompt
 }
 
-pub(crate) fn resolve_workspace_path(
+pub(crate) fn resolve_workspace_path_snapshot(
     session: &ChatSession,
     agent: &ChatAgent,
     session_agent: &ChatSessionAgent,
@@ -820,4 +820,34 @@ pub(crate) fn resolve_workspace_path(
             .join("agents")
             .join(agent.id.to_string())
     }
+}
+
+pub(crate) async fn resolve_workspace_path(
+    db: &DBService,
+    session: &ChatSession,
+    agent: &ChatAgent,
+    session_agent: &ChatSessionAgent,
+) -> Result<PathBuf, WorkflowRuntimeError> {
+    if session.worktree_mode == ChatSessionWorktreeMode::Isolated {
+        let worktree_service = SessionWorktreeService::new(db.pool.clone());
+        if let Some(worktree) = worktree_service.get_latest_for_session(session.id).await? {
+            if worktree.status.is_active_for_workspace() {
+                return Ok(PathBuf::from(worktree.worktree_path));
+            }
+            return Ok(PathBuf::from(worktree.base_workspace_path));
+        }
+
+        if let Some(default_workspace) = session.default_workspace_path.as_ref() {
+            let input = EnsureWorktreeInput::new(session.id, default_workspace.into())
+                .with_project(session.project_id);
+            let outcome = worktree_service.ensure_for_session(input).await?;
+            let worktree = match outcome {
+                EnsureOutcome::Created(w) => w,
+                EnsureOutcome::Existing(w) => w,
+            };
+            return Ok(PathBuf::from(worktree.worktree_path));
+        }
+    }
+
+    Ok(resolve_workspace_path_snapshot(session, agent, session_agent))
 }

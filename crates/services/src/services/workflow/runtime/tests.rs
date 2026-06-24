@@ -1,8 +1,11 @@
 #[cfg(test)]
 mod tests {
+    use std::{path::Path, process::Command};
+
     use chrono::Utc;
     use db::models::{
         chat_agent::ChatAgent,
+        chat_session::{ChatSession, ChatSessionStatus, ChatSessionWorktreeMode},
         member_execution_config::MemberExecutionConfig,
         chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
         workflow_plan::WorkflowPlan,
@@ -14,9 +17,141 @@ mod tests {
         },
     };
     use executors::logs::{FileChange, ToolResult};
-    use sqlx::types::Json;
+    use sqlx::{SqlitePool, types::Json};
 
     use super::*;
+
+    async fn setup_runtime_worktree_db() -> DBService {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("create sqlite memory pool");
+        sqlx::query(
+            r#"
+            CREATE TABLE chat_session_worktrees (
+                id                    BLOB    NOT NULL PRIMARY KEY,
+                session_id            BLOB    NOT NULL,
+                project_id            BLOB,
+                base_workspace_path   TEXT    NOT NULL,
+                repo_path             TEXT    NOT NULL,
+                base_branch           TEXT    NOT NULL,
+                base_commit           TEXT,
+                branch_name           TEXT    NOT NULL,
+                worktree_path         TEXT    NOT NULL,
+                mode                  TEXT    NOT NULL DEFAULT 'session'
+                                            CHECK (mode IN ('session')),
+                status                TEXT    NOT NULL DEFAULT 'creating'
+                                            CHECK (status IN (
+                                                'creating', 'active', 'dirty', 'merging',
+                                                'needs_conflict_resolution', 'merged',
+                                                'archived', 'cleanup_pending', 'cleanup_failed'
+                                            )),
+                merge_target_branch   TEXT,
+                merge_operation       TEXT
+                                            CHECK (merge_operation IS NULL
+                                                   OR merge_operation IN (
+                                                       'merge', 'squash_merge', 'cherry_pick', 'rebase'
+                                                   )),
+                conflict_files_json   TEXT    NOT NULL DEFAULT '[]',
+                operation_started_at  TEXT,
+                cleanup_error         TEXT,
+                last_used_at          TEXT,
+                merged_at             TEXT,
+                archived_at           TEXT,
+                created_at            TEXT    NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at            TEXT    NOT NULL DEFAULT (datetime('now', 'subsec'))
+            );
+
+            CREATE UNIQUE INDEX idx_chat_session_worktrees_active_session
+                ON chat_session_worktrees(session_id)
+                WHERE status IN ('creating', 'active', 'dirty', 'merging',
+                                 'needs_conflict_resolution', 'merged', 'cleanup_pending');
+
+            CREATE TABLE chat_session_agents (
+                id                  BLOB    NOT NULL PRIMARY KEY,
+                session_id          BLOB    NOT NULL,
+                agent_id            BLOB    NOT NULL,
+                state               TEXT    NOT NULL DEFAULT 'idle',
+                workspace_path      TEXT,
+                pty_session_key     TEXT,
+                agent_session_id    TEXT,
+                agent_message_id    BLOB,
+                project_member_id   BLOB,
+                execution_config    TEXT    NOT NULL DEFAULT '{}',
+                allowed_skill_ids   TEXT    NOT NULL DEFAULT '[]',
+                created_at          TEXT    NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at          TEXT    NOT NULL DEFAULT (datetime('now', 'subsec'))
+            );
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .expect("create chat_session_worktrees test schema");
+        DBService { pool }
+    }
+
+    fn sample_chat_session(
+        worktree_mode: ChatSessionWorktreeMode,
+        default_workspace_path: Option<String>,
+    ) -> ChatSession {
+        let now = Utc::now();
+        ChatSession {
+            id: Uuid::new_v4(),
+            title: Some("workflow runtime test".to_string()),
+            status: ChatSessionStatus::Active,
+            lead_agent_id: None,
+            summary_text: None,
+            archive_ref: None,
+            last_seen_diff_key: None,
+            team_protocol: None,
+            team_protocol_enabled: false,
+            default_workspace_path,
+            chat_input_mode: None,
+            project_id: None,
+            worktree_mode,
+            pinned_at: None,
+            created_at: now,
+            updated_at: now,
+            archived_at: None,
+        }
+    }
+
+    fn git(repo: &Path, args: &[&str]) {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .args(args)
+            .output()
+            .expect("run git");
+        assert!(
+            output.status.success(),
+            "git {:?} failed\nstdout={}\nstderr={}",
+            args,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    fn init_git_repo(repo: &Path) {
+        std::fs::create_dir_all(repo).expect("create repo dir");
+        let output = Command::new("git")
+            .arg("init")
+            .arg("-b")
+            .arg("main")
+            .arg(repo)
+            .output()
+            .expect("git init");
+        assert!(
+            output.status.success(),
+            "git init failed\nstdout={}\nstderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        git(repo, &["config", "user.email", "workflow@example.test"]);
+        git(repo, &["config", "user.name", "Workflow Runtime"]);
+        std::fs::write(repo.join("README.md"), "base\n").expect("write seed file");
+        git(repo, &["add", "."]);
+        git(repo, &["commit", "-m", "initial"]);
+    }
 
     fn sample_plan_json() -> String {
         serde_json::json!({
@@ -225,6 +360,130 @@ mod tests {
         };
 
         (vec![session_agent], vec![agent])
+    }
+
+    #[tokio::test]
+    async fn workflow_resolve_workspace_path_lazy_creates_worktree_for_first_isolated_run() {
+        let db = setup_runtime_worktree_db().await;
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let base = tmp.path().join("base");
+        init_git_repo(&base);
+        let base_workspace = base.to_string_lossy().to_string();
+        let session = sample_chat_session(
+            ChatSessionWorktreeMode::Isolated,
+            Some(base_workspace.clone()),
+        );
+        let (session_agents, agents) = sample_agent_views();
+        let mut session_agent = session_agents[0].clone();
+        session_agent.session_id = session.id;
+        session_agent.workspace_path = Some(base_workspace.clone());
+        let agent = &agents[0];
+
+        let resolved = resolve_workspace_path(&db, &session, agent, &session_agent)
+            .await
+            .expect("resolve isolated workflow workspace");
+
+        assert_ne!(resolved, base);
+        assert!(resolved.exists());
+
+        let active_worktree_path: String = sqlx::query_scalar(
+            "SELECT worktree_path FROM chat_session_worktrees WHERE session_id = ?1 AND status = 'active'",
+        )
+        .bind(session.id)
+        .fetch_one(&db.pool)
+        .await
+        .expect("active worktree row");
+        assert_eq!(resolved.to_string_lossy(), active_worktree_path);
+
+        SessionWorktreeService::new(db.pool.clone())
+            .discard_worktree(session.id)
+            .await
+            .expect("discard test worktree");
+
+        let after_discard = resolve_workspace_path(&db, &session, agent, &session_agent)
+            .await
+            .expect("resolve after discard");
+        assert_eq!(after_discard, base);
+    }
+
+    #[tokio::test]
+    async fn workflow_resolve_workspace_path_uses_existing_active_worktree() {
+        let db = setup_runtime_worktree_db().await;
+        let base_workspace = "E:/workspace/base";
+        let worktree_workspace = "E:/workspace/.openteams/worktrees/session";
+        let session = sample_chat_session(
+            ChatSessionWorktreeMode::Isolated,
+            Some(base_workspace.to_string()),
+        );
+        let (session_agents, agents) = sample_agent_views();
+        let session_agent = &session_agents[0];
+        let agent = &agents[0];
+
+        sqlx::query(
+            r#"
+            INSERT INTO chat_session_worktrees (
+                id, session_id, base_workspace_path, repo_path, base_branch,
+                branch_name, worktree_path, mode, status
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'session', 'active')
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(session.id)
+        .bind(base_workspace)
+        .bind(base_workspace)
+        .bind("main")
+        .bind("openteams/session/test")
+        .bind(worktree_workspace)
+        .execute(&db.pool)
+        .await
+        .expect("insert active worktree");
+
+        let resolved = resolve_workspace_path(&db, &session, agent, session_agent)
+            .await
+            .expect("resolve active worktree");
+
+        assert_eq!(resolved, PathBuf::from(worktree_workspace));
+    }
+
+    #[tokio::test]
+    async fn workflow_resolve_workspace_path_returns_base_after_terminal_worktree() {
+        let db = setup_runtime_worktree_db().await;
+        let base_workspace = "E:/workspace/base";
+        let worktree_workspace = "E:/workspace/.openteams/worktrees/session";
+        let session = sample_chat_session(
+            ChatSessionWorktreeMode::Isolated,
+            Some(base_workspace.to_string()),
+        );
+        let (session_agents, agents) = sample_agent_views();
+        let session_agent = &session_agents[0];
+        let agent = &agents[0];
+
+        sqlx::query(
+            r#"
+            INSERT INTO chat_session_worktrees (
+                id, session_id, base_workspace_path, repo_path, base_branch,
+                branch_name, worktree_path, mode, status, archived_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'session', 'archived', datetime('now', 'subsec'))
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(session.id)
+        .bind(base_workspace)
+        .bind(base_workspace)
+        .bind("main")
+        .bind("openteams/session/test")
+        .bind(worktree_workspace)
+        .execute(&db.pool)
+        .await
+        .expect("insert archived worktree");
+
+        let resolved = resolve_workspace_path(&db, &session, agent, session_agent)
+            .await
+            .expect("resolve archived worktree");
+
+        assert_eq!(resolved, PathBuf::from(base_workspace));
     }
 
     fn sample_step_review(step: &WorkflowStep) -> WorkflowStepReview {
@@ -541,6 +800,88 @@ mod tests {
 
         assert!(!prompt.contains("Coding Task Skill Requirement"));
         assert!(!prompt.contains("`code-guidelines` skill"));
+    }
+
+    #[test]
+    fn build_workspace_scoped_workflow_prompt_declares_active_workspace_as_project_repo() {
+        let workspace_path = Path::new(
+            r"C:\Users\Admin\AppData\Local\Temp\openteams-dev\worktrees\sessions\34a8ed29",
+        );
+
+        let prompt = build_workspace_scoped_workflow_prompt("Run the workflow step.", workspace_path);
+
+        assert!(prompt.contains("## Workspace"));
+        assert!(prompt.contains("Active workspace path"));
+        assert!(prompt.contains("Treat this active workspace path as the project repository"));
+        assert!(prompt.contains(r"C:\Users\Admin\AppData\Local\Temp\openteams-dev\worktrees\sessions\34a8ed29"));
+        assert!(prompt.ends_with("Run the workflow step."));
+    }
+
+    #[tokio::test]
+    async fn workflow_prompt_after_worktree_discard_declares_base_workspace() {
+        let db = setup_runtime_worktree_db().await;
+        let base_workspace = "E:/workspace/base";
+        let worktree_workspace = "E:/workspace/.openteams/worktrees/session";
+        let session = sample_chat_session(
+            ChatSessionWorktreeMode::Isolated,
+            Some(base_workspace.to_string()),
+        );
+        let (session_agents, agents) = sample_agent_views();
+        let mut session_agent = session_agents[0].clone();
+        session_agent.session_id = session.id;
+        session_agent.workspace_path = Some(worktree_workspace.to_string());
+        let agent = &agents[0];
+
+        sqlx::query(
+            r#"
+            INSERT INTO chat_session_agents (
+                id, session_id, agent_id, state, workspace_path
+            )
+            VALUES (?1, ?2, ?3, 'idle', ?4)
+            "#,
+        )
+        .bind(session_agent.id)
+        .bind(session.id)
+        .bind(agent.id)
+        .bind(worktree_workspace)
+        .execute(&db.pool)
+        .await
+        .expect("insert workflow session agent");
+
+        sqlx::query(
+            r#"
+            INSERT INTO chat_session_worktrees (
+                id, session_id, base_workspace_path, repo_path, base_branch,
+                branch_name, worktree_path, mode, status, merged_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'session', 'merged', datetime('now', 'subsec'))
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(session.id)
+        .bind(base_workspace)
+        .bind(base_workspace)
+        .bind("main")
+        .bind("openteams/session/test")
+        .bind(worktree_workspace)
+        .execute(&db.pool)
+        .await
+        .expect("insert merged worktree");
+
+        SessionWorktreeService::new(db.pool.clone())
+            .discard_worktree(session.id)
+            .await
+            .expect("discard worktree");
+
+        let resolved = resolve_workspace_path(&db, &session, agent, &session_agent)
+            .await
+            .expect("resolve workflow workspace");
+        assert_eq!(resolved, PathBuf::from(base_workspace));
+
+        let prompt = build_workspace_scoped_workflow_prompt("Run the workflow step.", &resolved);
+
+        assert!(prompt.contains("Active workspace path: `E:/workspace/base`"));
+        assert!(!prompt.contains(worktree_workspace));
     }
 
     #[test]

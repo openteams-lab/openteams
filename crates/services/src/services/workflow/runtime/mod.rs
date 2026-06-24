@@ -15,7 +15,7 @@ use db::{
         chat_agent::ChatAgent,
         chat_message::{ChatMessage, ChatSenderType},
         chat_run::{ChatRun, ChatRunLogState, ChatRunRetentionSummary, CreateChatRun},
-        chat_session::ChatSession,
+        chat_session::{ChatSession, ChatSessionWorktreeMode},
         chat_session_agent::ChatSessionAgent,
         workflow_agent_session::WorkflowAgentSession,
         workflow_execution::WorkflowExecution,
@@ -63,6 +63,7 @@ use super::{
 };
 use crate::services::{
     member_execution::build_effective_member_executor,
+    session_worktree::{EnsureOutcome, EnsureWorktreeInput, SessionWorktreeService},
     workspace_change_capture::{
         WorkspaceChangeBaseline, build_git_observed_path_records,
         capture_workspace_change_baseline, capture_workspace_change_delta, run_records_prefix,

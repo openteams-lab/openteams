@@ -14,6 +14,24 @@ pub enum ChatSessionStatus {
     Archived,
 }
 
+/// Session-level preference for isolated Git worktree creation.
+///
+/// - `Inherit` (default): defer to the project/global default. Phase 1 treats
+///   this the same as `Disabled` — no worktree is created automatically.
+/// - `Disabled`: never create an isolated worktree for this session.
+/// - `Isolated`: create an isolated worktree lazily on the first agent run
+///   via `SessionWorktreeService::ensure_for_session`.
+#[derive(Debug, Clone, Copy, Default, Type, Serialize, Deserialize, PartialEq, TS)]
+#[sqlx(type_name = "chat_session_worktree_mode", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+#[ts(use_ts_enum)]
+pub enum ChatSessionWorktreeMode {
+    #[default]
+    Inherit,
+    Disabled,
+    Isolated,
+}
+
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
 pub struct ChatSession {
     pub id: Uuid,
@@ -28,6 +46,8 @@ pub struct ChatSession {
     pub default_workspace_path: Option<String>,
     pub chat_input_mode: Option<String>,
     pub project_id: Option<Uuid>,
+    pub worktree_mode: ChatSessionWorktreeMode,
+    pub pinned_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub archived_at: Option<DateTime<Utc>>,
@@ -38,6 +58,9 @@ pub struct CreateChatSession {
     pub title: Option<String>,
     pub workspace_path: Option<String>,
     pub project_id: Option<Uuid>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub worktree_mode: Option<ChatSessionWorktreeMode>,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -64,6 +87,9 @@ pub struct UpdateChatSession {
     )]
     #[ts(optional, type = "string | null")]
     pub chat_input_mode: Option<Option<String>>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub worktree_mode: Option<ChatSessionWorktreeMode>,
 }
 
 impl ChatSession {
@@ -81,50 +107,58 @@ impl ChatSession {
         }
 
         let sessions = if let Some(status) = status {
-            sqlx::query_as!(
-                ChatSession,
-                r#"SELECT id as "id!: Uuid",
+            sqlx::query_as::<_, ChatSession>(
+                r#"SELECT id,
                           title,
-                          status as "status!: ChatSessionStatus",
-                          lead_agent_id as "lead_agent_id: Uuid",
+                          status,
+                          lead_agent_id,
                           summary_text,
                           archive_ref,
                           last_seen_diff_key,
                           team_protocol,
-                          team_protocol_enabled as "team_protocol_enabled!: bool",
+                          team_protocol_enabled,
                           default_workspace_path,
                           chat_input_mode,
-                          project_id as "project_id: Uuid",
-                          created_at as "created_at!: DateTime<Utc>",
-                          updated_at as "updated_at!: DateTime<Utc>",
-                          archived_at as "archived_at: DateTime<Utc>"
+                          project_id,
+                          worktree_mode,
+                          pinned_at,
+                          created_at,
+                          updated_at,
+                          archived_at
                    FROM chat_sessions
                    WHERE status = $1
-                   ORDER BY updated_at DESC"#,
-                status
+                   ORDER BY
+                     CASE WHEN pinned_at IS NULL THEN 1 ELSE 0 END,
+                     pinned_at ASC,
+                     updated_at DESC"#,
             )
+            .bind(status)
             .fetch_all(pool)
             .await?
         } else {
-            sqlx::query_as!(
-                ChatSession,
-                r#"SELECT id as "id!: Uuid",
+            sqlx::query_as::<_, ChatSession>(
+                r#"SELECT id,
                           title,
-                          status as "status!: ChatSessionStatus",
-                          lead_agent_id as "lead_agent_id: Uuid",
+                          status,
+                          lead_agent_id,
                           summary_text,
                           archive_ref,
                           last_seen_diff_key,
                           team_protocol,
-                          team_protocol_enabled as "team_protocol_enabled!: bool",
+                          team_protocol_enabled,
                           default_workspace_path,
                           chat_input_mode,
-                          project_id as "project_id: Uuid",
-                          created_at as "created_at!: DateTime<Utc>",
-                          updated_at as "updated_at!: DateTime<Utc>",
-                          archived_at as "archived_at: DateTime<Utc>"
+                          project_id,
+                          worktree_mode,
+                          pinned_at,
+                          created_at,
+                          updated_at,
+                          archived_at
                    FROM chat_sessions
-                   ORDER BY updated_at DESC"#
+                   ORDER BY
+                     CASE WHEN pinned_at IS NULL THEN 1 ELSE 0 END,
+                     pinned_at ASC,
+                     updated_at DESC"#,
             )
             .fetch_all(pool)
             .await?
@@ -134,27 +168,28 @@ impl ChatSession {
     }
 
     pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            ChatSession,
-            r#"SELECT id as "id!: Uuid",
+        sqlx::query_as::<_, ChatSession>(
+            r#"SELECT id,
                       title,
-                      status as "status!: ChatSessionStatus",
-                      lead_agent_id as "lead_agent_id: Uuid",
+                      status,
+                      lead_agent_id,
                       summary_text,
                       archive_ref,
                       last_seen_diff_key,
                       team_protocol,
-                      team_protocol_enabled as "team_protocol_enabled!: bool",
+                      team_protocol_enabled,
                       default_workspace_path,
                       chat_input_mode,
-                      project_id as "project_id: Uuid",
-                      created_at as "created_at!: DateTime<Utc>",
-                      updated_at as "updated_at!: DateTime<Utc>",
-                      archived_at as "archived_at: DateTime<Utc>"
+                      project_id,
+                      worktree_mode,
+                      pinned_at,
+                      created_at,
+                      updated_at,
+                      archived_at
                FROM chat_sessions
                WHERE id = $1"#,
-            id
         )
+        .bind(id)
         .fetch_optional(pool)
         .await
     }
@@ -163,28 +198,32 @@ impl ChatSession {
         pool: &SqlitePool,
         project_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            ChatSession,
-            r#"SELECT id as "id!: Uuid",
+        sqlx::query_as::<_, ChatSession>(
+            r#"SELECT id,
                       title,
-                      status as "status!: ChatSessionStatus",
-                      lead_agent_id as "lead_agent_id: Uuid",
+                      status,
+                      lead_agent_id,
                       summary_text,
                       archive_ref,
                       last_seen_diff_key,
                       team_protocol,
-                      team_protocol_enabled as "team_protocol_enabled!: bool",
+                      team_protocol_enabled,
                       default_workspace_path,
                       chat_input_mode,
-                      project_id as "project_id: Uuid",
-                      created_at as "created_at!: DateTime<Utc>",
-                      updated_at as "updated_at!: DateTime<Utc>",
-                      archived_at as "archived_at: DateTime<Utc>"
+                      project_id,
+                      worktree_mode,
+                      pinned_at,
+                      created_at,
+                      updated_at,
+                      archived_at
                FROM chat_sessions
                WHERE project_id = $1
-               ORDER BY updated_at DESC"#,
-            project_id
+               ORDER BY
+                 CASE WHEN pinned_at IS NULL THEN 1 ELSE 0 END,
+                 pinned_at ASC,
+                 updated_at DESC"#,
         )
+        .bind(project_id)
         .fetch_all(pool)
         .await
     }
@@ -194,31 +233,34 @@ impl ChatSession {
         data: &CreateChatSession,
         id: Uuid,
     ) -> Result<Self, sqlx::Error> {
-        sqlx::query_as!(
-            ChatSession,
-            r#"INSERT INTO chat_sessions (id, title, status, default_workspace_path, project_id)
-               VALUES ($1, $2, $3, $4, $5)
-               RETURNING id as "id!: Uuid",
+        let worktree_mode = data.worktree_mode.unwrap_or_default();
+        sqlx::query_as::<_, ChatSession>(
+            r#"INSERT INTO chat_sessions (id, title, status, default_workspace_path, project_id, worktree_mode)
+               VALUES ($1, $2, $3, $4, $5, $6)
+               RETURNING id,
                          title,
-                         status as "status!: ChatSessionStatus",
-                         lead_agent_id as "lead_agent_id: Uuid",
+                         status,
+                         lead_agent_id,
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
                          team_protocol,
-                         team_protocol_enabled as "team_protocol_enabled!: bool",
+                         team_protocol_enabled,
                          default_workspace_path,
                          chat_input_mode,
-                         project_id as "project_id: Uuid",
-                         created_at as "created_at!: DateTime<Utc>",
-                         updated_at as "updated_at!: DateTime<Utc>",
-                         archived_at as "archived_at: DateTime<Utc>""#,
-            id,
-            data.title,
-            ChatSessionStatus::Active,
-            data.workspace_path,
-            data.project_id
+                         project_id,
+                         worktree_mode,
+                         pinned_at,
+                         created_at,
+                         updated_at,
+                         archived_at"#,
         )
+        .bind(id)
+        .bind(&data.title)
+        .bind(ChatSessionStatus::Active)
+        .bind(&data.workspace_path)
+        .bind(data.project_id)
+        .bind(worktree_mode)
         .fetch_one(pool)
         .await
     }
@@ -256,6 +298,7 @@ impl ChatSession {
             Some(value) => value.clone(), // Some(Some("workflow")) = set, Some(None) = clear
             None => existing.chat_input_mode, // Not provided, keep existing
         };
+        let worktree_mode = data.worktree_mode.unwrap_or(existing.worktree_mode);
 
         let archived_at = if status == ChatSessionStatus::Archived {
             existing.archived_at.or(Some(Utc::now()))
@@ -263,8 +306,7 @@ impl ChatSession {
             None
         };
 
-        sqlx::query_as!(
-            ChatSession,
+        sqlx::query_as::<_, ChatSession>(
             r#"UPDATE chat_sessions
                SET title = $2,
                    status = $3,
@@ -277,36 +319,75 @@ impl ChatSession {
                    archived_at = $10,
                    default_workspace_path = $11,
                    chat_input_mode = $12,
+                   worktree_mode = $13,
                    updated_at = datetime('now', 'subsec')
                WHERE id = $1
-               RETURNING id as "id!: Uuid",
+               RETURNING id,
                          title,
-                         status as "status!: ChatSessionStatus",
-                         lead_agent_id as "lead_agent_id: Uuid",
+                         status,
+                         lead_agent_id,
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
                          team_protocol,
-                         team_protocol_enabled as "team_protocol_enabled!: bool",
+                         team_protocol_enabled,
                          default_workspace_path,
                          chat_input_mode,
-                         project_id as "project_id: Uuid",
-                         created_at as "created_at!: DateTime<Utc>",
-                         updated_at as "updated_at!: DateTime<Utc>",
-                         archived_at as "archived_at: DateTime<Utc>""#,
-            id,
-            title,
-            status,
-            lead_agent_id,
-            summary_text,
-            archive_ref,
-            last_seen_diff_key,
-            team_protocol,
-            team_protocol_enabled,
-            archived_at,
-            default_workspace_path,
-            chat_input_mode
+                         project_id,
+                         worktree_mode,
+                         pinned_at,
+                         created_at,
+                         updated_at,
+                         archived_at"#,
         )
+        .bind(id)
+        .bind(title)
+        .bind(status)
+        .bind(lead_agent_id)
+        .bind(summary_text)
+        .bind(archive_ref)
+        .bind(last_seen_diff_key)
+        .bind(team_protocol)
+        .bind(team_protocol_enabled)
+        .bind(archived_at)
+        .bind(default_workspace_path)
+        .bind(chat_input_mode)
+        .bind(worktree_mode)
+        .fetch_one(pool)
+        .await
+    }
+
+    pub async fn set_pinned(
+        pool: &SqlitePool,
+        id: Uuid,
+        pinned: bool,
+    ) -> Result<Self, sqlx::Error> {
+        let pinned_at = pinned.then(Utc::now);
+        sqlx::query_as::<_, ChatSession>(
+            r#"UPDATE chat_sessions
+               SET pinned_at = $2,
+                   updated_at = datetime('now', 'subsec')
+               WHERE id = $1
+               RETURNING id,
+                         title,
+                         status,
+                         lead_agent_id,
+                         summary_text,
+                         archive_ref,
+                         last_seen_diff_key,
+                         team_protocol,
+                         team_protocol_enabled,
+                         default_workspace_path,
+                         chat_input_mode,
+                         project_id,
+                         worktree_mode,
+                         pinned_at,
+                         created_at,
+                         updated_at,
+                         archived_at"#,
+        )
+        .bind(id)
+        .bind(pinned_at)
         .fetch_one(pool)
         .await
     }
@@ -377,6 +458,9 @@ mod tests {
                 default_workspace_path TEXT,
                 chat_input_mode TEXT,
                 project_id BLOB,
+                worktree_mode TEXT NOT NULL DEFAULT 'inherit'
+                    CHECK (worktree_mode IN ('inherit', 'disabled', 'isolated')),
+                pinned_at TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 archived_at TEXT
@@ -404,6 +488,7 @@ mod tests {
                 title: Some("matching".to_string()),
                 workspace_path: None,
                 project_id: Some(project_id),
+                worktree_mode: None,
             },
             matching_id,
         )
@@ -415,6 +500,7 @@ mod tests {
                 title: Some("other".to_string()),
                 workspace_path: None,
                 project_id: Some(other_project_id),
+                worktree_mode: None,
             },
             Uuid::new_v4(),
         )
@@ -426,6 +512,7 @@ mod tests {
                 title: Some("legacy".to_string()),
                 workspace_path: None,
                 project_id: None,
+                worktree_mode: None,
             },
             Uuid::new_v4(),
         )
@@ -437,6 +524,7 @@ mod tests {
                 title: Some("archived".to_string()),
                 workspace_path: None,
                 project_id: Some(project_id),
+                worktree_mode: None,
             },
             archived_id,
         )
@@ -469,5 +557,60 @@ mod tests {
             .await
             .expect("list all sessions");
         assert_eq!(all_sessions.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn find_all_places_pinned_sessions_first_in_pin_order() {
+        let pool = setup_pool().await;
+        let project_id = Uuid::new_v4();
+        let first_pinned_id = Uuid::new_v4();
+        let second_pinned_id = Uuid::new_v4();
+        let unpinned_id = Uuid::new_v4();
+
+        for (id, title) in [
+            (unpinned_id, "unpinned"),
+            (second_pinned_id, "second pinned"),
+            (first_pinned_id, "first pinned"),
+        ] {
+            ChatSession::create(
+                &pool,
+                &CreateChatSession {
+                    title: Some(title.to_string()),
+                    workspace_path: None,
+                    project_id: Some(project_id),
+                    worktree_mode: None,
+                },
+                id,
+            )
+            .await
+            .expect("create session");
+        }
+
+        sqlx::query("UPDATE chat_sessions SET pinned_at = ?1 WHERE id = ?2")
+            .bind("2026-06-23T00:00:00Z")
+            .bind(first_pinned_id)
+            .execute(&pool)
+            .await
+            .expect("pin first session");
+        sqlx::query("UPDATE chat_sessions SET pinned_at = ?1 WHERE id = ?2")
+            .bind("2026-06-23T00:01:00Z")
+            .bind(second_pinned_id)
+            .execute(&pool)
+            .await
+            .expect("pin second session");
+
+        let sessions =
+            ChatSession::find_all(&pool, Some(ChatSessionStatus::Active), Some(project_id))
+                .await
+                .expect("list sessions");
+
+        let ordered_ids = sessions
+            .iter()
+            .map(|session| session.id)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            ordered_ids,
+            vec![first_pinned_id, second_pinned_id, unpinned_id]
+        );
     }
 }

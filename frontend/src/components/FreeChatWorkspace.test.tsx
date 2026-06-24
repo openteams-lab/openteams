@@ -347,8 +347,8 @@ check(
   source.includes("sessionAgentsApi.stop(activeSessionId, sessionAgentId)") &&
     source.includes("handleStopAgentMessage") &&
     source.includes("markSessionAgentStopped(sessionAgentId)") &&
-    source.indexOf("markSessionAgentStopped(sessionAgentId)") <
-      source.indexOf("sessionAgentsApi.stop(activeSessionId, sessionAgentId)") &&
+    source.indexOf("sessionAgentsApi.stop(activeSessionId, sessionAgentId)") <
+      source.indexOf("markSessionAgentStopped(sessionAgentId)") &&
     source.includes("msg.isAgentRunning") &&
     source.includes("msg.sessionAgentId") &&
     source.includes('title={t("agent.stop")}') &&

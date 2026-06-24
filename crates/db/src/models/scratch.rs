@@ -81,25 +81,6 @@ pub struct UiPreferencesData {
     pub workspace_panel_states: std::collections::HashMap<String, WorkspacePanelStateData>,
 }
 
-/// Data for a draft workspace scratch (new workspace creation)
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-pub struct DraftWorkspaceData {
-    pub message: String,
-    #[serde(default)]
-    pub project_id: Option<Uuid>,
-    #[serde(default)]
-    pub repos: Vec<DraftWorkspaceRepo>,
-    #[serde(default)]
-    pub selected_profile: Option<ExecutorProfileId>,
-}
-
-/// Repository entry in a draft workspace
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-pub struct DraftWorkspaceRepo {
-    pub repo_id: Uuid,
-    pub target_branch: String,
-}
-
 /// The payload of a scratch, tagged by type. The type is part of the composite primary key.
 /// Data is stored as markdown string.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, EnumDiscriminants)]
@@ -110,12 +91,10 @@ pub struct DraftWorkspaceRepo {
 #[strum_discriminants(serde(rename_all = "SCREAMING_SNAKE_CASE"))]
 #[strum_discriminants(strum(serialize_all = "SCREAMING_SNAKE_CASE"))]
 pub enum ScratchPayload {
-    DraftTask(String),
     DraftFollowUp(DraftFollowUpData),
     /// A follow-up that has been submitted and is waiting for the active run to finish.
     /// Persisted (instead of held in memory) so the queue survives a restart/refresh.
     QueuedFollowUp(DraftFollowUpData),
-    DraftWorkspace(DraftWorkspaceData),
     PreviewSettings(PreviewSettingsData),
     WorkspaceNotes(WorkspaceNotesData),
     UiPreferences(UiPreferencesData),

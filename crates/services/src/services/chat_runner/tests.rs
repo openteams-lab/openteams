@@ -10,7 +10,7 @@ use db::{
     models::{
         chat_agent::{ChatAgent, CreateChatAgent},
         chat_message::{ChatMessage, ChatSenderType},
-        chat_session::{ChatSession, ChatSessionStatus},
+        chat_session::{ChatSession, ChatSessionStatus, ChatSessionWorktreeMode},
         chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
     },
 };
@@ -29,7 +29,7 @@ use super::{
     RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE, ResolvedPromptLanguage, RunCompletionStatus,
     TokenUsageInfo, runtime::RunLogForwarders,
 };
-use crate::services::config::UiLanguage;
+use crate::services::{config::UiLanguage, session_worktree::SessionWorktreeService};
 
 fn test_message_with_sender(
     sender_type: ChatSenderType,
@@ -110,6 +110,9 @@ async fn setup_chat_runner_db() -> DBService {
                 chat_input_mode TEXT,
                 project_id BLOB,
                 lead_agent_id TEXT,
+                worktree_mode TEXT NOT NULL DEFAULT 'inherit'
+                    CHECK (worktree_mode IN ('inherit', 'disabled', 'isolated')),
+                pinned_at TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 archived_at TEXT
@@ -123,6 +126,37 @@ async fn setup_chat_runner_db() -> DBService {
                 system_prompt TEXT NOT NULL DEFAULT '',
                 tools_enabled TEXT NOT NULL DEFAULT '{}',
                 model_name TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+        r#"
+            CREATE TABLE chat_session_worktrees (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                project_id BLOB,
+                base_workspace_path TEXT NOT NULL,
+                repo_path TEXT NOT NULL,
+                base_branch TEXT NOT NULL,
+                base_commit TEXT,
+                branch_name TEXT NOT NULL,
+                worktree_path TEXT NOT NULL,
+                mode TEXT NOT NULL DEFAULT 'session'
+                    CHECK (mode IN ('session')),
+                status TEXT NOT NULL DEFAULT 'creating'
+                    CHECK (status IN (
+                        'creating', 'active', 'dirty', 'merging',
+                        'needs_conflict_resolution', 'merged',
+                        'archived', 'cleanup_pending', 'cleanup_failed'
+                    )),
+                merge_target_branch TEXT,
+                merge_operation TEXT,
+                conflict_files_json TEXT NOT NULL DEFAULT '[]',
+                operation_started_at TEXT,
+                cleanup_error TEXT,
+                last_used_at TEXT,
+                merged_at TEXT,
+                archived_at TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
             )
@@ -409,6 +443,135 @@ fn select_workspace_path_falls_back_to_session_default_before_generated_path() {
     );
 
     assert_eq!(resolved, "/tmp/session-default");
+}
+
+#[tokio::test]
+async fn resolve_workspace_path_for_merged_isolated_session_returns_worktree_workspace() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    let agent_id = Uuid::new_v4();
+    let base_workspace = "E:/workspace/base";
+    let worktree_workspace = "E:/workspace/.openteams/worktrees/session";
+
+    sqlx::query(
+        r#"
+        INSERT INTO chat_sessions (
+            id, title, status, default_workspace_path, worktree_mode
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5)
+        "#,
+    )
+    .bind(session_id)
+    .bind("merged isolated session")
+    .bind(ChatSessionStatus::Active)
+    .bind(base_workspace)
+    .bind(ChatSessionWorktreeMode::Isolated)
+    .execute(&db.pool)
+    .await
+    .expect("insert isolated session");
+
+    sqlx::query(
+        r#"
+        INSERT INTO chat_session_worktrees (
+            id, session_id, base_workspace_path, repo_path, base_branch,
+            branch_name, worktree_path, mode, status, merged_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'session', 'merged', datetime('now', 'subsec'))
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(session_id)
+    .bind(base_workspace)
+    .bind(base_workspace)
+    .bind("main")
+    .bind("openteams/session/test")
+    .bind(worktree_workspace)
+    .execute(&db.pool)
+    .await
+    .expect("insert merged worktree row");
+
+    let resolved = runner
+        .resolve_workspace_path_for_agent(session_id, agent_id, None)
+        .await
+        .expect("resolve workspace");
+
+    assert_eq!(resolved, worktree_workspace);
+
+    let active_rows: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+        FROM chat_session_worktrees
+        WHERE session_id = ?1
+          AND status IN (
+              'creating', 'active', 'dirty', 'merging',
+              'needs_conflict_resolution', 'merged', 'cleanup_pending'
+          )
+        "#,
+    )
+    .bind(session_id)
+    .fetch_one(&db.pool)
+    .await
+    .expect("count active rows");
+    assert_eq!(active_rows, 1);
+}
+
+#[tokio::test]
+async fn resolve_workspace_path_for_active_isolated_session_ignores_stale_agent_workspace() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    let agent_id = Uuid::new_v4();
+    let base_workspace = "E:/workspace/base";
+    let worktree_workspace = "E:/workspace/.openteams/worktrees/session";
+
+    sqlx::query(
+        r#"
+        INSERT INTO chat_sessions (
+            id, title, status, default_workspace_path, worktree_mode
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5)
+        "#,
+    )
+    .bind(session_id)
+    .bind("active isolated session")
+    .bind(ChatSessionStatus::Active)
+    .bind(base_workspace)
+    .bind(ChatSessionWorktreeMode::Isolated)
+    .execute(&db.pool)
+    .await
+    .expect("insert isolated session");
+
+    sqlx::query(
+        r#"
+        INSERT INTO chat_session_worktrees (
+            id, session_id, base_workspace_path, repo_path, base_branch,
+            branch_name, worktree_path, mode, status
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'session', 'active')
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(session_id)
+    .bind(base_workspace)
+    .bind(base_workspace)
+    .bind("main")
+    .bind("openteams/session/test")
+    .bind(worktree_workspace)
+    .execute(&db.pool)
+    .await
+    .expect("insert active worktree row");
+
+    let resolved = runner
+        .resolve_workspace_path_for_agent(
+            session_id,
+            agent_id,
+            Some(base_workspace.to_string()),
+        )
+        .await
+        .expect("resolve workspace");
+
+    assert_eq!(resolved, worktree_workspace);
 }
 
 #[test]
@@ -1548,6 +1711,136 @@ fn build_exact_markdown_prompt_includes_routed_message_intent_meaning() {
 }
 
 #[test]
+fn build_exact_markdown_prompt_declares_active_workspace_as_project_repo() {
+    let agent = test_agent("worker", "");
+    let message = test_message("@worker inspect the repo", json!({}));
+    let workspace_path = Path::new(r"C:\Users\Admin\AppData\Local\Temp\openteams-dev\worktrees\sessions\34a8ed29");
+
+    let prompt = ChatRunner::build_exact_markdown_prompt(
+        &agent,
+        &message,
+        &workspace_path.join(".openteams").join("context").join("demo"),
+        workspace_path,
+        &[],
+        None,
+        None,
+        &[],
+        ResolvedPromptLanguage {
+            setting: "english",
+            code: "en",
+            instruction: "You MUST respond in English.",
+        },
+        None,
+    );
+
+    assert!(prompt.contains("## Workspace"));
+    assert!(prompt.contains("Active workspace path"));
+    assert!(prompt.contains("Treat this active workspace path as the project repository"));
+    assert!(prompt.contains(r"C:\Users\Admin\AppData\Local\Temp\openteams-dev\worktrees\sessions\34a8ed29"));
+}
+
+#[tokio::test]
+async fn prompt_after_worktree_discard_declares_base_workspace() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    let agent_id = Uuid::new_v4();
+    let base_workspace = "E:/workspace/base";
+    let worktree_workspace = "E:/workspace/.openteams/worktrees/session";
+
+    sqlx::query(
+        r#"
+        INSERT INTO chat_sessions (
+            id, title, status, default_workspace_path, worktree_mode
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5)
+        "#,
+    )
+    .bind(session_id)
+    .bind("discarded isolated session")
+    .bind(ChatSessionStatus::Active)
+    .bind(base_workspace)
+    .bind(ChatSessionWorktreeMode::Isolated)
+    .execute(&db.pool)
+    .await
+    .expect("insert isolated session");
+
+    sqlx::query(
+        r#"
+        INSERT INTO chat_session_agents (
+            id, session_id, agent_id, state, workspace_path
+        )
+        VALUES (?1, ?2, ?3, 'idle', ?4)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(session_id)
+    .bind(agent_id)
+    .bind(worktree_workspace)
+    .execute(&db.pool)
+    .await
+    .expect("insert session agent");
+
+    sqlx::query(
+        r#"
+        INSERT INTO chat_session_worktrees (
+            id, session_id, base_workspace_path, repo_path, base_branch,
+            branch_name, worktree_path, mode, status, merged_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'session', 'merged', datetime('now', 'subsec'))
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(session_id)
+    .bind(base_workspace)
+    .bind(base_workspace)
+    .bind("main")
+    .bind("openteams/session/test")
+    .bind(worktree_workspace)
+    .execute(&db.pool)
+    .await
+    .expect("insert merged worktree row");
+
+    SessionWorktreeService::new(db.pool.clone())
+        .discard_worktree(session_id)
+        .await
+        .expect("discard worktree");
+
+    let resolved = runner
+        .resolve_workspace_path_for_agent(
+            session_id,
+            agent_id,
+            Some(worktree_workspace.to_string()),
+        )
+        .await
+        .expect("resolve workspace");
+    assert_eq!(resolved, base_workspace);
+
+    let agent = test_agent("worker", "");
+    let message = test_message("@worker inspect the repo", json!({}));
+    let workspace_path = Path::new(&resolved);
+    let prompt = ChatRunner::build_exact_markdown_prompt(
+        &agent,
+        &message,
+        &workspace_path.join(".openteams").join("context").join("demo"),
+        workspace_path,
+        &[],
+        None,
+        None,
+        &[],
+        ResolvedPromptLanguage {
+            setting: "english",
+            code: "en",
+            instruction: "You MUST respond in English.",
+        },
+        None,
+    );
+
+    assert!(prompt.contains("Active workspace path: `E:/workspace/base`"));
+    assert!(!prompt.contains(worktree_workspace));
+}
+
+#[test]
 fn build_exact_markdown_prompt_tells_notify_receiver_not_to_reply() {
     let agent = test_agent("coordinator", "");
     let message = test_message_with_sender(
@@ -2165,9 +2458,11 @@ fn resolve_session_team_protocol_returns_enabled_session_content_only() {
         default_workspace_path: None,
         chat_input_mode: None,
         project_id: None,
+        pinned_at: None,
         created_at: now,
         updated_at: now,
         archived_at: None,
+        worktree_mode: Default::default(),
     };
 
     assert_eq!(
@@ -2192,9 +2487,11 @@ fn resolve_session_team_protocol_ignores_disabled_or_empty_session_content() {
         default_workspace_path: None,
         chat_input_mode: None,
         project_id: None,
+        pinned_at: None,
         created_at: now,
         updated_at: now,
         archived_at: None,
+        worktree_mode: Default::default(),
     };
     let empty_session = ChatSession {
         id: Uuid::new_v4(),
@@ -2209,9 +2506,11 @@ fn resolve_session_team_protocol_ignores_disabled_or_empty_session_content() {
         default_workspace_path: None,
         chat_input_mode: None,
         project_id: None,
+        pinned_at: None,
         created_at: now,
         updated_at: now,
         archived_at: None,
+        worktree_mode: Default::default(),
     };
 
     assert_eq!(

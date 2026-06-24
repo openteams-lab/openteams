@@ -51,6 +51,21 @@ const parser = lazy(async () => {
   return p
 })
 
+// On Windows with Git Bash, `nul` is not a reserved device the way it is under
+// cmd.exe. A redirect such as `rg ... 2>nul` therefore silently creates a 0-byte
+// `nul` file in the working directory instead of discarding output. Normalize
+// those `nul` redirect targets to `/dev/null` so Git Bash behaves like cmd.exe.
+export function normalizeNulRedirects(
+  command: string,
+  shell: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform !== "win32") return command
+  const base = path.win32.basename(shell).toLowerCase()
+  if (base !== "bash.exe" && base !== "bash") return command
+  return command.replace(/((?:\d|&)?>>?)\s*nul(?=[\s|&;()<>]|$)/gi, "$1/dev/null")
+}
+
 // TODO: we may wanna rename this tool so it works better on other shells
 export const BashTool = Tool.define("bash", async () => {
   const shell = Shell.acceptable()
@@ -81,7 +96,8 @@ export const BashTool = Tool.define("bash", async () => {
         throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
       }
       const timeout = params.timeout ?? DEFAULT_TIMEOUT
-      const tree = await parser().then((p) => p.parse(params.command))
+      const command = normalizeNulRedirects(params.command, shell)
+      const tree = await parser().then((p) => p.parse(command))
       if (!tree) {
         throw new Error("Failed to parse command")
       }
@@ -164,7 +180,7 @@ export const BashTool = Tool.define("bash", async () => {
         { cwd, sessionID: ctx.sessionID, callID: ctx.callID },
         { env: {} },
       )
-      const proc = spawn(params.command, {
+      const proc = spawn(command, {
         shell,
         cwd,
         env: {

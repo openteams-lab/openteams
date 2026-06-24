@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Locale,
   Member,
   Message,
@@ -9,13 +9,11 @@ import type {
   SidebarPrimaryAction,
   SidebarProjectDisplay,
   Strategy,
-  TaskNode,
 } from '@/types';
 
 export type OnboardType = 'saas' | 'cli' | 'game' | 'ai';
 
 export interface WorkspaceBootstrapMock {
-  tasks: TaskNode[];
   members: Member[];
   sessions: Session[];
   messagesBySession: Record<string, Message[]>;
@@ -40,7 +38,6 @@ export interface WorkspaceBootstrapMock {
 
 export interface WorkflowPresetMock {
   id: 'feature' | 'bug' | 'chat';
-  tasks: TaskNode[];
   toast: string;
 }
 
@@ -95,13 +92,6 @@ export interface ShellOptionsMock {
 }
 
 export const mockWorkspaceBootstrap: WorkspaceBootstrapMock = {
-  tasks: [
-    { id: 'node-1', name: 'Design checkout flow', subText: 'long context -> Claude', avatar: 'CL', cost: '$0.12', status: 'done' },
-    { id: 'node-2', name: 'Backend: Stripe API', subText: 'code gen -> Codex', avatar: 'CO', cost: '$0.34', status: 'done' },
-    { id: 'node-3', name: 'Frontend: Checkout UI', subText: 'UI work -> Cursor', avatar: 'CU', cost: '$0.41', status: 'run' },
-    { id: 'node-4', name: 'Integration tests', subText: 'long-trace -> Gemini', avatar: 'GE', cost: '-', status: 'wait' },
-    { id: 'node-5', name: 'Deploy to Vercel', subText: 'cheap task -> Codex', avatar: 'CO', cost: '-', status: 'wait' },
-  ],
   members: [
     { id: 'mem-1', avatar: 'LD', status: 'on', name: '@lead', roleDetail: 'Claude - idle', modelName: 'Claude' },
     { id: 'mem-2', avatar: 'BE', status: 'on', name: '@backend', roleDetail: 'Codex - done', modelName: 'Codex' },
@@ -380,32 +370,14 @@ export const mockWorkflowPresets: WorkflowPresetMock[] = [
   {
     id: 'feature',
     toast: 'Applied Preset: Ship Feature Workflow successfully.',
-    tasks: [
-      { id: '1', name: 'Product specs feedback', status: 'done', cost: '$0.04', avatar: 'AI', subText: 'completed' },
-      { id: '2', name: 'Security review checklist', status: 'done', cost: '$0.08', avatar: 'SE', subText: 'completed' },
-      { id: '3', name: 'Draft marketing copy', status: 'run', cost: '$1.05', avatar: 'WR', subText: 'active' },
-      { id: '4', name: 'Deploy canary sandbox', status: 'wait', cost: '$0.00', avatar: 'DP', subText: 'queued' },
-    ],
   },
   {
     id: 'bug',
     toast: 'Applied Preset: Critical Patch Bug Workflow successfully.',
-    tasks: [
-      { id: '1', name: 'Retrieve bug trace parameters', status: 'done', cost: '$0.02', avatar: 'SE', subText: 'completed' },
-      { id: '2', name: 'Patch environment variable memory leak', status: 'run', cost: '$0.90', avatar: 'AI', subText: 'active' },
-      { id: '3', name: 'Validate with integration tests suite', status: 'wait', cost: '$0.00', avatar: 'QA', subText: 'queued' },
-    ],
   },
   {
     id: 'chat',
     toast: 'Chat converted into workflow.',
-    tasks: [
-      { id: 'w1', name: 'Analyze slow network login payload', subText: 'long-context -> Claude', avatar: 'CL', cost: '$0.05', status: 'done' },
-      { id: 'w2', name: 'Draft skeleton loaders', subText: 'UI asset -> Cursor', avatar: 'CU', cost: '$0.12', status: 'done' },
-      { id: 'w3', name: 'Inject AvatarLoader.tsx placeholder logic', subText: 'code gen -> Codex', avatar: 'CO', cost: '$0.18', status: 'run' },
-      { id: 'w4', name: 'Verify layout shifting boundaries', subText: 'long-trace -> Gemini', avatar: 'GE', cost: '-', status: 'wait' },
-      { id: 'w5', name: 'Release Hotfix v0.3.3', subText: 'cheap task -> Codex', avatar: 'CO', cost: '-', status: 'wait' },
-    ],
   },
 ];
 
@@ -478,12 +450,12 @@ export const mockDialogOptions: DialogOptionsMock = {
 
 export const mockSettingsOptions: SettingsOptionsMock = {
   languages: [
-    { code: 'zh', label: '中文' },
+    { code: 'zh', label: 'Chinese' },
     { code: 'en', label: 'English' },
-    { code: 'ja', label: '日本語' },
-    { code: 'ko', label: '한국어' },
-    { code: 'fr', label: 'Français' },
-    { code: 'es', label: 'Español' },
+    { code: 'ja', label: 'Japanese' },
+    { code: 'ko', label: 'Korean' },
+    { code: 'fr', label: 'Francais' },
+    { code: 'es', label: 'Espanol' },
   ],
   account: {
     email: 'mock-user@example.com',

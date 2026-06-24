@@ -188,6 +188,18 @@ check(
   source,
 );
 check(
+  'workflow plan cards suppress unprompted optimistic agent placeholders',
+  source.includes('const isWorkflowPlanCardMessage = (message: Message): boolean') &&
+    source.includes("message.workflowCard?.cardType === 'workflow_plan'") &&
+    source.includes("message.workflowCard?.cardType === 'workflow_plan_generation'") &&
+    source.includes('const hasWorkflowPlanCard = (allMessagesRef.current[sid] ?? []).some(') &&
+    source.includes('isWorkflowPlanCardMessage') &&
+    source.includes('const shouldCreatePendingAgentPlaceholder =') &&
+    /!hasWorkflowPlanCard\s*\|\|\s*hasExplicitMentions\s*\|\|\s*hasRouteMentionOverride/.test(source) &&
+    source.includes('shouldCreatePendingAgentPlaceholder'),
+  source,
+);
+check(
   'a new run evicts stale running placeholders for the same agent session',
   source.includes('evictStaleRunPlaceholders') &&
     source.includes('message.runId !== runId') &&
@@ -342,7 +354,15 @@ check(
     source.includes('hasRemainingRunningAgent') &&
     source.includes('setSessionRunningIndicator(sid, hasRemainingRunningAgent)') &&
     source.includes('message.sessionAgentId !== parsed.session_agent_id') &&
-    source.includes("sessionAgent.state !== 'running'"),
+    source.includes('wasStopRequested'),
+  source,
+);
+check(
+  'stop-requested agent placeholders remain visible until the stopped message replaces them',
+  source.includes('persisted stop') &&
+    source.includes('!isActiveAgentState(parsed.state) && !wasStopRequested') &&
+    source.includes('optimisticallyStoppedSessionAgentIdsRef.current.delete') &&
+    source.includes('nextMessage.sessionAgentId'),
   source,
 );
 check(

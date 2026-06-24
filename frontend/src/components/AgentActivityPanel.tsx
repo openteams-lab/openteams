@@ -16,7 +16,6 @@ import {
   Search,
   Terminal,
   Wrench,
-  X as XIcon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ScrollArea";
 import {
@@ -216,21 +215,12 @@ const useAutoFollowScroll = (scrollSignal: string) => {
 
 const ToolLineItem: React.FC<{
   line: AgentActivityDisplayRow;
-  errorLabel: string;
-}> = ({ line, errorLabel }) => {
+}> = ({ line }) => {
   const ToolIcon = line.toolKind ? toolIconByKind[line.toolKind] : Wrench;
-  const isError =
-    line.toolStatus === "failed" ||
-    line.toolStatus === "denied" ||
-    line.toolStatus === "timed_out";
 
   return (
     <div className="wf-log-task-row">
-      <span className="wf-log-task-status">
-        {isError && (
-          <XIcon className="wf-log-error-x-icon" aria-label={errorLabel} />
-        )}
-      </span>
+      <span className="wf-log-task-status" />
       <span className="wf-log-task-tool-icon">
         <ToolIcon className="w-3 h-3" />
       </span>
@@ -246,18 +236,11 @@ const ToolLineItem: React.FC<{
 
 const ContentLineItem: React.FC<{
   line: AgentActivityDisplayRow;
-  errorLabel: string;
-}> = ({ line, errorLabel }) => {
-  const isError = line.line_type === "error";
-
+}> = ({ line }) => {
   return (
     <div className="wf-log-task-row wf-log-task-row--content">
-      <span className="wf-log-task-status">
-        {isError && (
-          <XIcon className="wf-log-error-x-icon" aria-label={errorLabel} />
-        )}
-      </span>
-      <span className={`wf-log-task-content-text ${isError ? "wf-log-task-content-text--error" : ""}`}>
+      <span className="wf-log-task-status" />
+      <span className="wf-log-task-content-text">
         {renderSimpleBoldMarkdown(line.content)}
       </span>
     </div>
@@ -329,13 +312,11 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
                 <ToolLineItem
                   key={line.row_id}
                   line={line}
-                  errorLabel={labels.error}
                 />
               ) : (
                 <ContentLineItem
                   key={line.row_id}
                   line={line}
-                  errorLabel={labels.error}
                 />
               ),
             )}

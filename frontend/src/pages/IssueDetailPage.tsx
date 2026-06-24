@@ -38,12 +38,18 @@ import {
   CommandSelectSearchRow,
 } from '@/components/CommandSelectMenu';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
+import { IssueWorktreeSessionDialog } from '@/components/IssueWorktreeSessionDialog';
 import {
   NotificationToast,
   type NotificationToastTone,
 } from '@/components/NotificationToast';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { projectApi, projectGithubApi, projectWorkItemsApi } from '@/lib/api';
+import {
+  chatSessionsApi,
+  projectApi,
+  projectGithubApi,
+  projectWorkItemsApi,
+} from '@/lib/api';
 import {
   notifyChatInputPrefill,
   type ChatInputPrefillMode,
@@ -57,6 +63,7 @@ import { notifyBuildStatsUsageUpdated } from '@/lib/buildStatsEvents';
 import { mapSession } from '@/lib/mappers';
 import type {
   BackendChatSession,
+  ChatSessionWorktreeMode,
   GitHubAccount,
   ProjectRepoIntegration,
   ProjectWorkItem,
@@ -378,6 +385,10 @@ export function IssueDetailPage({
   const [priorityQuery, setPriorityQuery] = useState('');
   const [labelQuery, setLabelQuery] = useState('');
   const [sessionQuery, setSessionQuery] = useState('');
+  const [worktreeSessionOpen, setWorktreeSessionOpen] = useState(false);
+  const [worktreeSessionGit, setWorktreeSessionGit] = useState<boolean | null>(
+    null,
+  );
   const propertyMenuRef = useRef<HTMLDivElement | null>(null);
   const labelMenuRef = useRef<HTMLDivElement | null>(null);
   const sessionMenuRef = useRef<HTMLDivElement | null>(null);
@@ -1274,7 +1285,9 @@ export function IssueDetailPage({
     });
   };
 
-  const handleCreateSession = async () => {
+  const performCreateSession = async (
+    worktreeMode: ChatSessionWorktreeMode | null,
+  ) => {
     await runAction('create-session', async () => {
       const labelsForPrompt =
         issueLabels.length > 0 ? issueLabels : labelDraftToList(labelDraft);
@@ -1297,6 +1310,7 @@ export function IssueDetailPage({
           tr('issue.detail.issueSessionDefault', 'Issue session'),
         ),
         workspace_path: projectWorkspacePath,
+        ...(worktreeMode ? { worktree_mode: worktreeMode } : {}),
       });
 
       await linkSession(createdSession.id);
@@ -1343,6 +1357,35 @@ export function IssueDetailPage({
             ),
       );
     });
+  };
+
+  // The work-item "Create session" entry opens a dialog first so the user can
+  // decide whether to isolate the new session in a Git worktree (per the
+  // session-worktree-isolation-design doc). The dialog defaults to off,
+  // preserving the historical main-workspace behavior.
+  const handleOpenCreateSessionDialog = async () => {
+    setWorktreeSessionGit(null);
+    setWorktreeSessionOpen(true);
+    const trimmedWorkspacePath = projectWorkspacePath?.trim() ?? '';
+    if (!trimmedWorkspacePath) {
+      setWorktreeSessionGit(false);
+      return;
+    }
+    try {
+      const workspace = await chatSessionsApi.validateWorkspacePath(
+        trimmedWorkspacePath,
+      );
+      setWorktreeSessionGit(workspace.valid && workspace.is_git_repo);
+    } catch {
+      setWorktreeSessionGit(false);
+    }
+  };
+
+  const handleWorktreeSessionCreate = async (
+    worktreeMode: ChatSessionWorktreeMode | null,
+  ) => {
+    setWorktreeSessionOpen(false);
+    await performCreateSession(worktreeMode);
   };
 
   const handleUnlinkSession = async (linkId: string) => {
@@ -1409,6 +1452,10 @@ export function IssueDetailPage({
         linkedRepoName={linkedRepoName}
         onOpenIntegrations={onOpenIntegrations}
         tr={tr}
+        worktreeSessionOpen={worktreeSessionOpen}
+        worktreeSessionGit={worktreeSessionGit}
+        onCloseWorktreeSession={() => setWorktreeSessionOpen(false)}
+        onCreateWorktreeSession={handleWorktreeSessionCreate}
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--surface-2)] text-[var(--ink)]">
@@ -1896,9 +1943,9 @@ export function IssueDetailPage({
                 {linkedSessionLinks.length === 0 && (
                   <button
                     type="button"
-                    disabled={action === 'create-session' || detailLoading}
+                    disabled={action === 'create-session' || detailLoading || worktreeSessionOpen}
                     className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-full bg-[var(--primary)] px-2.5 text-[12px] font-bold leading-none text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
-                    onClick={() => void handleCreateSession()}
+                    onClick={() => void handleOpenCreateSessionDialog()}
                   >
                     {action === 'create-session' ? (
                       <RefreshCw
@@ -1967,6 +2014,10 @@ function IssueDetailHeader({
   linkedRepoName,
   onOpenIntegrations,
   tr,
+  worktreeSessionOpen,
+  worktreeSessionGit,
+  onCloseWorktreeSession,
+  onCreateWorktreeSession,
 }: {
   issue: IssueDetailItem;
   projectName: string;
@@ -1980,6 +2031,12 @@ function IssueDetailHeader({
   linkedRepoName?: string;
   onOpenIntegrations: () => void;
   tr: IssueDetailTranslator;
+  worktreeSessionOpen: boolean;
+  worktreeSessionGit: boolean | null;
+  onCloseWorktreeSession: () => void;
+  onCreateWorktreeSession: (
+    worktreeMode: ChatSessionWorktreeMode | null,
+  ) => Promise<void> | void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -2157,6 +2214,16 @@ function IssueDetailHeader({
           onConfirm={() => void handleDelete()}
         />
       )}
+      <IssueWorktreeSessionDialog
+        open={worktreeSessionOpen}
+        projectName={issue.title || tr('issue.detail.issueSessionDefault', 'Issue session')}
+        gitAvailable={worktreeSessionGit}
+        tr={tr}
+        onClose={onCloseWorktreeSession}
+        onCreate={(worktreeMode) =>
+          onCreateWorktreeSession(worktreeMode)
+        }
+      />
     </header>
   );
 }

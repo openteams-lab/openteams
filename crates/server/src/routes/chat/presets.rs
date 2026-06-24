@@ -113,6 +113,7 @@ pub async fn update_team_protocol(
             team_protocol_enabled: Some(effective.enabled),
             default_workspace_path: None,
             chat_input_mode: None,
+            worktree_mode: None,
         },
     )
     .await?;
@@ -515,9 +516,11 @@ mod tests {
             default_workspace_path: Some("/workspace/default".to_string()),
             chat_input_mode: None,
             project_id: None,
+            pinned_at: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
             archived_at: None,
+            worktree_mode: Default::default(),
         }
     }
 

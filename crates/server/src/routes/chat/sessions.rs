@@ -17,8 +17,12 @@ use db::models::{
     analytics::AnalyticsSessionStats,
     chat_agent::ChatAgent,
     chat_run::ChatRun,
-    chat_session::{ChatSession, ChatSessionStatus, CreateChatSession, UpdateChatSession},
+    chat_session::{
+        ChatSession, ChatSessionStatus, ChatSessionWorktreeMode, CreateChatSession,
+        UpdateChatSession,
+    },
     chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
+    chat_session_worktree::SessionWorktree,
     member_execution_config::MemberExecutionConfig,
 };
 use deployment::Deployment;
@@ -28,6 +32,7 @@ use serde::{Deserialize, Serialize};
 use services::services::{
     analytics_events::{AnalyticsProjector, DomainEvent},
     chat::create_session_with_project_members,
+    session_worktree::SessionWorktreeService,
     workflow::workflow_analytics::{self, hash_user_id},
 };
 use sqlx::FromRow;
@@ -276,11 +281,11 @@ fn build_session_workspaces(rows: Vec<SessionWorkspaceRow>) -> Vec<SessionWorksp
                 is_git_repo: git2::Repository::open(&row.workspace_path).is_ok(),
             });
 
-        if !workspace.agent_ids.contains(&row.agent_id) {
+        if row.agent_id != Uuid::nil() && !workspace.agent_ids.contains(&row.agent_id) {
             workspace.agent_ids.push(row.agent_id);
         }
 
-        if !workspace.agent_names.contains(&row.agent_name) {
+        if !row.agent_name.is_empty() && !workspace.agent_names.contains(&row.agent_name) {
             workspace.agent_names.push(row.agent_name);
         }
     }
@@ -1156,17 +1161,22 @@ fn collect_session_scoped_git_changes(
         }
     };
 
-    let path_filter = session_paths.iter().map(String::as_str).collect::<Vec<_>>();
     let head_commit = Commit::new(head_oid);
-    let diffs = if path_filter.is_empty() {
+    let diffs = if session_paths.is_empty() {
         Vec::new()
     } else {
+        // Do not pass `session_paths` as git pathspec arguments here. Large
+        // sessions can produce enough paths to exceed Windows' command-line
+        // length limit (os error 206). Collect the workspace diff with the
+        // standard runtime-directory excludes, then filter back to the
+        // session-observed paths in Rust so unrelated files still do not leak
+        // into the response.
         match git_service.get_diffs(
             DiffTarget::Worktree {
                 worktree_path: workspace_path,
                 base_commit: &head_commit,
             },
-            Some(&path_filter),
+            None,
         ) {
             Ok(diffs) => diffs
                 .into_iter()
@@ -1409,7 +1419,17 @@ async fn normalize_or_inherit_workspace_path(
 ) -> Result<Option<String>, ApiError> {
     match workspace_path {
         Some(path) => normalize_workspace_path(Some(path)).await,
-        None => Ok(session.default_workspace_path.clone()),
+        None => {
+            // For isolated sessions, do NOT inherit the session default
+            // workspace path. Keeping it None ensures the ChatRunner
+            // resolver always runs worktree resolution instead of treating
+            // the inherited default as an "explicit agent workspace".
+            if session.worktree_mode == ChatSessionWorktreeMode::Isolated {
+                Ok(None)
+            } else {
+                Ok(session.default_workspace_path.clone())
+            }
+        }
     }
 }
 
@@ -1498,6 +1518,72 @@ async fn list_session_workspace_rows(
     .await
 }
 
+fn same_workspace_path(left: &str, right: &str) -> bool {
+    !left.trim().is_empty()
+        && !right.trim().is_empty()
+        && (left == right || PathBuf::from(left) == PathBuf::from(right))
+}
+
+fn synthetic_workspace_row(workspace_path: String) -> SessionWorkspaceRow {
+    SessionWorkspaceRow {
+        workspace_path,
+        agent_id: Uuid::nil(),
+        agent_name: String::new(),
+    }
+}
+
+fn worktree_workspace_for_request(
+    session: &ChatSession,
+    worktree: &SessionWorktree,
+    requested_path: &str,
+) -> Option<String> {
+    let matches_base = same_workspace_path(requested_path, &worktree.base_workspace_path);
+    let matches_worktree = same_workspace_path(requested_path, &worktree.worktree_path);
+    let matches_session_default = session
+        .default_workspace_path
+        .as_deref()
+        .is_some_and(|path| same_workspace_path(requested_path, path));
+
+    if !(matches_base || matches_worktree || matches_session_default) {
+        return None;
+    }
+
+    if worktree.status.is_active_for_workspace() {
+        Some(worktree.worktree_path.clone())
+    } else {
+        Some(worktree.base_workspace_path.clone())
+    }
+}
+
+async fn latest_session_worktree(
+    pool: &sqlx::SqlitePool,
+    session: &ChatSession,
+) -> Result<Option<SessionWorktree>, ApiError> {
+    if session.worktree_mode != ChatSessionWorktreeMode::Isolated {
+        return Ok(None);
+    }
+
+    SessionWorktreeService::new(pool.clone())
+        .get_latest_for_session(session.id)
+        .await
+        .map_err(|err| ApiError::BadRequest(format!("Failed to inspect session worktree: {err}")))
+}
+
+pub(crate) async fn resolve_session_workspace_path_for_request(
+    pool: &sqlx::SqlitePool,
+    session: &ChatSession,
+    requested_path: &str,
+) -> Result<Option<String>, ApiError> {
+    let Some(worktree) = latest_session_worktree(pool, session).await? else {
+        return Ok(None);
+    };
+    Ok(worktree_workspace_for_request(
+        session,
+        &worktree,
+        requested_path,
+    ))
+}
+
 pub async fn get_session_agents(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
@@ -1510,7 +1596,18 @@ pub async fn get_session_workspaces(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<SessionWorkspacesResponse>>, ApiError> {
-    let rows = list_session_workspace_rows(&deployment.db().pool, session.id).await?;
+    let mut rows = list_session_workspace_rows(&deployment.db().pool, session.id).await?;
+    if let Some(default_workspace) = session.default_workspace_path.clone() {
+        rows.push(synthetic_workspace_row(default_workspace));
+    }
+    if let Some(worktree) = latest_session_worktree(&deployment.db().pool, &session).await? {
+        let workspace_path = if worktree.status.is_active_for_workspace() {
+            worktree.worktree_path
+        } else {
+            worktree.base_workspace_path
+        };
+        rows.push(synthetic_workspace_row(workspace_path));
+    }
 
     Ok(ResponseJson(ApiResponse::success(
         SessionWorkspacesResponse {
@@ -1544,7 +1641,12 @@ pub async fn get_session_workspace_changes(
         ));
     }
 
-    if !session_has_workspace_path(&deployment.db().pool, session.id, workspace_path).await? {
+    let worktree_workspace_path =
+        resolve_session_workspace_path_for_request(&deployment.db().pool, &session, workspace_path)
+            .await?;
+    if worktree_workspace_path.is_none()
+        && !session_has_workspace_path(&deployment.db().pool, session.id, workspace_path).await?
+    {
         workflow_analytics::track_permission_denied(
             workflow_analytics::analytics_if_enabled(
                 deployment.analytics().as_ref(),
@@ -1569,10 +1671,31 @@ pub async fn get_session_workspace_changes(
         ));
     }
 
-    let runs =
-        ChatRun::list_for_session_workspace(&deployment.db().pool, session.id, workspace_path)
-            .await?;
-    let workspace_path_owned = workspace_path.to_string();
+    let workspace_path_owned =
+        worktree_workspace_path.unwrap_or_else(|| workspace_path.to_string());
+    let mut run_workspace_paths = vec![workspace_path_owned.clone()];
+    if !same_workspace_path(&workspace_path_owned, workspace_path) {
+        run_workspace_paths.push(workspace_path.to_string());
+    }
+    let mut seen_run_workspace_paths = Vec::<String>::new();
+    let mut runs = Vec::new();
+    for run_workspace_path in run_workspace_paths {
+        if seen_run_workspace_paths
+            .iter()
+            .any(|seen| same_workspace_path(seen, &run_workspace_path))
+        {
+            continue;
+        }
+        seen_run_workspace_paths.push(run_workspace_path.clone());
+        runs.extend(
+            ChatRun::list_for_session_workspace(
+                &deployment.db().pool,
+                session.id,
+                &run_workspace_path,
+            )
+            .await?,
+        );
+    }
     let session_id = session.id;
     let response = tokio::task::spawn_blocking(move || {
         collect_workspace_changes(session_id, &workspace_path_owned, include_diff, runs)
@@ -1847,6 +1970,7 @@ pub async fn delete_session_agent(
             team_protocol_enabled: None,
             default_workspace_path: None,
             chat_input_mode: None,
+            worktree_mode: None,
         };
         ChatSession::update(&deployment.db().pool, session.id, &update).await?;
     }
@@ -1893,6 +2017,7 @@ pub async fn archive_session(
             team_protocol_enabled: None,
             default_workspace_path: None,
             chat_input_mode: None,
+            worktree_mode: None,
         },
     )
     .await?;
@@ -1935,6 +2060,7 @@ pub async fn restore_session(
             team_protocol_enabled: None,
             default_workspace_path: None,
             chat_input_mode: None,
+            worktree_mode: None,
         },
     )
     .await?;
@@ -1950,6 +2076,30 @@ pub async fn restore_session(
         true,
     );
 
+    Ok(ResponseJson(ApiResponse::success(updated)))
+}
+
+pub async fn pin_session(
+    Extension(session): Extension<ChatSession>,
+    State(deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<ChatSession>>, ApiError> {
+    if session.status != ChatSessionStatus::Active {
+        return Err(ApiError::Conflict("Chat session is archived".to_string()));
+    }
+
+    let updated = ChatSession::set_pinned(&deployment.db().pool, session.id, true).await?;
+    Ok(ResponseJson(ApiResponse::success(updated)))
+}
+
+pub async fn unpin_session(
+    Extension(session): Extension<ChatSession>,
+    State(deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<ChatSession>>, ApiError> {
+    if session.status != ChatSessionStatus::Active {
+        return Err(ApiError::Conflict("Chat session is archived".to_string()));
+    }
+
+    let updated = ChatSession::set_pinned(&deployment.db().pool, session.id, false).await?;
     Ok(ResponseJson(ApiResponse::success(updated)))
 }
 
@@ -2038,6 +2188,7 @@ pub struct ValidateWorkspacePathRequest {
 #[derive(Debug, Serialize, TS)]
 pub struct ValidateWorkspacePathResponse {
     pub valid: bool,
+    pub is_git_repo: bool,
     pub error: Option<String>,
 }
 
@@ -2050,6 +2201,7 @@ pub async fn validate_workspace_path_endpoint(
         return Ok(ResponseJson(ApiResponse::success(
             ValidateWorkspacePathResponse {
                 valid: false,
+                is_git_repo: false,
                 error: Some("Workspace path is required.".to_string()),
             },
         )));
@@ -2059,6 +2211,7 @@ pub async fn validate_workspace_path_endpoint(
         return Ok(ResponseJson(ApiResponse::success(
             ValidateWorkspacePathResponse {
                 valid: false,
+                is_git_repo: false,
                 error: Some(e.to_string()),
             },
         )));
@@ -2071,6 +2224,7 @@ pub async fn validate_workspace_path_endpoint(
                 Ok(ResponseJson(ApiResponse::success(
                     ValidateWorkspacePathResponse {
                         valid: true,
+                        is_git_repo: git2::Repository::open(&parsed_path).is_ok(),
                         error: None,
                     },
                 )))
@@ -2078,6 +2232,7 @@ pub async fn validate_workspace_path_endpoint(
                 Ok(ResponseJson(ApiResponse::success(
                     ValidateWorkspacePathResponse {
                         valid: false,
+                        is_git_repo: false,
                         error: Some("Workspace path must be an existing directory.".to_string()),
                     },
                 )))
@@ -2091,6 +2246,7 @@ pub async fn validate_workspace_path_endpoint(
             Ok(ResponseJson(ApiResponse::success(
                 ValidateWorkspacePathResponse {
                     valid: false,
+                    is_git_repo: false,
                     error: Some(error_msg),
                 },
             )))
@@ -2106,12 +2262,41 @@ mod tests {
     use db::models::{
         chat_run::{ChatRun, ChatRunArtifactState, ChatRunLogState},
         chat_session::ChatSessionStatus,
+        chat_session_worktree::{SessionWorktree, SessionWorktreeMode, SessionWorktreeStatus},
     };
     use git::GitService;
     use sqlx::SqlitePool;
     use uuid::Uuid;
 
     use super::*;
+
+    #[tokio::test]
+    async fn validate_workspace_path_reports_git_repository_state() {
+        let git_dir = tempfile::tempdir().expect("create git dir");
+        git2::Repository::init(git_dir.path()).expect("init git repo");
+        let ResponseJson(response) =
+            validate_workspace_path_endpoint(Json(ValidateWorkspacePathRequest {
+                workspace_path: git_dir.path().to_string_lossy().to_string(),
+            }))
+            .await
+            .expect("validate git workspace");
+        let data = response.into_data().expect("git validation data");
+        assert!(data.valid);
+        assert!(data.is_git_repo);
+        assert!(data.error.is_none());
+
+        let plain_dir = tempfile::tempdir().expect("create plain dir");
+        let ResponseJson(response) =
+            validate_workspace_path_endpoint(Json(ValidateWorkspacePathRequest {
+                workspace_path: plain_dir.path().to_string_lossy().to_string(),
+            }))
+            .await
+            .expect("validate plain workspace");
+        let data = response.into_data().expect("plain validation data");
+        assert!(data.valid);
+        assert!(!data.is_git_repo);
+        assert!(data.error.is_none());
+    }
 
     async fn setup_workspace_history_pool() -> (SqlitePool, Uuid, Uuid) {
         let pool = SqlitePool::connect("sqlite::memory:")
@@ -2198,10 +2383,83 @@ mod tests {
             default_workspace_path: default_workspace_path.map(str::to_string),
             chat_input_mode: None,
             project_id: None,
+            pinned_at: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
             archived_at: None,
+            worktree_mode: Default::default(),
         }
+    }
+
+    fn test_worktree(
+        session_id: Uuid,
+        status: SessionWorktreeStatus,
+        base_workspace: &str,
+        worktree_workspace: &str,
+    ) -> SessionWorktree {
+        let now = Utc::now();
+        SessionWorktree {
+            id: Uuid::new_v4(),
+            session_id,
+            project_id: None,
+            base_workspace_path: base_workspace.to_string(),
+            repo_path: base_workspace.to_string(),
+            base_branch: "main".to_string(),
+            base_commit: None,
+            branch_name: "openteams/session/test".to_string(),
+            worktree_path: worktree_workspace.to_string(),
+            mode: SessionWorktreeMode::Session,
+            status,
+            merge_target_branch: None,
+            merge_operation: None,
+            conflict_files_json: "[]".to_string(),
+            operation_started_at: None,
+            cleanup_error: None,
+            last_used_at: None,
+            merged_at: None,
+            archived_at: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[test]
+    fn worktree_workspace_request_uses_active_worktree_for_base_request() {
+        let mut session = test_session(Some("E:/workspace/base"));
+        session.worktree_mode = ChatSessionWorktreeMode::Isolated;
+        let worktree = test_worktree(
+            session.id,
+            SessionWorktreeStatus::Active,
+            "E:/workspace/base",
+            "E:/workspace/base/.openteams/worktrees/session",
+        );
+
+        let resolved = worktree_workspace_for_request(&session, &worktree, "E:/workspace/base");
+
+        assert_eq!(
+            resolved.as_deref(),
+            Some("E:/workspace/base/.openteams/worktrees/session")
+        );
+    }
+
+    #[test]
+    fn worktree_workspace_request_returns_base_for_archived_worktree() {
+        let mut session = test_session(Some("E:/workspace/base"));
+        session.worktree_mode = ChatSessionWorktreeMode::Isolated;
+        let worktree = test_worktree(
+            session.id,
+            SessionWorktreeStatus::Archived,
+            "E:/workspace/base",
+            "E:/workspace/base/.openteams/worktrees/session",
+        );
+
+        let resolved = worktree_workspace_for_request(
+            &session,
+            &worktree,
+            "E:/workspace/base/.openteams/worktrees/session",
+        );
+
+        assert_eq!(resolved.as_deref(), Some("E:/workspace/base"));
     }
 
     fn test_run(
@@ -2742,6 +3000,56 @@ new file mode 100644
                 .as_deref()
                 .unwrap_or_default()
                 .contains("+untracked")
+        );
+    }
+
+    #[test]
+    fn collect_workspace_changes_handles_large_session_path_union() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let repo_path = tempdir.path().join("repo");
+        let git = GitService::new();
+        git.initialize_repo_with_main_branch(&repo_path)
+            .expect("init repo");
+
+        fs::write(repo_path.join("tracked.txt"), "base\n").expect("write tracked");
+        fs::write(repo_path.join("outside.txt"), "base\n").expect("write outside");
+        git.commit(&repo_path, "baseline").expect("commit baseline");
+
+        fs::write(repo_path.join("tracked.txt"), "updated\n").expect("modify tracked");
+        fs::write(repo_path.join("outside.txt"), "outside\n").expect("modify outside");
+
+        let session_id = Uuid::new_v4();
+        let session_agent_id = Uuid::new_v4();
+        let run_dir = tempdir.path().join("run-record");
+        fs::create_dir_all(&run_dir).expect("create run dir");
+        let mut patch = String::new();
+        patch.push_str(
+            "diff --git a/tracked.txt b/tracked.txt\n--- a/tracked.txt\n+++ b/tracked.txt\n",
+        );
+        for i in 0..5_000 {
+            patch.push_str(&format!(
+                "diff --git a/very/long/nonmatching/path/{i:04}/placeholder.txt b/very/long/nonmatching/path/{i:04}/placeholder.txt\n",
+            ));
+        }
+        fs::write(run_dir.join("diff.patch"), patch).expect("write diff patch");
+        let run = test_run(session_id, session_agent_id, 1, &run_dir, Utc::now());
+
+        let response =
+            collect_workspace_changes(session_id, &repo_path.to_string_lossy(), false, vec![run]);
+
+        assert!(response.error.is_none(), "{:?}", response.error);
+        let changes = response.changes.expect("changes present");
+        assert!(
+            changes
+                .modified
+                .iter()
+                .any(|entry| entry.path == "tracked.txt")
+        );
+        assert!(
+            changes
+                .modified
+                .iter()
+                .all(|entry| entry.path != "outside.txt")
         );
     }
 

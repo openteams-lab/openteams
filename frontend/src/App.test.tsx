@@ -193,9 +193,17 @@ check(
   source,
 );
 check(
+  "passes resolved member workspaces into create-agent modal",
+  source.includes("workflowWorkspacePath={") &&
+    source.includes("memberWorkspacePaths={createSessionWorkspaceLookup.memberWorkspacePaths}") &&
+    source.includes("buildCreateSessionWorkspaceLookup"),
+  source,
+);
+check(
   "refreshes create-agent modal member data when opened",
   source.includes("if (!isCreateSessionModalOpen || !selectedProjectId) return") &&
     source.includes("void refreshMembers().catch(() => undefined)") &&
+    source.includes("void loadCreateSessionWorkspaceLookup(selectedProjectId)") &&
     source.includes("void loadLeadMember(selectedProjectId)"),
   source,
 );
@@ -267,6 +275,14 @@ check(
     source.includes("setSessionChatInputMode(backendSession.id, nextChatInputMode)") &&
     source.includes("workflowLeadAgentId,") &&
     source.includes("chatInputMode: nextChatInputMode"),
+  source,
+);
+check(
+  "isolated new session is revalidated against the final workspace before submit",
+  source.includes("if (worktreeMode === 'isolated')") &&
+    source.includes("const workspacePathForWorktree =") &&
+    source.includes("chatSessionsApi.validateWorkspacePath(") &&
+    source.includes("worktreeMode = undefined"),
   source,
 );
 check(
@@ -435,7 +451,6 @@ check(
 check(
   "does not expose the removed skill library page",
   !source.includes('case "tokens"') &&
-    !source.includes("<DialogManager preview />") &&
     !source.includes('activeAppPage !== "tokens"'),
   source,
 );

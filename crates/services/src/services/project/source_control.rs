@@ -9,7 +9,7 @@ use std::{
 use dashmap::DashMap;
 use db::models::{
     chat_run::ChatRun,
-    chat_session::{ChatSession, ChatSessionStatus},
+    chat_session::{ChatSession, ChatSessionStatus, ChatSessionWorktreeMode},
     project::Project,
     project_path::{ProjectPath, ProjectPathKind},
     project_work_item::ProjectWorkItem,
@@ -25,6 +25,7 @@ use utils::diff::{compute_line_change_counts, create_unified_diff};
 use uuid::Uuid;
 
 use super::delivery::ProjectDeliveryService;
+use crate::services::session_worktree::{SessionWorktreeError, SessionWorktreeService};
 
 const MAX_INLINE_DIFF_BYTES: u64 = 2 * 1024 * 1024;
 const SOURCE_CONTROL_CACHE_TTL: Duration = Duration::from_secs(2);
@@ -1046,8 +1047,58 @@ async fn resolve_workspace_context(
         return Err(SourceControlError::SessionProjectMismatch);
     }
 
+    // For isolated sessions, check the session worktree FIRST — before
+    // resolving the project workspace. This ensures that:
+    // 1. An active worktree is used even when the project has no default
+    //    workspace configured (e.g. worktree was prepared via the API with
+    //    a custom base_workspace_path).
+    // 2. Archived/failed worktrees fall back to the worktree row's
+    //    base_workspace_path, not the (possibly changed) project default.
+    if session.worktree_mode == ChatSessionWorktreeMode::Isolated {
+        let worktree_service = SessionWorktreeService::new(pool.clone());
+        let latest = worktree_service
+            .get_latest_for_session(session_id)
+            .await
+            .map_err(|e| match e {
+                SessionWorktreeError::Database(db) => SourceControlError::Database(db),
+                SessionWorktreeError::Io(io) => SourceControlError::Io(io),
+                other => SourceControlError::WorkspaceNotAccessible(other.to_string()),
+            })?;
+        if let Some(wt) = latest {
+            // Active worktree (creating/active/dirty/merging/needs_conflict_resolution/cleanup_pending)
+            // → use worktree path as the active workspace.
+            if wt.status.is_active_for_workspace() {
+                let workspace_path = PathBuf::from(&wt.worktree_path);
+                ensure_workspace_accessible(&workspace_path)?;
+                return Ok(WorkspaceContext {
+                    project_id,
+                    session_id,
+                    workspace_id: None,
+                    workspace_path_string: workspace_path.to_string_lossy().to_string(),
+                    workspace_path,
+                });
+            }
+            // Terminal/audit states (merged/archived/cleanup_failed)
+            // → switch back to the worktree row's base_workspace_path,
+            // not the (possibly changed) project default.
+            let workspace_path = PathBuf::from(&wt.base_workspace_path);
+            ensure_workspace_accessible(&workspace_path)?;
+            return Ok(WorkspaceContext {
+                project_id,
+                session_id,
+                workspace_id: None,
+                workspace_path_string: workspace_path.to_string_lossy().to_string(),
+                workspace_path,
+            });
+        }
+        // No worktree row — fall through to project workspace resolution
+    }
+
+    // Non-isolated sessions, or isolated sessions with no worktree row,
+    // use the project workspace.
     let (workspace_id, workspace_path) =
         resolve_project_workspace(pool, &project, workspace_id).await?;
+
     ensure_workspace_accessible(&workspace_path)?;
     let workspace_path_string = workspace_path.to_string_lossy().to_string();
 

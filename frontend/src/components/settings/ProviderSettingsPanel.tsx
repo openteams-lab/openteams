@@ -362,7 +362,7 @@ export function ProviderSettingsPanel() {
     isBuiltInProviderConfigDirty(config, savedConfig, selectedId);
 
   return (
-    <div className="provider-settings-panel h-full min-h-0 space-y-4">
+    <div className="provider-settings-panel flex h-full min-h-0 flex-col space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-[15px] font-semibold text-[var(--provider-heading)]">
@@ -393,7 +393,7 @@ export function ProviderSettingsPanel() {
       )}
 
       <div
-        className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_693px] xl:grid-cols-[minmax(0,1fr)_747px]"
+        className="provider-layout-grid grid min-h-0 flex-1 gap-4"
       >
         <section className="provider-list-column min-w-0">
           <div className="provider-list-panel overflow-hidden">
@@ -494,7 +494,7 @@ export function ProviderSettingsPanel() {
         </section>
 
         {selectedId ? (
-          <aside className="provider-side-sheet min-w-0 p-4 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-96px)] lg:overflow-y-auto">
+          <aside className="provider-side-sheet min-w-0 overflow-y-auto p-4">
             <div className="mb-4 flex items-start justify-between gap-4 border-b border-[var(--hairline)] pb-3">
               <div className="min-w-0">
                 <p className="text-[15px] font-semibold text-[var(--provider-heading)]">
@@ -546,7 +546,7 @@ export function ProviderSettingsPanel() {
             )}
           </aside>
         ) : (
-          <aside className="provider-empty-state min-w-0 p-6 lg:sticky lg:top-0">
+          <aside className="provider-empty-state min-w-0 p-6">
             <div className="provider-empty-illustration" aria-hidden="true">
               <span className="provider-empty-node provider-empty-node-main">
                 <MeteorIcon className="h-4 w-4" />

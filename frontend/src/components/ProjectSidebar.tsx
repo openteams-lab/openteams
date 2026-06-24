@@ -30,6 +30,7 @@ import {
   LoaderCircle,
   MoreHorizontal,
   Pencil,
+  Pin,
   Plus,
   PlusCircle,
   Settings2,
@@ -98,6 +99,7 @@ interface ProjectSidebarProps {
   onProjectSelect?: (projectId: string) => void;
   onRenameSession?: (sessionId: string, title: string) => Promise<void>;
   onArchiveSession?: (sessionId: string) => Promise<void>;
+  onPinSession?: (sessionId: string, pinned: boolean) => Promise<void>;
   onDeleteSession?: (sessionId: string) => Promise<void>;
   onCreateProject?: (
     data: CreateProjectRequest,
@@ -141,10 +143,17 @@ const hasSidebarPrioritySessionActivity = (session: Session): boolean =>
   Boolean(session.hasPendingWorkflowInput) ||
   Boolean(session.hasPendingWorkflowReview);
 
-const prioritizeRunningSessions = (sessions: Session[]): Session[] => [
-  ...sessions.filter(hasSidebarPrioritySessionActivity),
-  ...sessions.filter((session) => !hasSidebarPrioritySessionActivity(session)),
-];
+const isPinnedSession = (session: Session): boolean => Boolean(session.pinnedAt);
+
+const prioritizeSessions = (sessions: Session[]): Session[] => {
+  const pinned = sessions.filter(isPinnedSession);
+  const unpinned = sessions.filter((session) => !isPinnedSession(session));
+  return [
+    ...pinned,
+    ...unpinned.filter(hasSidebarPrioritySessionActivity),
+    ...unpinned.filter((session) => !hasSidebarPrioritySessionActivity(session)),
+  ];
+};
 
 const blankTeamOptions: DropdownSelectOption[] = [
   {
@@ -303,6 +312,7 @@ export function ProjectSidebar({
   onProjectSelect,
   onRenameSession,
   onArchiveSession,
+  onPinSession,
   onDeleteSession,
   onCreateProject,
   onUpdateProject,
@@ -343,6 +353,7 @@ export function ProjectSidebar({
   const [archivingSessionId, setArchivingSessionId] = useState<string | null>(
     null,
   );
+  const [pinningSessionId, setPinningSessionId] = useState<string | null>(null);
   const [deletingSession, setDeletingSession] = useState<Session | null>(null);
   const [deleteSessionError, setDeleteSessionError] = useState<string | null>(
     null,
@@ -411,7 +422,7 @@ export function ProjectSidebar({
   );
   const buildStats = realBuildStats ?? ZERO_BUILD_STATS;
   const orderedSessions = useMemo(
-    () => prioritizeRunningSessions(sessions),
+    () => prioritizeSessions(sessions),
     [sessions],
   );
   const hasOverflowSessions = orderedSessions.length > visibleSessionLimit;
@@ -711,7 +722,7 @@ export function ProjectSidebar({
     const viewportWidth = toOverlayValue(window.innerWidth);
     const viewportHeight = toOverlayValue(window.innerHeight);
     const menuWidth = 180;
-    const menuHeight = 164;
+    const menuHeight = 200;
     setSessionContextMenu({
       sessionId: session.id,
       left: Math.min(
@@ -788,7 +799,7 @@ export function ProjectSidebar({
   };
 
   const handleArchiveSession = async (session: Session) => {
-    if (!onArchiveSession || archivingSessionId) return;
+    if (!onArchiveSession || archivingSessionId || pinningSessionId) return;
 
     setArchivingSessionId(session.id);
     setSessionActionError(null);
@@ -804,6 +815,26 @@ export function ProjectSidebar({
       );
     } finally {
       setArchivingSessionId(null);
+    }
+  };
+
+  const handlePinSession = async (session: Session) => {
+    if (!onPinSession || pinningSessionId || archivingSessionId) return;
+
+    setPinningSessionId(session.id);
+    setSessionActionError(null);
+    try {
+      await onPinSession(session.id, !isPinnedSession(session));
+      setSessionContextMenu(null);
+    } catch (error) {
+      setSessionActionError(
+        sessionErrorMessage(
+          error,
+          translate("sidebar.pinSessionFailed", "Failed to update pin"),
+        ),
+      );
+    } finally {
+      setPinningSessionId(null);
     }
   };
 
@@ -933,19 +964,19 @@ export function ProjectSidebar({
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
       if (target && sessionMenuRef.current?.contains(target)) return;
-      if (!archivingSessionId) {
+      if (!archivingSessionId && !pinningSessionId) {
         setSessionContextMenu(null);
         setSessionActionError(null);
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !archivingSessionId) {
+      if (event.key === "Escape" && !archivingSessionId && !pinningSessionId) {
         setSessionContextMenu(null);
         setSessionActionError(null);
       }
     };
     const closeOnViewportChange = () => {
-      if (!archivingSessionId) {
+      if (!archivingSessionId && !pinningSessionId) {
         setSessionContextMenu(null);
         setSessionActionError(null);
       }
@@ -962,7 +993,7 @@ export function ProjectSidebar({
       window.removeEventListener("resize", closeOnViewportChange);
       window.removeEventListener("scroll", closeOnViewportChange, true);
     };
-  }, [archivingSessionId, sessionContextMenu]);
+  }, [archivingSessionId, pinningSessionId, sessionContextMenu]);
 
   useEffect(() => {
     if (sessionContextMenu && !menuSession) {
@@ -1642,7 +1673,11 @@ export function ProjectSidebar({
               role="menuitem"
               className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] text-[var(--ink-muted)] transition hover:bg-[var(--surface-1)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => startRenameSession(menuSession)}
-              disabled={!onRenameSession || Boolean(archivingSessionId)}
+              disabled={
+                !onRenameSession ||
+                Boolean(archivingSessionId) ||
+                Boolean(pinningSessionId)
+              }
             >
               <Pencil className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
               {translate("sidebar.renameSession", "Rename")}
@@ -1651,8 +1686,30 @@ export function ProjectSidebar({
               type="button"
               role="menuitem"
               className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] text-[var(--ink-muted)] transition hover:bg-[var(--surface-1)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => void handlePinSession(menuSession)}
+              disabled={
+                !onPinSession ||
+                pinningSessionId === menuSession.id ||
+                Boolean(archivingSessionId)
+              }
+            >
+              {pinningSessionId === menuSession.id ? (
+                <LoaderCircle className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--primary)]" />
+              ) : (
+                <Pin className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+              )}
+              {pinningSessionId === menuSession.id
+                ? translate("sidebar.updatingPin", "Updating...")
+                : isPinnedSession(menuSession)
+                  ? translate("sidebar.unpinSession", "Unpin")
+                  : translate("sidebar.pinSession", "Pin to top")}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] text-[var(--ink-muted)] transition hover:bg-[var(--surface-1)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => startViewSessionId(menuSession)}
-              disabled={Boolean(archivingSessionId)}
+              disabled={Boolean(archivingSessionId) || Boolean(pinningSessionId)}
             >
               <Hash className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
               {translate("sidebar.viewSessionId", "View ID")}
@@ -1663,7 +1720,9 @@ export function ProjectSidebar({
               className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] text-[var(--ink-muted)] transition hover:bg-[var(--surface-1)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => void handleArchiveSession(menuSession)}
               disabled={
-                !onArchiveSession || archivingSessionId === menuSession.id
+                !onArchiveSession ||
+                archivingSessionId === menuSession.id ||
+                Boolean(pinningSessionId)
               }
             >
               {archivingSessionId === menuSession.id ? (
@@ -1681,7 +1740,11 @@ export function ProjectSidebar({
               role="menuitem"
               className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] text-red-400 transition hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => startDeleteSession(menuSession)}
-              disabled={!onDeleteSession || Boolean(archivingSessionId)}
+              disabled={
+                !onDeleteSession ||
+                Boolean(archivingSessionId) ||
+                Boolean(pinningSessionId)
+              }
             >
               <Trash2 className="h-3.5 w-3.5 shrink-0" />
               {translate("sidebar.deleteSession", "Delete")}
@@ -2070,6 +2133,7 @@ export function ProjectSidebar({
                     Boolean(session.hasPendingWorkflowInput);
                   const hasUnreadAgentCompletion =
                     !isRunning && Boolean(session.hasUnreadAgentCompletion);
+                  const pinned = isPinnedSession(session);
                   const SessionIcon =
                     isRunning || hasPendingWorkflowReview
                       ? LoaderCircle
@@ -2129,6 +2193,9 @@ export function ProjectSidebar({
                       <span className="min-w-0 flex-1 truncate">
                         {session.title}
                       </span>
+                      {pinned && (
+                        <Pin className="h-3 w-3 shrink-0 text-[var(--primary)]" />
+                      )}
                     </button>
                   );
                 })}

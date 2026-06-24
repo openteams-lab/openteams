@@ -9,7 +9,6 @@ export {
   mockShellOptions,
 } from '@/mockApiData';
 
-export const initialTasks = mockWorkspaceBootstrap.tasks;
 export const initialMembers = mockWorkspaceBootstrap.members;
 export const initialSessions = mockWorkspaceBootstrap.sessions;
 export const initialMessages = mockWorkspaceBootstrap.messagesBySession;

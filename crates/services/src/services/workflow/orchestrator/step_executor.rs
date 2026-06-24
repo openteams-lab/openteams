@@ -138,11 +138,9 @@ fn detect_active_frontier_workspace_conflicts(
         let Some(agent) = agent_by_id.get(&session_agent.agent_id) else {
             continue;
         };
-        let workspace_path = normalize_workspace_path(&workflow_runtime::resolve_workspace_path(
-            session,
-            agent,
-            session_agent,
-        ));
+        let workspace_path = normalize_workspace_path(
+            &workflow_runtime::resolve_workspace_path_snapshot(session, agent, session_agent),
+        );
         if workspace_path.is_empty() {
             continue;
         }
@@ -461,6 +459,7 @@ Read this file before writing the final result. Do not rely on the workflow plan
     }
 
     async fn write_result_dependency_context_file(
+        pool: &SqlitePool,
         session: &ChatSession,
         agent: &ChatAgent,
         session_agent: &ChatSessionAgent,
@@ -468,8 +467,13 @@ Read this file before writing the final result. Do not rely on the workflow plan
         step: &WorkflowStep,
         contexts: &[String],
     ) -> Result<ResultDependencyContextFile, OrchestratorError> {
-        let workspace_path =
-            workflow_runtime::resolve_workspace_path(session, agent, session_agent);
+        let workspace_path = workflow_runtime::resolve_workspace_path(
+            &DBService { pool: pool.clone() },
+            session,
+            agent,
+            session_agent,
+        )
+        .await?;
         let tmp_dir = workspace_path.join(".openteams").join("tmp");
         tokio::fs::create_dir_all(&tmp_dir)
             .await
@@ -1748,6 +1752,7 @@ Before modifying files, you MUST use the `using-git-workspace` skill to create a
                     &reviews,
                 );
                 let context_file = Self::write_result_dependency_context_file(
+                    pool,
                     session,
                     agent,
                     session_agent,

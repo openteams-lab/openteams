@@ -5,7 +5,7 @@ use tokio::{
 
 use crate::services::project::source_control::SourceControlService;
 
-use super::{super::workflow_analytics, *};
+use super::{super::workflow_analytics, startup_timing, *};
 
 pub(super) struct ExitWatcherArgs {
     pub(super) child: command_group::AsyncGroupChild,
@@ -1257,6 +1257,7 @@ impl ChatRunner {
         run_started_at: chrono::DateTime<Utc>,
         protocol_retry_attempt: u32,
         track_source_message: bool,
+        startup_timing: Arc<startup_timing::RunStartupTiming>,
         suppress_codex_tool_runtime_details: bool,
     ) {
         let db = self.db.clone();
@@ -1279,6 +1280,12 @@ impl ChatRunner {
         );
 
         tokio::spawn(async move {
+            startup_timing
+                .mark_and_persist(
+                    startup_timing::StartupMilestoneName::StreamBridgeStarted,
+                    None,
+                )
+                .await;
             let mut stream = msg_store.history_plus_stream();
             let mut last_content: HashMap<usize, String> = HashMap::new();
             let mut latest_assistant = String::new();
@@ -1292,6 +1299,9 @@ impl ChatRunner {
             let mut error_type: Option<NormalizedEntryError> = None;
             let mut activity_state = AgentActivityStreamState::default();
             let mut activity_sequence = 0_u64;
+            let mut saw_raw_stdout = false;
+            let mut saw_activity_line = false;
+            let mut saw_assistant_delta = false;
 
             while let Some(item) = stream.next().await {
                 match item {
@@ -1318,6 +1328,15 @@ impl ChatRunner {
                         }
                     }
                     Ok(LogMsg::Stdout(chunk)) => {
+                        if !saw_raw_stdout {
+                            saw_raw_stdout = true;
+                            startup_timing
+                                .mark_and_persist(
+                                    startup_timing::StartupMilestoneName::FirstRawStdout,
+                                    Some(format!("chunk_bytes={}", chunk.len())),
+                                )
+                                .await;
+                        }
                         Self::update_token_usage_from_stdout_chunk(
                             &mut stdout_line_buffer,
                             &mut last_token_usage,
@@ -1326,6 +1345,8 @@ impl ChatRunner {
                     }
                     Ok(LogMsg::JsonPatch(patch)) => {
                         let activity_lines = activity_state.drain_patch_lines(&patch, true);
+                        let first_activity_line =
+                            !saw_activity_line && !activity_lines.is_empty();
                         Self::persist_and_emit_activity_lines(
                             &activity_path,
                             &sender,
@@ -1338,6 +1359,16 @@ impl ChatRunner {
                             activity_lines,
                         )
                         .await;
+                        if first_activity_line {
+                            saw_activity_line = true;
+                            startup_timing
+                                .mark_and_persist(
+                                    startup_timing::StartupMilestoneName::FirstActivityLine,
+                                    Some(format!("sequence={}", activity_sequence.saturating_sub(1))),
+                                )
+                                .await;
+                        }
+                        let assistant_updates_before = assistant_update_count;
                         Self::process_stream_patch(
                             patch,
                             session_id,
@@ -1354,6 +1385,18 @@ impl ChatRunner {
                             &mut error_type,
                             stream_filter,
                         );
+                        if !saw_assistant_delta && assistant_update_count > assistant_updates_before
+                        {
+                            saw_assistant_delta = true;
+                            startup_timing
+                                .mark_and_persist(
+                                    startup_timing::StartupMilestoneName::FirstAssistantDelta,
+                                    Some(format!(
+                                        "assistant_update_count={assistant_update_count}"
+                                    )),
+                                )
+                                .await;
+                        }
                     }
                     Ok(LogMsg::Finished) => {
                         Self::flush_token_usage_buffer(
@@ -1371,6 +1414,16 @@ impl ChatRunner {
                             assistant_content_len = latest_assistant.len(),
                             "[chat_runner] Executor finished, processing final output"
                         );
+                        startup_timing
+                            .mark_and_persist(
+                                startup_timing::StartupMilestoneName::ExecutorFinished,
+                                Some(format!(
+                                    "assistant_content_bytes={},has_error={}",
+                                    latest_assistant.len(),
+                                    !error_content.is_empty()
+                                )),
+                            )
+                            .await;
 
                         // Drain tail messages briefly to handle out-of-order `Finished` vs stdout/json patches.
                         let drain_deadline =
@@ -1413,6 +1466,15 @@ impl ChatRunner {
                                     }
                                 }
                                 Ok(LogMsg::Stdout(chunk)) => {
+                                    if !saw_raw_stdout {
+                                        saw_raw_stdout = true;
+                                        startup_timing
+                                            .mark_and_persist(
+                                                startup_timing::StartupMilestoneName::FirstRawStdout,
+                                                Some(format!("chunk_bytes={}", chunk.len())),
+                                            )
+                                            .await;
+                                    }
                                     Self::update_token_usage_from_stdout_chunk(
                                         &mut stdout_line_buffer,
                                         &mut last_token_usage,
@@ -1422,6 +1484,8 @@ impl ChatRunner {
                                 Ok(LogMsg::JsonPatch(patch)) => {
                                     let activity_lines =
                                         activity_state.drain_patch_lines(&patch, true);
+                                    let first_activity_line =
+                                        !saw_activity_line && !activity_lines.is_empty();
                                     Self::persist_and_emit_activity_lines(
                                         &activity_path,
                                         &sender,
@@ -1434,6 +1498,19 @@ impl ChatRunner {
                                         activity_lines,
                                     )
                                     .await;
+                                    if first_activity_line {
+                                        saw_activity_line = true;
+                                        startup_timing
+                                            .mark_and_persist(
+                                                startup_timing::StartupMilestoneName::FirstActivityLine,
+                                                Some(format!(
+                                                    "sequence={}",
+                                                    activity_sequence.saturating_sub(1)
+                                                )),
+                                            )
+                                            .await;
+                                    }
+                                    let assistant_updates_before = assistant_update_count;
                                     Self::process_stream_patch(
                                         patch,
                                         session_id,
@@ -1450,6 +1527,19 @@ impl ChatRunner {
                                         &mut error_type,
                                         stream_filter,
                                     );
+                                    if !saw_assistant_delta
+                                        && assistant_update_count > assistant_updates_before
+                                    {
+                                        saw_assistant_delta = true;
+                                        startup_timing
+                                            .mark_and_persist(
+                                                startup_timing::StartupMilestoneName::FirstAssistantDelta,
+                                                Some(format!(
+                                                    "assistant_update_count={assistant_update_count}"
+                                                )),
+                                            )
+                                            .await;
+                                    }
                                 }
                                 _ => {}
                             }
@@ -1671,6 +1761,7 @@ impl ChatRunner {
                             "live_bytes_dropped": spool_snapshot.dropped_bytes,
                             "log_truncated": spool_snapshot.log_truncated,
                             "log_capture_degraded": spool_snapshot.log_capture_degraded,
+                            "startup_timing_path": startup_timing.artifact_path_string(),
                         });
 
                         meta["token_usage"] = serde_json::json!({
@@ -1759,6 +1850,12 @@ impl ChatRunner {
                                 "failed to write run meta with workspace observed paths"
                             ),
                         }
+                        startup_timing
+                            .mark_and_persist(
+                                startup_timing::StartupMilestoneName::RunMetaWritten,
+                                Some(meta_path.to_string_lossy().to_string()),
+                            )
+                            .await;
 
                         let error_summary = visible_error_content
                             .map(|content| content.chars().take(200).collect::<String>());
@@ -1803,6 +1900,12 @@ impl ChatRunner {
                             retention_summary_json,
                         )
                         .await;
+                        startup_timing
+                            .mark_and_persist(
+                                startup_timing::StartupMilestoneName::ChatRunCompletionPersisted,
+                                None,
+                            )
+                            .await;
 
                         let protocol_output = if matches!(
                             completion_status,

@@ -7,6 +7,7 @@ pub mod sessions;
 pub mod skills;
 pub mod work_items;
 pub mod workflow;
+pub mod worktree;
 
 use axum::{Router, extract::DefaultBodyLimit, middleware::from_fn_with_state, routing::get};
 
@@ -25,6 +26,8 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         )
         .route("/archive", axum::routing::post(sessions::archive_session))
         .route("/restore", axum::routing::post(sessions::restore_session))
+        .route("/pin", axum::routing::post(sessions::pin_session))
+        .route("/unpin", axum::routing::post(sessions::unpin_session))
         .route("/stream", get(sessions::stream_session_ws))
         .route("/workspaces", get(sessions::get_session_workspaces))
         .route(
@@ -157,6 +160,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             "/presets/snapshot",
             axum::routing::post(presets::create_preset_snapshot),
         )
+        .nest("/worktree", worktree::router())
         .layer(from_fn_with_state(
             deployment.clone(),
             load_chat_session_middleware,

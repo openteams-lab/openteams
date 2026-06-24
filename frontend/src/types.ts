@@ -18,6 +18,8 @@ export type {
   QueuedMessage,
   QueuedMessageListItem,
   QueuedMessageStatus,
+  ValidateWorkspacePathRequest,
+  ValidateWorkspacePathResponse,
 } from '../../shared/types';
 
 export type MemberQueuesBySessionAgentId = Record<string, MemberQueueSnapshot>;
@@ -25,15 +27,6 @@ export type MemberQueuesBySessionAgentId = Record<string, MemberQueueSnapshot>;
 export type Theme = 'dark' | 'light';
 
 export type Locale = 'en' | 'zh' | 'ja' | 'ko' | 'fr' | 'es';
-
-export interface TaskNode {
-  id: string;
-  name: string;
-  subText: string;
-  avatar: string;
-  cost: string;
-  status: 'done' | 'run' | 'wait';
-}
 
 export interface Member {
   id: string;
@@ -56,6 +49,10 @@ export interface Session {
   pendingWorkflowInputId?: string | null;
   hasPendingWorkflowReview?: boolean;
   pendingWorkflowReviewId?: string | null;
+  pinnedAt?: string | null;
+  // Mirrors `BackendChatSession.worktree_mode`. Undefined keeps legacy
+  // sessions on the main workspace without touching their behavior.
+  worktreeMode?: ChatSessionWorktreeMode;
 }
 
 export interface ArtifactItem {
@@ -211,7 +208,6 @@ export type SidebarNavigationTarget =
   | 'issue'
   | 'team'
   | 'team-templates'
-  | 'tasks'
   | 'routing'
   | 'github'
   | 'providers'
@@ -832,6 +828,10 @@ export interface SourceControlCommitError {
 
 export type ChatSessionStatus = 'active' | 'archived';
 
+// Mirrors `ChatSessionWorktreeMode` in shared/types.ts. Kept as a string union
+// here so callers that only import `@/types` keep the snake_case wire format.
+export type ChatSessionWorktreeMode = 'inherit' | 'disabled' | 'isolated';
+
 export interface BackendChatSession {
   id: string;
   title: string | null;
@@ -845,6 +845,8 @@ export interface BackendChatSession {
   default_workspace_path: string | null;
   chat_input_mode: string | null;
   project_id: string | null;
+  worktree_mode: ChatSessionWorktreeMode;
+  pinned_at: string | null;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
@@ -853,6 +855,7 @@ export interface BackendChatSession {
 export interface CreateChatSession {
   title: string | null;
   workspace_path: string | null;
+  worktree_mode?: ChatSessionWorktreeMode;
 }
 
 export interface UpdateChatSession {
@@ -866,6 +869,75 @@ export interface UpdateChatSession {
   team_protocol_enabled: boolean | null;
   default_workspace_path: string | null;
   chat_input_mode?: string | null;
+  worktree_mode?: ChatSessionWorktreeMode;
+}
+
+// ----- Session worktree isolation -------------------------------------------
+// Mirrors the snake_case wire format produced by `SessionWorktreeStatus` and
+// related types in crates/db/src/models/chat_session_worktree.rs. Never
+// re-derive these from `Debug`; keep them in sync with shared/types.ts.
+
+export type SessionWorktreeStatus =
+  | 'creating'
+  | 'active'
+  | 'dirty'
+  | 'merging'
+  | 'needs_conflict_resolution'
+  | 'merged'
+  | 'archived'
+  | 'cleanup_pending'
+  | 'cleanup_failed';
+
+export type SessionWorktreeMergeOperation =
+  | 'merge'
+  | 'squash_merge'
+  | 'cherry_pick'
+  | 'rebase';
+
+export interface SessionWorktree {
+  id: string;
+  session_id: string;
+  project_id: string | null;
+  base_workspace_path: string;
+  repo_path: string;
+  base_branch: string;
+  base_commit: string | null;
+  branch_name: string;
+  worktree_path: string;
+  mode: 'session';
+  status: SessionWorktreeStatus;
+  merge_target_branch: string | null;
+  merge_operation: SessionWorktreeMergeOperation | null;
+  conflict_files_json: string;
+  operation_started_at: string | null;
+  cleanup_error: string | null;
+  last_used_at: string | null;
+  merged_at: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConflictFileInfo {
+  path: string;
+  status: string;
+}
+
+export interface ConflictFileContent {
+  path: string;
+  base?: string | null;
+  current?: string | null;
+  session?: string | null;
+  working_tree: string;
+  is_binary: boolean;
+  is_too_large: boolean;
+  size_bytes: number;
+}
+
+export interface SessionWorktreeMergeResult {
+  worktree: SessionWorktree;
+  has_conflicts: boolean;
+  conflict_files: string[];
 }
 
 export interface TeamProtocolConfig {

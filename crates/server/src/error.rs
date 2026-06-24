@@ -244,6 +244,9 @@ impl IntoResponse for ApiError {
             ApiError::ChatRunner(ChatRunnerError::UnknownRunnerType(_)) => {
                 ErrorInfo::bad_request("ChatRunnerError", "Unknown runner type.")
             }
+            ApiError::ChatRunner(ChatRunnerError::SessionWorktree(err)) => {
+                ErrorInfo::bad_request("ChatRunnerError", err.to_string())
+            }
             ApiError::ChatRunner(_) => ErrorInfo::internal("ChatRunnerError"),
             ApiError::Io(_) => ErrorInfo::internal("IoError"),
         };

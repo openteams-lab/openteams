@@ -7,17 +7,54 @@ impl ChatRunner {
         agent_id: Uuid,
         session_agent_workspace_path: Option<String>,
     ) -> Result<String, ChatRunnerError> {
+        // Load the session to check worktree_mode and default_workspace_path.
+        let session = ChatSession::find_by_id(&self.db.pool, session_id)
+            .await?
+            .ok_or(ChatRunnerError::SessionNotFound(session_id))?;
+
+        // 2. Before falling back to the session default workspace, resolve
+        //    the session worktree. Only isolated sessions use worktree
+        //    paths; inherit/disabled sessions always use the legacy path
+        //    even if a historical worktree row exists.
+        let worktree_service = SessionWorktreeService::new(self.db.pool.clone());
+        if session.worktree_mode == ChatSessionWorktreeMode::Isolated {
+            // First check for an existing worktree row. Merged rows keep using
+            // the isolated path so follow-up commits can be merged again.
+            if let Some(worktree) = worktree_service.get_latest_for_session(session_id).await? {
+                if worktree.status.is_active_for_workspace() {
+                    return Ok(worktree.worktree_path);
+                }
+                return Ok(worktree.base_workspace_path);
+            }
+            // No existing worktree: try to lazy-create one using the
+            // session's default_workspace_path as the base.
+            if let Some(default_workspace) = session.default_workspace_path.as_ref() {
+                let input = EnsureWorktreeInput::new(session_id, default_workspace.into())
+                    .with_project(session.project_id);
+                let outcome = worktree_service.ensure_for_session(input).await?;
+                let worktree = match outcome {
+                    EnsureOutcome::Created(w) => w,
+                    EnsureOutcome::Existing(w) => w,
+                };
+                return Ok(worktree.worktree_path);
+            }
+            // No existing worktree and no default_workspace_path: fall
+            // through to legacy logic.
+        }
+
+        // 3. Prefer an explicitly-set agent workspace path only for
+        // non-isolated sessions. Isolated sessions must route through the
+        // session worktree reducer above so stale member workspace paths cannot
+        // keep runs on a deleted worktree, or bypass an active worktree.
         if let Some(workspace_path) = session_agent_workspace_path {
             return Ok(workspace_path);
         }
 
-        let session_default_workspace_path = ChatSession::find_by_id(&self.db.pool, session_id)
-            .await?
-            .and_then(|session| session.default_workspace_path);
-
+        // 4. Fall back to the session default workspace, then the app-generated
+        //    per-agent directory.
         Ok(Self::select_workspace_path(
             None,
-            session_default_workspace_path.as_deref(),
+            session.default_workspace_path.as_deref(),
             self.build_workspace_path(session_id, agent_id),
         ))
     }
@@ -862,6 +899,14 @@ impl ChatRunner {
         let is_workflow_mode = chat::is_workflow_chat_input_mode(&message.meta.0);
 
         markdown.push_str("# Chat Message\n\n");
+        markdown.push_str("## Workspace\n");
+        markdown.push_str("- Active workspace path: `");
+        markdown.push_str(&workspace_path.to_string_lossy());
+        markdown.push_str("`.\n");
+        markdown.push_str(
+            "- Treat this active workspace path as the project repository for this turn. Run file reads, writes, and shell commands there unless the user explicitly asks for another path.\n\n",
+        );
+
         markdown.push_str("## Output Requirements\n");
         markdown.push_str("Return **only a JSON array** matching the following schema.\n\n");
 

@@ -274,6 +274,8 @@ pub enum ChatRunnerError {
     ChatService(#[from] ChatServiceError),
     #[error(transparent)]
     NativeSkills(#[from] NativeSkillError),
+    #[error(transparent)]
+    SessionWorktree(#[from] SessionWorktreeError),
     #[error("invalid workflow plan: {0}")]
     InvalidWorkflowPlan(String),
 }

@@ -10,7 +10,7 @@ static WORKSPACE_DIR_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 use git::{GitService, GitServiceError};
 use git2::{Error as GitError, Repository};
 use thiserror::Error;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 use utils::{path::normalize_macos_private_alias, shell::resolve_executable_path};
 
 // Global synchronization for worktree creation to prevent race conditions
@@ -87,7 +87,7 @@ impl WorktreeManager {
             .map_err(|e| WorktreeError::TaskJoin(format!("Task join error: {e}")))??;
         }
 
-        Self::ensure_worktree_exists(repo_path, branch_name, worktree_path).await
+        Self::ensure_worktree_exists_inner(repo_path, branch_name, worktree_path, true).await
     }
 
     /// Ensure worktree exists, recreating if necessary with proper synchronization
@@ -96,6 +96,15 @@ impl WorktreeManager {
         repo_path: &Path,
         branch_name: &str,
         worktree_path: &Path,
+    ) -> Result<(), WorktreeError> {
+        Self::ensure_worktree_exists_inner(repo_path, branch_name, worktree_path, false).await
+    }
+
+    async fn ensure_worktree_exists_inner(
+        repo_path: &Path,
+        branch_name: &str,
+        worktree_path: &Path,
+        allow_recreate: bool,
     ) -> Result<(), WorktreeError> {
         let path_str = worktree_path.to_string_lossy().to_string();
 
@@ -117,9 +126,17 @@ impl WorktreeManager {
             return Ok(());
         }
 
+        if !allow_recreate && worktree_path.exists() {
+            return Err(WorktreeError::Repository(format!(
+                "Worktree path {} exists but is not registered correctly; refusing automatic cleanup during ensure",
+                worktree_path.display()
+            )));
+        }
+
         // If worktree doesn't exist or isn't properly set up, recreate it
         info!("Worktree needs recreation at path: {}", path_str);
-        Self::recreate_worktree_internal(repo_path, branch_name, worktree_path).await
+        Self::recreate_worktree_internal(repo_path, branch_name, worktree_path, allow_recreate)
+            .await
     }
 
     /// Internal worktree recreation function (always recreates)
@@ -127,6 +144,7 @@ impl WorktreeManager {
         repo_path: &Path,
         branch_name: &str,
         worktree_path: &Path,
+        allow_cleanup: bool,
     ) -> Result<(), WorktreeError> {
         let path_str = worktree_path.to_string_lossy().to_string();
         let branch_name_owned = branch_name.to_string();
@@ -137,8 +155,22 @@ impl WorktreeManager {
             branch_name_owned, path_str
         );
 
-        // Step 1: Comprehensive cleanup of existing worktree and metadata (non-blocking)
-        Self::comprehensive_worktree_cleanup_async(repo_path, &worktree_path_owned).await?;
+        // Step 1: Only clean up when there is stale state to remove. Fresh
+        // creation should not look like a destructive cleanup in logs, and
+        // startup "ensure" paths must not remove healthy worktrees unless the
+        // setup check already proved the path/metadata is inconsistent.
+        if allow_cleanup && Self::has_worktree_state(repo_path, &worktree_path_owned).await? {
+            info!(
+                "Removing stale worktree state before recreation at {}",
+                worktree_path_owned.display()
+            );
+            Self::comprehensive_worktree_cleanup_async(repo_path, &worktree_path_owned).await?;
+        } else {
+            debug!(
+                "No existing worktree state found before creation at {}",
+                worktree_path_owned.display()
+            );
+        }
 
         // Step 2: Ensure parent directory exists (non-blocking)
         if let Some(parent) = worktree_path_owned.parent() {
@@ -234,6 +266,20 @@ impl WorktreeManager {
     fn get_worktree_metadata_path(git_repo_path: &Path) -> Result<PathBuf, WorktreeError> {
         let repo = Repository::open(git_repo_path).map_err(WorktreeError::Git)?;
         Ok(repo.commondir().join("worktrees"))
+    }
+
+    async fn has_worktree_state(
+        git_repo_path: &Path,
+        worktree_path: &Path,
+    ) -> Result<bool, WorktreeError> {
+        let git_repo_path = git_repo_path.to_path_buf();
+        let worktree_path = worktree_path.to_path_buf();
+        tokio::task::spawn_blocking(move || {
+            Ok(worktree_path.exists()
+                || Self::find_worktree_git_internal_name(&git_repo_path, &worktree_path)?.is_some())
+        })
+        .await
+        .map_err(|e| WorktreeError::TaskJoin(format!("{e}")))?
     }
 
     /// Comprehensive cleanup of worktree path and metadata to prevent "path exists" errors (blocking)
@@ -465,6 +511,68 @@ impl WorktreeManager {
         Ok(())
     }
 
+    /// Force-remove the Git worktree registration and metadata even when the
+    /// physical directory is locked by another process. On Windows a process
+    /// with cwd/files under the worktree can make `remove_dir_all` fail with
+    /// ERROR_SHARING_VIOLATION; in that case the worktree is detached from Git
+    /// and the remaining directory is left for a later OS-level cleanup.
+    pub async fn force_remove_worktree(worktree: &WorktreeCleanup) -> Result<(), WorktreeError> {
+        let path_str = worktree.worktree_path.to_string_lossy().to_string();
+
+        let lock = {
+            let mut locks = WORKTREE_CREATION_LOCKS.lock().unwrap();
+            locks
+                .entry(path_str.clone())
+                .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+                .clone()
+        };
+
+        let _guard = lock.lock().await;
+
+        let resolved_repo_path = if let Some(repo_path) = &worktree.git_repo_path {
+            Some(repo_path.to_path_buf())
+        } else {
+            Self::infer_git_repo_path(&worktree.worktree_path).await
+        };
+
+        let worktree_path = worktree.worktree_path.clone();
+        tokio::task::spawn_blocking(move || -> Result<(), WorktreeError> {
+            if let Some(repo_path) = resolved_repo_path {
+                let git_service = GitService::new();
+                if let Err(err) = git_service.remove_worktree(&repo_path, &worktree_path, true) {
+                    debug!("force git worktree remove returned non-fatal error: {err}");
+                }
+                Self::force_cleanup_worktree_metadata(&repo_path, &worktree_path)?;
+                if let Err(err) = git_service.prune_worktrees(&repo_path) {
+                    debug!("git worktree prune after force remove failed: {err}");
+                }
+            }
+
+            if worktree_path.exists() {
+                match std::fs::remove_dir_all(&worktree_path) {
+                    Ok(()) => {
+                        info!(
+                            "Force-removed worktree directory: {}",
+                            worktree_path.display()
+                        );
+                    }
+                    Err(err) if is_process_lock_error(&err) => {
+                        warn!(
+                            "Worktree directory is locked by another process; Git metadata was detached but physical directory remains: {} ({})",
+                            worktree_path.display(),
+                            err
+                        );
+                    }
+                    Err(err) => return Err(WorktreeError::Io(err)),
+                }
+            }
+
+            Ok(())
+        })
+        .await
+        .map_err(|e| WorktreeError::TaskJoin(format!("{e}")))?
+    }
+
     /// Try to infer the git repository path from a worktree
     async fn infer_git_repo_path(worktree_path: &Path) -> Option<PathBuf> {
         // Try using git rev-parse --git-common-dir from within the worktree
@@ -562,6 +670,18 @@ impl WorktreeManager {
     }
 }
 
+fn is_process_lock_error(err: &std::io::Error) -> bool {
+    #[cfg(windows)]
+    {
+        matches!(err.raw_os_error(), Some(32))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = err;
+        false
+    }
+}
+
 #[tokio::test]
 async fn create_worktree_when_repo_path_is_a_worktree() {
     use tempfile::TempDir;
@@ -605,4 +725,28 @@ async fn create_worktree_when_repo_path_is_a_worktree() {
     )
     .await
     .unwrap();
+}
+
+#[tokio::test]
+async fn ensure_worktree_exists_refuses_to_delete_existing_unregistered_path() {
+    use tempfile::TempDir;
+    let td = TempDir::new().unwrap();
+
+    let repo_path = td.path().join("repo");
+    let git_service = GitService::new();
+    git_service
+        .initialize_repo_with_main_branch(&repo_path)
+        .unwrap();
+
+    let worktree_path = td.path().join("existing-unregistered");
+    std::fs::create_dir_all(&worktree_path).unwrap();
+    let marker = worktree_path.join("unmerged-work.txt");
+    std::fs::write(&marker, "keep me").unwrap();
+
+    let err = WorktreeManager::ensure_worktree_exists(&repo_path, "main", &worktree_path)
+        .await
+        .expect_err("startup ensure must not delete an existing unregistered path");
+
+    assert!(matches!(err, WorktreeError::Repository(_)));
+    assert!(marker.exists());
 }

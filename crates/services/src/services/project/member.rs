@@ -440,6 +440,9 @@ mod tests {
                 default_workspace_path TEXT,
                 chat_input_mode TEXT,
                 project_id BLOB,
+                worktree_mode TEXT NOT NULL DEFAULT 'inherit'
+                    CHECK (worktree_mode IN ('inherit', 'disabled', 'isolated')),
+                pinned_at TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 archived_at TEXT

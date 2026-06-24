@@ -18,13 +18,6 @@ export const mockSessionWorkspaceChanges: Record<
           has_diff: true,
         },
         {
-          path: 'src/components/DialogManager.tsx',
-          additions: 0,
-          deletions: 0,
-          unified_diff: null,
-          has_diff: false,
-        },
-        {
           path: 'src/components/DropdownsWorkspace.tsx',
           additions: 0,
           deletions: 0,

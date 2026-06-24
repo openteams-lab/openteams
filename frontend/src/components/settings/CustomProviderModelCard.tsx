@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   FileText,
@@ -17,6 +17,7 @@ import {
 type CustomProviderModelCardProps = {
   busyAction: string | null;
   copy: (key: string, fallback: string) => string;
+  focusOnRender: boolean;
   isBusy: boolean;
   model: ModelDraft;
   onRemove: () => void;
@@ -27,6 +28,7 @@ type CustomProviderModelCardProps = {
 export function CustomProviderModelCard({
   busyAction,
   copy,
+  focusOnRender,
   isBusy,
   model,
   onRemove,
@@ -35,14 +37,35 @@ export function CustomProviderModelCard({
 }: CustomProviderModelCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const modelId =
     model.id || model.name || copy('settings.providers.custom.newModel', 'New model');
   const contextLabel = formatLimit(model.contextLimit);
   const hasText = model.inputText || model.outputText;
   const hasImage = model.inputImage || model.outputImage;
 
+  useEffect(() => {
+    if (!focusOnRender) return;
+    setExpanded(true);
+
+    let secondFrame: number | null = null;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        cardRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame != null) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [focusOnRender, model.key]);
+
   return (
-    <div className="provider-model-item group bg-transparent">
+    <div ref={cardRef} className="provider-model-item group bg-transparent">
       <div className="provider-model-row">
         <button
           type="button"

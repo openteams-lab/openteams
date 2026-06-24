@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   createContext,
   useCallback,
   useContext,
@@ -9,7 +9,6 @@ import React, {
 import {
   Theme,
   Locale,
-  TaskNode,
   Member,
   Session,
   Message,
@@ -530,8 +529,8 @@ const findPendingAgentPlaceholderIndex = (
 
 // A session agent runs at most one run at a time. When a new run starts (or
 // its first activity line arrives), drop any prior running placeholder for a
-// *different* run of the same agent so a stale one — e.g. left over from a
-// just-stopped run that refreshMessages re-hydrated — cannot coexist with the
+// *different* run of the same agent so a stale one 鈥?e.g. left over from a
+// just-stopped run that refreshMessages re-hydrated 鈥?cannot coexist with the
 // new run and produce duplicate "executing" placeholders.
 const evictStaleRunPlaceholders = (
   messages: Message[],
@@ -851,6 +850,10 @@ const makePendingAgentPlaceholder = (
   };
 };
 
+const isWorkflowPlanCardMessage = (message: Message): boolean =>
+  message.workflowCard?.cardType === 'workflow_plan' ||
+  message.workflowCard?.cardType === 'workflow_plan_generation';
+
 const summarizeQuotedContent = (content: string): string => {
   const normalized = content.trim().replace(/\s+/g, ' ');
   if (!normalized) return '';
@@ -1105,8 +1108,6 @@ interface WorkspaceContextProps {
   setLocale: (l: Locale) => void;
   chatMessageFontSize: number;
   setChatMessageFontSize: (size: number) => void;
-  tasks: TaskNode[];
-  setTasks: (t: ListUpdater<TaskNode>) => void;
   members: Member[];
   setMembers: (m: ListUpdater<Member>) => void;
   sessions: Session[];
@@ -1149,10 +1150,6 @@ interface WorkspaceContextProps {
   setEarlyBirdLeft: (n: number | ((prev: number) => number)) => void;
 
   // Modals state
-  isNewTaskModalOpen: boolean;
-  setIsNewTaskModalOpen: (b: boolean) => void;
-  isRetryModalOpen: boolean;
-  setIsRetryModalOpen: (b: boolean) => void;
   isAddMemberModalOpen: boolean;
   setIsAddMemberModalOpen: (b: boolean) => void;
   isAddProviderModalOpen: boolean;
@@ -1170,8 +1167,6 @@ interface WorkspaceContextProps {
     text: string,
     options?: SendMessageOptions,
   ) => void;
-  addNewTask: (title: string, details: string, chosenMembers: string[]) => void;
-  retryWorkflowFromStep3: () => void;
   addMemberToOrganization: (name: string, model: string) => void;
   addProviderToKeychain: (name: string, key: string) => void;
 
@@ -1193,14 +1188,15 @@ interface WorkspaceContextProps {
   refreshArchivedSessions: () => Promise<void>;
   renameSession: (sessionId: string, title: string) => Promise<void>;
   archiveSession: (sessionId: string) => Promise<void>;
+  pinSession: (sessionId: string, pinned: boolean) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   restoreSession: (sessionId: string) => Promise<void>;
   messagesAsync: AsyncResourceState<Message[]>;
   refreshMessages: () => Promise<void>;
   /**
-   * Optimistically drop the running placeholder of a stopped session agent and
-   * suppress its re-hydration until a new run starts or it reaches a terminal
-   * state. Call right when the user requests a stop.
+   * Mark a stop request so the run does not keep session-level running
+   * indicators active while the visible placeholder stays in place until the
+   * persisted stopped message replaces it.
    */
   markSessionAgentStopped: (sessionAgentId: string) => void;
   refreshMemberQueues: () => Promise<void>;
@@ -1271,7 +1267,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         return CHAT_MESSAGE_FONT_SIZE_DEFAULT;
       }
     });
-  const [tasks, setTasks] = useState<TaskNode[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>(() => {
     try {
       return localStorage.getItem(ACTIVE_SESSION_ID_STORAGE_KEY) ?? '';
@@ -1354,7 +1349,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const [showExplanation, setShowExplanation] = useState<boolean>(true);
   const [warnOverDollar, setWarnOverDollar] = useState<boolean>(false);
 
-  // Stats (LOCAL / MOCK-FALLBACK per backend_contract_audit §5.1)
+  // Stats (LOCAL / MOCK-FALLBACK per backend_contract_audit 搂5.1)
   const [weeklyCost, setWeeklyCost] = useState<number>(0);
   const [weeklySaved, setWeeklySaved] = useState<number>(0);
   const [earlyBirdLeft, setEarlyBirdLeft] = useState<number>(0);
@@ -1364,8 +1359,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     useState<string>('providers');
 
   // Modal Switches
-  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState<boolean>(false);
-  const [isRetryModalOpen, setIsRetryModalOpen] = useState<boolean>(false);
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] =
     useState<boolean>(false);
   const [isAddProviderModalOpen, setIsAddProviderModalOpen] =
@@ -1390,10 +1383,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const agentModelsByIdRef = useRef<Record<string, string | null>>({});
   const notifiedTokenUsageSignaturesRef = useRef<Record<string, string>>({});
   // Session agents the user has just requested to stop. While an agent is in
-  // this set its (stopping) run must not be re-hydrated as a running
-  // placeholder, so a freshly sent message cannot end up beside a stale
-  // "executing" placeholder. Cleared when a new run starts or a terminal
-  // agent_state arrives.
+  // this set, keep any existing visible placeholder until the persisted stop
+  // notice replaces it, but do not re-hydrate a separate running placeholder.
+  // Cleared when a new run starts or after the terminal stop notice replaces
+  // the placeholder.
   const optimisticallyStoppedSessionAgentIdsRef = useRef<Set<string>>(
     new Set(),
   );
@@ -1959,7 +1952,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       );
       mockBootstrapRef.current = { ...bootstrap, messagesBySession };
       toastDurationMsRef.current = bootstrap.defaults.toastDurationMs;
-      setTasks(bootstrap.tasks);
       setSessionsAsync(initialAsync([]));
       setArchivedSessionsAsync(initialAsync([]));
       setAllMessages(messagesBySession);
@@ -2179,6 +2171,28 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     [refreshSessionLists],
   );
 
+  const pinSession = useCallback(
+    async (sessionId: string, pinned: boolean): Promise<void> => {
+      try {
+        if (pinned) {
+          await chatSessionsApi.pin(sessionId);
+        } else {
+          await chatSessionsApi.unpin(sessionId);
+        }
+        await refreshSessionLists();
+      } catch (err) {
+        showToast(
+          err instanceof Error
+            ? `Pin update failed: ${err.message}`
+            : 'Pin update failed.',
+          'error',
+        );
+        throw err;
+      }
+    },
+    [refreshSessionLists],
+  );
+
   const deleteSession = useCallback(
     async (sessionId: string): Promise<void> => {
       try {
@@ -2285,21 +2299,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           agentModelsById,
         }),
       );
-      // Drop the optimistic-stop suppression for any agent that has already
-      // moved out of the `stopping` state (terminal, or a new run is active).
+      // Stop-requested agents keep their current placeholder visible, but REST
+      // hydration must not create an additional running placeholder for the
+      // same stopping run.
       const suppressedStoppedIds =
         optimisticallyStoppedSessionAgentIdsRef.current;
-      if (suppressedStoppedIds.size > 0) {
-        for (const sessionAgent of sessionAgents) {
-          if (
-            suppressedStoppedIds.has(sessionAgent.id) &&
-            sessionAgent.state !== 'stopping' &&
-            sessionAgent.state !== 'running'
-          ) {
-            suppressedStoppedIds.delete(sessionAgent.id);
-          }
-        }
-      }
       setSessionRunningIndicator(
         sid,
         hasRunningSessionAgent(sessionAgents, ignoredSessionAgentIds),
@@ -2320,8 +2324,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         sessionAgents
           .filter(
             (sessionAgent) =>
-              isActiveAgentState(sessionAgent.state) &&
-              !suppressedStoppedIds.has(sessionAgent.id),
+              isActiveAgentState(sessionAgent.state) ||
+              suppressedStoppedIds.has(sessionAgent.id),
           )
           .map((sessionAgent) => sessionAgent.id),
       );
@@ -2353,42 +2357,23 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [filterDeferredQueuedUserMessages, setSessionRunningIndicator]);
 
-  // Optimistically clear the running placeholder of a session agent the user
-  // just stopped. The stopped run keeps the agent in the `stopping` state for a
-  // while, during which both refreshMessages and a freshly sent message would
-  // otherwise leave a stale "executing" placeholder on screen alongside the new
-  // one. We drop it immediately and suppress re-hydration until the agent
-  // either starts a new run or reaches a terminal state.
+  // Mark a session agent as stop-requested without removing its visible
+  // placeholder. The placeholder should switch directly to the backend's
+  // persisted "Agent stopped" message, avoiding an empty gap while the stop
+  // request propagates.
   const markSessionAgentStopped = useCallback((sessionAgentId: string) => {
     if (!sessionAgentId) return;
     optimisticallyStoppedSessionAgentIdsRef.current.add(sessionAgentId);
     const sid = activeSessionIdRef.current;
     if (!sid) return;
-    setAllMessages((prev) => {
-      const current = filterMessagesForSession(sid, prev[sid] ?? []);
-      if (current.length === 0) return prev;
-      const updated = current.filter(
-        (message) =>
-          !(
-            message.isAgentRunning &&
-            message.sessionAgentId === sessionAgentId
-          ),
-      );
-      const hasRemainingRunningAgent = updated.some(
-        (message) =>
-          message.isAgentRunning &&
-          !isOptimisticPendingAgentPlaceholder(message) &&
-          (!message.sessionAgentId ||
-            !optimisticallyStoppedSessionAgentIdsRef.current.has(
-              message.sessionAgentId,
-            )),
-      );
-      setSessionRunningIndicator(sid, hasRemainingRunningAgent);
-      if (updated.length === current.length) return prev;
-      const next = { ...prev, [sid]: updated };
-      setMessagesAsync(succeed(updated));
-      return next;
-    });
+    const current = allMessagesRef.current[sid] ?? [];
+    const hasRemainingRunningAgent = current.some(
+      (message) =>
+        message.isAgentRunning &&
+        !isOptimisticPendingAgentPlaceholder(message) &&
+        message.sessionAgentId !== sessionAgentId,
+    );
+    setSessionRunningIndicator(sid, hasRemainingRunningAgent);
   }, [setSessionRunningIndicator]);
 
   const mergeMemberQueueSnapshot = useCallback((queue: MemberQueueSnapshot) => {
@@ -2955,6 +2940,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           isAgentRunning: undefined,
           isThinking: undefined,
         };
+        if (!nextMessage.isUser && nextMessage.sessionAgentId) {
+          optimisticallyStoppedSessionAgentIdsRef.current.delete(
+            nextMessage.sessionAgentId,
+          );
+        }
         const nextClientMessageId = userMessageClientId(nextMessage);
         const existingIndex = withoutPlaceholder.findIndex((message) => {
           if (message.id === nextMessage.id) return true;
@@ -3356,12 +3346,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       if (parsed.type === 'agent_state') {
+        const wasStopRequested =
+          optimisticallyStoppedSessionAgentIdsRef.current.has(
+            parsed.session_agent_id,
+          );
         if (isRunningSessionAgentState(parsed.state)) {
           setSessionRunningIndicator(sid, true);
         } else {
-          optimisticallyStoppedSessionAgentIdsRef.current.add(
-            parsed.session_agent_id,
-          );
           const hasRemainingRunningAgent = (
             allMessagesRef.current[sid] ?? []
           ).some(
@@ -3379,7 +3370,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         // clear only placeholders tied to that concrete run. Optimistic
         // pending placeholders represent newly sent/queued messages and must
         // survive stale idle/dead events from an earlier run.
-        if (!isActiveAgentState(parsed.state)) {
+        if (!isActiveAgentState(parsed.state) && !wasStopRequested) {
           setAllMessages((prev) => {
             const current = filterMessagesForSession(sid, prev[sid] ?? []);
             if (current.length === 0) return prev;
@@ -3610,7 +3601,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           model: responderLabel,
           time: 'just now',
           text: replyText,
-          cost: `$${costVal} · ${tokenNum} tokens`,
+          cost: `$${costVal} 路 ${tokenNum} tokens`,
         };
         setAllMessages((prev) => {
           const cur = filterMessagesForSession(sid, prev[sid] ?? []);
@@ -3735,8 +3726,14 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     };
     const shouldPersistToBackend =
       sessionsAsync.source === 'api' || options.persistToBackend === true;
+    const hasWorkflowPlanCard = (allMessagesRef.current[sid] ?? []).some(
+      isWorkflowPlanCardMessage,
+    );
+    const shouldCreatePendingAgentPlaceholder =
+      shouldPersistToBackend &&
+      (!hasWorkflowPlanCard || hasExplicitMentions || hasRouteMentionOverride);
     const pendingAgentMsg =
-      shouldPersistToBackend
+      shouldCreatePendingAgentPlaceholder
         ? makePendingAgentPlaceholder(
             text,
             userMsgId,
@@ -3896,96 +3893,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     sendMessageToSession(activeSessionIdRef.current, text, options);
   };
 
-  // Add new workflow task representing Prototype 4 action into Prototype 1 List
-  const addNewTask = (
-    title: string,
-    _details: string,
-    chosenMembers: string[],
-  ) => {
-    const mainMembersMap: Record<string, string> = {
-      Lead: 'CL',
-      Backend: 'CO',
-      Frontend: 'CU',
-      QA: 'GE',
-      Security: 'SE',
-    };
-    const newNodes: TaskNode[] = chosenMembers.map((m, idx) => {
-      const isFirst = idx === 0;
-      const avatarStr = mainMembersMap[m] || 'CL';
-      return {
-        id: `node-sub-${Date.now()}-${idx}`,
-        name: idx === 0 ? title : `${m}: processing...`,
-        subText: `${m.toLowerCase()} -> ${avatarStr === 'CL' ? 'Claude' : avatarStr === 'CO' ? 'Codex' : avatarStr === 'CU' ? 'Cursor' : 'Gemini'}`,
-        avatar: avatarStr,
-        cost: idx === 0 ? '$0.15' : '—',
-        status: isFirst ? 'run' : 'wait',
-      };
-    });
-    setTasks(newNodes);
-    showToast(t('toastPlanStarted'));
-
-    // Best-effort: kick off the real backend workflow generator when we have a
-    // live session. Failures are non-fatal; the mock task list still drives UI.
-    const sid = activeSessionIdRef.current;
-    if (sessionsAsync.source === 'api') {
-      workflowApi
-        .generatePlanAndRun(sid, title)
-        .then((res) => {
-          setSessionWorkflowRunningIndicator(sid, true);
-          void refreshWorkflowCard(res.workflow_card_message.id);
-          void refreshMessages();
-        })
-        .catch(() => {
-          void refreshSessionWorkflowRunningIndicator(sid);
-          // Silent: mock state remains in place.
-        });
-    }
-  };
-
-  const retryWorkflowFromStep3 = () => {
-    setTasks((prev) =>
-      prev.map((task, idx) => {
-        if (idx < 2) return { ...task, status: 'done' as const };
-        if (idx === 2)
-          return { ...task, status: 'run' as const, cost: '$0.41' };
-        return { ...task, status: 'wait' as const, cost: '—' };
-      }),
-    );
-    showToast('Re-running steps from Step 3...');
-    setTimeout(() => {
-      setTasks((prev) =>
-        prev.map((task, idx) => {
-          if (idx <= 2) return { ...task, status: 'done' as const };
-          if (idx === 3)
-            return { ...task, status: 'run' as const, cost: '$0.28' };
-          return task;
-        }),
-      );
-      showToast('Step 3 Done. Gemini evaluating integration tests...');
-      setTimeout(() => {
-        setTasks((prev) =>
-          prev.map((task, idx) => {
-            if (idx <= 3) return { ...task, status: 'done' as const };
-            if (idx === 4)
-              return { ...task, status: 'run' as const, cost: '$0.12' };
-            return task;
-          }),
-        );
-        showToast('Step 4 done. Initializing deployment pipeline...');
-        setTimeout(() => {
-          setTasks((prev) =>
-            prev.map((task) => ({ ...task, status: 'done' as const })),
-          );
-          showToast(
-            'Deployment completed successfully! Product live on Cloud Run!',
-          );
-          setWeeklyCost((prev) => parseFloat((prev + 0.42).toFixed(2)));
-          setWeeklySaved((prev) => parseFloat((prev + 1.2).toFixed(2)));
-        }, 2000);
-      }, 2500);
-    }, 3000);
-  };
-
   const addMemberToOrganization = (name: string, model: string) => {
     if (!name) return;
     const cleanName = name.startsWith('@') ? name : `@${name}`;
@@ -3995,7 +3902,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       avatar: monogram,
       status: 'i',
       name: cleanName,
-      roleDetail: `${model} · idle`,
+      roleDetail: `${model} 路 idle`,
       modelName: model,
     };
     setMembers((prev) => [...prev, newM]);
@@ -4005,7 +3912,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const addProviderToKeychain = (name: string, key: string) => {
     if (!name) return;
     const mono = name.substring(0, 2).toUpperCase();
-    const mask = key ? `${key.substring(0, 4)}••••••••••••` : 'sk-••••••••••••';
+    const mask = key ? `${key.substring(0, 4)}************` : 'sk-************';
     const newProv: Provider = {
       id: `prov-${Date.now()}`,
       monogram: mono,
@@ -4027,8 +3934,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         setLocale,
         chatMessageFontSize,
         setChatMessageFontSize,
-        tasks,
-        setTasks,
         members,
         setMembers,
         sessions,
@@ -4069,10 +3974,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         weeklySaved,
         earlyBirdLeft,
         setEarlyBirdLeft,
-        isNewTaskModalOpen,
-        setIsNewTaskModalOpen,
-        isRetryModalOpen,
-        setIsRetryModalOpen,
         isAddMemberModalOpen,
         setIsAddMemberModalOpen,
         isAddProviderModalOpen,
@@ -4081,8 +3982,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         sendMessage,
         sendMessageToSession,
         stagePendingAgentPlaceholder,
-        addNewTask,
-        retryWorkflowFromStep3,
         addMemberToOrganization,
         addProviderToKeychain,
 
@@ -4098,6 +3997,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         refreshArchivedSessions,
         renameSession,
         archiveSession,
+        pinSession,
         deleteSession,
         restoreSession,
         messagesAsync,

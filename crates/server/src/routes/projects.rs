@@ -7,7 +7,7 @@ use axum::{
 use chrono::NaiveDate;
 use db::models::{
     chat_agent::ChatAgent,
-    chat_session::{ChatSession, CreateChatSession},
+    chat_session::{ChatSession, ChatSessionWorktreeMode, CreateChatSession},
     member_execution_config::MemberExecutionConfig,
     project::{CreateProject, Project, ProjectError, UpdateProject},
     project_member::{ProjectMember, ProjectMemberType},
@@ -87,6 +87,9 @@ pub struct UpdateProjectMemberRequest {
 pub struct CreateProjectSessionRequest {
     pub title: Option<String>,
     pub workspace_path: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub worktree_mode: Option<db::models::chat_session::ChatSessionWorktreeMode>,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -283,11 +286,27 @@ async fn create_project_session_payload(
             .await?
             .and_then(|project| project.default_workspace_path),
     };
+    if payload.worktree_mode == Some(ChatSessionWorktreeMode::Isolated) {
+        let Some(path) = workspace_path
+            .as_deref()
+            .filter(|path| !path.trim().is_empty())
+        else {
+            return Err(ApiError::BadRequest(
+                "Isolated worktree sessions require a Git workspace.".to_string(),
+            ));
+        };
+        if git2::Repository::open(path).is_err() {
+            return Err(ApiError::BadRequest(
+                "Isolated worktree sessions require a Git workspace.".to_string(),
+            ));
+        }
+    }
 
     Ok(CreateChatSession {
         title: payload.title,
         workspace_path,
         project_id: Some(project_id),
+        worktree_mode: payload.worktree_mode,
     })
 }
 
@@ -552,7 +571,7 @@ mod tests {
         DBService,
         models::{
             chat_agent::{ChatAgent, CreateChatAgent},
-            chat_session::{ChatSession, CreateChatSession},
+            chat_session::{ChatSession, ChatSessionWorktreeMode, CreateChatSession},
             project::{CreateProject, Project},
             project_path::{ProjectPath, ProjectPathKind},
             project_repo::ProjectRepo,
@@ -718,6 +737,7 @@ mod tests {
             CreateProjectSessionRequest {
                 title: Some("Session".to_string()),
                 workspace_path: Some("E:/workspace".to_string()),
+                worktree_mode: None,
             },
         )
         .await
@@ -726,6 +746,52 @@ mod tests {
         assert_eq!(payload.project_id, Some(project_id));
         assert_eq!(payload.title.as_deref(), Some("Session"));
         assert_eq!(payload.workspace_path.as_deref(), Some("E:/workspace"));
+    }
+
+    #[tokio::test]
+    async fn project_session_rejects_isolated_worktree_for_non_git_workspace() {
+        let pool = setup_pool().await;
+        let plain_dir = tempfile::tempdir().expect("create plain dir");
+        let err = create_project_session_payload(
+            &pool,
+            Uuid::new_v4(),
+            CreateProjectSessionRequest {
+                title: Some("Session".to_string()),
+                workspace_path: Some(plain_dir.path().to_string_lossy().to_string()),
+                worktree_mode: Some(ChatSessionWorktreeMode::Isolated),
+            },
+        )
+        .await
+        .expect_err("reject isolated non-git workspace");
+
+        assert!(err.to_string().contains("Git workspace"));
+    }
+
+    #[tokio::test]
+    async fn project_session_allows_isolated_worktree_for_git_workspace() {
+        let pool = setup_pool().await;
+        let git_dir = tempfile::tempdir().expect("create git dir");
+        git2::Repository::init(git_dir.path()).expect("init git repo");
+        let payload = create_project_session_payload(
+            &pool,
+            Uuid::new_v4(),
+            CreateProjectSessionRequest {
+                title: Some("Session".to_string()),
+                workspace_path: Some(git_dir.path().to_string_lossy().to_string()),
+                worktree_mode: Some(ChatSessionWorktreeMode::Isolated),
+            },
+        )
+        .await
+        .expect("allow isolated git workspace");
+
+        assert_eq!(
+            payload.worktree_mode,
+            Some(ChatSessionWorktreeMode::Isolated)
+        );
+        assert_eq!(
+            payload.workspace_path.as_deref(),
+            Some(git_dir.path().to_string_lossy().as_ref())
+        );
     }
 
     #[tokio::test]
@@ -752,6 +818,7 @@ mod tests {
             CreateProjectSessionRequest {
                 title: Some("Session".to_string()),
                 workspace_path: None,
+                worktree_mode: None,
             },
         )
         .await
@@ -905,6 +972,7 @@ mod tests {
                 title: Some("Other project session".to_string()),
                 workspace_path: None,
                 project_id: Some(other_project.id),
+                worktree_mode: None,
             },
             Uuid::new_v4(),
         )

@@ -10,7 +10,6 @@ import { WorkspaceProvider, useWorkspace } from "@/context/WorkspaceContext";
 import { AppScaleContext } from "@/context/AppScaleContext";
 import { WorkflowWorkspace } from "@/components/WorkflowWorkspace";
 import { CreateAgentSessionModal } from "@/components/CreateAgentSessionModal";
-import { DialogManager } from "@/components/DialogManager";
 import { DiffViewTab } from "@/components/DiffViewTab";
 import { NotificationToast } from "@/components/NotificationToast";
 import { ProjectSidebar } from "@/components/ProjectSidebar";
@@ -18,7 +17,6 @@ import { GitHubRepositoryPage } from "@/pages/GitHubRepositoryPage";
 import { IssuePage } from "@/pages/IssuePage";
 import { RoutingPage } from "@/pages/RoutingPage";
 import { SettingsPage } from "@/pages/SettingsPage";
-import { TasksPage } from "@/pages/TasksPage";
 import { BuildStatsPage } from "@/pages/BuildStatsPage";
 import { AgentsPage } from "@/pages/AgentsPage";
 import { TeamPage } from "@/pages/TeamPage";
@@ -34,7 +32,6 @@ import {
   Plus,
   Route,
   Settings2,
-  SquareCheckBig,
   Users,
   X,
   type LucideIcon,
@@ -78,6 +75,7 @@ import {
 } from "../../shared/types";
 import type {
   AgentRuntimeStatus,
+  ChatSessionWorktreeMode,
   JsonValue,
   Member,
   SidebarNavigationItem,
@@ -131,7 +129,6 @@ const pageTabConfig: Record<
   issue: { label: "Issues", icon: FileText },
   team: { label: "Members", icon: Users },
   "team-templates": { label: "Team templates", icon: Users },
-  tasks: { label: "Action center", icon: SquareCheckBig },
   routing: { label: "Routing engine", icon: Route },
   github: { label: "GitHub", icon: Github },
   providers: { label: "Settings", icon: Settings2 },
@@ -216,6 +213,30 @@ const findWorkflowProjectAgent = (projectMembers: ProjectMemberWithRuntime[]) =>
   projectMembers.find(
     (member) => member.member_type === ProjectMemberType.agent,
   );
+
+type CreateSessionWorkspaceLookup = {
+  workflowWorkspacePath: string | null;
+  memberWorkspacePaths: Record<string, string | null>;
+};
+
+const normalizeMemberLookupName = (name?: string | null): string =>
+  name?.replace(/^@/, "").trim().toLowerCase() ?? "";
+
+const buildCreateSessionWorkspaceLookup = (
+  projectMembers: ProjectMemberWithRuntime[],
+): CreateSessionWorkspaceLookup => {
+  const workflowProjectAgent = findWorkflowProjectAgent(projectMembers);
+  const memberWorkspacePaths: Record<string, string | null> = {};
+  for (const member of projectMembers) {
+    const key = normalizeMemberLookupName(member.member_name);
+    if (!key) continue;
+    memberWorkspacePaths[key] = member.default_workspace_path ?? null;
+  }
+  return {
+    workflowWorkspacePath: workflowProjectAgent?.default_workspace_path ?? null,
+    memberWorkspacePaths,
+  };
+};
 
 const clampSidebarWidth = (width: number) =>
   Math.min(maxSidebarWidth, Math.max(minSidebarWidth, width));
@@ -343,6 +364,7 @@ function WorkspaceLayout() {
     refreshSessions,
     renameSession,
     archiveSession,
+    pinSession,
     deleteSession,
     members,
     refreshMembers,
@@ -372,6 +394,11 @@ function WorkspaceLayout() {
     null,
   );
   const [leadMember, setLeadMember] = useState<Member | null>(null);
+  const [createSessionWorkspaceLookup, setCreateSessionWorkspaceLookup] =
+    useState<CreateSessionWorkspaceLookup>({
+      workflowWorkspacePath: null,
+      memberWorkspacePaths: {},
+    });
   const sidebarResizeRef = useRef({
     startX: 0,
     startWidth: defaultSidebarWidth,
@@ -416,9 +443,21 @@ function WorkspaceLayout() {
     [],
   );
 
+  const loadCreateSessionWorkspaceLookup = useCallback(
+    async (projectId: string): Promise<CreateSessionWorkspaceLookup> => {
+      const projectMembers = await projectApi.listMembers(projectId);
+      return buildCreateSessionWorkspaceLookup(projectMembers);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!selectedProjectId) {
       setLeadMember(null);
+      setCreateSessionWorkspaceLookup({
+        workflowWorkspacePath: null,
+        memberWorkspacePaths: {},
+      });
       return;
     }
     setLeadMember(null);
@@ -439,6 +478,18 @@ function WorkspaceLayout() {
     if (!isCreateSessionModalOpen || !selectedProjectId) return;
     let cancelled = false;
     void refreshMembers().catch(() => undefined);
+    void loadCreateSessionWorkspaceLookup(selectedProjectId)
+      .then((lookup) => {
+        if (!cancelled) setCreateSessionWorkspaceLookup(lookup);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCreateSessionWorkspaceLookup({
+            workflowWorkspacePath: null,
+            memberWorkspacePaths: {},
+          });
+        }
+      });
     void loadLeadMember(selectedProjectId)
       .then((nextLeadMember) => {
         if (!cancelled) setLeadMember(nextLeadMember);
@@ -451,6 +502,7 @@ function WorkspaceLayout() {
     };
   }, [
     isCreateSessionModalOpen,
+    loadCreateSessionWorkspaceLookup,
     loadLeadMember,
     refreshMembers,
     selectedProjectId,
@@ -740,8 +792,6 @@ function WorkspaceLayout() {
         return <IssuePage />;
       case "team-templates":
         return <TeamTemplatesPage />;
-      case "tasks":
-        return <TasksPage />;
       case "routing":
         return <RoutingPage />;
       case "github":
@@ -1006,6 +1056,7 @@ function WorkspaceLayout() {
       memberAvatar?: string;
       memberModelName?: string;
       workItemId?: string;
+      worktreeMode?: ChatSessionWorktreeMode;
     },
   ) => {
     if (!selectedProjectId) {
@@ -1029,10 +1080,10 @@ function WorkspaceLayout() {
           workspacePath = workflowProjectAgent?.default_workspace_path ?? null;
           workflowLeadAgentId = workflowProjectAgent?.agent_id ?? null;
         } else {
-          const normalizedName = options.memberName?.replace(/^@/, '').toLowerCase();
+          const normalizedName = normalizeMemberLookupName(options.memberName);
           const matched = projectMembers.find((pm) => {
             if (normalizedName && pm.member_name) {
-              return pm.member_name.replace(/^@/, '').toLowerCase() === normalizedName;
+              return normalizeMemberLookupName(pm.member_name) === normalizedName;
             }
             return false;
           });
@@ -1042,11 +1093,32 @@ function WorkspaceLayout() {
         }
       } catch {}
 
+      let worktreeMode = options.worktreeMode;
+      if (worktreeMode === 'isolated') {
+        const workspacePathForWorktree =
+          workspacePath?.trim() || activeProjectWorkspacePath?.trim() || '';
+        if (!workspacePathForWorktree) {
+          worktreeMode = undefined;
+        } else {
+          try {
+            const workspace = await chatSessionsApi.validateWorkspacePath(
+              workspacePathForWorktree,
+            );
+            if (!workspace.valid || !workspace.is_git_repo) {
+              worktreeMode = undefined;
+            }
+          } catch {
+            worktreeMode = undefined;
+          }
+        }
+      }
+
       const backendSession = await projectApi.createSession(
         selectedProjectId,
         {
           title: prompt,
           workspace_path: workspacePath,
+          ...(worktreeMode ? { worktree_mode: worktreeMode } : {}),
         },
       );
       let sessionForUi = backendSession;
@@ -1354,6 +1426,8 @@ function WorkspaceLayout() {
   const activeProjectName = currentProject
     ? projectDisplayName(currentProject)
     : shellOptions?.projects.find((project) => project.active)?.label;
+  const activeProjectWorkspacePath =
+    currentProject?.default_workspace_path ?? null;
 
   const projectSidebarProps = {
     shellOptions,
@@ -1373,6 +1447,7 @@ function WorkspaceLayout() {
     onProjectSelect: handleProjectSelect,
     onRenameSession: renameSession,
     onArchiveSession: archiveSession,
+    onPinSession: pinSession,
     onDeleteSession: deleteSession,
     onCreateProject: handleCreateProject,
     onUpdateProject: handleUpdateProject,
@@ -1385,11 +1460,16 @@ function WorkspaceLayout() {
         <NotificationToast message={toast.message} tone={toast.tone} />
       )}
 
-      <DialogManager />
       <CreateAgentSessionModal
         open={isCreateSessionModalOpen}
         projectId={selectedProjectId}
         projectName={activeProjectName}
+        workspacePath={activeProjectWorkspacePath}
+        workflowWorkspacePath={
+          createSessionWorkspaceLookup.workflowWorkspacePath ??
+          activeProjectWorkspacePath
+        }
+        memberWorkspacePaths={createSessionWorkspaceLookup.memberWorkspacePaths}
         members={members}
         leadMember={leadMember}
         t={t}

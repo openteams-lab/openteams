@@ -85,6 +85,8 @@ export const mapSession = (
   pendingWorkflowInputId: opts?.pendingWorkflowInputId ?? null,
   hasPendingWorkflowReview: opts?.hasPendingWorkflowReview,
   pendingWorkflowReviewId: opts?.pendingWorkflowReviewId ?? null,
+  pinnedAt: backend.pinned_at,
+  worktreeMode: backend.worktree_mode,
 });
 
 export const mapSessions = (

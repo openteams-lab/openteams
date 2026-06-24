@@ -11,14 +11,13 @@ import {
   Search,
   Sparkles,
   Terminal,
-  X as XIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { ChatMarkdown } from '@/components/ui-new/primitives/conversation/ChatMarkdown';
+import { ChatMarkdown } from '@/components/conversation/ChatMarkdown';
 import { cn } from '@/lib/utils';
 import './WorkflowAgentLogPanel.css';
 
-export type TaskStatus = 'running' | 'success' | 'error';
+export type TaskStatus = 'running' | 'success';
 
 export type TaskToolType =
   | 'skill'
@@ -45,7 +44,6 @@ type AgentLogGroup = {
     key: string;
     timestamp: string;
     content: string;
-    isError: boolean;
   }>;
 };
 
@@ -84,9 +82,7 @@ function detectToolType(content: string): TaskToolType {
   return 'unknown';
 }
 
-function detectStatus(content: string, isError: boolean): TaskStatus {
-  if (isError) return 'error';
-
+function detectStatus(content: string): TaskStatus {
   const lower = content.toLowerCase();
   if (/\bcompleted?\b|\bfinished\b|\bdone\b|\bsuccess\b/.test(lower))
     return 'success';
@@ -125,12 +121,12 @@ function consolidateLogLines(lines: AgentLogGroup['lines']): TaskItemData[] {
     const toolType = detectToolType(line.content);
     const target = extractTarget(line.content);
     const collapsedTarget = toCollapsedTarget(target);
-    const status = detectStatus(line.content, line.isError);
+    const status = detectStatus(line.content);
     const consolidationKey = `${toolType}::${target}`;
     const existing = tasks.get(consolidationKey);
 
     if (existing) {
-      if (status === 'success' || status === 'error') {
+      if (status === 'success') {
         existing.status = status;
       }
       continue;
@@ -216,12 +212,6 @@ function TaskItem({
           <span
             className="wf-log-spinner"
             aria-label="running"
-          />
-        )}
-        {status === 'error' && (
-          <XIcon
-            className="wf-log-error-x-icon"
-            aria-label="error"
           />
         )}
       </span>

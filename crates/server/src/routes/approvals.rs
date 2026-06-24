@@ -20,7 +20,7 @@ pub async fn respond_to_approval(
 ) -> Result<ResponseJson<ApiResponse<ApprovalStatus>>, StatusCode> {
     let service = deployment.approvals();
 
-    match service.respond(&deployment.db().pool, &id, request).await {
+    match service.respond(&id, request).await {
         Ok((status, _context)) => Ok(ResponseJson(ApiResponse::success(status))),
         Err(e) => {
             tracing::error!("Failed to respond to approval: {:?}", e);

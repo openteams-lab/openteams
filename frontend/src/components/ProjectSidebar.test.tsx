@@ -494,13 +494,17 @@ check(
   componentSource,
 );
 check(
-  "session context menu includes rename view id archive and delete actions",
+  "session context menu includes rename pin view id archive and delete actions",
   componentSource.includes('translate("sidebar.renameSession"') &&
+    componentSource.includes('translate("sidebar.pinSession"') &&
+    componentSource.includes('translate("sidebar.unpinSession"') &&
     componentSource.includes('translate("sidebar.viewSessionId"') &&
     componentSource.includes('translate("sidebar.archiveSession"') &&
     componentSource.includes('translate("sidebar.deleteSession"') &&
+    componentSource.includes("handlePinSession(menuSession)") &&
     componentSource.includes("startViewSessionId(menuSession)") &&
     componentSource.includes("onRenameSession(renamingSession.id") &&
+    componentSource.includes("onPinSession(session.id") &&
     componentSource.includes("onArchiveSession(session.id)") &&
     componentSource.includes("onDeleteSession(deletingSession.id)"),
   componentSource,
@@ -537,9 +541,11 @@ check(
   "wires WorkspaceContext session actions into ProjectSidebar",
   appSource.includes("renameSession,") &&
     appSource.includes("archiveSession,") &&
+    appSource.includes("pinSession,") &&
     appSource.includes("deleteSession,") &&
     appSource.includes("onRenameSession: renameSession") &&
     appSource.includes("onArchiveSession: archiveSession") &&
+    appSource.includes("onPinSession: pinSession") &&
     appSource.includes("onDeleteSession: deleteSession"),
   appSource,
 );

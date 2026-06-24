@@ -9,10 +9,11 @@ pub async fn create_session_with_project_members(
 
     let mut tx = pool.begin().await?;
 
+    let worktree_mode = payload.worktree_mode.unwrap_or_default();
     let session = sqlx::query_as::<_, ChatSession>(
         r#"
-        INSERT INTO chat_sessions (id, title, status, default_workspace_path, project_id)
-        VALUES (?1, ?2, ?3, ?4, ?5)
+        INSERT INTO chat_sessions (id, title, status, default_workspace_path, project_id, worktree_mode)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
         RETURNING id,
                   title,
                   status,
@@ -25,6 +26,8 @@ pub async fn create_session_with_project_members(
                   default_workspace_path,
                   chat_input_mode,
                   project_id,
+                  worktree_mode,
+                  pinned_at,
                   created_at,
                   updated_at,
                   archived_at
@@ -35,6 +38,7 @@ pub async fn create_session_with_project_members(
     .bind(ChatSessionStatus::Active)
     .bind(payload.workspace_path.clone())
     .bind(project_id)
+    .bind(worktree_mode)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -60,9 +64,20 @@ pub async fn create_session_with_project_members(
     for member in default_members {
         let project_member_id: Uuid = member.try_get("project_member_id")?;
         let agent_id: Uuid = member.try_get("agent_id")?;
-        let workspace_path: Option<String> = member
-            .try_get::<Option<String>, _>("default_workspace_path")?
-            .or_else(|| session.default_workspace_path.clone());
+        // For isolated sessions, do NOT backfill workspace_path from
+        // project member or session defaults. Keeping it None ensures the
+        // ChatRunner resolver always runs worktree resolution (lazy-create
+        // or existing-row lookup) instead of treating the inherited
+        // default as an "explicit agent workspace" and skipping worktree.
+        let workspace_path: Option<String> = if session.worktree_mode
+            == db::models::chat_session::ChatSessionWorktreeMode::Isolated
+        {
+            None
+        } else {
+            member
+                .try_get::<Option<String>, _>("default_workspace_path")?
+                .or_else(|| session.default_workspace_path.clone())
+        };
         let allowed_skill_ids: sqlx::types::Json<Vec<String>> =
             member.try_get("allowed_skill_ids")?;
         let execution_config: sqlx::types::Json<db::models::member_execution_config::MemberExecutionConfig> =
@@ -101,7 +116,7 @@ pub async fn create_session_with_project_members(
 #[cfg(test)]
 mod session_creation_tests {
     use db::models::{
-        chat_session::CreateChatSession,
+        chat_session::{ChatSessionWorktreeMode, CreateChatSession},
         chat_session_agent::ChatSessionAgent,
     };
     use sqlx::{Row, SqlitePool};
@@ -129,6 +144,9 @@ mod session_creation_tests {
                 default_workspace_path TEXT,
                 chat_input_mode TEXT,
                 project_id BLOB,
+                worktree_mode TEXT NOT NULL DEFAULT 'inherit'
+                    CHECK (worktree_mode IN ('inherit', 'disabled', 'isolated')),
+                pinned_at TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 archived_at TEXT
@@ -259,6 +277,7 @@ mod session_creation_tests {
                 title: Some("Project session".to_string()),
                 workspace_path: Some("/session/workspace".to_string()),
                 project_id: Some(project_id),
+                worktree_mode: None,
             },
             Uuid::new_v4(),
         )
@@ -317,6 +336,7 @@ mod session_creation_tests {
                 title: Some("Project session".to_string()),
                 workspace_path: Some("/session/workspace".to_string()),
                 project_id: Some(project_id),
+                worktree_mode: None,
             },
             Uuid::new_v4(),
         )
@@ -331,6 +351,43 @@ mod session_creation_tests {
             session_agents[0].workspace_path.as_deref(),
             Some("/session/workspace")
         );
+    }
+
+    #[tokio::test]
+    async fn isolated_project_session_does_not_backfill_member_workspace_path() {
+        let pool = setup_pool().await;
+        let project_id = Uuid::new_v4();
+        let agent_id = Uuid::new_v4();
+        insert_project_member(
+            &pool,
+            project_id,
+            agent_id,
+            true,
+            Some("/agent/workspace"),
+            r#"[]"#,
+            r#"{}"#,
+        )
+        .await;
+
+        let session = create_session_with_project_members(
+            &pool,
+            &CreateChatSession {
+                title: Some("Isolated project session".to_string()),
+                workspace_path: Some("/session/workspace".to_string()),
+                project_id: Some(project_id),
+                worktree_mode: Some(ChatSessionWorktreeMode::Isolated),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create isolated project session");
+
+        assert_eq!(session.worktree_mode, ChatSessionWorktreeMode::Isolated);
+        let session_agents = ChatSessionAgent::find_all_for_session(&pool, session.id)
+            .await
+            .expect("list session agents");
+        assert_eq!(session_agents.len(), 1);
+        assert_eq!(session_agents[0].workspace_path, None);
     }
 
     #[tokio::test]
@@ -355,6 +412,7 @@ mod session_creation_tests {
                 title: Some("Broken project session".to_string()),
                 workspace_path: None,
                 project_id: Some(project_id),
+                worktree_mode: None,
             },
             session_id,
         )
@@ -384,6 +442,7 @@ mod session_creation_tests {
                 title: Some("Temporary session".to_string()),
                 workspace_path: Some("/tmp/workspace".to_string()),
                 project_id: None,
+                worktree_mode: None,
             },
             Uuid::new_v4(),
         )

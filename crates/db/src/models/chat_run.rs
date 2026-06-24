@@ -562,6 +562,7 @@ mod tests {
                 title: Some("test".to_string()),
                 workspace_path: None,
                 project_id: None,
+                worktree_mode: None,
             },
             Uuid::new_v4(),
         )

@@ -946,6 +946,35 @@ fn merge_refreshes_main_worktree_when_on_base() {
 }
 
 #[test]
+fn commit_excludes_openteams_runtime_directory() {
+    let td = TempDir::new().unwrap();
+    let repo_path = td.path().join("repo_runtime");
+    let s = GitService::new();
+    s.initialize_repo_with_main_branch(&repo_path).unwrap();
+    let repo = Repository::open(&repo_path).unwrap();
+    configure_user(&repo);
+    checkout_branch(&repo, "main");
+
+    write_file(&repo_path, "src/app.txt", "source\n");
+    write_file(
+        &repo_path,
+        ".openteams/context/session/messages.jsonl",
+        "{}\n",
+    );
+    let committed = s.commit(&repo_path, "commit source only").unwrap();
+
+    assert!(committed);
+    let tree_paths = GitCli::new()
+        .git(&repo_path, ["ls-tree", "-r", "--name-only", "HEAD"])
+        .unwrap();
+    assert!(tree_paths.contains("src/app.txt"));
+    assert!(
+        !tree_paths.contains(".openteams"),
+        ".openteams runtime files must never be committed"
+    );
+}
+
+#[test]
 fn sparse_checkout_respected_in_worktree_diffs_and_commit() {
     let td = TempDir::new().unwrap();
     let repo_path = td.path().join("repo_sparse");

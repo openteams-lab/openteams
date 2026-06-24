@@ -830,10 +830,10 @@ export function WorkflowGraphBoard({
                   {t('workflow_retry', { defaultValue: '重试' })}
                 </button>
                 {retryDialogStepId === retryStepId && (
-                  <div className="absolute right-0 bottom-full mb-1.5 z-[100] flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg min-w-[140px]">
+                  <div className="absolute right-0 bottom-full mb-1.5 z-[100] flex min-w-[140px] flex-col gap-1 rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] p-1.5 shadow-lg">
                     <button
                       type="button"
-                      className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100 transition-colors text-left"
+                      className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[11px] font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
                       onClick={(e) => {
                         e.stopPropagation();
                         setRetryDialogStepId(null);
@@ -845,10 +845,10 @@ export function WorkflowGraphBoard({
                     <button
                       type="button"
                       className={cn(
-                        'flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors text-left',
+                        'flex items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[11px] font-medium transition-colors',
                         canRetryReviewStep
-                          ? 'text-slate-700 hover:bg-slate-100'
-                          : 'text-slate-400 cursor-not-allowed'
+                          ? 'text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]'
+                          : 'cursor-not-allowed text-[var(--ink-tertiary)]'
                       )}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -862,7 +862,7 @@ export function WorkflowGraphBoard({
                     </button>
                     <button
                       type="button"
-                      className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-medium text-black hover:bg-slate-100 transition-colors text-left"
+                      className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[11px] font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
                       onClick={(e) => {
                         e.stopPropagation();
                         setRetryDialogStepId(null);

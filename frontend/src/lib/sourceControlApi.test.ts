@@ -1,4 +1,4 @@
-import { ApiError, projectSourceControlApi } from './api';
+import { ApiError, chatSessionWorktreeApi, projectSourceControlApi } from './api';
 import type { SessionSourceControlStatus } from '@/types';
 
 let failures = 0;
@@ -197,6 +197,26 @@ check(
         session_id: 'session-1',
         message: 'commit message',
         expected_staged_paths: ['src/App.tsx'],
+      }),
+  requests.at(-1),
+);
+
+enqueueSuccess(null);
+await chatSessionWorktreeApi.resolveMergeConflict('session-1', {
+  path: 'assets/logo.png',
+  content: '',
+  delete_file: true,
+});
+check(
+  'worktree conflict resolve supports deleting the file result',
+  requests.at(-1)?.url ===
+    '/api/chat/sessions/session-1/worktree/merge-conflicts/resolve' &&
+    requests.at(-1)?.method === 'POST' &&
+    JSON.stringify(requests.at(-1)?.body) ===
+      JSON.stringify({
+        path: 'assets/logo.png',
+        content: '',
+        delete_file: true,
       }),
   requests.at(-1),
 );

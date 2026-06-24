@@ -38,7 +38,7 @@ fn sessions_route_uses_unified_workflow_analytics_events() {
 
 #[test]
 fn guarded_transition_tracks_step_state_changes_for_running_path() {
-    let content = read_repo_file("crates/services/src/services/workflow_orchestrator/mod.rs");
+    let content = read_repo_file("crates/services/src/services/workflow/orchestrator/mod.rs");
     let guarded_block_start = content
         .find("pub(crate) async fn guarded_transition_step_and_sync")
         .expect("guarded transition helper not found");
@@ -52,7 +52,7 @@ fn workflow_and_message_routes_wire_engagement_and_risk_events() {
     let workflow_route = read_repo_file("crates/server/src/routes/chat/workflow.rs");
     let message_route = read_repo_file("crates/server/src/routes/chat/messages.rs");
     let plan_control =
-        read_repo_file("crates/services/src/services/workflow_orchestrator/plan_control.rs");
+        read_repo_file("crates/services/src/services/workflow/orchestrator/plan_control.rs");
 
     assert!(workflow_route.contains("workflow_analytics::track_approval_timeout("));
     assert!(workflow_route.contains("workflow_analytics::track_plan_generated("));
@@ -84,21 +84,21 @@ fn workflow_and_message_routes_wire_engagement_and_risk_events() {
 #[test]
 fn step_executor_wires_handoff_completed_on_completion_paths() {
     let content =
-        read_repo_file("crates/services/src/services/workflow_orchestrator/step_executor.rs");
+        read_repo_file("crates/services/src/services/workflow/orchestrator/step_executor.rs");
     assert!(content.contains("workflow_analytics::track_handoff_completed("));
 }
 
 #[test]
 fn workflow_orchestrator_wires_state_review_and_retry_events() {
     let orchestrator_mod =
-        read_repo_file("crates/services/src/services/workflow_orchestrator/mod.rs");
+        read_repo_file("crates/services/src/services/workflow/orchestrator/mod.rs");
     let step_input =
-        read_repo_file("crates/services/src/services/workflow_orchestrator/step_input.rs");
-    let review = read_repo_file("crates/services/src/services/workflow_orchestrator/review.rs");
+        read_repo_file("crates/services/src/services/workflow/orchestrator/step_input.rs");
+    let review = read_repo_file("crates/services/src/services/workflow/orchestrator/review.rs");
     let transcript_actions =
-        read_repo_file("crates/services/src/services/workflow_orchestrator/transcript_actions.rs");
+        read_repo_file("crates/services/src/services/workflow/orchestrator/transcript_actions.rs");
     let retry_resume =
-        read_repo_file("crates/services/src/services/workflow_orchestrator/retry_resume.rs");
+        read_repo_file("crates/services/src/services/workflow/orchestrator/retry_resume.rs");
 
     assert!(orchestrator_mod.contains("workflow_analytics::track_execution_state_changed("));
     assert!(orchestrator_mod.contains("workflow_analytics::track_step_state_changed("));

@@ -8,6 +8,8 @@ pub enum WorkflowRuntimeError {
     Json(#[from] serde_json::Error),
     #[error(transparent)]
     Executor(#[from] ExecutorError),
+    #[error(transparent)]
+    SessionWorktree(#[from] crate::services::session_worktree::SessionWorktreeError),
     #[error("workflow validation error: {0}")]
     Validation(String),
     #[error("workflow step interrupted: {0}")]

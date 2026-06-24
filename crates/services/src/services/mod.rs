@@ -13,7 +13,6 @@ pub mod cli_config;
 pub mod cli_manager;
 pub mod config;
 pub mod container;
-pub mod diff_stream;
 pub mod events;
 pub mod file_ranker;
 pub mod file_search;
@@ -43,6 +42,7 @@ pub mod queued_message;
 pub mod remote_client;
 pub mod repo;
 pub mod repo_integration;
+pub mod session_worktree;
 pub mod skill_registry;
 pub mod workflow;
 pub use workflow::{
@@ -50,5 +50,4 @@ pub use workflow::{
     workflow_orchestrator, workflow_review, workflow_runtime, workflow_validator,
 };
 pub mod workspace_change_capture;
-pub mod workspace_manager;
 pub mod worktree_manager;
