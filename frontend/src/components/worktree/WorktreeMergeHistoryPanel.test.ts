@@ -1,7 +1,7 @@
 // Behavior tests for the ui-new worktree merge history panel.
 //
 // Run with:
-//     pnpm exec tsx src/components/ui-new/worktree/WorktreeMergeHistoryPanel.test.ts
+//     pnpm exec tsx src/components/worktree/WorktreeMergeHistoryPanel.test.ts
 
 import { buildWorktreeMergeHistoryRows } from './WorktreeMergeHistoryPanel';
 import type { SessionWorktree } from '@/types';

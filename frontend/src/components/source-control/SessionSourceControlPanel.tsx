@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ChevronRight,
   Loader2,
@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ScrollArea";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useSessionSourceControl } from "@/hooks/useSessionSourceControl";
 import { useSessionWorktree } from "@/hooks/useSessionWorktree";
-import { WorktreeMergeHistorySection } from "@/pages/ui-new/worktree/WorktreeMergeHistorySection";
+import { WorktreeMergeHistorySection } from "@/pages/worktree/WorktreeMergeHistorySection";
 import { deliveryApi } from "@/lib/api";
 import type {
   ChatSessionWorktreeMode,
@@ -25,7 +25,7 @@ import {
   SessionWorktreeBadge,
   type SessionWorktreeAction,
 } from "./SessionWorktreeBadge";
-import { WorktreeMergeConflictsSection } from "@/pages/ui-new/worktree/WorktreeMergeConflictsSection";
+import { WorktreeMergeConflictsSection } from "@/pages/worktree/WorktreeMergeConflictsSection";
 import {
   buildSourceControlViewModel,
   sourceControlHasSharedFiles,
@@ -42,7 +42,6 @@ interface SessionSourceControlPanelProps {
   sessionId: string | null;
   enabled: boolean;
   worktreeMode?: ChatSessionWorktreeMode;
-  refreshKey?: number;
   fallbackRelatedFiles: React.ReactNode;
   linkedWorkItemIds?: string[];
   onOpenDiff: (
