@@ -103,17 +103,20 @@ function TemplateCardView({
 
   return (
     <article
-      className="team-template-card group relative flex min-h-[92px] items-start gap-4 rounded-[8px] p-5 text-left"
+      className="team-template-card group relative flex min-h-[108px] items-start gap-4 pb-4 pl-7 pr-6 pt-6 text-left"
     >
       <span className="team-template-icon mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
         <Icon aria-hidden="true" className="h-[18px] w-[18px]" strokeWidth={1.5} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-3">
-          <h3 className="min-w-0 truncate text-[15px] font-bold leading-tight text-[var(--team-template-title)]">
+          <h3 className="min-w-0 truncate text-[15px] font-semibold leading-tight text-[var(--team-template-title)]">
             {t(template.titleKey)}
           </h3>
-          <span className="team-template-tag inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium leading-none">
+          <span
+            className="team-template-tag inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium leading-none"
+            data-category={template.categoryKey}
+          >
             {t(template.categoryKey)}
           </span>
         </div>
@@ -127,7 +130,7 @@ function TemplateCardView({
 
 function CustomTemplatePlaceholder({ t }: { t: TranslateFn }) {
   return (
-    <div className="team-template-custom-card flex min-h-[92px] items-center justify-center rounded-[8px] p-5 text-center text-[var(--team-template-title)]">
+    <div className="team-template-custom-card flex min-h-[108px] items-center justify-center p-6 text-center text-[var(--team-template-title)]">
       <div className="flex items-center gap-3">
         <Plus aria-hidden="true" className="h-4 w-4" />
         <span className="text-[13px] font-semibold leading-none">
@@ -153,19 +156,17 @@ function TemplateSection({
 }) {
   return (
     <section>
-      <div className="mb-4 flex min-w-0 items-center gap-3">
+      <div className="team-template-section-heading flex min-w-0 items-center gap-3">
         <h2 className="shrink-0 text-[13px] font-semibold leading-none text-[var(--ink-subtle)]">
           {t(title, { count })}
         </h2>
         {premium && (
-          <span className="team-template-upgrade-badge shrink-0 rounded-full bg-[linear-gradient(135deg,color-mix(in_srgb,var(--primary)_36%,transparent),color-mix(in_srgb,var(--success)_26%,transparent))] p-px">
-            <span className="block rounded-full bg-[var(--surface-2)] px-2.5 py-1 text-[11px] font-medium leading-none text-[var(--primary)]">
-              {t("teamTemplates.upgradeAvailable")}
-            </span>
+          <span className="team-template-upgrade-badge shrink-0 px-2.5 py-1 text-[11px] font-medium leading-none text-[var(--primary)]">
+            {t("teamTemplates.upgradeAvailable")}
           </span>
         )}
       </div>
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="team-template-grid grid sm:grid-cols-2 xl:grid-cols-4">
         {children}
       </div>
     </section>
@@ -180,12 +181,12 @@ export function TeamTemplatesPage() {
       <TeamTemplatesHeader t={t} />
 
       <main className="min-h-0 flex-1 overflow-y-auto ot-scroll-area-styled">
-        <div className="flex w-full flex-col gap-7 px-5 pb-4 pt-4 lg:px-6">
+        <div className="flex w-full flex-col gap-8 px-5 pb-5 pt-4 lg:px-6">
           <section className="team-template-status-bar flex min-w-0 items-center gap-2 text-[13px]">
-            <span className="team-template-status-dot shrink-0" />
             <span className="font-medium text-[var(--ink-subtle)]">
               {t("teamTemplates.current.label")}
             </span>
+            <span className="team-template-status-rule" aria-hidden="true" />
             <strong className="min-w-0 truncate font-semibold text-[var(--ink)]">
               {t("teamTemplates.current.name")}
             </strong>
