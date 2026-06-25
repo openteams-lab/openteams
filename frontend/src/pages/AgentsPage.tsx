@@ -11,11 +11,12 @@ import {
   Bot,
   ChevronRight,
   ListFilter,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PencilLine,
   Plus,
   RefreshCw,
-  Save,
   Settings,
-  Star,
   X,
 } from "lucide-react";
 import {
@@ -303,7 +304,7 @@ function StatusDot({ state }: { state: RuntimeDisplayState }) {
   return (
     <span
       className={cx(
-        "inline-block h-1.5 w-1.5 rounded-full",
+        "inline-block h-1.5 w-1.5 shrink-0 rounded-full",
         state === "available" && "bg-[var(--success)]",
         state === "error" && "bg-red-500",
         state === "not_installed" && "bg-[var(--ink-tertiary)]",
@@ -331,18 +332,38 @@ function StatusBadge({
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1.5 rounded-full border font-semibold uppercase tracking-wider",
-        size === "normal" ? "h-6 px-2.5 text-[14px]" : "h-5 px-2 text-[11px]",
-        state === "available" &&
-          "border-[var(--success)]/30 bg-[var(--success)]/10 text-[var(--success)]",
-        state === "error" && "border-red-500/30 bg-red-500/10 text-red-400",
-        state === "not_installed" &&
-          "border-[var(--hairline-strong)] bg-[var(--surface-3)] text-[var(--ink-subtle)]",
+        "inline-flex items-center gap-1.5 whitespace-nowrap font-medium",
+        size === "normal" ? "text-[13px]" : "text-[11px]",
+        state === "available" && "text-[var(--success)]",
+        state === "error" && "text-red-400",
+        state === "not_installed" && "text-[var(--ink-subtle)]",
       )}
     >
       <StatusDot state={state} />
       {label}
     </span>
+  );
+}
+
+function AgentNavStatusDot({
+  state,
+  overlay = false,
+}: {
+  state: RuntimeDisplayState;
+  overlay?: boolean;
+}) {
+  return (
+    <span
+      className={cx(
+        "h-1 w-1 shrink-0 rounded-full",
+        overlay &&
+          "absolute -right-0.5 -top-0.5 ring-2 ring-[var(--surface-2)]",
+        state === "available" && "bg-[var(--success)]",
+        state === "error" && "bg-red-500",
+        state === "not_installed" &&
+          "border border-[var(--ink-tertiary)] bg-[var(--surface-2)]",
+      )}
+    />
   );
 }
 
@@ -442,21 +463,16 @@ function sortRunnersByAvailability(
 function AgentRow({
   runner,
   selected,
+  collapsed,
   onOpenConfig,
-  t,
 }: {
   runner: AgentRuntimeStatus;
   selected: boolean;
+  collapsed: boolean;
   onOpenConfig: () => void;
-  t: TranslateFn;
 }) {
   const state = getRuntimeDisplayState(runner);
-  const models =
-    runner.discovered_models.length > 0
-      ? runner.discovered_models.join(", ")
-      : state === "not_installed"
-        ? t("agents.model.installToDiscover")
-        : t("agents.model.noneReported");
+  const runnerLabel = getRunnerLabel(runner.runner_type);
 
   return (
     <div
@@ -470,62 +486,41 @@ function AgentRow({
         }
       }}
       className={cx(
-        "group grid min-h-[58px] cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[var(--hairline)] px-3 py-2.5 transition-colors last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] md:grid-cols-[minmax(210px,1.15fr)_128px_minmax(220px,1.85fr)_72px]",
-        selected &&
-          "bg-[var(--surface-3)] ring-1 ring-inset ring-[var(--primary)]/35",
-        state === "available"
-          ? "hover:bg-[var(--surface-2)]"
-          : state === "error"
-            ? "hover:bg-[var(--surface-2)]"
-            : "opacity-70 hover:bg-[var(--surface-2)] hover:opacity-95",
-        !selected && "bg-transparent",
+        "group cursor-pointer px-2 py-1 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
+        collapsed ? "flex justify-center" : "block",
+        selected && "opacity-100",
+        !selected && state === "available" && "opacity-75 hover:opacity-95",
+        !selected && state === "error" && "opacity-65 hover:opacity-90",
+        !selected && state === "not_installed" && "opacity-40 hover:opacity-65",
       )}
+      title={runnerLabel}
     >
-      <div className="flex min-w-0 items-center gap-3">
-        <AgentBrandAvatar runner={runner.runner_type} framed={false} />
-        <div className="min-w-0">
-          <p className="truncate text-[14px] font-medium leading-[1.3] text-[var(--ink)]">
-            {getRunnerLabel(runner.runner_type)}
-          </p>
-          <p className="mt-0.5 truncate font-mono text-[14px] leading-[1.3] text-[var(--ink-tertiary)]">
-            {runner.version ?? formatRunnerKey(runner.runner_type)}
-          </p>
-        </div>
-      </div>
-
-      <div className="hidden md:block">
-        <StatusBadge runner={runner} t={t} />
-      </div>
-
-      <div className="hidden min-w-0 md:block">
-        <p
-          className={cx(
-            "truncate font-mono text-[14px] leading-[1.4]",
-            runner.discovered_models.length > 0
-              ? "text-[var(--ink-muted)]"
-              : "text-[var(--ink-tertiary)]",
-          )}
-          title={models}
-        >
-          {models}
-        </p>
-      </div>
-
-      <div className="flex shrink-0 items-center justify-end gap-1">
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenConfig();
-          }}
-          className="flex h-7 w-7 items-center justify-center rounded-[6px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
-          aria-label={t("agents.action.configure", {
-            agent: getRunnerLabel(runner.runner_type),
-          })}
-          title={t("agents.action.configureShort")}
-        >
-          <Settings className="h-3.5 w-3.5" />
-        </button>
+      <div
+        className={cx(
+          "flex min-w-0 items-center gap-3 rounded-[7px] transition-colors",
+          collapsed ? "h-10 w-10 justify-center" : "px-2.5 py-2",
+          selected
+            ? "bg-[#f3eee3]/[0.045] text-[var(--ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] backdrop-blur-[1px]"
+            : cx(
+                "group-hover:bg-white/[0.025]",
+                state === "available" && "text-[var(--ink)]",
+                state === "error" && "text-red-300",
+                state === "not_installed" && "text-[var(--ink-tertiary)]",
+              ),
+        )}
+      >
+        <span className="relative shrink-0">
+          <AgentBrandAvatar runner={runner.runner_type} framed={false} />
+          {collapsed && <AgentNavStatusDot state={state} overlay />}
+        </span>
+        {!collapsed && (
+          <>
+            <p className="min-w-0 flex-1 truncate text-[14px] font-medium leading-[1.35]">
+              {runnerLabel}
+            </p>
+            <AgentNavStatusDot state={state} />
+          </>
+        )}
       </div>
     </div>
   );
@@ -533,11 +528,11 @@ function AgentRow({
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1.5 py-1">
-      <p className="font-mono text-[14px] font-medium tracking-tight text-[var(--ink-tertiary)] uppercase">
+    <div className="grid grid-cols-[128px_minmax(0,1fr)] items-baseline gap-3 py-1.5">
+      <p className="truncate text-[12px] font-medium leading-[1.4] text-[var(--ink-subtle)]">
         {label}
       </p>
-      <p className="break-all font-mono text-[14px] leading-[1.5] text-[var(--ink-muted)]">
+      <p className="break-all font-mono text-[12px] leading-[1.55] text-[var(--ink-muted)]">
         {value}
       </p>
     </div>
@@ -550,6 +545,7 @@ function ConfigSchemaField({
   property,
   value,
   onChange,
+  onCommit,
   t,
 }: {
   runner: BaseCodingAgent;
@@ -557,6 +553,7 @@ function ConfigSchemaField({
   property: JsonSchemaProperty;
   value: JsonValue | undefined;
   onChange: (key: string, value: JsonValue | undefined) => void;
+  onCommit?: () => void | Promise<void>;
   t: TranslateFn;
 }) {
   const [jsonDraft, setJsonDraft] = useState(() =>
@@ -590,20 +587,15 @@ function ConfigSchemaField({
   }, [value, valueType]);
 
   const labelNode = (
-    <div className="space-y-1">
-      <label className="text-[14px] font-medium leading-none text-[var(--ink)]">
+    <div className="w-32 shrink-0 pt-1" title={description || undefined}>
+      <label className="block truncate text-[12px] font-medium leading-[1.35] text-[var(--ink-subtle)]">
         {label}
       </label>
-      {description && (
-        <p className="text-[14px] leading-[1.5] text-[var(--ink-subtle)]">
-          {description}
-        </p>
-      )}
     </div>
   );
 
   const inputBaseClass =
-    "w-full rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-3)] px-3 py-2 font-mono text-[14px] text-[var(--ink)] outline-none transition-all placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20";
+    "w-full rounded-none border-x-0 border-b border-t-0 border-transparent bg-transparent px-0 py-1.5 font-mono text-[12px] leading-[1.55] text-[var(--ink)] outline-none transition-all placeholder:text-[var(--ink-tertiary)] hover:border-white/10 hover:bg-white/[0.04] focus:border-white/20 focus:bg-white/[0.04]";
 
   if (property.enum) {
     const hasNullOption = property.enum.some((item) => item === null);
@@ -622,13 +614,13 @@ function ConfigSchemaField({
       value === null || value === undefined ? nullOptionId : String(value);
 
     return (
-      <div className="flex flex-col gap-2.5">
+      <div className="flex items-start gap-3 py-1.5">
         {labelNode}
         <DropdownSelect
           value={selectedValue}
           options={options}
           showSearch={options.length > 8}
-          className="w-full [&>button]:h-9 [&>button]:bg-[var(--surface-3)] [&>button]:text-[14px] [&>button]:font-mono"
+          className="min-w-0 flex-1 hover:[&>button]:!border-white/10 hover:[&>button]:!bg-white/[0.04] focus-within:[&>button]:!border-white/20 focus-within:[&>button]:!bg-white/[0.04] [&>button]:h-8 [&>button]:!rounded-none [&>button]:!border-x-0 [&>button]:!border-b [&>button]:!border-t-0 [&>button]:!border-transparent [&>button]:!bg-transparent [&>button]:px-0 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[12px]"
           panelClassName="max-w-none"
           onChange={(nextValue) =>
             onChange(fieldKey, nextValue === nullOptionId ? null : nextValue)
@@ -639,16 +631,41 @@ function ConfigSchemaField({
   }
 
   if (valueType === "boolean") {
+    const checked = value === true;
     return (
-      <div className="flex items-start justify-between gap-4 py-1">
+      <div className="flex items-center gap-3 py-1.5">
         {labelNode}
-        <div className="flex h-5 items-center">
-          <input
-            type="checkbox"
-            checked={value === true}
-            onChange={(event) => onChange(fieldKey, event.target.checked)}
-            className="h-4 w-4 rounded-[4px] border-[var(--hairline-strong)] bg-[var(--surface-3)] text-[var(--primary)] focus:ring-[var(--primary)]/30"
-          />
+        <div className="flex h-8 min-w-0 flex-1 items-center">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={checked}
+            aria-label={label}
+            onClick={() => {
+              onChange(fieldKey, !checked);
+              window.setTimeout(() => {
+                void onCommit?.();
+              }, 0);
+            }}
+            onBlur={() => {
+              void onCommit?.();
+            }}
+            className={cx(
+              "relative h-5 w-9 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
+              checked
+                ? "bg-[var(--primary)]/80"
+                : "bg-white/[0.035] ring-1 ring-inset ring-white/10 hover:bg-white/[0.06]",
+            )}
+          >
+            <span
+              className={cx(
+                "absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full transition-all",
+                checked
+                  ? "left-[18px] bg-white shadow-[0_0_10px_rgba(255,255,255,0.18)]"
+                  : "left-1 bg-white/35",
+              )}
+            />
+          </button>
         </div>
       </div>
     );
@@ -657,7 +674,7 @@ function ConfigSchemaField({
   if (valueType === "array") {
     const arrayValue = Array.isArray(value) ? value : [];
     return (
-      <div className="flex flex-col gap-2.5">
+      <div className="flex items-start gap-3 py-1.5">
         {labelNode}
         <textarea
           value={arrayValue.map(String).join("\n")}
@@ -668,10 +685,13 @@ function ConfigSchemaField({
               .filter(Boolean);
             onChange(fieldKey, items.length > 0 ? items : null);
           }}
+          onBlur={() => {
+            void onCommit?.();
+          }}
           rows={3}
           spellCheck={false}
           placeholder={t("agents.config.placeholder.array")}
-          className={cx(inputBaseClass, "resize-none")}
+          className={cx(inputBaseClass, "min-w-0 flex-1 resize-none")}
         />
       </div>
     );
@@ -679,9 +699,9 @@ function ConfigSchemaField({
 
   if (valueType === "object") {
     return (
-      <div className="flex flex-col gap-2.5">
+      <div className="flex items-start gap-3 py-1.5">
         {labelNode}
-        <div>
+        <div className="min-w-0 flex-1">
           <textarea
             value={jsonDraft}
             onChange={(event) => {
@@ -704,6 +724,9 @@ function ConfigSchemaField({
                 );
               }
             }}
+            onBlur={() => {
+              void onCommit?.();
+            }}
             rows={5}
             spellCheck={false}
             placeholder={t("agents.config.placeholder.object")}
@@ -724,7 +747,7 @@ function ConfigSchemaField({
   const InputElement = property.format === "textarea" ? "textarea" : "input";
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex items-start gap-3 py-1.5">
       {labelNode}
       <InputElement
         value={stringValue}
@@ -732,12 +755,22 @@ function ConfigSchemaField({
           const nextValue = event.target.value;
           onChange(fieldKey, nextValue.trim() ? nextValue : null);
         }}
-        rows={property.format === "textarea" ? 4 : undefined}
+        onBlur={() => {
+          void onCommit?.();
+        }}
+        rows={
+          property.format === "textarea"
+            ? fieldKey === "append_prompt"
+              ? 1
+              : 2
+            : undefined
+        }
         spellCheck={property.format === "textarea"}
         placeholder={t("agents.config.placeholder.value")}
         className={cx(
           inputBaseClass,
-          property.format === "textarea" && "resize-none",
+          "min-w-0 flex-1",
+          property.format === "textarea" && "resize-y",
         )}
       />
     </div>
@@ -829,60 +862,64 @@ function ModelConfigField({
   };
 
   return (
-    <div className="flex flex-col gap-2.5">
-      <div className="space-y-1">
-        <label className="text-[14px] font-medium leading-none text-[var(--ink)]">
-          {t("agents.model.field.label")}
-        </label>
-        <p className="text-[14px] leading-[1.5] text-[var(--ink-subtle)]">
-          {models.length > 0
-            ? t("agents.model.field.description", { source: sourceLabel })
-            : t("agents.model.field.emptyDescription")}
-        </p>
-      </div>
-      <div className="flex items-center gap-2">
-        <DropdownSelect
-          value={selectedModel}
-          options={modelOptions}
-          placeholder={t("agents.model.field.placeholder")}
-          searchPlaceholder={t("agents.model.field.searchPlaceholder")}
-          emptyLabel={t("agents.model.field.noMatch")}
-          className="min-w-0 flex-1 [&>button]:h-9 [&>button]:bg-[var(--surface-3)] [&>button]:py-0 [&>button]:font-mono"
-          maxPanelHeightClassName="max-h-[280px]"
-          onChange={(nextValue) => {
-            const trimmed = nextValue.trim();
-            onChange("model", trimmed ? trimmed : null);
-            if (trimmed) {
-              setModelFormMode("edit");
-              setEditingModelName(trimmed);
-              setNewModelName(trimmed);
-              setAddModelError(null);
-            } else {
-              setModelFormMode(null);
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-3 py-1.5">
+        <div
+          className="w-32 shrink-0 pt-1"
+          title={
+            models.length > 0
+              ? t("agents.model.field.description", { source: sourceLabel })
+              : t("agents.model.field.emptyDescription")
+          }
+        >
+          <label className="block truncate text-[12px] font-medium leading-[1.35] text-[var(--ink-subtle)]">
+            {t("agents.model.field.label")}
+          </label>
+        </div>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <DropdownSelect
+            value={selectedModel}
+            options={modelOptions}
+            placeholder={t("agents.model.field.placeholder")}
+            searchPlaceholder={t("agents.model.field.searchPlaceholder")}
+            emptyLabel={t("agents.model.field.noMatch")}
+            className="min-w-0 flex-1 hover:[&>button]:!border-white/10 hover:[&>button]:!bg-white/[0.04] focus-within:[&>button]:!border-white/20 focus-within:[&>button]:!bg-white/[0.04] [&>button]:h-8 [&>button]:!rounded-none [&>button]:!border-x-0 [&>button]:!border-b [&>button]:!border-t-0 [&>button]:!border-transparent [&>button]:!bg-transparent [&>button]:px-0 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[12px]"
+            maxPanelHeightClassName="max-h-[280px]"
+            onChange={(nextValue) => {
+              const trimmed = nextValue.trim();
+              onChange("model", trimmed ? trimmed : null);
+              if (trimmed) {
+                setModelFormMode("edit");
+                setEditingModelName(trimmed);
+                setNewModelName(trimmed);
+                setAddModelError(null);
+              } else {
+                setModelFormMode(null);
+                setEditingModelName("");
+                setNewModelName("");
+                setAddModelError(null);
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setModelFormMode("add");
               setEditingModelName("");
               setNewModelName("");
               setAddModelError(null);
-            }
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => {
-            setModelFormMode("add");
-            setEditingModelName("");
-            setNewModelName("");
-            setAddModelError(null);
-          }}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-3)] text-[var(--ink-muted)] transition-colors hover:border-[var(--hairline-strong)] hover:text-[var(--ink)]"
-          title={t("agents.model.add.button")}
-          aria-label={t("agents.model.add.button")}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
+            }}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border border-transparent bg-transparent text-[var(--ink-tertiary)] transition-colors hover:border-white/20 hover:bg-white/[0.04] hover:text-[var(--ink)]"
+            title={t("agents.model.add.button")}
+            aria-label={t("agents.model.add.button")}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
       {modelFormMode && (
         <form
-          className="flex items-center gap-2"
+          className="flex items-center gap-1.5 py-1.5 pl-[140px]"
           onSubmit={(event) => {
             event.preventDefault();
             void handleSaveModel();
@@ -897,17 +934,17 @@ function ModelConfigField({
             }}
             spellCheck={false}
             placeholder={t("agents.model.add.placeholder")}
-            className="h-10 min-w-0 flex-1 rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-3)] px-3 font-mono text-[14px] text-[var(--ink)] outline-none transition-all placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+            className="h-8 min-w-0 flex-1 rounded-none border-x-0 border-b border-t-0 border-transparent bg-transparent px-0 font-mono text-[12px] text-[var(--ink)] outline-none transition-all placeholder:text-[var(--ink-tertiary)] hover:border-white/10 hover:bg-white/[0.04] focus:border-white/20 focus:bg-white/[0.04]"
           />
           <button
             type="submit"
             disabled={savingModel}
-            className="inline-flex h-10 min-w-[104px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[8px] bg-[var(--primary)] px-5 text-[14px] font-semibold text-white transition-all hover:bg-[var(--primary-hover)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+            className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-2 text-[13px] font-medium text-[var(--primary)] transition-colors hover:text-[var(--primary-hover)] focus-visible:outline-none focus-visible:text-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {savingModel ? (
               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Save className="h-3.5 w-3.5" />
+              <PencilLine className="h-3.5 w-3.5" />
             )}
             {savingModel
               ? t("agents.model.add.saving")
@@ -921,7 +958,7 @@ function ModelConfigField({
               setNewModelName("");
               setAddModelError(null);
             }}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-3)] text-[var(--ink-muted)] transition-colors hover:border-[var(--hairline-strong)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/50"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border border-transparent bg-transparent text-[var(--ink-tertiary)] transition-colors hover:border-white/20 hover:bg-white/[0.04] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/10"
             aria-label={t("agents.save.cancel")}
           >
             <X className="h-3.5 w-3.5" />
@@ -940,7 +977,6 @@ function ModelConfigField({
 function AgentConfigSidebar({
   runner,
   refreshKey,
-  saving,
   saveError,
   onClose,
   onSave,
@@ -949,7 +985,6 @@ function AgentConfigSidebar({
 }: {
   runner: AgentRuntimeStatus;
   refreshKey: number;
-  saving: boolean;
   saveError: string | null;
   onClose: () => void;
   onSave: (
@@ -974,6 +1009,11 @@ function AgentConfigSidebar({
     useState<AgentRuntimeDiagnostics | null>(null);
   const [diagnosticsError, setDiagnosticsError] = useState<string | null>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<
+    "idle" | "saving" | "saved"
+  >("idle");
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const savedStatusTimerRef = useRef<number | null>(null);
   const latestRunnerRef = useRef(runner);
   latestRunnerRef.current = runner;
   const schema = agentConfigSchemas[runner.runner_type];
@@ -1003,8 +1043,60 @@ function AgentConfigSidebar({
     () => envSummaryToText(envSummary),
     [envSummary],
   );
+  const latestDraftRef = useRef({
+    formData,
+    envText,
+    envDirty,
+    isDirty,
+  });
+  latestDraftRef.current = {
+    formData,
+    envText,
+    envDirty,
+    isDirty,
+  };
+
+  const clearSavedStatusTimer = useCallback(() => {
+    if (savedStatusTimerRef.current !== null) {
+      window.clearTimeout(savedStatusTimerRef.current);
+      savedStatusTimerRef.current = null;
+    }
+  }, []);
+
+  const runAutoSave = useCallback(async () => {
+    const draft = latestDraftRef.current;
+    if (!draft.isDirty) return;
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    clearSavedStatusTimer();
+    setAutoSaveStatus("saving");
+    try {
+      await onSave(
+        runner.runner_type,
+        draft.formData,
+        draft.envDirty ? parseEnvText(draft.envText) : null,
+      );
+      setInitialFormData(draft.formData);
+      setEnvDirty(false);
+      setAutoSaveStatus("saved");
+      savedStatusTimerRef.current = window.setTimeout(() => {
+        setAutoSaveStatus("idle");
+        savedStatusTimerRef.current = null;
+      }, 1500);
+    } catch {
+      setAutoSaveStatus("idle");
+    }
+  }, [clearSavedStatusTimer, onSave, runner.runner_type]);
 
   useEffect(() => {
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    clearSavedStatusTimer();
+    setAutoSaveStatus("idle");
     const nextFormData = getRuntimeExecutorOptions(runner);
     setFormData(nextFormData);
     setInitialFormData(nextFormData);
@@ -1028,12 +1120,38 @@ function AgentConfigSidebar({
           }
         : current,
     );
-  }, [runner]);
+  }, [clearSavedStatusTimer, runner]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current !== null) {
+        window.clearTimeout(autoSaveTimerRef.current);
+      }
+      clearSavedStatusTimer();
+    };
+  }, [clearSavedStatusTimer]);
 
   useEffect(() => {
     if (envDirty) return;
     setEnvText(envSummaryText);
   }, [envDirty, envSummaryText]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      void runAutoSave();
+    }, 500);
+
+    return () => {
+      if (autoSaveTimerRef.current !== null) {
+        window.clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, [formData, envText, envDirty, isDirty, runAutoSave]);
 
   useEffect(() => {
     let active = true;
@@ -1090,11 +1208,20 @@ function AgentConfigSidebar({
   const handleModelSaved = async (model: string) => {
     const nextFormData = { ...formData, model };
     setFormData(nextFormData);
+    clearSavedStatusTimer();
+    setAutoSaveStatus("saving");
     await onSave(
       runner.runner_type,
       nextFormData,
       envDirty ? parseEnvText(envText) : null,
     );
+    setInitialFormData(nextFormData);
+    setEnvDirty(false);
+    setAutoSaveStatus("saved");
+    savedStatusTimerRef.current = window.setTimeout(() => {
+      setAutoSaveStatus("idle");
+      savedStatusTimerRef.current = null;
+    }, 1500);
   };
 
   return (
@@ -1119,33 +1246,45 @@ function AgentConfigSidebar({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="-mr-1 rounded-[6px] p-1.5 text-[var(--ink-tertiary)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
-            aria-label={t("agents.sidebar.close")}
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="min-w-[74px]">
+              {autoSaveStatus !== "idle" && (
+                <div className="flex items-center justify-end gap-1.5 font-mono text-[11px] text-white/35 transition-opacity">
+                  {autoSaveStatus === "saving" && (
+                    <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                  )}
+                  <span>
+                    {autoSaveStatus === "saving" ? "Saving..." : "Saved"}
+                  </span>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="-mr-1 rounded-[6px] p-1.5 text-[var(--ink-tertiary)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+              aria-label={t("agents.sidebar.close")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </header>
 
       <div
         className={cx(
-          "min-h-0 flex-1 space-y-6 overflow-y-auto p-5 ot-scroll-area-styled",
-          isDirty && "pb-28",
+          "min-h-0 flex-1 overflow-y-auto px-5 py-4 ot-scroll-area-styled",
         )}
       >
-        <section>
-          <h3 className="mb-3 text-[14px] font-bold tracking-[0.05em] text-[var(--ink-subtle)] uppercase">
+        <section className="pb-5">
+          <h3 className="mb-3 text-[11px] font-semibold tracking-[0.12em] text-white/40 uppercase">
             {t("agents.details.runtime")}
           </h3>
-          <div className="grid gap-3 rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)] p-3">
+          <div className="grid gap-1">
             <DetailRow
               label={t("agents.details.configFile")}
               value={configPath}
             />
-            <div className="h-px bg-[var(--hairline)]" />
             <DetailRow
               label={t("agents.details.cliVersion")}
               value={cliVersion}
@@ -1159,31 +1298,34 @@ function AgentConfigSidebar({
           )}
         </section>
 
-        <section>
-          <h3 className="mb-3 text-[14px] font-bold tracking-[0.05em] text-[var(--ink-subtle)] uppercase">
+        <section className="border-t border-white/10 py-5">
+          <h3 className="mb-3 text-[11px] font-semibold tracking-[0.12em] text-white/40 uppercase">
             {t("agents.env.title")}
           </h3>
-          <div className="overflow-hidden rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)]">
+          <div>
             <textarea
               value={envText}
               onChange={(event) => {
                 setEnvText(event.target.value);
                 setEnvDirty(true);
               }}
+              onBlur={() => {
+                void runAutoSave();
+              }}
               rows={Math.max(4, Math.min(10, envText.split(/\r?\n/u).length))}
               spellCheck={false}
               placeholder={t("agents.env.placeholder")}
-              className="block w-full resize-y border-0 bg-[var(--surface-1)] px-4 py-3 font-mono text-[14px] text-[var(--ink)] outline-none transition-all placeholder:text-[var(--ink-tertiary)] focus:bg-[var(--surface-3)] focus:ring-1 focus:ring-inset focus:ring-[var(--primary)]"
+              className="block w-full resize-y rounded-[6px] border border-transparent bg-transparent px-2.5 py-2 font-mono text-[12px] leading-[1.55] text-[var(--ink)] outline-none transition-all placeholder:text-[var(--ink-tertiary)] hover:border-white/10 hover:bg-white/[0.025] focus:border-white/20 focus:bg-transparent focus:ring-1 focus:ring-white/10"
             />
           </div>
         </section>
 
-        <section>
-          <h3 className="mb-3 text-[14px] font-bold tracking-[0.05em] text-[var(--ink-subtle)] uppercase">
+        <section className="border-t border-white/10 py-5">
+          <h3 className="mb-3 text-[11px] font-semibold tracking-[0.12em] text-white/40 uppercase">
             {t("agents.config.title")}
           </h3>
 
-          <div className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)] p-4">
+          <div>
             {schemaFields.length === 0 ? (
               <ModelConfigField
                 runner={runner.runner_type}
@@ -1195,7 +1337,7 @@ function AgentConfigSidebar({
                 t={t}
               />
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-1">
                 <ModelConfigField
                   runner={runner.runner_type}
                   models={modelOptions}
@@ -1213,6 +1355,7 @@ function AgentConfigSidebar({
                     property={property}
                     value={formData[fieldKey]}
                     onChange={handleConfigFieldChange}
+                    onCommit={runAutoSave}
                     t={t}
                   />
                 ))}
@@ -1229,38 +1372,6 @@ function AgentConfigSidebar({
         </section>
       </div>
 
-      {isDirty && (
-        <footer className="absolute inset-x-0 bottom-0 z-20 border-t border-[var(--hairline)] bg-[var(--surface-1)] p-4">
-          <div className="flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-10 rounded-[8px] border border-[var(--hairline-strong)] bg-[var(--surface-3)] px-5 text-[14px] font-medium text-[var(--ink-muted)] transition-all hover:bg-[var(--surface-4)] hover:text-[var(--ink)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/30"
-            >
-              {t("agents.save.cancel")}
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() =>
-                void onSave(
-                  runner.runner_type,
-                  formData,
-                  envDirty ? parseEnvText(envText) : null,
-                )
-              }
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[var(--primary)] px-6 text-[14px] font-semibold text-white transition-all hover:bg-[var(--primary-hover)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
-            >
-              {saving ? (
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Save className="h-3.5 w-3.5" />
-              )}
-              {saving ? t("agents.save.saving") : t("agents.save.saveChanges")}
-            </button>
-          </div>
-        </footer>
-      )}
     </aside>
   );
 }
@@ -1301,17 +1412,37 @@ export function AgentsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedRunner, setSelectedRunner] =
     useState<AgentRuntimeStatus | null>(null);
+  const [agentNavCollapsed, setAgentNavCollapsed] = useState(false);
   const [diagnosticsRefreshKey, setDiagnosticsRefreshKey] = useState(0);
-  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const discoveryRefreshedNotice = t("agents.notice.discoveryRefreshed");
   const configSavedNotice = t("agents.notice.configSaved");
 
   const statusFilterOptions = useMemo(() => createStatusFilterOptions(t), [t]);
+  const toggleAgentNavCollapsed = useCallback(() => {
+    setAgentNavCollapsed((current) => !current);
+  }, []);
   const autoDismissNotices = useMemo(
     () => new Set([discoveryRefreshedNotice, configSavedNotice]),
     [configSavedNotice, discoveryRefreshedNotice],
   );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "b") {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable='true']")) {
+        return;
+      }
+      event.preventDefault();
+      toggleAgentNavCollapsed();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleAgentNavCollapsed]);
 
   const notifyRuntimeErrors = useCallback(
     (next: AgentRuntimeStatus[], previous: AgentRuntimeStatus[]) => {
@@ -1492,7 +1623,6 @@ export function AgentsPage() {
     formData: Record<string, JsonValue | undefined>,
     envJson: Record<string, string> | null,
   ) => {
-    setSaving(true);
     setSaveError(null);
     try {
       const updated = await agentRuntimeApi.updateConfig(runner, {
@@ -1502,13 +1632,11 @@ export function AgentsPage() {
       });
       replaceRuntimeRunner(updated);
       setSelectedRunner(updated);
-      setNotice(configSavedNotice);
     } catch (error) {
       setSaveError(
         error instanceof Error ? error.message : t("agents.save.failed"),
       );
-    } finally {
-      setSaving(false);
+      throw error;
     }
   };
 
@@ -1521,6 +1649,9 @@ export function AgentsPage() {
     [],
   );
   const systemBreadcrumbLabel = t("agents.breadcrumb.system");
+  const agentNavToggleLabel = agentNavCollapsed
+    ? "Expand agent list (Ctrl/Cmd+B)"
+    : "Collapse agent list (Ctrl/Cmd+B)";
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-2)] text-[var(--ink)]">
@@ -1542,19 +1673,25 @@ export function AgentsPage() {
             className="h-[15px] w-[15px] shrink-0 text-[#8f9298]"
             strokeWidth={2.4}
           />
-          <h1 className="truncate text-[16px] font-semibold leading-none text-[var(--ink)]">
+          <h1 className="truncate text-[16px] font-semibold leading-[1.25] text-[var(--ink)]">
             {t("agents.page.title")}
           </h1>
-          <button
-            type="button"
-            className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
-            aria-label="Favorite agents page"
-          >
-            <Star aria-hidden="true" className="h-[15px] w-[15px]" />
-          </button>
         </nav>
 
         <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleAgentNavCollapsed}
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+            aria-label={agentNavToggleLabel}
+            title={agentNavToggleLabel}
+          >
+            {agentNavCollapsed ? (
+              <PanelLeftOpen className="h-3.5 w-3.5" />
+            ) : (
+              <PanelLeftClose className="h-3.5 w-3.5" />
+            )}
+          </button>
           <DropdownSelect
             value={filter}
             options={statusFilterOptions}
@@ -1603,8 +1740,20 @@ export function AgentsPage() {
           </div>
         )}
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(640px,750px)]">
-          <div className="min-h-0 flex-1 overflow-y-auto ot-scroll-area-styled">
+        <div
+          className={cx(
+            "flex min-h-0 flex-1 flex-col overflow-hidden lg:grid",
+            agentNavCollapsed
+              ? "lg:grid-cols-[64px_minmax(0,1fr)]"
+              : "lg:grid-cols-[256px_minmax(0,1fr)]",
+          )}
+        >
+          <div
+            className={cx(
+              "min-h-0 flex-1 overflow-y-auto border-r border-white/10 py-3 ot-scroll-area-styled",
+              agentNavCollapsed ? "px-1.5" : "px-2",
+            )}
+          >
             {suppressRuntimePlaceholder ? (
               null
             ) : filteredRunners.length === 0 ? (
@@ -1618,47 +1767,38 @@ export function AgentsPage() {
                 </p>
               </div>
             ) : (
-              <div>
-                <div className="hidden grid-cols-[minmax(210px,1.15fr)_128px_minmax(220px,1.85fr)_72px] border-b border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2 text-[14px] font-medium text-[var(--ink-tertiary)] md:grid">
-                  <span>{t("agents.table.agent")}</span>
-                  <span>{t("agents.table.status")}</span>
-                  <span>{t("agents.table.models")}</span>
-                  <span className="text-right">
-                    {t("agents.table.actions")}
-                  </span>
-                </div>
+              <div className="space-y-0.5">
                 {filteredRunners.map((runner) => (
                   <AgentRow
                     key={runner.runner_type}
                     runner={runner}
                     selected={selectedRunner?.runner_type === runner.runner_type}
+                    collapsed={agentNavCollapsed}
                     onOpenConfig={() => handleOpenConfig(runner)}
-                    t={t}
                   />
                 ))}
               </div>
             )}
           </div>
 
-            <div className="min-h-[360px] overflow-hidden border-t border-[var(--hairline)] lg:min-h-0 lg:border-l lg:border-t-0">
-              {!runtimeLoaded ? (
-                null
-              ) : selectedRunner ? (
-                <AgentConfigSidebar
-                  runner={selectedRunner}
-                  refreshKey={diagnosticsRefreshKey}
-                  saving={saving}
-                  saveError={saveError}
-                  onClose={() => setSelectedRunner(null)}
-                  onSave={handleSave}
-                  onDiagnosticsLoaded={handleDiagnosticsLoaded}
-                  t={t}
-                />
-              ) : (
-                <AgentConfigEmptyState t={t} />
-              )}
-            </div>
+          <div className="min-h-[360px] overflow-hidden border-t border-[var(--hairline)] lg:min-h-0 lg:border-t-0">
+            {!runtimeLoaded ? (
+              null
+            ) : selectedRunner ? (
+              <AgentConfigSidebar
+                runner={selectedRunner}
+                refreshKey={diagnosticsRefreshKey}
+                saveError={saveError}
+                onClose={() => setSelectedRunner(null)}
+                onSave={handleSave}
+                onDiagnosticsLoaded={handleDiagnosticsLoaded}
+                t={t}
+              />
+            ) : (
+              <AgentConfigEmptyState t={t} />
+            )}
           </div>
+        </div>
       </div>
     </div>
   );

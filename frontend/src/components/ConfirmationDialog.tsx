@@ -65,8 +65,7 @@ export function ConfirmationDialog({
         aria-describedby={descriptionId}
         className="relative w-full max-w-[500px] overflow-hidden rounded-[16px] border border-[var(--hairline)] bg-[var(--surface-1)] font-sans text-[var(--ink)] shadow-[0_24px_80px_rgba(0,0,0,0.28)] select-none"
         style={{
-          fontFamily:
-            'Inter, "PingFang SC", "Hiragino Sans GB", "Source Han Sans SC", "Microsoft YaHei", sans-serif',
+          fontFamily: "Inter, sans-serif",
         }}
       >
         <div className="relative px-8 pb-7 pt-8">
