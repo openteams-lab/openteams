@@ -2,10 +2,6 @@ use std::time::Duration;
 
 use anyhow::{self, Error as AnyhowError};
 use deployment::{Deployment, DeploymentError};
-use executors::{
-    env::{ExecutionEnv, RepoContext},
-    model_sync,
-};
 use server::{DeploymentImpl, npx_browser_lifecycle, routes};
 use services::services::{
     build_stats::model_pricing_sync::ModelPricingSyncService, container::ContainerService,
@@ -181,23 +177,6 @@ async fn main() -> Result<(), OpenTeamsError> {
             ticker.tick().await;
             if let Err(err) = pricing_sync.sync_prices(&pricing_pool).await {
                 tracing::warn!("Failed to sync model pricing: {err}");
-            }
-        }
-    });
-    // Keep executor profiles in sync with agent model listings.
-    let model_refresh_dir = std::env::current_dir().unwrap_or_else(|_| asset_dir());
-    let model_refresh_env = ExecutionEnv::new(RepoContext::default(), false, String::new());
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(Duration::from_secs(5 * 60));
-        loop {
-            ticker.tick().await;
-            if let Err(err) = model_sync::refresh_profiles_from_agent_models(
-                &model_refresh_dir,
-                &model_refresh_env,
-            )
-            .await
-            {
-                tracing::warn!("Failed to refresh agent model profiles: {err}");
             }
         }
     });
