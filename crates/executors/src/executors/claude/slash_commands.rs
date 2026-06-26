@@ -55,6 +55,7 @@ impl ClaudeCode {
             let commands_dir = base_path.join("commands");
             if commands_dir.exists() {
                 for entry in WalkDir::new(&commands_dir)
+                    .follow_links(true)
                     .max_depth(1)
                     .into_iter()
                     .filter_map(|e| e.ok())
@@ -80,6 +81,7 @@ impl ClaudeCode {
             let skills_dir = base_path.join("skills");
             if skills_dir.exists() {
                 for entry in WalkDir::new(&skills_dir)
+                    .follow_links(true)
                     .min_depth(2)
                     .max_depth(2)
                     .into_iter()

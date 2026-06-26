@@ -128,8 +128,12 @@ async fn discover_skill_files(
         };
 
         while let Some(entry) = entries.next_entry().await? {
-            let file_type = entry.file_type().await?;
-            if !file_type.is_dir() {
+            let metadata = match fs::metadata(entry.path()).await {
+                Ok(metadata) => metadata,
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(err) => return Err(ExecutorError::Io(err)),
+            };
+            if !metadata.is_dir() {
                 continue;
             }
 
