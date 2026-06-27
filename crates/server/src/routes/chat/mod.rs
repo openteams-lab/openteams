@@ -247,27 +247,29 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             axum::routing::post(skills::install_builtin_skill_api),
         );
 
-    Router::new().nest(
-        "/chat",
-        Router::new()
-            .nest("/sessions", sessions_router)
-            .nest("/agents", agents_router)
-            .nest("/messages", messages_router)
-            .nest("/skills", skills_router)
-            .nest("/agents/{agent_id}/skills", agent_skills_router)
-            .nest("/registry", registry_router)
-            .nest("/builtin", builtin_router)
-            .route(
-                "/validate-workspace-path",
-                axum::routing::post(sessions::validate_workspace_path_endpoint),
-            )
-            .route("/runs/{run_id}/log", get(runs::get_run_log))
-            .route("/runs/{run_id}/activity", get(runs::get_run_activity))
-            .route("/runs/{run_id}/diff", get(runs::get_run_diff))
-            .route("/runs/{run_id}/files", get(runs::get_run_files))
-            .route(
-                "/runs/{run_id}/untracked",
-                get(runs::get_run_untracked_file),
-            ),
-    )
+    Router::new()
+        .nest("/team-presets", presets::team_presets_router())
+        .nest(
+            "/chat",
+            Router::new()
+                .nest("/sessions", sessions_router)
+                .nest("/agents", agents_router)
+                .nest("/messages", messages_router)
+                .nest("/skills", skills_router)
+                .nest("/agents/{agent_id}/skills", agent_skills_router)
+                .nest("/registry", registry_router)
+                .nest("/builtin", builtin_router)
+                .route(
+                    "/validate-workspace-path",
+                    axum::routing::post(sessions::validate_workspace_path_endpoint),
+                )
+                .route("/runs/{run_id}/log", get(runs::get_run_log))
+                .route("/runs/{run_id}/activity", get(runs::get_run_activity))
+                .route("/runs/{run_id}/diff", get(runs::get_run_diff))
+                .route("/runs/{run_id}/files", get(runs::get_run_files))
+                .route(
+                    "/runs/{run_id}/untracked",
+                    get(runs::get_run_untracked_file),
+                ),
+        )
 }

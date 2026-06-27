@@ -119,14 +119,18 @@ import type {
 import type {
   AddProjectMemberRequest,
   CreateProjectRequest,
+  CreateTeamPresetRequest,
   Project,
   ProjectDetail,
   ProjectMemberWithRuntime,
   ProjectStats,
   ProjectStatsQuery,
   Repo,
+  TeamPresetDetail,
+  TeamPresetListResponse,
   UpdateProject,
   UpdateProjectMemberRequest,
+  UpdateTeamPresetRequest,
   ChatRunFilesResponse,
 } from "../../../shared/types";
 import {
@@ -268,6 +272,46 @@ export const profilesApi = {
       body: content,
     });
     return handleApiResponse<string>(r);
+  },
+};
+
+export const teamPresetsApi = {
+  list: async (): Promise<TeamPresetListResponse> => {
+    const r = await makeRequest("/api/team-presets", { cache: "no-store" });
+    return handleApiResponse<TeamPresetListResponse>(r);
+  },
+  get: async (teamPresetId: string): Promise<TeamPresetDetail> => {
+    const r = await makeRequest(
+      `/api/team-presets/${encodeURIComponent(teamPresetId)}`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<TeamPresetDetail>(r);
+  },
+  create: async (
+    data: CreateTeamPresetRequest,
+  ): Promise<TeamPresetDetail> => {
+    const r = await makeRequest("/api/team-presets", {
+      method: "POST",
+      body: jsonBody(data),
+    });
+    return handleApiResponse<TeamPresetDetail>(r);
+  },
+  update: async (
+    teamPresetId: string,
+    data: UpdateTeamPresetRequest,
+  ): Promise<TeamPresetDetail> => {
+    const r = await makeRequest(
+      `/api/team-presets/${encodeURIComponent(teamPresetId)}`,
+      { method: "PUT", body: jsonBody(data) },
+    );
+    return handleApiResponse<TeamPresetDetail>(r);
+  },
+  delete: async (teamPresetId: string): Promise<void> => {
+    const r = await makeRequest(
+      `/api/team-presets/${encodeURIComponent(teamPresetId)}`,
+      { method: "DELETE" },
+    );
+    await handleApiResponse<void>(r);
   },
 };
 
@@ -2099,6 +2143,7 @@ export const api = {
   cliConfig: cliConfigApi,
   buildStats: buildStatsApi,
   profiles: profilesApi,
+  teamPresets: teamPresetsApi,
   githubAuth: githubAuthApi,
   projectGithub: projectGithubApi,
   projectWorkItems: projectWorkItemsApi,

@@ -736,7 +736,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     activeSessionId,
     messages,
     memberQueuesBySessionAgentId,
-    deferredQueuedMessagesById,
+    queuedUserMessagesById,
     sendMessage,
     stagePendingAgentPlaceholder,
     members,
@@ -877,9 +877,9 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     () =>
       new Map([
         ...messages.map((message) => [message.id, message] as const),
-        ...Object.entries(deferredQueuedMessagesById),
+        ...Object.entries(queuedUserMessagesById),
       ]),
-    [deferredQueuedMessagesById, messages],
+    [queuedUserMessagesById, messages],
   );
   const visibleQueueGroups = useMemo(
     () =>

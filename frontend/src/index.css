@@ -412,46 +412,99 @@ body[data-mode="light"] .animate-shimmer::after {
 }
 
 .team-template-page {
-  --team-template-canvas: transparent;
+  --team-template-canvas: #080808;
   --team-template-border: rgba(255, 255, 255, 0.06);
-  --team-template-border-strong: rgba(255, 255, 255, 0.12);
+  --team-template-border-strong: rgba(255, 255, 255, 0.09);
   --team-template-grid-line: var(--team-template-border);
   --team-template-grid-line-strong: var(--team-template-border-strong);
-  --team-template-surface: rgba(255, 255, 255, 0.03);
-  --team-template-surface-hover: rgba(255, 255, 255, 0.06);
-  --team-template-active-surface: rgba(255, 255, 255, 0.048);
-  --team-template-tag-surface: rgba(255, 255, 255, 0.018);
+  --team-template-surface: #0c0c0d;
+  --team-template-surface-top: #101011;
+  --team-template-surface-hover: #111112;
+  --team-template-active-surface: #0f0f10;
+  --team-template-inner-stroke: rgba(255, 255, 255, 0.06);
+  --team-template-inner-stroke-strong: rgba(255, 255, 255, 0.08);
+  --team-template-tag-surface: rgba(255, 255, 255, 0.03);
+  --team-template-avatar-surface: rgba(255, 255, 255, 0.035);
+  --team-template-pipeline-track: rgba(255, 255, 255, 0.07);
+  --team-template-pipeline-node-border: rgba(255, 255, 255, 0.1);
+  --team-template-pipeline-dot: #d8d9dc;
+  --team-template-pipeline-dot-muted: rgba(255, 255, 255, 0.28);
+  --team-template-pipeline-dot-glow: rgba(216, 217, 220, 0.34);
+  --team-template-code-surface: rgba(255, 255, 255, 0.03);
+  --team-template-code-border: rgba(255, 255, 255, 0.08);
+  --team-template-code-text: #a7aaaf;
+  --team-template-index: rgba(138, 141, 145, 0.45);
+  --team-template-disabled: rgba(138, 141, 145, 0.36);
+  --team-template-ghost-badge-border: rgba(255, 255, 255, 0.07);
+  --team-template-row-hover: rgba(255, 255, 255, 0.03);
+  --team-template-member-description: #8a8d91;
+  --team-template-primary-button-top: rgba(244, 245, 246, 0.96);
+  --team-template-primary-button-bottom: rgba(214, 218, 226, 0.92);
+  --team-template-primary-button-text: #08090a;
+  --team-template-primary-button-border: rgba(255, 255, 255, 0.18);
+  --team-template-primary-button-border-hover: rgba(255, 255, 255, 0.28);
+  --team-template-primary-button-highlight: rgba(255, 255, 255, 0.68);
+  --team-template-primary-button-lowlight: rgba(0, 0, 0, 0.12);
+  --team-template-primary-button-kbd-bg: rgba(8, 9, 10, 0.06);
+  --team-template-primary-button-kbd-border: rgba(8, 9, 10, 0.14);
+  --team-template-primary-button-kbd-text: rgba(8, 9, 10, 0.62);
   --team-template-hover: var(--team-template-surface-hover);
   --team-template-top-highlight: rgba(255, 255, 255, 0.1);
-  --team-template-top-highlight-strong: rgba(255, 255, 255, 0.14);
+  --team-template-top-highlight-strong: rgba(255, 255, 255, 0.13);
   --team-template-top-glow: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.08) 50%,
     transparent 100%
   );
-  --team-template-title: #f2f2f2;
-  --team-template-muted: #8a8f98;
-  --team-template-aux: rgba(255, 255, 255, 0.4);
-  --team-template-icon-strong: rgba(255, 255, 255, 0.7);
+  --team-template-title: #eeeeee;
+  --team-template-muted: #8a8d91;
+  --team-template-aux: #62656b;
+  --team-template-icon-strong: #8a8f98;
   --team-template-accent: var(--primary-hover);
   --team-template-accent-glow: color-mix(in srgb, var(--primary-hover) 34%, transparent);
   --team-template-description: var(--team-template-muted);
-  --team-template-icon: var(--team-template-muted);
+  --team-template-icon: #8a8f98;
   --team-template-tag-text: var(--team-template-muted);
-  background: transparent;
 }
 
 body[data-mode="light"] .team-template-page {
-  --team-template-canvas: transparent;
+  --team-template-canvas: #fbfbfc;
   --team-template-border: rgba(15, 23, 42, 0.08);
   --team-template-border-strong: rgba(15, 23, 42, 0.12);
   --team-template-grid-line: var(--team-template-border);
   --team-template-grid-line-strong: var(--team-template-border-strong);
-  --team-template-surface: rgba(15, 23, 42, 0.026);
-  --team-template-surface-hover: rgba(15, 23, 42, 0.052);
-  --team-template-active-surface: rgba(15, 23, 42, 0.048);
-  --team-template-tag-surface: rgba(15, 23, 42, 0.018);
+  --team-template-surface: #ffffff;
+  --team-template-surface-top: #ffffff;
+  --team-template-surface-hover: #f7f8fa;
+  --team-template-active-surface: #f5f6f8;
+  --team-template-inner-stroke: rgba(15, 23, 42, 0.08);
+  --team-template-inner-stroke-strong: rgba(15, 23, 42, 0.12);
+  --team-template-tag-surface: rgba(88, 101, 242, 0.08);
+  --team-template-avatar-surface: rgba(15, 23, 42, 0.045);
+  --team-template-pipeline-track: rgba(15, 23, 42, 0.07);
+  --team-template-pipeline-node-border: rgba(15, 23, 42, 0.14);
+  --team-template-pipeline-dot: #4b5563;
+  --team-template-pipeline-dot-muted: rgba(15, 23, 42, 0.28);
+  --team-template-pipeline-dot-glow: rgba(15, 23, 42, 0.12);
+  --team-template-code-surface: rgba(15, 23, 42, 0.045);
+  --team-template-code-border: rgba(15, 23, 42, 0.085);
+  --team-template-code-text: #374151;
+  --team-template-index: rgba(98, 102, 109, 0.48);
+  --team-template-disabled: rgba(98, 102, 109, 0.42);
+  --team-template-ghost-badge-border: rgba(15, 23, 42, 0.1);
+  --team-template-row-hover: rgba(15, 23, 42, 0.03);
+  --team-template-member-description: #62666d;
+  --team-template-primary-button-top: #171b24;
+  --team-template-primary-button-bottom: #0d1118;
+  --team-template-primary-button-text: #ffffff;
+  --team-template-primary-button-border: rgba(15, 23, 42, 0.24);
+  --team-template-primary-button-border-hover: rgba(15, 23, 42, 0.36);
+  --team-template-primary-button-highlight: rgba(255, 255, 255, 0.12);
+  --team-template-primary-button-lowlight: rgba(0, 0, 0, 0.28);
+  --team-template-primary-button-kbd-bg: rgba(255, 255, 255, 0.08);
+  --team-template-primary-button-kbd-border: rgba(255, 255, 255, 0.16);
+  --team-template-primary-button-kbd-text: rgba(255, 255, 255, 0.72);
   --team-template-hover: var(--team-template-surface-hover);
   --team-template-top-highlight: rgba(255, 255, 255, 0.85);
   --team-template-top-highlight-strong: rgba(255, 255, 255, 0.95);
@@ -464,13 +517,192 @@ body[data-mode="light"] .team-template-page {
   --team-template-title: #111827;
   --team-template-muted: #62666d;
   --team-template-aux: rgba(15, 23, 42, 0.46);
-  --team-template-icon-strong: rgba(15, 23, 42, 0.68);
+  --team-template-icon-strong: rgba(15, 23, 42, 0.58);
   --team-template-accent: var(--primary-hover);
   --team-template-accent-glow: color-mix(in srgb, var(--primary-hover) 28%, transparent);
   --team-template-description: var(--team-template-muted);
-  --team-template-icon: var(--team-template-muted);
+  --team-template-icon: rgba(98, 102, 109, 0.78);
   --team-template-tag-text: var(--team-template-muted);
   background: transparent;
+}
+
+.team-template-scrollbar {
+  scrollbar-width: none;
+}
+
+.team-template-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.team-template-workflow-copy {
+  opacity: 0.42;
+  filter: brightness(0.72);
+  transform: translateY(3px);
+  transition:
+    opacity 720ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 860ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 860ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.team-template-workflow-copy-lit {
+  opacity: 1;
+  filter: brightness(1);
+  transform: translateY(0);
+}
+
+.team-template-workflow-copy h3 {
+  color: color-mix(in srgb, var(--team-template-title) 46%, transparent);
+  transition: color 780ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.team-template-workflow-copy p {
+  color: color-mix(in srgb, #808080 48%, transparent);
+  transition: color 780ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.team-template-workflow-copy-lit h3 {
+  color: var(--team-template-title);
+}
+
+.team-template-workflow-copy-lit p {
+  color: #808080;
+}
+
+.team-template-workflow-dot {
+  isolation: isolate;
+  opacity: 0.36;
+  border-color: var(--team-template-pipeline-dot-muted);
+  background-color: transparent;
+  transform: scale(0.7);
+  transition:
+    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 780ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 780ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 820ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.team-template-workflow-dot::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    var(--team-template-pipeline-dot-glow) 0%,
+    color-mix(in srgb, var(--team-template-pipeline-dot-glow) 68%, transparent) 36%,
+    transparent 70%
+  );
+  filter: blur(4px);
+  opacity: 0;
+  transform: scale(0.55);
+  pointer-events: none;
+}
+
+.team-template-workflow-dot-lit {
+  opacity: 1;
+  border-color: var(--team-template-pipeline-dot);
+  background-color: var(--team-template-pipeline-dot);
+  transform: scale(1);
+  animation: team-template-workflow-dot-halo 3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.team-template-workflow-dot-lit::after {
+  animation: team-template-workflow-dot-blur-halo 3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.team-template-workflow-track {
+  opacity: 0;
+  transform: scaleY(0);
+  transform-origin: top;
+  transition:
+    opacity 680ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 880ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.team-template-workflow-track-lit {
+  opacity: 0.6;
+  transform: scaleY(1);
+}
+
+@keyframes team-template-workflow-dot-halo {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 var(--team-template-pipeline-dot-glow);
+  }
+  22% {
+    transform: scale(1.12);
+    box-shadow:
+      0 0 0 3px var(--team-template-pipeline-dot-glow),
+      0 0 12px var(--team-template-pipeline-dot-glow);
+  }
+  68% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 5px color-mix(in srgb, var(--team-template-pipeline-dot-glow) 52%, transparent),
+      0 0 9px color-mix(in srgb, var(--team-template-pipeline-dot-glow) 62%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--team-template-pipeline-dot-glow) 70%, transparent);
+  }
+}
+
+@keyframes team-template-workflow-dot-blur-halo {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  18% {
+    opacity: 0.95;
+    transform: scale(0.9);
+  }
+  62% {
+    opacity: 0.48;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.34);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-template-workflow-copy,
+  .team-template-workflow-dot,
+  .team-template-workflow-track {
+    opacity: 1;
+    transform: none;
+    animation: none;
+    transition: none;
+  }
+
+  .team-template-workflow-track {
+    opacity: 0.6;
+  }
+}
+
+.team-template-role-markdown :where(p) {
+  margin-top: 0.35rem !important;
+  margin-bottom: 0.35rem !important;
+}
+
+.team-template-role-markdown :where(p:first-child) {
+  margin-top: 0 !important;
+}
+
+.team-template-role-markdown :where(p:last-child) {
+  margin-bottom: 0 !important;
+}
+
+.team-template-role-markdown :where(ul, ol) {
+  margin-top: 0.4rem !important;
+  margin-bottom: 0.4rem !important;
+}
+
+.team-template-role-markdown :where(h1, h2, h3, h4, h5, h6) {
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.35rem !important;
 }
 
 .team-template-status-bar {

@@ -403,8 +403,8 @@ check(
   "renders queued messages inline after the active agent message",
   source.includes("visibleQueueGroups") &&
     source.includes("const queuedQueueItems =") &&
-    source.includes("deferredQueuedMessagesById") &&
-    source.includes("...Object.entries(deferredQueuedMessagesById)") &&
+    source.includes("queuedUserMessagesById") &&
+    source.includes("...Object.entries(queuedUserMessagesById)") &&
     source.includes("messagesById.get(item.message.chat_message_id)") &&
     source.includes("queueGroupsBySessionAgentId") &&
     source.includes("queueAnchorMessageIds") &&

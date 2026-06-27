@@ -1116,6 +1116,22 @@ export type CustomProviderProbeResponse = { status: CustomProviderProbeStatus, v
 
 export type TeamProtocolConfig = { content: string, enabled: boolean, };
 
+export type TeamPresetMemberSummary = { id: string, name: string, description: string, runner_type: string | null, recommended_model: string | null, is_builtin: boolean, enabled: boolean, };
+
+export type TeamPresetSummary = { id: string, name: string, description: string, member_ids: Array<string>, lead_member_id: string | null, team_protocol: string, is_builtin: boolean, enabled: boolean, member_count: number, members: Array<TeamPresetMemberSummary>, };
+
+export type TeamPresetListResponse = { teams: Array<TeamPresetSummary>, };
+
+export type TeamPresetDetail = { team: ChatTeamPreset, members: Array<ChatMemberPreset>, };
+
+export type TeamPresetWrite = { id: string, name: string, description: string | null, member_ids: Array<string>, lead_member_id: string | null, team_protocol: string | null, enabled: boolean | null, };
+
+export type TeamPresetMemberWrite = { id: string, name: string, description: string | null, runner_type: string | null, recommended_model: string | null, system_prompt: string | null, default_workspace_path: string | null, selected_skill_ids: Array<string>, tools_enabled: JsonValue | null, enabled: boolean | null, };
+
+export type CreateTeamPresetRequest = { team: TeamPresetWrite, members: Array<TeamPresetMemberWrite>, };
+
+export type UpdateTeamPresetRequest = { team: TeamPresetWrite, members: Array<TeamPresetMemberWrite>, };
+
 export type CreatePresetSnapshotRequest = { team_preset_id: string | null, name: string | null, description: string | null, overwrite_strategy: PresetSnapshotOverwriteStrategy | null, };
 
 export type PresetSnapshotOverwriteStrategy = "fail_if_exists" | "overwrite_custom";

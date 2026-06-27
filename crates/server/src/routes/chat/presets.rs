@@ -1,6 +1,11 @@
 use std::{collections::HashSet, str::FromStr};
 
-use axum::{Extension, Json, extract::State, response::Json as ResponseJson};
+use axum::{
+    Extension, Json, Router,
+    extract::{Path, State},
+    response::Json as ResponseJson,
+    routing::get,
+};
 use db::models::chat_session::{ChatSession, UpdateChatSession};
 use deployment::Deployment;
 use executors::{
@@ -58,6 +63,90 @@ pub struct CreatePresetSnapshotResponse {
     pub team: ChatTeamPreset,
     pub members: Vec<ChatMemberPreset>,
     pub overwritten: bool,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct TeamPresetMemberSummary {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub runner_type: Option<String>,
+    pub recommended_model: Option<String>,
+    pub is_builtin: bool,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct TeamPresetSummary {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub member_ids: Vec<String>,
+    pub lead_member_id: Option<String>,
+    pub team_protocol: String,
+    pub is_builtin: bool,
+    pub enabled: bool,
+    pub member_count: usize,
+    pub members: Vec<TeamPresetMemberSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct TeamPresetListResponse {
+    pub teams: Vec<TeamPresetSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct TeamPresetDetail {
+    pub team: ChatTeamPreset,
+    pub members: Vec<ChatMemberPreset>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[ts(export)]
+pub struct TeamPresetWrite {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub member_ids: Vec<String>,
+    pub lead_member_id: Option<String>,
+    pub team_protocol: Option<String>,
+    pub enabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[ts(export)]
+pub struct TeamPresetMemberWrite {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub runner_type: Option<String>,
+    pub recommended_model: Option<String>,
+    pub system_prompt: Option<String>,
+    pub default_workspace_path: Option<String>,
+    #[serde(default)]
+    pub selected_skill_ids: Vec<String>,
+    pub tools_enabled: Option<serde_json::Value>,
+    pub enabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[ts(export)]
+pub struct CreateTeamPresetRequest {
+    pub team: TeamPresetWrite,
+    #[serde(default)]
+    pub members: Vec<TeamPresetMemberWrite>,
+}
+
+#[derive(Debug, Clone, Deserialize, TS)]
+#[ts(export)]
+pub struct UpdateTeamPresetRequest {
+    pub team: TeamPresetWrite,
+    #[serde(default)]
+    pub members: Vec<TeamPresetMemberWrite>,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -119,6 +208,83 @@ pub async fn update_team_protocol(
     .await?;
 
     Ok(ResponseJson(ApiResponse::success(effective)))
+}
+
+pub fn team_presets_router() -> Router<DeploymentImpl> {
+    Router::new()
+        .route("/", get(list_team_presets).post(create_team_preset))
+        .route(
+            "/{id}",
+            get(get_team_preset)
+                .put(update_team_preset)
+                .delete(delete_team_preset),
+        )
+}
+
+pub async fn list_team_presets(
+    State(deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<TeamPresetListResponse>>, ApiError> {
+    let config = deployment.config().read().await;
+    let response = list_team_presets_from_config(&config.chat_presets)?;
+
+    Ok(ResponseJson(ApiResponse::success(response)))
+}
+
+pub async fn get_team_preset(
+    State(deployment): State<DeploymentImpl>,
+    Path(id): Path<String>,
+) -> Result<ResponseJson<ApiResponse<TeamPresetDetail>>, ApiError> {
+    let id = validate_preset_id(&id, "Team preset ID")?;
+    let config = deployment.config().read().await;
+    let detail = get_team_preset_from_config(&config.chat_presets, &id)?;
+
+    Ok(ResponseJson(ApiResponse::success(detail)))
+}
+
+pub async fn create_team_preset(
+    State(deployment): State<DeploymentImpl>,
+    Json(payload): Json<CreateTeamPresetRequest>,
+) -> Result<ResponseJson<ApiResponse<TeamPresetDetail>>, ApiError> {
+    let mut config_guard = deployment.config().write().await;
+    let mut next_config = config_guard.clone();
+    let detail = create_team_preset_in_config(&mut next_config.chat_presets, payload)?;
+
+    save_config_to_file_atomic(&next_config, &config_path()).await?;
+    *config_guard = next_config;
+
+    Ok(ResponseJson(ApiResponse::success(detail)))
+}
+
+pub async fn update_team_preset(
+    State(deployment): State<DeploymentImpl>,
+    Path(id): Path<String>,
+    Json(payload): Json<UpdateTeamPresetRequest>,
+) -> Result<ResponseJson<ApiResponse<TeamPresetDetail>>, ApiError> {
+    let id = validate_preset_id(&id, "Team preset ID")?;
+    let mut config_guard = deployment.config().write().await;
+    let mut next_config = config_guard.clone();
+    let detail = update_team_preset_in_config(&mut next_config.chat_presets, &id, payload)?;
+
+    save_config_to_file_atomic(&next_config, &config_path()).await?;
+    *config_guard = next_config;
+
+    Ok(ResponseJson(ApiResponse::success(detail)))
+}
+
+pub async fn delete_team_preset(
+    State(deployment): State<DeploymentImpl>,
+    Path(id): Path<String>,
+) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
+    let id = validate_preset_id(&id, "Team preset ID")?;
+    let mut config_guard = deployment.config().write().await;
+    let mut next_config = config_guard.clone();
+
+    delete_team_preset_from_config(&mut next_config.chat_presets, &id)?;
+
+    save_config_to_file_atomic(&next_config, &config_path()).await?;
+    *config_guard = next_config;
+
+    Ok(ResponseJson(ApiResponse::success(())))
 }
 
 pub async fn create_preset_snapshot(
@@ -195,6 +361,404 @@ async fn list_session_preset_member_rows(
     .bind(session_id)
     .fetch_all(pool)
     .await
+}
+
+fn list_team_presets_from_config(
+    presets: &ChatPresetsConfig,
+) -> Result<TeamPresetListResponse, ApiError> {
+    let teams = presets
+        .teams
+        .iter()
+        .map(|team| team_preset_summary(presets, team))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(TeamPresetListResponse { teams })
+}
+
+fn get_team_preset_from_config(
+    presets: &ChatPresetsConfig,
+    id: &str,
+) -> Result<TeamPresetDetail, ApiError> {
+    let team = presets
+        .teams
+        .iter()
+        .find(|preset| preset.id == id)
+        .ok_or_else(|| ApiError::BadRequest(format!("Team preset not found: {id}")))?;
+
+    team_preset_detail(presets, team)
+}
+
+fn create_team_preset_in_config(
+    presets: &mut ChatPresetsConfig,
+    payload: CreateTeamPresetRequest,
+) -> Result<TeamPresetDetail, ApiError> {
+    let validated = validate_team_preset_payload(
+        presets,
+        None,
+        payload.team,
+        payload.members,
+        "Team preset ID",
+    )?;
+
+    if presets
+        .teams
+        .iter()
+        .any(|preset| preset.id == validated.team.id)
+    {
+        return Err(ApiError::Conflict(format!(
+            "Team preset ID already exists: {}",
+            validated.team.id
+        )));
+    }
+
+    upsert_member_presets(presets, validated.members);
+    presets.teams.push(validated.team.clone());
+
+    team_preset_detail(presets, &validated.team)
+}
+
+fn update_team_preset_in_config(
+    presets: &mut ChatPresetsConfig,
+    id: &str,
+    payload: UpdateTeamPresetRequest,
+) -> Result<TeamPresetDetail, ApiError> {
+    let existing_index = presets
+        .teams
+        .iter()
+        .position(|preset| preset.id == id)
+        .ok_or_else(|| ApiError::BadRequest(format!("Team preset not found: {id}")))?;
+    let existing_team = presets.teams[existing_index].clone();
+
+    if existing_team.is_builtin {
+        return Err(ApiError::Forbidden(format!(
+            "Cannot edit built-in team preset: {id}"
+        )));
+    }
+
+    let validated = validate_team_preset_payload(
+        presets,
+        Some(&existing_team),
+        payload.team,
+        payload.members,
+        "Team preset ID",
+    )?;
+    if validated.team.id != id {
+        return Err(ApiError::BadRequest(format!(
+            "Team preset ID in request must match path ID: {id}"
+        )));
+    }
+
+    let cleanup_candidates = existing_team
+        .member_ids
+        .iter()
+        .cloned()
+        .collect::<HashSet<_>>();
+    presets.teams[existing_index] = validated.team.clone();
+    upsert_member_presets(presets, validated.members);
+    cleanup_unused_custom_members(presets, &cleanup_candidates);
+
+    team_preset_detail(presets, &validated.team)
+}
+
+fn delete_team_preset_from_config(
+    presets: &mut ChatPresetsConfig,
+    id: &str,
+) -> Result<(), ApiError> {
+    let existing_index = presets
+        .teams
+        .iter()
+        .position(|preset| preset.id == id)
+        .ok_or_else(|| ApiError::BadRequest(format!("Team preset not found: {id}")))?;
+    if presets.teams[existing_index].is_builtin {
+        return Err(ApiError::Forbidden(format!(
+            "Cannot delete built-in team preset: {id}"
+        )));
+    }
+
+    let removed = presets.teams.remove(existing_index);
+    let cleanup_candidates = removed.member_ids.into_iter().collect::<HashSet<_>>();
+    cleanup_unused_custom_members(presets, &cleanup_candidates);
+
+    Ok(())
+}
+
+#[derive(Debug)]
+struct ValidatedTeamPresetPayload {
+    team: ChatTeamPreset,
+    members: Vec<ChatMemberPreset>,
+}
+
+fn validate_team_preset_payload(
+    presets: &ChatPresetsConfig,
+    existing_team: Option<&ChatTeamPreset>,
+    team: TeamPresetWrite,
+    members: Vec<TeamPresetMemberWrite>,
+    id_label: &str,
+) -> Result<ValidatedTeamPresetPayload, ApiError> {
+    let team_id = validate_preset_id(&team.id, id_label)?;
+    let team_name = normalize_required_string(&team.name, "Team preset name")?;
+    let member_ids = validate_member_reference_ids(&team.member_ids)?;
+    let member_id_set = member_ids.iter().cloned().collect::<HashSet<_>>();
+    let lead_member_id = normalize_optional_string(team.lead_member_id)
+        .map(|id| validate_preset_id(&id, "Lead member ID"))
+        .transpose()?;
+
+    if let Some(lead_member_id) = lead_member_id.as_ref()
+        && !member_id_set.contains(lead_member_id)
+    {
+        return Err(ApiError::BadRequest(format!(
+            "Lead member ID must reference a team member: {lead_member_id}"
+        )));
+    }
+
+    let replaceable_member_ids = existing_team
+        .map(|preset| preset.member_ids.iter().cloned().collect::<HashSet<_>>())
+        .unwrap_or_default();
+    let members = validate_member_presets(presets, &replaceable_member_ids, members)?;
+    let member_payload_ids = members
+        .iter()
+        .map(|member| member.id.clone())
+        .collect::<HashSet<_>>();
+
+    for member in &members {
+        if !member_id_set.contains(&member.id) {
+            return Err(ApiError::BadRequest(format!(
+                "Member preset payload is not referenced by team: {}",
+                member.id
+            )));
+        }
+    }
+
+    for member_id in &member_ids {
+        let exists_in_config = presets.members.iter().any(|member| member.id == *member_id);
+        if !exists_in_config && !member_payload_ids.contains(member_id) {
+            return Err(ApiError::BadRequest(format!(
+                "Team preset references unknown member preset: {member_id}"
+            )));
+        }
+    }
+
+    Ok(ValidatedTeamPresetPayload {
+        team: ChatTeamPreset {
+            id: team_id,
+            name: team_name,
+            description: normalize_optional_string(team.description).unwrap_or_default(),
+            member_ids,
+            lead_member_id,
+            team_protocol: normalize_optional_string(team.team_protocol).unwrap_or_default(),
+            is_builtin: false,
+            enabled: team.enabled.unwrap_or(true),
+        },
+        members,
+    })
+}
+
+fn validate_member_presets(
+    presets: &ChatPresetsConfig,
+    replaceable_member_ids: &HashSet<String>,
+    members: Vec<TeamPresetMemberWrite>,
+) -> Result<Vec<ChatMemberPreset>, ApiError> {
+    let mut seen_ids = HashSet::new();
+    let mut validated = Vec::with_capacity(members.len());
+
+    for member in members {
+        let member_id = validate_preset_id(&member.id, "Member preset ID")?;
+        if !seen_ids.insert(member_id.clone()) {
+            return Err(ApiError::BadRequest(format!(
+                "Member preset payload must not contain duplicate ID: {member_id}"
+            )));
+        }
+
+        if let Some(existing_member) = presets.members.iter().find(|preset| preset.id == member_id)
+        {
+            if existing_member.is_builtin {
+                return Err(ApiError::Forbidden(format!(
+                    "Cannot edit built-in member preset: {member_id}"
+                )));
+            }
+            if !replaceable_member_ids.contains(&member_id) {
+                return Err(ApiError::Conflict(format!(
+                    "Member preset ID already exists: {member_id}"
+                )));
+            }
+        }
+
+        let name = sanitize_member_handle(&member.name);
+        if name.is_empty() {
+            return Err(ApiError::BadRequest(
+                "Member preset name is required.".to_string(),
+            ));
+        }
+
+        validated.push(ChatMemberPreset {
+            id: member_id,
+            name,
+            description: normalize_optional_string(member.description).unwrap_or_default(),
+            runner_type: normalize_optional_string(member.runner_type),
+            recommended_model: normalize_optional_string(member.recommended_model),
+            system_prompt: member.system_prompt.unwrap_or_default(),
+            default_workspace_path: normalize_optional_string(member.default_workspace_path),
+            selected_skill_ids: normalize_skill_ids(member.selected_skill_ids),
+            tools_enabled: member
+                .tools_enabled
+                .filter(|value| !value.is_null())
+                .unwrap_or_else(|| serde_json::json!({})),
+            is_builtin: false,
+            enabled: member.enabled.unwrap_or(true),
+        });
+    }
+
+    Ok(validated)
+}
+
+fn validate_member_reference_ids(member_ids: &[String]) -> Result<Vec<String>, ApiError> {
+    let mut seen_ids = HashSet::new();
+    let mut normalized_ids = Vec::with_capacity(member_ids.len());
+
+    for member_id in member_ids {
+        let member_id = validate_preset_id(member_id, "Member preset ID")?;
+        if !seen_ids.insert(member_id.clone()) {
+            return Err(ApiError::BadRequest(format!(
+                "Team preset member_ids must not contain duplicate ID: {member_id}"
+            )));
+        }
+        normalized_ids.push(member_id);
+    }
+
+    if normalized_ids.is_empty() {
+        return Err(ApiError::BadRequest(
+            "Team preset must include at least one member.".to_string(),
+        ));
+    }
+
+    Ok(normalized_ids)
+}
+
+fn upsert_member_presets(presets: &mut ChatPresetsConfig, members: Vec<ChatMemberPreset>) {
+    for member in members {
+        if let Some(index) = presets
+            .members
+            .iter()
+            .position(|preset| preset.id == member.id)
+        {
+            presets.members[index] = member;
+        } else {
+            presets.members.push(member);
+        }
+    }
+}
+
+fn cleanup_unused_custom_members(
+    presets: &mut ChatPresetsConfig,
+    candidate_member_ids: &HashSet<String>,
+) {
+    if candidate_member_ids.is_empty() {
+        return;
+    }
+
+    let referenced_member_ids = presets
+        .teams
+        .iter()
+        .flat_map(|team| team.member_ids.iter().cloned())
+        .collect::<HashSet<_>>();
+
+    presets.members.retain(|member| {
+        member.is_builtin
+            || !candidate_member_ids.contains(&member.id)
+            || referenced_member_ids.contains(&member.id)
+    });
+}
+
+fn team_preset_detail(
+    presets: &ChatPresetsConfig,
+    team: &ChatTeamPreset,
+) -> Result<TeamPresetDetail, ApiError> {
+    Ok(TeamPresetDetail {
+        team: team.clone(),
+        members: resolve_team_members(presets, team)?,
+    })
+}
+
+fn team_preset_summary(
+    presets: &ChatPresetsConfig,
+    team: &ChatTeamPreset,
+) -> Result<TeamPresetSummary, ApiError> {
+    let members = resolve_team_members(presets, team)?
+        .iter()
+        .map(member_preset_summary)
+        .collect::<Vec<_>>();
+
+    Ok(TeamPresetSummary {
+        id: team.id.clone(),
+        name: team.name.clone(),
+        description: team.description.clone(),
+        member_ids: team.member_ids.clone(),
+        lead_member_id: team.lead_member_id.clone(),
+        team_protocol: team.team_protocol.clone(),
+        is_builtin: team.is_builtin,
+        enabled: team.enabled,
+        member_count: team.member_ids.len(),
+        members,
+    })
+}
+
+fn resolve_team_members(
+    presets: &ChatPresetsConfig,
+    team: &ChatTeamPreset,
+) -> Result<Vec<ChatMemberPreset>, ApiError> {
+    team.member_ids
+        .iter()
+        .map(|member_id| {
+            presets
+                .members
+                .iter()
+                .find(|member| member.id == *member_id)
+                .cloned()
+                .ok_or_else(|| {
+                    ApiError::BadRequest(format!(
+                        "Team preset references unknown member preset: {member_id}"
+                    ))
+                })
+        })
+        .collect()
+}
+
+fn member_preset_summary(member: &ChatMemberPreset) -> TeamPresetMemberSummary {
+    TeamPresetMemberSummary {
+        id: member.id.clone(),
+        name: member.name.clone(),
+        description: member.description.clone(),
+        runner_type: member.runner_type.clone(),
+        recommended_model: member.recommended_model.clone(),
+        is_builtin: member.is_builtin,
+        enabled: member.enabled,
+    }
+}
+
+fn validate_preset_id(value: &str, label: &str) -> Result<String, ApiError> {
+    let id = value.trim();
+    if id.is_empty() {
+        return Err(ApiError::BadRequest(format!("{label} is required.")));
+    }
+
+    if !id
+        .chars()
+        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_' || ch == '-')
+    {
+        return Err(ApiError::BadRequest(format!(
+            "{label} must contain only lowercase letters, numbers, underscores, or hyphens."
+        )));
+    }
+
+    Ok(id.to_string())
+}
+
+fn normalize_required_string(value: &str, label: &str) -> Result<String, ApiError> {
+    let value = value.trim().to_string();
+    if value.is_empty() {
+        return Err(ApiError::BadRequest(format!("{label} is required.")));
+    }
+    Ok(value)
 }
 
 fn build_preset_snapshot(
@@ -532,6 +1096,78 @@ mod tests {
         }
     }
 
+    fn custom_member_preset(id: &str) -> ChatMemberPreset {
+        ChatMemberPreset {
+            id: id.to_string(),
+            name: id.to_string(),
+            description: format!("{id} description"),
+            runner_type: Some("codex".to_string()),
+            recommended_model: Some("gpt-5.2".to_string()),
+            system_prompt: format!("You are {id}."),
+            default_workspace_path: None,
+            selected_skill_ids: vec![],
+            tools_enabled: json!({}),
+            is_builtin: false,
+            enabled: true,
+        }
+    }
+
+    fn builtin_member_preset(id: &str) -> ChatMemberPreset {
+        ChatMemberPreset {
+            is_builtin: true,
+            ..custom_member_preset(id)
+        }
+    }
+
+    fn team_write(id: &str, member_ids: Vec<&str>) -> TeamPresetWrite {
+        TeamPresetWrite {
+            id: id.to_string(),
+            name: "Delivery Team".to_string(),
+            description: Some("Team description".to_string()),
+            member_ids: member_ids.into_iter().map(str::to_string).collect(),
+            lead_member_id: None,
+            team_protocol: Some("Coordinate before shipping.".to_string()),
+            enabled: Some(true),
+        }
+    }
+
+    fn member_write(id: &str) -> TeamPresetMemberWrite {
+        TeamPresetMemberWrite {
+            id: id.to_string(),
+            name: id.to_string(),
+            description: Some(format!("{id} description")),
+            runner_type: Some("codex".to_string()),
+            recommended_model: Some("gpt-5.2".to_string()),
+            system_prompt: Some(format!("You are {id}.")),
+            default_workspace_path: None,
+            selected_skill_ids: vec!["skill-b".to_string(), "skill-a".to_string()],
+            tools_enabled: Some(json!({"mode": "test"})),
+            enabled: Some(true),
+        }
+    }
+
+    fn create_team_request(
+        id: &str,
+        member_ids: Vec<&str>,
+        members: Vec<TeamPresetMemberWrite>,
+    ) -> CreateTeamPresetRequest {
+        CreateTeamPresetRequest {
+            team: team_write(id, member_ids),
+            members,
+        }
+    }
+
+    fn update_team_request(
+        id: &str,
+        member_ids: Vec<&str>,
+        members: Vec<TeamPresetMemberWrite>,
+    ) -> UpdateTeamPresetRequest {
+        UpdateTeamPresetRequest {
+            team: team_write(id, member_ids),
+            members,
+        }
+    }
+
     fn test_row(name: &str) -> SessionPresetMemberRow {
         SessionPresetMemberRow {
             session_agent_id: Uuid::new_v4(),
@@ -569,6 +1205,233 @@ mod tests {
             description: None,
             overwrite_strategy: Some(PresetSnapshotOverwriteStrategy::FailIfExists),
         }
+    }
+
+    #[test]
+    fn create_team_preset_in_config_creates_custom_team_and_members() {
+        let mut presets = test_presets();
+        let mut request = create_team_request(
+            "delivery_team",
+            vec!["delivery_backend"],
+            vec![member_write("delivery_backend")],
+        );
+        request.team.lead_member_id = Some("delivery_backend".to_string());
+
+        let detail = create_team_preset_in_config(&mut presets, request).expect("create succeeds");
+
+        assert_eq!(detail.team.id, "delivery_team");
+        assert_eq!(detail.team.member_ids, vec!["delivery_backend"]);
+        assert_eq!(
+            detail.team.lead_member_id.as_deref(),
+            Some("delivery_backend")
+        );
+        assert_eq!(detail.members.len(), 1);
+        assert_eq!(detail.members[0].name, "delivery_backend");
+        assert_eq!(
+            detail.members[0].selected_skill_ids,
+            vec!["skill-a", "skill-b"]
+        );
+        assert!(!detail.team.is_builtin);
+        assert!(presets.teams.iter().any(|team| team.id == "delivery_team"));
+        assert!(
+            presets
+                .members
+                .iter()
+                .any(|member| member.id == "delivery_backend")
+        );
+    }
+
+    #[test]
+    fn update_team_preset_in_config_updates_custom_team_and_removes_unreferenced_members() {
+        let mut presets = test_presets();
+        create_team_preset_in_config(
+            &mut presets,
+            create_team_request(
+                "delivery_team",
+                vec!["delivery_backend"],
+                vec![member_write("delivery_backend")],
+            ),
+        )
+        .expect("create succeeds");
+
+        let mut update = update_team_request(
+            "delivery_team",
+            vec!["delivery_frontend"],
+            vec![member_write("delivery_frontend")],
+        );
+        update.team.name = "Updated Team".to_string();
+
+        let detail = update_team_preset_in_config(&mut presets, "delivery_team", update)
+            .expect("update succeeds");
+
+        assert_eq!(detail.team.name, "Updated Team");
+        assert_eq!(detail.team.member_ids, vec!["delivery_frontend"]);
+        assert!(
+            presets
+                .members
+                .iter()
+                .any(|member| member.id == "delivery_frontend")
+        );
+        assert!(
+            !presets
+                .members
+                .iter()
+                .any(|member| member.id == "delivery_backend")
+        );
+    }
+
+    #[test]
+    fn delete_team_preset_from_config_removes_only_unshared_custom_members() {
+        let mut presets = test_presets();
+        presets.members.push(custom_member_preset("owned_member"));
+        presets.members.push(custom_member_preset("shared_member"));
+        presets
+            .members
+            .push(builtin_member_preset("builtin_member"));
+        presets.teams.push(ChatTeamPreset {
+            id: "target_team".to_string(),
+            name: "Target".to_string(),
+            description: "Target".to_string(),
+            member_ids: vec![
+                "owned_member".to_string(),
+                "shared_member".to_string(),
+                "builtin_member".to_string(),
+            ],
+            lead_member_id: None,
+            team_protocol: String::new(),
+            is_builtin: false,
+            enabled: true,
+        });
+        presets.teams.push(ChatTeamPreset {
+            id: "other_team".to_string(),
+            name: "Other".to_string(),
+            description: "Other".to_string(),
+            member_ids: vec!["shared_member".to_string()],
+            lead_member_id: None,
+            team_protocol: String::new(),
+            is_builtin: false,
+            enabled: true,
+        });
+
+        delete_team_preset_from_config(&mut presets, "target_team").expect("delete succeeds");
+
+        assert!(!presets.teams.iter().any(|team| team.id == "target_team"));
+        assert!(
+            !presets
+                .members
+                .iter()
+                .any(|member| member.id == "owned_member")
+        );
+        assert!(
+            presets
+                .members
+                .iter()
+                .any(|member| member.id == "shared_member")
+        );
+        assert!(
+            presets
+                .members
+                .iter()
+                .any(|member| member.id == "builtin_member")
+        );
+    }
+
+    #[test]
+    fn team_preset_crud_rejects_builtin_template_mutations() {
+        let mut presets = test_presets();
+        presets
+            .members
+            .push(builtin_member_preset("builtin_member"));
+        presets.teams.push(ChatTeamPreset {
+            id: "builtin_team".to_string(),
+            name: "Built-in".to_string(),
+            description: "Built-in".to_string(),
+            member_ids: vec!["builtin_member".to_string()],
+            lead_member_id: None,
+            team_protocol: String::new(),
+            is_builtin: true,
+            enabled: true,
+        });
+
+        let update_error = update_team_preset_in_config(
+            &mut presets,
+            "builtin_team",
+            update_team_request("builtin_team", vec!["builtin_member"], vec![]),
+        )
+        .expect_err("built-in update should fail");
+        let delete_error = delete_team_preset_from_config(&mut presets, "builtin_team")
+            .expect_err("built-in delete should fail");
+
+        assert!(matches!(update_error, ApiError::Forbidden(_)));
+        assert!(matches!(delete_error, ApiError::Forbidden(_)));
+    }
+
+    #[test]
+    fn team_preset_crud_rejects_builtin_member_edits() {
+        let mut presets = test_presets();
+        presets
+            .members
+            .push(builtin_member_preset("builtin_member"));
+
+        let error = create_team_preset_in_config(
+            &mut presets,
+            create_team_request(
+                "custom_team",
+                vec!["builtin_member"],
+                vec![member_write("builtin_member")],
+            ),
+        )
+        .expect_err("built-in member edit should fail");
+
+        assert!(matches!(error, ApiError::Forbidden(_)));
+    }
+
+    #[test]
+    fn team_preset_crud_validates_member_references_and_duplicate_ids() {
+        let mut missing_reference_presets = test_presets();
+        let missing_reference_error = create_team_preset_in_config(
+            &mut missing_reference_presets,
+            create_team_request("custom_team", vec!["missing_member"], vec![]),
+        )
+        .expect_err("missing member reference should fail");
+
+        let mut duplicate_reference_presets = test_presets();
+        let duplicate_reference_error = create_team_preset_in_config(
+            &mut duplicate_reference_presets,
+            create_team_request(
+                "custom_team",
+                vec!["member_one", "member_one"],
+                vec![member_write("member_one")],
+            ),
+        )
+        .expect_err("duplicate member reference should fail");
+
+        let mut duplicate_payload_presets = test_presets();
+        let duplicate_payload_error = create_team_preset_in_config(
+            &mut duplicate_payload_presets,
+            create_team_request(
+                "custom_team",
+                vec!["member_one"],
+                vec![member_write("member_one"), member_write("member_one")],
+            ),
+        )
+        .expect_err("duplicate member payload should fail");
+
+        let mut invalid_lead_presets = test_presets();
+        let mut invalid_lead_request = create_team_request(
+            "custom_team",
+            vec!["member_one"],
+            vec![member_write("member_one")],
+        );
+        invalid_lead_request.team.lead_member_id = Some("missing_lead".to_string());
+        let invalid_lead_error =
+            create_team_preset_in_config(&mut invalid_lead_presets, invalid_lead_request)
+                .expect_err("invalid lead reference should fail");
+
+        assert!(matches!(missing_reference_error, ApiError::BadRequest(_)));
+        assert!(matches!(duplicate_reference_error, ApiError::BadRequest(_)));
+        assert!(matches!(duplicate_payload_error, ApiError::BadRequest(_)));
+        assert!(matches!(invalid_lead_error, ApiError::BadRequest(_)));
     }
 
     #[test]
