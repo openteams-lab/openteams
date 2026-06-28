@@ -146,255 +146,6 @@ const normalizeWorkflowStepTokens = (value: unknown): WorkflowStepTokenEntry[] =
     };
   });
 
-const timeRangeDays: Record<TimeRange, number> = {
-  '7d': 7,
-  '30d': 30,
-  '90d': 90,
-};
-
-const isoDateNDaysAgo = (daysAgo: number): string => {
-  const date = new Date();
-  date.setDate(date.getDate() - daysAgo);
-  return date.toISOString().slice(0, 10);
-};
-
-const mockDailyTokens = (range: TimeRange): DailyTokenDataPoint[] => {
-  const days = timeRangeDays[range];
-  return Array.from({ length: days }, (_, index) => {
-    const age = days - index - 1;
-    const wave = Math.sin(index / 2.7) * 420_000;
-    const input = Math.round(
-      3_200_000 + index * 140_000 + wave + (index % 4) * 260_000,
-    );
-    const output = Math.round(
-      1_450_000 + index * 80_000 + wave * 0.35 + (index % 3) * 180_000,
-    );
-    return {
-      date: isoDateNDaysAgo(age),
-      input_tokens: Math.max(0, input),
-      output_tokens: Math.max(0, output),
-      cache_read_tokens: 0,
-      reasoning_output_tokens: 0,
-      total_tokens: Math.max(0, input + output),
-      estimated_cost: 0,
-    };
-  });
-};
-
-const mockActivityDays = (range: TimeRange): ActivityDataPoint[] => {
-  const days = timeRangeDays[range];
-  return Array.from({ length: days }, (_, index) => ({
-    date: isoDateNDaysAgo(days - index - 1),
-    bugs_fixed: index % 5 === 0 ? 0 : 1 + ((index * 2) % 4),
-    features_delivered: index % 6 === 1 ? 0 : 1 + (index % 3),
-  }));
-};
-
-const mockSessions: SessionCostEntry[] = [
-  {
-    session_id: 'mock-session-1',
-    title: '修复登录流程中的 OAuth 回调问题',
-    input_tokens: 48200,
-    output_tokens: 19400,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 67600,
-    estimated_cost: 0,
-  },
-  {
-    session_id: 'mock-session-2',
-    title: '构建项目级构建统计 Dashboard',
-    input_tokens: 42100,
-    output_tokens: 17250,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 59350,
-    estimated_cost: 0,
-  },
-  {
-    session_id: 'mock-session-3',
-    title: '重构容器服务与本地部署状态同步',
-    input_tokens: 31840,
-    output_tokens: 11820,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 43660,
-    estimated_cost: 0,
-  },
-  {
-    session_id: 'mock-session-4',
-    title: '补齐模型价格同步与展示逻辑',
-    input_tokens: 24600,
-    output_tokens: 9400,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 34000,
-    estimated_cost: 0,
-  },
-  {
-    session_id: 'mock-session-5',
-    title: '前端空状态与错误兜底验证',
-    input_tokens: 15320,
-    output_tokens: 6110,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 21430,
-    estimated_cost: 0,
-  },
-];
-
-const mockScrollableSessions: SessionCostEntry[] = [
-  ...mockSessions,
-  {
-    session_id: 'mock-session-6',
-    title: 'Stabilize build statistics hover state',
-    input_tokens: 12420,
-    output_tokens: 3980,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 16400,
-    estimated_cost: 0,
-  },
-  {
-    session_id: 'mock-session-7',
-    title: 'Audit pricing cache sync behavior',
-    input_tokens: 10840,
-    output_tokens: 2860,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 13700,
-    estimated_cost: 0,
-  },
-  {
-    session_id: 'mock-session-8',
-    title: 'Polish chart responsive layout',
-    input_tokens: 9120,
-    output_tokens: 2440,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 11560,
-    estimated_cost: 0,
-  },
-  {
-    session_id: 'mock-session-9',
-    title: 'Validate project scoped analytics query',
-    input_tokens: 7800,
-    output_tokens: 2180,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 9980,
-    estimated_cost: 0,
-  },
-  {
-    session_id: 'mock-session-10',
-    title: 'Repair fallback data normalization',
-    input_tokens: 6400,
-    output_tokens: 1720,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 8120,
-    estimated_cost: 0,
-  },
-  {
-    session_id: 'mock-session-11',
-    title: 'Review session token sorting',
-    input_tokens: 5200,
-    output_tokens: 1420,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 6620,
-    estimated_cost: 0,
-  },
-  {
-    session_id: 'mock-session-12',
-    title: 'Tune compact number formatting',
-    input_tokens: 3980,
-    output_tokens: 980,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 4960,
-    estimated_cost: 0,
-  },
-];
-
-const mockModels: ModelUsageRow[] = [
-  {
-    model_id: 'gpt-5.2-codex',
-    model_name: 'GPT-5.2 Codex',
-    input_tokens: 84500,
-    output_tokens: 32900,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 117400,
-    input_price_per_1m: 1.25,
-    output_price_per_1m: 10,
-    cache_read_price_per_1m: 0,
-    estimated_cost: 0.4356,
-    price_source: 'mock',
-    cache_price_source: 'mock',
-  },
-  {
-    model_id: 'sonnet',
-    model_name: 'Claude Sonnet',
-    input_tokens: 61200,
-    output_tokens: 22800,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 84000,
-    input_price_per_1m: 3,
-    output_price_per_1m: 15,
-    cache_read_price_per_1m: 0,
-    estimated_cost: 0.5256,
-    price_source: 'mock',
-    cache_price_source: 'mock',
-  },
-  {
-    model_id: 'gpt-5.2',
-    model_name: 'GPT-5.2',
-    input_tokens: 53100,
-    output_tokens: 18700,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 71800,
-    input_price_per_1m: 0.15,
-    output_price_per_1m: 0.6,
-    cache_read_price_per_1m: 0,
-    estimated_cost: 0.0192,
-    price_source: 'mock',
-    cache_price_source: 'mock',
-  },
-  {
-    model_id: 'gemini-3-pro',
-    model_name: 'Gemini 3 Pro',
-    input_tokens: 38200,
-    output_tokens: 14100,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 52300,
-    input_price_per_1m: 1.25,
-    output_price_per_1m: 10,
-    cache_read_price_per_1m: 0,
-    estimated_cost: 0.1888,
-    price_source: 'mock',
-    cache_price_source: 'mock',
-  },
-  {
-    model_id: 'kimi-k2.6',
-    model_name: 'Kimi K2.6',
-    input_tokens: 29500,
-    output_tokens: 9900,
-    cache_read_tokens: 0,
-    reasoning_output_tokens: 0,
-    total_tokens: 39400,
-    input_price_per_1m: 0.6,
-    output_price_per_1m: 2.5,
-    cache_read_price_per_1m: 0,
-    estimated_cost: 0.0425,
-    price_source: 'mock',
-    cache_price_source: 'mock',
-  },
-];
-
 export function BuildStatsPage() {
   const { t, selectedProjectId } = useWorkspace();
   const [timeRange, setTimeRange] = useState<TimeRange>('7d');
@@ -440,7 +191,7 @@ export function BuildStatsPage() {
 
   const fetchDailyTokens = useCallback(async () => {
     if (!selectedProjectId) {
-      setDailyTokens(mockDailyTokens(timeRange));
+      setDailyTokens([]);
       setDailyTokensLoading(false);
       setDailyTokensError(null);
       return;
@@ -461,7 +212,7 @@ export function BuildStatsPage() {
 
   const fetchActivity = useCallback(async () => {
     if (!selectedProjectId) {
-      setActivityDays(mockActivityDays(timeRange));
+      setActivityDays([]);
       setActivityLoading(false);
       setActivityError(null);
       return;
@@ -497,7 +248,7 @@ export function BuildStatsPage() {
 
   const fetchSessions = useCallback(async () => {
     if (!selectedProjectId) {
-      setSessions(mockScrollableSessions);
+      setSessions([]);
       setSessionsLoading(false);
       setSessionsError(null);
       return;
@@ -548,8 +299,8 @@ export function BuildStatsPage() {
 
   const fetchModels = useCallback(async () => {
     if (!selectedProjectId) {
-      setModels(mockModels);
-      setModelCostModels(mockModels);
+      setModels([]);
+      setModelCostModels([]);
       setModelsLoading(false);
       setModelsError(null);
       modelsLoadedRef.current = true;
