@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::{Context, Result, anyhow, bail};
+use rust_embed::RustEmbed;
 use serde::Deserialize;
 use utils::{path::home_directory, text::sanitize_member_handle};
 
@@ -8,8 +9,11 @@ use crate::services::config::versions::v9::{
     ChatMemberPreset, ChatPresetsConfig, ChatTeamPreset, ChatWorkflowStep,
 };
 
-const TEAM_PROTOCOL_MARKDOWN: &str =
-    include_str!("presets/protocol/team_collaboration_protocol.md");
+const TEAM_COLLABORATION_PROTOCOL_FILE: &str = "team_collaboration_protocol.md";
+
+#[derive(RustEmbed)]
+#[folder = "src/services/config/presets/protocol/"]
+struct EmbeddedTeamProtocolFiles;
 
 const ROLE_PRESET_MARKDOWN: &[(&str, &str)] = &[
     (
@@ -670,41 +674,6 @@ const ROLE_PRESET_MARKDOWN: &[(&str, &str)] = &[
     ("zk-steward.md", include_str!("presets/roles/zk-steward.md")),
 ];
 
-const TEAM_PRESET_MARKDOWN: &[(&str, &str)] = &[
-    (
-        "fullstack_delivery_team.md",
-        include_str!("presets/protocol/fullstack_delivery_team.md"),
-    ),
-    (
-        "ai_prompt_quality_team.md",
-        include_str!("presets/protocol/ai_prompt_quality_team.md"),
-    ),
-    (
-        "architecture_governance_team.md",
-        include_str!("presets/protocol/architecture_governance_team.md"),
-    ),
-    (
-        "product_discovery_team.md",
-        include_str!("presets/protocol/product_discovery_team.md"),
-    ),
-    (
-        "content_studio_team.md",
-        include_str!("presets/protocol/content_studio_team.md"),
-    ),
-    (
-        "growth_marketing_team.md",
-        include_str!("presets/protocol/growth_marketing_team.md"),
-    ),
-    (
-        "research_innovation_team.md",
-        include_str!("presets/protocol/research_innovation_team.md"),
-    ),
-    (
-        "rapid_bugfix_team.md",
-        include_str!("presets/protocol/rapid_bugfix_team.md"),
-    ),
-];
-
 #[derive(Debug, Deserialize)]
 struct RolePresetFrontmatter {
     id: String,
@@ -742,7 +711,11 @@ struct TeamPresetFrontmatter {
     description: String,
     member_ids: Vec<String>,
     #[serde(default)]
+    lead_member_id: Option<String>,
+    #[serde(default)]
     workflow_steps: Vec<ChatWorkflowStep>,
+    #[serde(default = "default_true")]
+    enabled: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -751,8 +724,10 @@ struct TeamPresetMd {
     name: String,
     description: String,
     member_ids: Vec<String>,
+    lead_member_id: Option<String>,
     workflow_steps: Vec<ChatWorkflowStep>,
     team_protocol: String,
+    enabled: bool,
 }
 
 pub struct PresetLoader;
@@ -769,9 +744,10 @@ impl PresetLoader {
             .iter()
             .map(|member| (member.id.as_str(), member))
             .collect();
-        let teams = TEAM_PRESET_MARKDOWN
-            .iter()
-            .map(|(path, raw)| Self::parse_team_preset_markdown(path, raw))
+        let teams = Self::embedded_team_preset_markdown_files()
+            .expect("built-in team preset markdown files should be embedded")
+            .into_iter()
+            .map(|(path, raw)| Self::parse_team_preset_markdown(&path, &raw))
             .map(|team_result| {
                 team_result.and_then(|team_md| {
                     let team_members = team_md
@@ -791,16 +767,27 @@ impl PresetLoader {
                                 })
                         })
                         .collect::<Result<Vec<_>>>()?;
+                    if let Some(ref lead_member_id) = team_md.lead_member_id
+                        && !team_members
+                            .iter()
+                            .any(|member| &member.id == lead_member_id)
+                    {
+                        bail!(
+                            "built-in team \"{}\" lead_member_id references unknown member: {}",
+                            team_md.id,
+                            lead_member_id
+                        );
+                    }
                     Ok(ChatTeamPreset {
                         id: team_md.id,
                         name: team_md.name,
                         description: team_md.description,
                         members: team_members,
-                        lead_member_id: None,
+                        lead_member_id: team_md.lead_member_id,
                         workflow_steps: team_md.workflow_steps,
                         team_protocol: team_md.team_protocol,
                         is_builtin: true,
-                        enabled: true,
+                        enabled: team_md.enabled,
                     })
                 })
             })
@@ -820,14 +807,39 @@ impl PresetLoader {
     }
 
     fn try_load_team_protocol() -> Result<String> {
-        let protocol = normalize_newlines(TEAM_PROTOCOL_MARKDOWN)
-            .trim()
-            .to_string();
+        let protocol = normalize_newlines(&Self::embedded_markdown_file(
+            TEAM_COLLABORATION_PROTOCOL_FILE,
+        )?)
+        .trim()
+        .to_string();
         if protocol.is_empty() {
             bail!("built-in team collaboration protocol is empty");
         }
 
         Ok(protocol)
+    }
+
+    fn embedded_team_preset_markdown_files() -> Result<Vec<(String, String)>> {
+        let mut markdown_files = EmbeddedTeamProtocolFiles::iter()
+            .filter(|path| {
+                path.ends_with(".md") && path.as_ref() != TEAM_COLLABORATION_PROTOCOL_FILE
+            })
+            .map(|path| {
+                let path = path.into_owned();
+                let raw = Self::embedded_markdown_file(&path)?;
+                Ok((path, raw))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        markdown_files.sort_by(|left, right| left.0.cmp(&right.0));
+        Ok(markdown_files)
+    }
+
+    fn embedded_markdown_file(path: &str) -> Result<String> {
+        let asset = EmbeddedTeamProtocolFiles::get(path)
+            .ok_or_else(|| anyhow!("missing embedded team protocol markdown: {path}"))?;
+        String::from_utf8(asset.data.into_owned())
+            .with_context(|| format!("embedded team protocol markdown is not UTF-8: {path}"))
     }
 
     fn parse_chat_member_preset(
@@ -912,10 +924,19 @@ impl PresetLoader {
             name: frontmatter.name,
             description: frontmatter.description,
             member_ids,
+            lead_member_id: frontmatter
+                .lead_member_id
+                .map(|lead_member_id| lead_member_id.trim().to_string())
+                .filter(|lead_member_id| !lead_member_id.is_empty()),
             workflow_steps: frontmatter.workflow_steps,
             team_protocol: body.trim().to_string(),
+            enabled: frontmatter.enabled,
         })
     }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn normalize_selected_skill_ids(skill_ids: Vec<String>) -> Vec<String> {
@@ -957,14 +978,16 @@ fn split_frontmatter(content: &str) -> Option<(&str, &str)> {
 mod tests {
     use utils::path::home_directory;
 
-    use super::PresetLoader;
+    use super::{PresetLoader, TEAM_COLLABORATION_PROTOCOL_FILE};
 
     #[test]
     fn load_builtin_presets_reads_all_builtin_preset_markdown_files() {
         let presets = PresetLoader::load_builtin_presets();
 
         assert_eq!(presets.members.len(), 166); // 22 original + 144 new
-        assert_eq!(presets.teams.len(), 8);
+        let embedded_team_files = PresetLoader::embedded_team_preset_markdown_files()
+            .expect("embedded team markdown files should load");
+        assert_eq!(presets.teams.len(), embedded_team_files.len());
 
         let fullstack = presets
             .members
@@ -1145,7 +1168,53 @@ Coordinate tightly and document every handoff.
             parsed.team_protocol,
             "Coordinate tightly and document every handoff.\n- Backend owns API behavior.\n- Frontend owns UX delivery."
         );
+        assert_eq!(parsed.lead_member_id, None);
         assert!(parsed.workflow_steps.is_empty());
+        assert!(parsed.enabled);
+    }
+
+    #[test]
+    fn parse_team_preset_markdown_supports_all_team_template_metadata() {
+        let markdown = r#"---
+id: sample_team
+name: Sample Team
+description: Team description
+member_ids:
+  - backend_engineer
+  - frontend_engineer
+lead_member_id: backend_engineer
+workflow_steps:
+  - title: Plan
+    description: Set the implementation direction.
+  - title: Ship
+    description: Deliver and verify the change.
+enabled: false
+---
+
+Follow the team protocol.
+"#;
+
+        let parsed = PresetLoader::parse_team_preset_markdown("sample_team.md", markdown).unwrap();
+
+        assert_eq!(parsed.lead_member_id.as_deref(), Some("backend_engineer"));
+        assert_eq!(parsed.workflow_steps.len(), 2);
+        assert_eq!(parsed.workflow_steps[0].title, "Plan");
+        assert!(!parsed.enabled);
+        assert_eq!(parsed.team_protocol, "Follow the team protocol.");
+    }
+
+    #[test]
+    fn embedded_team_preset_markdown_files_load_from_protocol_directory() {
+        let files = PresetLoader::embedded_team_preset_markdown_files()
+            .expect("embedded team markdown files should load");
+        let file_names = files
+            .iter()
+            .map(|(path, _)| path.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(file_names.contains(&"fullstack_delivery_team.md"));
+        assert!(file_names.contains(&"rapid_bugfix_team.md"));
+        assert!(!file_names.contains(&TEAM_COLLABORATION_PROTOCOL_FILE));
     }
 
     #[test]
