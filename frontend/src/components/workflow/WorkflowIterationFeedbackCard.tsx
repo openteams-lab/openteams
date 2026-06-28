@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronUp } from 'lucide-react';
+import { Check, ChevronUp, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import type { WorkflowIterationSummaryData } from '@/lib/api';
@@ -307,11 +307,16 @@ export function WorkflowIterationFeedbackCard({
             'border-t border-white/[0.06] bg-transparent p-4 transition-all duration-300'
           )}
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
+          <div
+            className={cn(
+              'flex items-center justify-between gap-3',
+              expandedReject && 'mb-3'
+            )}
+          >
+            <div className="flex min-w-0 items-center gap-2">
               <div
                 className={cn(
-                  'h-1.5 w-1.5 rounded-full',
+                  'h-1.5 w-1.5 shrink-0 rounded-full',
                   expandedReject
                     ? 'bg-[var(--workflow-danger,#ef4444)] shadow-[0_0_10px_color-mix(in_srgb,var(--workflow-danger,#ef4444)_55%,transparent)]'
                     : 'bg-[var(--primary)] shadow-[0_0_10px_color-mix(in_srgb,var(--primary)_48%,transparent)]'
@@ -319,7 +324,7 @@ export function WorkflowIterationFeedbackCard({
               />
               <span
                 className={cn(
-                  'font-mono text-[10px] font-medium uppercase',
+                  'truncate font-mono text-[10px] font-medium uppercase',
                   expandedReject
                     ? 'text-[var(--workflow-danger,#ef4444)]'
                     : 'text-[#8A8F98]'
@@ -334,6 +339,43 @@ export function WorkflowIterationFeedbackCard({
                     })}
               </span>
             </div>
+
+            {!expandedReject && (
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAccept}
+                  disabled={disabled || !canSubmit}
+                  className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-white/[0.05] bg-[#2A2B32] px-3 text-[13px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_8px_18px_rgba(0,0,0,0.18)] transition-colors hover:bg-[#31323A] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+                >
+                  <Check
+                    className="h-3.5 w-3.5"
+                    strokeWidth={2.3}
+                    strokeLinecap="square"
+                    strokeLinejoin="miter"
+                  />
+                  {t('workflow.iterationFeedback.accept', {
+                    defaultValue: 'ACCEPT',
+                  })}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReject}
+                  disabled={disabled || !canSubmit}
+                  className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-white/[0.08] bg-transparent px-3 text-[13px] font-medium text-[#8A8F98] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors hover:border-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_20%,transparent)] hover:bg-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_10%,transparent)] hover:text-[#d95c61] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+                >
+                  <X
+                    className="h-3.5 w-3.5"
+                    strokeWidth={2.3}
+                    strokeLinecap="square"
+                    strokeLinejoin="miter"
+                  />
+                  {t('workflow.iterationFeedback.reject', {
+                    defaultValue: 'REJECT',
+                  })}
+                </button>
+              </div>
+            )}
           </div>
 
           {expandedReject && (
@@ -433,53 +475,38 @@ export function WorkflowIterationFeedbackCard({
             </div>
           )}
 
-          <div className="flex gap-3">
-            {!expandedReject && (
+          {expandedReject && (
+            <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={handleAccept}
+                onClick={handleReject}
                 disabled={disabled || !canSubmit}
-                className="flex h-8 flex-1 items-center justify-center rounded-md border border-[color-mix(in_srgb,var(--primary)_52%,white_10%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--primary)_88%,white_10%),var(--primary))] px-3 text-[13px] font-semibold text-[var(--on-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_10px_26px_rgba(37,99,235,0.22)] transition-all hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+                className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_24%,transparent)] bg-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_10%,transparent)] px-3 text-[13px] font-medium text-[var(--workflow-danger,#ef4444)] transition-colors hover:bg-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_15%,transparent)] hover:text-[#ff5d5d] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
               >
-                {t('workflow.iterationFeedback.accept', {
-                  defaultValue: 'ACCEPT',
+                <X
+                  className="h-3.5 w-3.5"
+                  strokeWidth={2.3}
+                  strokeLinecap="square"
+                  strokeLinejoin="miter"
+                />
+                {t('workflow.iterationFeedback.submitRejection', {
+                  defaultValue: 'SUBMIT REJECTION',
                 })}
               </button>
-            )}
-            <button
-              type="button"
-              onClick={handleReject}
-              disabled={disabled || !canSubmit}
-              className={cn(
-                'flex h-8 flex-1 items-center justify-center rounded-md px-3 text-[13px] font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100',
-                expandedReject
-                  ? 'border border-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_24%,transparent)] bg-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_10%,transparent)] text-[var(--workflow-danger,#ef4444)] hover:bg-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_15%,transparent)] hover:text-[#ff5d5d]'
-                  : 'border border-transparent bg-transparent text-[#5F6672] hover:bg-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_15%,transparent)] hover:text-[#ff5d5d]'
-              )}
-            >
-              {expandedReject
-                ? t('workflow.iterationFeedback.submitRejection', {
-                    defaultValue: 'SUBMIT REJECTION',
-                  })
-                : t('workflow.iterationFeedback.reject', {
-                    defaultValue: 'REJECT',
-                  })}
-            </button>
-            {expandedReject && (
               <button
                 type="button"
                 onClick={() => {
                   setExpandedReject(false);
                   setValidationError(null);
                 }}
-                className="flex h-8 items-center justify-center rounded-md border border-white/[0.08] bg-transparent px-4 text-[13px] font-semibold text-[#8A8F98] transition-all hover:bg-white/[0.06] hover:text-[#F2F2F2]"
+                className="inline-flex h-7 items-center justify-center rounded-md border border-white/[0.08] bg-transparent px-3 text-[13px] font-medium text-[#8A8F98] transition-colors hover:bg-white/[0.06] hover:text-[#F2F2F2]"
               >
                 {t('workflow.iterationFeedback.cancel', {
                   defaultValue: 'CANCEL',
                 })}
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
       </motion.div>
