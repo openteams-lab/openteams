@@ -74,7 +74,11 @@ const PROTOCOL_OUTPUT_SCHEMA_JSON_WORKFLOW_PLAN: &str = r#"{
         "type": "object",
         "properties": {
           "type": { "const": "artifact" },
-          "content": { "type": "string", "minLength": 1 }
+          "content": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          }
         },
         "required": ["type", "content"],
         "additionalProperties": false
@@ -134,7 +138,11 @@ const PROTOCOL_OUTPUT_SCHEMA_JSON: &str = r#"{
         "type": "object",
         "properties": {
           "type": { "const": "artifact" },
-          "content": { "type": "string", "minLength": 1 }
+          "content": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          }
         },
         "required": ["type", "content"],
         "additionalProperties": false
@@ -154,11 +162,13 @@ const PROTOCOL_OUTPUT_SCHEMA_JSON: &str = r#"{
 }"#;
 const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON: &str = r#"[
   {"type": "send", "to": "you", "intent": "request", "content": "I have finished the implementation"},
+  {"type": "artifact", "content": ["frontend/src/lib/api.ts", "crates/server/src/routes/chat/sessions.rs"]},
   {"type": "record", "content": "The metrics are `latency_p95_ms` and `success_rate`."},
   {"type": "conclusion", "content": "Finished metric definition. Next: wire collection into runner."}
 ]"#;
 const MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON_WORKFLOW_PLAN: &str = r#"[
   {"type": "send", "to": "you", "intent": "request", "content": "I have finished the implementation"},
+  {"type": "artifact", "content": ["docs/workflow-plan.md"]},
   {"type": "record", "content": "The metrics are `latency_p95_ms` and `success_rate`."},
   {"type": "workflow_generate", "plan_check": true, "content": "Generate a workflow plan to implement the following task: ...", "design_doc_path": ["path/to/design_doc1.md", "path/to/design_doc2.md"]}
 ]"#;

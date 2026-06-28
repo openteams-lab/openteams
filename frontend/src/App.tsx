@@ -95,6 +95,7 @@ type WorkspaceTab =
       kind: "diff";
       sessionId: string;
       filePath: string;
+      runId?: string;
       status: string;
       unified_diff: string;
     }
@@ -911,8 +912,11 @@ function WorkspaceLayout() {
     };
   });
 
-  const createDiffTabId = (sessionId: string, filePath: string) =>
-    `diff:${sessionId}:${filePath}`;
+  const createDiffTabId = (
+    sessionId: string,
+    filePath: string,
+    runId?: string,
+  ) => `diff:${sessionId}:${runId ?? "session"}:${filePath}`;
   const createSourceControlDiffTabId = (
     projectId: string,
     sessionId: string,
@@ -925,12 +929,14 @@ function WorkspaceLayout() {
     filePath: string,
     status: string,
     unified_diff: string,
+    runId?: string,
   ) => {
     const nextTab: WorkspaceTab = {
-      id: createDiffTabId(sessionId, filePath),
+      id: createDiffTabId(sessionId, filePath, runId),
       kind: "diff",
       sessionId,
       filePath,
+      runId,
       status,
       unified_diff,
     };

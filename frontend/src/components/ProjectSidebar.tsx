@@ -26,6 +26,7 @@ import {
   Github,
   Hash,
   History,
+  Home,
   Inbox,
   LoaderCircle,
   MoreHorizontal,
@@ -33,6 +34,7 @@ import {
   Pin,
   Plus,
   PlusCircle,
+  RefreshCw,
   Settings2,
   Trash2,
   Users,
@@ -164,6 +166,12 @@ const blankTeamOptions: DropdownSelectOption[] = [
     hint: "1",
   },
 ];
+
+const createProjectLabelClass =
+  "mb-1.5 block text-[12px] font-semibold tracking-[0.04em] text-[var(--ink-tertiary)]";
+
+const createProjectFieldBaseClass =
+  "w-full rounded-md border border-transparent bg-[rgba(255,255,255,0.04)] px-3 py-2 text-[var(--ink)] outline-none transition placeholder:text-[rgba(138,143,152,0.58)] hover:bg-[rgba(255,255,255,0.055)] focus:border-[rgba(130,143,255,0.58)] focus:bg-[rgba(255,255,255,0.06)]";
 
 const getNavigationIcon = (icon: string): LucideIcon =>
   navigationIcons[icon] ?? CircleDot;
@@ -375,6 +383,11 @@ export function ProjectSidebar({
   const [workspaceBrowserError, setWorkspaceBrowserError] = useState<
     string | null
   >(null);
+  const [workspaceBrowserScrolling, setWorkspaceBrowserScrolling] =
+    useState(false);
+  const workspaceBrowserScrollResetRef = useRef<
+    ReturnType<typeof setTimeout> | null
+  >(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
   const [deletingProjectDraft, setDeletingProjectDraft] =
@@ -487,6 +500,17 @@ export function ProjectSidebar({
 
   const statValue = (_statId: string, value: string) => value;
 
+  const handleWorkspaceBrowserScroll = useCallback(() => {
+    setWorkspaceBrowserScrolling(true);
+    if (workspaceBrowserScrollResetRef.current) {
+      clearTimeout(workspaceBrowserScrollResetRef.current);
+    }
+    workspaceBrowserScrollResetRef.current = setTimeout(() => {
+      setWorkspaceBrowserScrolling(false);
+      workspaceBrowserScrollResetRef.current = null;
+    }, 900);
+  }, []);
+
   useEffect(() => {
     if (!selectedProjectId) {
       setRealBuildStats(null);
@@ -578,6 +602,14 @@ export function ProjectSidebar({
       }
     });
   }, [selectedProjectId]);
+
+  useEffect(() => {
+    return () => {
+      if (workspaceBrowserScrollResetRef.current) {
+        clearTimeout(workspaceBrowserScrollResetRef.current);
+      }
+    };
+  }, []);
 
   const openBuildStatsPage = () => {
     onNavigate({
@@ -1315,7 +1347,7 @@ export function ProjectSidebar({
             role="presentation"
           >
             <div
-              className="absolute inset-0 bg-[#000000]"
+              className="absolute inset-0 bg-black/70"
               onClick={() => {
                 setCreateFormOpen(false);
                 setCreateError(null);
@@ -1339,12 +1371,12 @@ export function ProjectSidebar({
               role="dialog"
               aria-modal="true"
               aria-labelledby="create-project-modal-title"
-              className="relative w-full max-w-[480px] rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface-2)]"
+              className="relative w-full max-w-[480px] overflow-hidden rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#141517]"
             >
-              <header className="flex items-center justify-between border-b border-[var(--hairline)] px-6 py-4">
+              <header className="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] px-6 py-4">
                 <h2
                   id="create-project-modal-title"
-                  className="text-[14px] font-semibold tracking-tight text-[var(--ink)]"
+                  className="text-[14px] font-semibold text-[var(--ink)]"
                 >
                   {editingProject
                     ? translate("sidebar.editProject", "Edit project")
@@ -1352,7 +1384,7 @@ export function ProjectSidebar({
                 </h2>
                 <button
                   type="button"
-                  className="rounded-md p-1 text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+                  className="rounded-md p-1 text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink)]"
                   onClick={() => {
                     setCreateFormOpen(false);
                     setCreateError(null);
@@ -1365,11 +1397,11 @@ export function ProjectSidebar({
               </header>
               <form className="space-y-4 p-6" onSubmit={handleCreateProject}>
                 <div>
-                  <label className="mb-1.5 block text-[13px] font-medium tracking-[0.4px] text-[var(--ink-tertiary)]">
+                  <label className={createProjectLabelClass}>
                     {translate("sidebar.projectName", "Project name")}
                   </label>
                   <input
-                    className="w-full rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)]"
+                    className={`${createProjectFieldBaseClass} text-[14px]`}
                     value={projectName}
                     onChange={(event) => setProjectName(event.target.value)}
                     placeholder={translate(
@@ -1382,7 +1414,7 @@ export function ProjectSidebar({
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-[13px] font-medium tracking-[0.4px] text-[var(--ink-tertiary)]">
+                  <label className={createProjectLabelClass}>
                     {translate("sidebar.assignTeam", "Assign team")}
                   </label>
                   <DropdownSelect
@@ -1403,15 +1435,16 @@ export function ProjectSidebar({
                       "No teams match this search.",
                     )}
                     triggerIcon={
-                      <Users className="h-3.5 w-3.5 text-[var(--ink-tertiary)]" />
+                      <Users className="h-3 w-3 text-[var(--ink-tertiary)]" />
                     }
+                    triggerClassName="border-transparent bg-[rgba(255,255,255,0.04)] hover:border-transparent hover:bg-[rgba(255,255,255,0.055)]"
                     panelClassName="z-[1010] max-w-none"
                     maxPanelHeightClassName="max-h-[240px]"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="mb-1.5 block text-[13px] font-medium tracking-[0.4px] text-[var(--ink-tertiary)]">
+                  <label className={createProjectLabelClass}>
                     {translate(
                       "sidebar.workspaceSettings",
                       "Workspace settings",
@@ -1419,7 +1452,7 @@ export function ProjectSidebar({
                   </label>
                   <div className="flex gap-2">
                     <input
-                      className="min-w-0 flex-1 rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2 font-mono text-[13px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)]"
+                      className={`min-w-0 flex-1 ${createProjectFieldBaseClass} font-mono text-[13px]`}
                       value={projectWorkspacePath}
                       onChange={(event) =>
                         setProjectWorkspacePath(event.target.value)
@@ -1431,7 +1464,7 @@ export function ProjectSidebar({
                     />
                     <button
                       type="button"
-                      className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--hairline-strong)] bg-[var(--surface-3)] px-3 py-2 text-[14px] font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-4)] hover:text-[var(--ink)]"
+                      className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-transparent bg-[rgba(255,255,255,0.04)] px-3 py-2 text-[13px] font-medium text-[var(--ink-subtle)] transition hover:bg-[rgba(255,255,255,0.065)] hover:text-[var(--ink)]"
                       onClick={() => {
                         setWorkspaceBrowserOpen((open) => !open);
                       }}
@@ -1442,55 +1475,71 @@ export function ProjectSidebar({
                   </div>
 
                   {workspaceBrowserOpen && (
-                    <div className="overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)]">
-                      <div className="flex items-center gap-2 border-b border-[var(--hairline)] bg-[var(--surface-2)] px-3 py-2">
-                        <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-[var(--ink-tertiary)]">
+                    <div className="overflow-hidden rounded-lg bg-transparent">
+                      <div className="flex items-center gap-1.5 border-b border-[rgba(255,255,255,0.08)] px-1 py-1.5">
+                        <span className="min-w-0 flex-1 truncate px-1 font-mono text-[12px] text-[var(--ink-tertiary)]">
                           {workspaceCurrentPath ||
                             translate("sidebar.workspaceRoots", "Local roots")}
                         </span>
                         <button
                           type="button"
-                          className="rounded-sm border border-[var(--hairline)] bg-[var(--surface-3)] px-2 py-1 text-[12px] text-[var(--ink-muted)] transition hover:bg-[var(--surface-4)] hover:text-[var(--ink)]"
+                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink-muted)]"
                           onClick={() => void loadWorkspaceRoots()}
+                          aria-label={translate("sidebar.roots", "Roots")}
+                          title={translate("sidebar.roots", "Roots")}
                         >
-                          {translate("sidebar.roots", "Roots")}
+                          <Home className="h-3.5 w-3.5" />
                         </button>
                         <button
                           type="button"
                           disabled={!workspaceCurrentPath}
-                          className="rounded-sm border border-[var(--hairline)] bg-[var(--surface-3)] px-2 py-1 text-[12px] text-[var(--ink-muted)] transition hover:bg-[var(--surface-4)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-40"
+                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink-muted)] disabled:cursor-not-allowed disabled:opacity-35"
                           onClick={() => {
                             const parent = getParentPath(workspaceCurrentPath);
                             if (parent) void loadWorkspaceDirectory(parent);
                           }}
+                          aria-label={translate("sidebar.up", "Up")}
+                          title={translate("sidebar.up", "Up")}
                         >
-                          {translate("sidebar.up", "Up")}
+                          <ChevronUp className="h-3.5 w-3.5" />
                         </button>
                         <button
                           type="button"
-                          className="rounded-sm bg-[var(--primary)] px-2 py-1 text-[12px] font-medium text-white transition hover:bg-[var(--primary-hover)]"
+                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink)]"
                           onClick={() =>
                             void loadWorkspaceDirectory(projectWorkspacePath)
                           }
+                          aria-label={translate(
+                            "sidebar.readWorkspace",
+                            "Read",
+                          )}
+                          title={translate("sidebar.readWorkspace", "Read")}
                         >
-                          {translate("sidebar.readWorkspace", "Read")}
+                          <RefreshCw className="h-3.5 w-3.5" />
                         </button>
                       </div>
                       {workspaceBrowserError && (
-                        <div className="border-b border-[var(--hairline)] px-3 py-2 text-[13px] text-red-400">
+                        <div className="px-3 py-2 text-[12px] text-red-400">
                           {workspaceBrowserError}
                         </div>
                       )}
-                      <div className="max-h-[180px] overflow-y-auto py-1 ot-scroll-area-styled">
+                      <div
+                        className={`project-workspace-browser-scrollbar h-[180px] overflow-y-auto px-1 py-1 ${
+                          workspaceBrowserScrolling
+                            ? "project-workspace-browser-scrollbar-active"
+                            : ""
+                        }`}
+                        onScroll={handleWorkspaceBrowserScroll}
+                      >
                         {workspaceBrowserLoading ? (
-                          <div className="px-3 py-2 text-[13px] text-[var(--ink-tertiary)]">
+                          <div className="px-2 py-2 text-[12px] text-[var(--ink-tertiary)]">
                             {translate(
                               "sidebar.workspaceLoading",
                               "Reading local files...",
                             )}
                           </div>
                         ) : workspaceEntries.length === 0 ? (
-                          <div className="px-3 py-2 text-[13px] text-[var(--ink-tertiary)]">
+                          <div className="px-2 py-2 text-[12px] text-[var(--ink-tertiary)]">
                             {translate(
                               "sidebar.workspaceEmpty",
                               "No files were found here.",
@@ -1499,34 +1548,71 @@ export function ProjectSidebar({
                         ) : (
                           workspaceEntries.map((entry) => {
                             const Icon = entry.is_directory ? Folder : FileText;
+                            const selected =
+                              entry.path === projectWorkspacePath.trim();
                             return (
-                              <button
+                              <div
                                 key={`${entry.path}-${directoryEntryTime(entry)}`}
-                                type="button"
-                                disabled={!entry.is_directory}
-                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-[var(--ink-subtle)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50 transition"
-                                onClick={() => {
-                                  if (entry.is_directory) {
-                                    void loadWorkspaceDirectory(entry.path);
-                                  }
-                                }}
+                                className={`group/workspace-entry relative flex items-center rounded-md ${
+                                  selected
+                                    ? "bg-[rgba(255,255,255,0.08)] before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-[2px] before:rounded-full before:bg-[var(--primary)]"
+                                    : ""
+                                }`}
                               >
-                                <Icon
-                                  className={`h-3.5 w-3.5 shrink-0 ${
-                                    entry.is_git_repo
-                                      ? "text-[var(--primary)]"
-                                      : "text-[var(--ink-tertiary)]"
+                                <button
+                                  type="button"
+                                  disabled={!entry.is_directory}
+                                  className={`flex min-h-7 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors hover:bg-[rgba(255,255,255,0.04)] disabled:cursor-default disabled:opacity-55 ${
+                                    selected
+                                      ? "text-white"
+                                      : "text-[#8A8F98] hover:text-[#D1D5DB]"
                                   }`}
-                                />
-                                <span className="min-w-0 flex-1 truncate font-mono text-[13px]">
-                                  {entry.name}
-                                </span>
-                                {entry.is_git_repo && (
-                                  <span className="rounded-xs bg-[var(--primary-tint)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--primary)]">
-                                    git
+                                  onClick={() => {
+                                    if (entry.is_directory) {
+                                      void loadWorkspaceDirectory(entry.path);
+                                    }
+                                  }}
+                                >
+                                  <Icon
+                                    className={`h-4 w-4 shrink-0 ${
+                                      selected
+                                        ? "text-white"
+                                        : entry.is_git_repo
+                                          ? "text-[#8A94FA]"
+                                          : "text-[#8A8F98]"
+                                    }`}
+                                  />
+                                  <span className="min-w-0 flex-1 truncate font-mono text-[12px]">
+                                    {entry.name}
                                   </span>
+                                  {entry.is_git_repo && (
+                                    <span className="rounded-[4px] bg-[rgba(94,106,210,0.15)] px-1.5 py-px font-mono text-[10px] font-semibold text-[#8A94FA]">
+                                      GIT
+                                    </span>
+                                  )}
+                                </button>
+                                {entry.is_directory && (
+                                  <button
+                                    type="button"
+                                    className={`mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] opacity-0 transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink)] group-hover/workspace-entry:opacity-100 ${
+                                      selected ? "!opacity-100" : ""
+                                    }`}
+                                    onClick={() =>
+                                      setProjectWorkspacePath(entry.path)
+                                    }
+                                    aria-label={translate(
+                                      "sidebar.selectWorkspace",
+                                      "Select workspace",
+                                    )}
+                                    title={translate(
+                                      "sidebar.selectWorkspace",
+                                      "Select workspace",
+                                    )}
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </button>
                                 )}
-                              </button>
+                              </div>
                             );
                           })
                         )}
@@ -1537,14 +1623,17 @@ export function ProjectSidebar({
                 {createError && (
                   <div className="text-[13px] text-red-400">{createError}</div>
                 )}
-                <div className="flex items-center justify-between border-t border-[var(--hairline)] bg-[var(--surface-1)] -mx-6 -mb-6 mt-2 rounded-b-lg px-6 py-3">
-                  <span className="rounded-xs border border-[var(--hairline)] bg-[var(--surface-3)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--ink-muted)]">
-                    {translate("escToCancel", "Esc to cancel")}
+                <div className="-mx-6 -mb-6 mt-2 flex items-center justify-between border-t border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.025)] px-6 py-3">
+                  <span className="flex items-center gap-1.5 text-[11px] text-[var(--ink-tertiary)]">
+                    <kbd className="rounded-[4px] border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--ink-subtle)] shadow-[inset_0_-1px_0_rgba(0,0,0,0.35)]">
+                      Esc
+                    </kbd>
+                    {translate("sidebar.cancel", "Cancel")}
                   </span>
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      className="cursor-pointer rounded-md border border-[var(--hairline-strong)] bg-[var(--surface-3)] px-3 py-1.5 text-[14px] font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-4)] hover:text-[var(--ink)]"
+                      className="cursor-pointer rounded-md px-2.5 py-1.5 text-[13px] font-medium text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.055)] hover:text-[var(--ink)]"
                       onClick={() => {
                         setCreateFormOpen(false);
                         setCreateError(null);
@@ -1557,7 +1646,7 @@ export function ProjectSidebar({
                     <button
                       type="submit"
                       disabled={creatingProject || !projectName.trim()}
-                      className="cursor-pointer rounded-md bg-[var(--primary)] px-3.5 py-1.5 text-[14px] font-medium text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="cursor-pointer rounded-md bg-white px-3.5 py-1.5 text-[13px] font-semibold text-[#0b0b0c] transition hover:bg-[rgba(255,255,255,0.9)] disabled:cursor-not-allowed disabled:bg-[rgba(255,255,255,0.22)] disabled:text-[rgba(255,255,255,0.46)]"
                     >
                       {creatingProject
                         ? translate("sidebar.creatingProject", "Creating...")

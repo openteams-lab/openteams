@@ -924,17 +924,11 @@ impl ChatRunner {
             markdown
                 .push_str("3. `send.to` must match a group member name or `\"you\"` (the user).\n");
         }
-        markdown.push_str("4. `record`: long-lived shared facts only. Written to `");
-        markdown.push_str(&shared_blackboard_rel.to_string_lossy());
-        markdown.push_str("`.\n");
-        markdown.push_str("5. `artifact`: deliverables or file paths only. Written to `");
-        markdown.push_str(&work_records_rel.to_string_lossy());
-        markdown.push_str("`.\n");
+        markdown.push_str("4. `record`: long-lived shared facts only.\n`");
+        markdown.push_str("5. `artifact.content`: a JSON array of file paths only. Include every file modified, added, or deleted in this turn. Paths may be workspace-relative or absolute, but must not include prose.\n");
         markdown.push_str(
-            "6. `conclusion`: current-turn summary only (completed work, blockers, next steps). Max 3 sentences. Written to `",
+            "6. `conclusion`: current-turn summary only (completed work, blockers, next steps). Max 3 sentences.\n",
         );
-        markdown.push_str(&work_records_rel.to_string_lossy());
-        markdown.push_str("`.\n");
         if is_workflow_mode {
             markdown.push_str("7. `workflow_generate`: \n");
             markdown.push_str(

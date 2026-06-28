@@ -38,10 +38,14 @@ import { AgentMessageContent } from "@/components/AgentMessageContent";
 import { SessionSourceControlPanel } from "@/components/source-control/SessionSourceControlPanel";
 import {
   chatMessagesApi,
+  chatRunsApi,
   sessionAgentsApi,
   projectWorkItemsApi,
 } from "@/lib/api";
-import type { AgentFileRow } from "@/lib/agentFileRows";
+import {
+  flattenRunFileChanges,
+  type AgentFileRow,
+} from "@/lib/agentFileRows";
 import {
   CHAT_INPUT_PREFILL_EVENT,
   clearChatInputPrefill,
@@ -86,6 +90,7 @@ interface FreeChatWorkspaceProps {
     filePath: string,
     status: string,
     unifiedDiff: string,
+    runId?: string,
   ) => void;
   onOpenSourceControlDiffTab?: (
     projectId: string,
@@ -1886,15 +1891,6 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     [activeSessionId, currentWorkspacePath, showToast],
   );
 
-  const isDifferentWorkspace = (workspacePath?: string | null) => {
-    if (!workspacePath) return false;
-    if (!currentWorkspacePath) return true;
-    return (
-      workspacePath.replace(/\\/g, "/").toLowerCase() !==
-      currentWorkspacePath.replace(/\\/g, "/").toLowerCase()
-    );
-  };
-
   // Open an artifact file from an agent message. Files without run diff data
   // (including ignored `.openteams/` artifacts) open in Explorer directly.
   const handleOpenArtifact = useCallback(
@@ -1909,42 +1905,47 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
         return;
       }
 
-      const match = relatedFileChanges.find(
-        (candidate) =>
-          normalizeArtifactPath(candidate.path) === normalizeArtifactPath(path),
-      );
-      if (match && hasRelatedFileDiff(match) && onOpenDiffTab) {
+      const openRunDiff = (row: AgentFileRow) => {
+        if (!onOpenDiffTab || row.unifiedDiff === undefined) {
+          return false;
+        }
         onOpenDiffTab(
           activeSessionId,
-          match.path,
-          match.status,
-          match.unified_diff ?? "",
+          row.path,
+          row.status ?? file.status ?? "M",
+          row.unifiedDiff,
+          row.runId ?? file.runId,
         );
+        return true;
+      };
+
+      if (openRunDiff(file)) {
         return;
       }
-      if (isDifferentWorkspace(file.workspacePath)) {
-        openArtifactInExplorer(path, file.workspacePath);
-        return;
-      }
-      if (selectedProjectId && onOpenSourceControlDiffTab) {
-        onOpenSourceControlDiffTab(
-          selectedProjectId,
-          activeSessionId,
-          path,
-          "changes",
-        );
+      if (file.runId) {
+        void chatRunsApi
+          .getFiles(file.runId, { includeDiff: true })
+          .then((response) => {
+            const match = flattenRunFileChanges(response).find(
+              (candidate) =>
+                normalizeArtifactPath(candidate.path) ===
+                normalizeArtifactPath(path),
+            );
+            if (!match || !openRunDiff(match)) {
+              openArtifactInExplorer(path, file.workspacePath);
+            }
+          })
+          .catch(() => {
+            openArtifactInExplorer(path, file.workspacePath);
+          });
         return;
       }
       openArtifactInExplorer(path, file.workspacePath);
     },
     [
-      relatedFileChanges,
       onOpenDiffTab,
-      onOpenSourceControlDiffTab,
       activeSessionId,
-      selectedProjectId,
       openArtifactInExplorer,
-      currentWorkspacePath,
     ],
   );
 

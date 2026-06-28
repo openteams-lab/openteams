@@ -56,7 +56,7 @@ export interface Session {
 }
 
 export interface ArtifactItem {
-  /** Trimmed file path (or artifact content) used for display + matching. */
+  /** Clean file path extracted from an artifact entry. */
   path: string;
   /** Original, untrimmed artifact content. */
   raw: string;

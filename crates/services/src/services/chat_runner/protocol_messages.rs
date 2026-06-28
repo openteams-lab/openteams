@@ -19,10 +19,42 @@ struct AgentProtocolMessage {
     intent: Option<String>,
     #[serde(default)]
     plan_check: Option<bool>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_protocol_content")]
     content: String,
     #[serde(default)]
     design_doc_path: Option<Vec<String>>,
+}
+
+fn deserialize_protocol_content<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::String(text) => Ok(text),
+        serde_json::Value::Array(items) => {
+            let mut paths = Vec::new();
+            for item in items {
+                let Some(path) = item.as_str().map(str::trim).filter(|path| !path.is_empty())
+                else {
+                    return Err(serde::de::Error::custom(
+                        "content arrays must contain only non-empty strings",
+                    ));
+                };
+                paths.push(path.to_string());
+            }
+            if paths.is_empty() {
+                return Err(serde::de::Error::custom(
+                    "content arrays must contain at least one string",
+                ));
+            }
+            serde_json::to_string(&paths).map_err(serde::de::Error::custom)
+        }
+        other => Err(serde::de::Error::custom(format!(
+            "content must be a string or an array of strings, got {}",
+            ChatRunner::json_value_kind(&other)
+        ))),
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1011,7 +1011,9 @@ impl ChatRunner {
             }
 
             for path in extract_workspace_paths_from_artifact_text(&entry.content, workspace_path) {
-                paths.insert(path, ());
+                if workspace_path.join(&path).is_file() {
+                    paths.insert(path, ());
+                }
             }
         }
 

@@ -581,7 +581,7 @@ fn parse_agent_protocol_messages_supports_json_list() {
 [
   {"type":"send","to":"backend","intent":"REQUEST","content":"redo api"},
   {"type":"record","content":"route=/chat"},
-  {"type":"artifact","content":"frontend/src/app.tsx"},
+  {"type":"artifact","content":["frontend/src/app.tsx", "crates/server/src/routes/chat/sessions.rs"]},
   {"type":"conclusion","content":"waiting for backend confirmation"}
 ]
 ```
@@ -595,6 +595,10 @@ fn parse_agent_protocol_messages_supports_json_list() {
     ));
     assert_eq!(messages[0].to.as_deref(), Some("backend"));
     assert_eq!(messages[0].intent.as_deref(), Some("request"));
+    assert_eq!(
+        messages[2].content,
+        r#"["frontend/src/app.tsx","crates/server/src/routes/chat/sessions.rs"]"#
+    );
     assert!(matches!(
         messages[3].message_type,
         AgentProtocolMessageType::Conclusion
@@ -662,7 +666,7 @@ fn parse_agent_protocol_messages_supports_relaxed_message_type_shorthand() {
 "#;
 
     let messages = ChatRunner::parse_agent_protocol_messages(content).expect("messages");
-    assert_eq!(messages.len(), 3);
+    assert_eq!(messages.len(), 4);
     assert!(matches!(
         messages[0].message_type,
         AgentProtocolMessageType::Send
@@ -671,6 +675,10 @@ fn parse_agent_protocol_messages_supports_relaxed_message_type_shorthand() {
     assert_eq!(messages[0].intent.as_deref(), Some("reply"));
     assert!(matches!(
         messages[1].message_type,
+        AgentProtocolMessageType::Artifact
+    ));
+    assert!(matches!(
+        messages[2].message_type,
         AgentProtocolMessageType::Record
     ));
     assert_eq!(messages[1].content, "hero grid restored to idle");
@@ -1488,7 +1496,7 @@ async fn process_agent_protocol_output_persists_stopped_hint_when_stopped_empty(
 fn markdown_protocol_output_example_json_is_valid() {
     let messages = ChatRunner::parse_agent_protocol_messages(MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON)
         .expect("json");
-    assert_eq!(messages.len(), 3);
+    assert_eq!(messages.len(), 4);
     assert!(matches!(
         messages.first().map(|message| &message.message_type),
         Some(AgentProtocolMessageType::Send)
@@ -1496,6 +1504,10 @@ fn markdown_protocol_output_example_json_is_valid() {
     assert_eq!(messages[0].intent.as_deref(), Some("request"));
     assert!(matches!(
         messages[1].message_type,
+        AgentProtocolMessageType::Artifact
+    ));
+    assert!(matches!(
+        messages[2].message_type,
         AgentProtocolMessageType::Record
     ));
 }
@@ -1924,6 +1936,16 @@ fn artifact_path_extraction_allows_explicit_openteams_runtime_paths() {
 }
 
 #[test]
+fn artifact_path_extraction_supports_json_path_lists() {
+    let paths = super::extract_workspace_paths_from_artifact_text(
+        r#"["src/app.ts","docs/report.md"]"#,
+        Path::new(r"E:\workspace\projectSS\MainPage2"),
+    );
+
+    assert_eq!(paths, vec!["docs/report.md".to_string(), "src/app.ts".to_string()]);
+}
+
+#[test]
 fn file_change_refresh_excludes_openteams_artifact_paths() {
     let changes = ChatRunner::file_change_entries_from_observed(&[
         super::WorkspaceObservedPathEntry {
@@ -2005,7 +2027,7 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
     assert!(prompt.contains("### Schema"));
     assert!(prompt.contains("send.to"));
     assert!(prompt.contains("record`: long-lived shared facts only."));
-    assert!(prompt.contains("artifact`: deliverables or file paths only."));
+    assert!(prompt.contains("artifact.content`: a JSON array of file paths only."));
     assert!(prompt.contains("conclusion`: current-turn summary only"));
     assert!(prompt.contains(PROTOCOL_OUTPUT_SCHEMA_JSON));
     assert!(prompt.contains("### Example"));

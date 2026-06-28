@@ -124,7 +124,7 @@ const whitespacePath = parseStructuredAgentReply(
 ok(
   'artifact path trimmed',
   whitespacePath.kind === 'structured' &&
-    whitespacePath.artifacts[0].path === './src/b.ts',
+    whitespacePath.artifacts[0].path === 'src/b.ts',
 );
 ok(
   'artifact raw preserved',
@@ -150,6 +150,37 @@ ok(
   withRecord.kind === 'structured' &&
     withRecord.replyText === 'hi' &&
     withRecord.artifacts.length === 1,
+);
+
+const sentenceArtifact = parseStructuredAgentReply(
+  '[{"type":"artifact","content":"Saved `docs/a.md` and `src/b.ts`."},{"type":"conclusion","content":"done"}]',
+);
+ok(
+  'artifact sentences keep only paths',
+  sentenceArtifact.kind === 'structured' &&
+    sentenceArtifact.artifacts.length === 2 &&
+    sentenceArtifact.artifacts[0].path === 'docs/a.md' &&
+    sentenceArtifact.artifacts[1].path === 'src/b.ts',
+);
+
+const listArtifact = parseStructuredAgentReply(
+  '[{"type":"artifact","content":["docs/a.md","src/b.ts"]},{"type":"conclusion","content":"done"}]',
+);
+ok(
+  'artifact list content is supported',
+  listArtifact.kind === 'structured' &&
+    listArtifact.artifacts.length === 2 &&
+    listArtifact.artifacts[0].path === 'docs/a.md' &&
+    listArtifact.artifacts[1].path === 'src/b.ts',
+);
+
+const invalidArtifact = parseStructuredAgentReply(
+  '[{"type":"send","content":"done"},{"type":"artifact","content":"not a file path"}]',
+);
+ok(
+  'invalid artifact content is ignored',
+  invalidArtifact.kind === 'structured' &&
+    invalidArtifact.artifacts.length === 0,
 );
 
 // leading/trailing whitespace around the whole array is tolerated
@@ -185,6 +216,13 @@ ok(
     extractArtifactPaths('Saved `binaries/x.txt`, `src/y.rs`, and `z.json`.'),
     ['binaries/x.txt', 'src/y.rs', 'z.json'],
   ),
+);
+ok(
+  'extract: json path list',
+  arraysEqual(extractArtifactPaths('["docs/a.md","src/b.ts"]'), [
+    'docs/a.md',
+    'src/b.ts',
+  ]),
 );
 ok(
   'extract: strips leading ./ from backtick tokens',

@@ -604,6 +604,29 @@ check(
   componentSource,
 );
 check(
+  "create project workspace browser keeps file list height stable",
+  componentSource.includes(
+    "project-workspace-browser-scrollbar h-[180px] overflow-y-auto",
+  ),
+  componentSource,
+);
+check(
+  "create project workspace browser uses ghost icon actions and selected rows",
+  componentSource.includes("<Home className=\"h-3.5 w-3.5\"") &&
+    componentSource.includes("<ChevronUp className=\"h-3.5 w-3.5\"") &&
+    componentSource.includes("<RefreshCw className=\"h-3.5 w-3.5\"") &&
+    componentSource.includes("before:w-[2px]") &&
+    componentSource.includes("GIT"),
+  componentSource,
+);
+check(
+  "create project modal uses softer Linear-style controls",
+  componentSource.includes("bg-[#141517]") &&
+    componentSource.includes("border-transparent bg-[rgba(255,255,255,0.04)]") &&
+    componentSource.includes("bg-white px-3.5 py-1.5"),
+  componentSource,
+);
+check(
   "create project modal omits description and status fields",
   !componentSource.includes("setProjectDescription") &&
     !componentSource.includes("setProjectStatus"),

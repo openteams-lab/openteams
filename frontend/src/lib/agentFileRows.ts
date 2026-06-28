@@ -2,9 +2,9 @@
 // Agent message file-row helpers
 // -----------------------------------------------------------------------------
 // The file list pinned to the bottom of an agent message is sourced from the
-// per-run changed files (GET /chat/runs/{run_id}/files), with artifact-mentioned
-// paths merged in as supplementary rows. These pure helpers turn the per-run
-// `WorkspaceChanges` payload into a flat row list and merge artifact paths.
+// per-run changed files (GET /chat/runs/{run_id}/files). The backend includes
+// validated artifact-mentioned paths, so these helpers keep the UI focused on
+// the run-scoped payload instead of the broader session diff.
 // =============================================================================
 
 import { normalizeArtifactPath } from '@/lib/parseStructuredReply';
@@ -13,6 +13,8 @@ export type AgentFileStatus = 'M' | 'A' | 'D' | 'U';
 
 export interface AgentFileRow {
   path: string;
+  /** Chat run that produced this file row, when sourced from run files. */
+  runId?: string;
   /** Absolute workspace root that this run/file row belongs to, when known. */
   workspacePath?: string | null;
   /** Additions (+) for this file in the run, when known. */
@@ -21,6 +23,8 @@ export interface AgentFileRow {
   deletions?: number;
   /** True when the run endpoint has inline diff content for this file. */
   hasDiff?: boolean;
+  /** Unified diff captured for this file within the current run. */
+  unifiedDiff?: string;
   status?: AgentFileStatus;
   /**
    * True when the path came from an artifact mention rather than the run's git
@@ -40,12 +44,14 @@ interface RunFileChanges {
     additions?: number;
     deletions?: number;
     has_diff?: boolean;
+    unified_diff?: string | null;
   }>;
   added: Array<{
     path: string;
     additions?: number;
     deletions?: number;
     has_diff?: boolean;
+    unified_diff?: string | null;
   }>;
   deleted: Array<{ path: string }>;
   untracked: Array<{
@@ -53,10 +59,12 @@ interface RunFileChanges {
     additions?: number;
     deletions?: number;
     has_diff?: boolean;
+    unified_diff?: string | null;
   }>;
 }
 
 interface RunFileChangesPayload {
+  run_id?: string;
   workspace_path?: string | null;
   changes?: RunFileChanges | null;
 }
@@ -72,38 +80,51 @@ export const flattenRunFileChanges = (
   const changes = payload?.changes;
   if (!changes) return [];
   const workspacePath = payload.workspace_path ?? null;
+  const runId = payload.run_id;
 
   const rows: AgentFileRow[] = [];
   for (const file of changes.modified) {
     rows.push({
       path: file.path,
+      runId,
       workspacePath,
       additions: file.additions,
       deletions: file.deletions,
       hasDiff: file.has_diff,
+      unifiedDiff: file.unified_diff ?? undefined,
       status: 'M',
     });
   }
   for (const file of changes.added) {
     rows.push({
       path: file.path,
+      runId,
       workspacePath,
       additions: file.additions,
       deletions: file.deletions,
       hasDiff: file.has_diff,
+      unifiedDiff: file.unified_diff ?? undefined,
       status: 'A',
     });
   }
   for (const file of changes.deleted) {
-    rows.push({ path: file.path, workspacePath, hasDiff: false, status: 'D' });
+    rows.push({
+      path: file.path,
+      runId,
+      workspacePath,
+      hasDiff: false,
+      status: 'D',
+    });
   }
   for (const file of changes.untracked) {
     rows.push({
       path: file.path,
+      runId,
       workspacePath,
       additions: file.additions,
       deletions: file.deletions,
       hasDiff: file.has_diff,
+      unifiedDiff: file.unified_diff ?? undefined,
       status: 'U',
     });
   }

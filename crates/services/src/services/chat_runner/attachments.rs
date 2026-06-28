@@ -149,15 +149,19 @@ fn extract_workspace_paths_from_text_with_options(
 ) -> Vec<String> {
     let mut candidates = Vec::new();
 
-    for capture in INLINE_CODE_PATH_RE.captures_iter(text) {
-        if let Some(matched) = capture.get(1) {
-            candidates.push(matched.as_str().to_string());
+    if let Ok(paths) = serde_json::from_str::<Vec<String>>(text.trim()) {
+        candidates.extend(paths);
+    } else {
+        for capture in INLINE_CODE_PATH_RE.captures_iter(text) {
+            if let Some(matched) = capture.get(1) {
+                candidates.push(matched.as_str().to_string());
+            }
         }
-    }
 
-    if candidates.is_empty() {
-        for token in text.split_whitespace() {
-            candidates.push(token.to_string());
+        if candidates.is_empty() {
+            for token in text.split_whitespace() {
+                candidates.push(token.to_string());
+            }
         }
     }
 

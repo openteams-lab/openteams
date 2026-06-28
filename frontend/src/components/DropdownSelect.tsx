@@ -24,6 +24,7 @@ interface DropdownSelectBaseProps {
   defaultOpen?: boolean;
   showSearch?: boolean;
   className?: string;
+  triggerClassName?: string;
   panelClassName?: string;
   panelMinWidth?: number;
   maxPanelHeightClassName?: string;
@@ -76,6 +77,7 @@ export function DropdownSelect(props: DropdownSelectProps) {
     defaultOpen = false,
     showSearch = true,
     className,
+    triggerClassName,
     panelClassName,
     panelMinWidth,
     maxPanelHeightClassName = 'max-h-[160px]',
@@ -307,7 +309,7 @@ export function DropdownSelect(props: DropdownSelectProps) {
           if (!open) updatePanelPosition();
           setOpen((current) => !current);
         }}
-        className={`${triggerClass} ${open ? 'border-[var(--primary)] text-[var(--ink)]' : ''}`}
+        className={`${triggerClass} ${triggerClassName ?? ''} ${open ? 'border-[var(--primary)] text-[var(--ink)]' : ''}`}
       >
         {triggerIcon}
         <span

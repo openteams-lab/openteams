@@ -8,10 +8,8 @@ import { WorkflowCard } from "@/components/workflow/WorkflowCard";
 import { ApiError, chatRunsApi } from "@/lib/api";
 import {
   flattenRunFileChanges,
-  mergeArtifactPaths,
   type AgentFileRow,
 } from "@/lib/agentFileRows";
-import { extractArtifactPaths } from "@/lib/parseStructuredReply";
 import type { ActivityLoadState, ChatRunActivityLine, Message } from "@/types";
 
 const ACTIVITY_LOAD_TIMEOUT_MS = 15000;
@@ -22,7 +20,6 @@ const ACTIVITY_LOAD_TIMEOUT_MS = 15000;
  */
 interface RunFileRowsCacheEntry {
   rows: AgentFileRow[];
-  workspacePath: string | null;
 }
 
 const runFileRowsCache = new Map<string, RunFileRowsCacheEntry>();
@@ -168,13 +165,10 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
 
   // ---- Per-run changed files ------------------------------------------------
   // The file list pinned to the message bottom is sourced from the run's own
-  // diff (GET /chat/runs/{run_id}/files). Results are cached per session/run.
+  // file capture. Diff bodies are loaded lazily when a row is opened.
   const cacheKey = runFileRowsCacheKey(message.sessionId, message.runId);
   const [runFileRows, setRunFileRows] = useState<AgentFileRow[]>(() =>
     cacheKey ? (runFileRowsCache.get(cacheKey)?.rows ?? []) : [],
-  );
-  const [runWorkspacePath, setRunWorkspacePath] = useState<string | null>(() =>
-    cacheKey ? (runFileRowsCache.get(cacheKey)?.workspacePath ?? null) : null,
   );
 
   useEffect(() => {
@@ -184,7 +178,6 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
     const cached = runFileRowsCache.get(nextCacheKey);
     if (cached) {
       setRunFileRows(cached.rows);
-      setRunWorkspacePath(cached.workspacePath);
       return;
     }
 
@@ -197,7 +190,6 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
           const rows = flattenRunFileChanges(response);
           const entry = {
             rows,
-            workspacePath: response.workspace_path ?? null,
           };
           runFileRowsCache.set(nextCacheKey, entry);
           return entry;
@@ -212,30 +204,17 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
       .then((entry) => {
         if (cancelled) return;
         setRunFileRows(entry.rows);
-        setRunWorkspacePath(entry.workspacePath);
       })
       .catch(() => {
         if (cancelled) return;
         setRunFileRows([]);
-        setRunWorkspacePath(null);
       });
     return () => {
       cancelled = true;
     };
   }, [message.sessionId, message.runId, isRunning]);
 
-  const artifactPaths = useMemo(
-    () =>
-      (message.artifacts ?? []).flatMap((artifact) =>
-        extractArtifactPaths(artifact.raw ?? artifact.path),
-      ),
-    [message.artifacts],
-  );
-
-  const fileRows = useMemo(
-    () => mergeArtifactPaths(runFileRows, artifactPaths, runWorkspacePath),
-    [runFileRows, artifactPaths, runWorkspacePath],
-  );
+  const fileRows = runFileRows;
 
   const panelLabels = {
     loading: t("agentActivity.loading"),

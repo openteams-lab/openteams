@@ -946,6 +946,37 @@ function AutoGrowingTextarea({
   );
 }
 
+function WorkflowStepDescriptionTextarea({
+  disabled,
+  onChange,
+  value,
+}: {
+  disabled?: boolean;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "0px";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      disabled={disabled}
+      value={value}
+      rows={1}
+      placeholder="Add a step description..."
+      onChange={(event) => onChange(event.target.value)}
+      className="team-template-workflow-step-description -mx-1 mt-0.5 min-h-6 w-full resize-none overflow-hidden rounded-[3px] border-0 bg-transparent px-1 py-0.5 text-[12px] leading-[1.45] text-[var(--team-template-member-description)] outline-none transition-colors duration-150 placeholder:text-[var(--team-template-aux)] hover:bg-white/[0.035] focus:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-60"
+    />
+  );
+}
+
 function MarkdownEditableField({
   compact = false,
   disabled,
@@ -1871,47 +1902,44 @@ function WorkflowPreview({
           {editableSteps.map((step, index) => (
             <section
               key={`workflow-step-${index}`}
-              className="team-template-compact-workflow-step group relative py-2"
+              className="team-template-compact-workflow-step group relative grid grid-cols-[24px_minmax(0,1fr)_24px] gap-2 py-1.5"
             >
               <span
                 aria-hidden="true"
-                className="absolute -left-[19px] top-3 h-1.5 w-1.5 rounded-full border border-[var(--team-template-pipeline-dot-muted)] bg-[var(--team-template-canvas)]"
+                className="absolute -left-[19px] top-2.5 h-1.5 w-1.5 rounded-full border border-[var(--team-template-pipeline-dot-muted)] bg-[var(--team-template-canvas)]"
               />
-              <div className="mb-1.5 flex items-center justify-between gap-3">
-                <span className="font-mono text-[9px] font-semibold text-[var(--team-template-aux)]">
-                  STEP {String(index + 1).padStart(2, "0")}
-                </span>
-                <button
-                  type="button"
+              <span className="pt-1 font-mono text-[10px] font-semibold tabular-nums text-[var(--team-template-aux)]">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <div className="min-w-0">
+                <input
                   disabled={disabled}
-                  onClick={() =>
-                    onStepsChange?.(
-                      editableSteps.filter((_, stepIndex) => stepIndex !== index),
-                    )
-                  }
-                  className="pointer-events-none flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--team-template-muted)] opacity-0 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 group-hover:pointer-events-auto group-hover:opacity-100 focus:pointer-events-auto focus:opacity-100 disabled:opacity-40"
-                  aria-label="Remove workflow step"
-                >
-                  <Trash2 aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.4} />
-                </button>
-              </div>
-              <div className="space-y-1.5">
-                <FormInput
-                  disabled={disabled}
-                  label="步骤标题"
                   value={step.title}
-                  variant="bare"
-                  onChange={(title) => updateStep(index, { title })}
+                  placeholder="Step title"
+                  onChange={(event) =>
+                    updateStep(index, { title: event.target.value })
+                  }
+                  className="team-template-workflow-step-title -mx-1 h-6 w-full rounded-[3px] border-0 bg-transparent px-1 text-[13px] font-semibold leading-none text-[var(--team-template-title)] outline-none transition-colors duration-150 placeholder:text-[var(--team-template-muted)] hover:bg-white/[0.035] focus:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-60"
                 />
-                <FormTextarea
+                <WorkflowStepDescriptionTextarea
                   disabled={disabled}
-                  label="步骤描述"
-                  rows={2}
                   value={step.description}
-                  variant="bare"
                   onChange={(description) => updateStep(index, { description })}
                 />
               </div>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() =>
+                  onStepsChange?.(
+                    editableSteps.filter((_, stepIndex) => stepIndex !== index),
+                  )
+                }
+                className="pointer-events-none flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--team-template-muted)] opacity-0 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 group-hover:pointer-events-auto group-hover:opacity-100 focus:pointer-events-auto focus:opacity-100 disabled:opacity-40"
+                aria-label="Remove workflow step"
+              >
+                <Trash2 aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.4} />
+              </button>
             </section>
           ))}
           <button

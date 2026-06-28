@@ -36,7 +36,7 @@ const KNOWN_ITEM_TYPES = new Set<string>([
 
 interface ReplyItem {
   type: string;
-  content: string;
+  content: string | string[];
 }
 
 const isReplyItem = (value: unknown): value is ReplyItem => {
@@ -44,10 +44,15 @@ const isReplyItem = (value: unknown): value is ReplyItem => {
     return false;
   }
   const obj = value as Record<string, unknown>;
+  const type = typeof obj.type === 'string' ? obj.type : null;
+  const contentIsString = typeof obj.content === 'string';
+  const contentIsStringArray =
+    Array.isArray(obj.content) &&
+    obj.content.every((item) => typeof item === 'string');
   return (
-    typeof obj.type === 'string' &&
-    KNOWN_ITEM_TYPES.has(obj.type) &&
-    typeof obj.content === 'string'
+    type !== null &&
+    KNOWN_ITEM_TYPES.has(type) &&
+    (contentIsString || (type === 'artifact' && contentIsStringArray))
   );
 };
 
@@ -85,14 +90,20 @@ export const parseStructuredAgentReply = (text: string): StructuredReply => {
 
   for (const item of items) {
     if (item.type === 'send') {
-      if (item.content.trim()) sends.push(item.content);
+      const content = typeof item.content === 'string' ? item.content : '';
+      if (content.trim()) sends.push(content);
     } else if (item.type === 'artifact') {
-      const path = item.content.trim();
-      if (path) artifacts.push({ path, raw: item.content });
+      const raw = Array.isArray(item.content)
+        ? JSON.stringify(item.content)
+        : item.content;
+      for (const path of extractArtifactPaths(raw)) {
+        artifacts.push({ path, raw });
+      }
     } else if (item.type === 'conclusion') {
-      conclusion = item.content;
+      conclusion = typeof item.content === 'string' ? item.content : '';
     } else if (item.type === 'record') {
-      if (item.content.trim()) records.push(item.content);
+      const content = typeof item.content === 'string' ? item.content : '';
+      if (content.trim()) records.push(content);
     }
   }
 
@@ -124,14 +135,13 @@ export const normalizeArtifactPath = (path: string): string =>
 
 const FILE_EXTENSION_RE = /\.[a-z0-9]{1,8}$/i;
 
-/**
- * Whether a token looks like a real workspace-relative file path: it must not
- * be a URL, must not contain whitespace, and must either contain a path
- * separator or end with a recognizable file extension.
- */
-export const looksLikeFilePath = (token: string): boolean => {
+const looksLikePathString = (token: string, allowWhitespace: boolean): boolean => {
   const trimmed = token.trim();
-  if (!trimmed || trimmed.includes('://') || /\s/.test(trimmed)) {
+  if (
+    !trimmed ||
+    trimmed.includes('://') ||
+    (!allowWhitespace && /\s/.test(trimmed))
+  ) {
     return false;
   }
   return (
@@ -140,6 +150,14 @@ export const looksLikeFilePath = (token: string): boolean => {
     FILE_EXTENSION_RE.test(trimmed)
   );
 };
+
+/**
+ * Whether a token looks like a real workspace-relative file path: it must not
+ * be a URL, must not contain whitespace, and must either contain a path
+ * separator or end with a recognizable file extension.
+ */
+export const looksLikeFilePath = (token: string): boolean =>
+  looksLikePathString(token, false);
 
 const BACKTICK_PATH_RE = /`([^`\r\n]+)`/g;
 
@@ -160,14 +178,33 @@ export const extractArtifactPaths = (content: string): string[] => {
   const result: string[] = [];
   const seen = new Set<string>();
 
-  const push = (raw: string): void => {
+  const push = (raw: string, trustedListItem = false): void => {
     const trimmed = raw.trim().replace(/^\.?\//, '').trim();
-    if (!trimmed || !looksLikeFilePath(trimmed)) return;
+    if (
+      !trimmed ||
+      !looksLikePathString(trimmed, trustedListItem) ||
+      trimmed.includes('://')
+    ) {
+      return;
+    }
     const key = trimmed.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
     result.push(trimmed);
   };
+
+  try {
+    const parsed = JSON.parse(content.trim());
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((item) => typeof item === 'string')
+    ) {
+      parsed.forEach((item) => push(item, true));
+      return result;
+    }
+  } catch {
+    // Non-JSON artifact content falls through to legacy free-text extraction.
+  }
 
   const backtickMatches: string[] = [];
   let match: RegExpExecArray | null;
@@ -177,7 +214,7 @@ export const extractArtifactPaths = (content: string): string[] => {
   }
 
   if (backtickMatches.length > 0) {
-    backtickMatches.forEach(push);
+    backtickMatches.forEach((path) => push(path));
     return result;
   }
 

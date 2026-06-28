@@ -8,6 +8,7 @@ interface WorkflowWorkspaceProps {
     filePath: string,
     status: string,
     unifiedDiff: string,
+    runId?: string,
   ) => void;
   onOpenSourceControlDiffTab?: (
     projectId: string,
