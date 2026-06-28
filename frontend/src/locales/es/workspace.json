@@ -298,5 +298,8 @@
   "worktree.merge.useCurrent": "Usar actual",
   "worktree.merge.useSession": "Usar sesión",
   "worktree.merge.useSessionHint": "Usar la versión del worktree de sesión",
-  "worktree.merge.useSessionMissing": "El archivo no existe en la sesión"
+  "worktree.merge.useSessionMissing": "El archivo no existe en la sesión",
+  "createSession.isolateWorktree": "Aislar worktree",
+  "createSession.worktreeCheckingGit": "Comprobando espacio Git",
+  "createSession.worktreeRequiresGit": "Requiere un espacio Git"
 }

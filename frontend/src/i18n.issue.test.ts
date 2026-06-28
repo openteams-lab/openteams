@@ -14,6 +14,8 @@ const sourceFiles = [
   "./pages/IssuePage.tsx",
   "./pages/IssueDetailPage.tsx",
   "./components/IssueCreateDialog.tsx",
+  "./components/IssueImportDialog.tsx",
+  "./components/IssueWorktreeSessionDialog.tsx",
 ] as const;
 const dynamicKeys = [
   "issue.linkDialog.provider.github.description",
@@ -22,12 +24,17 @@ const dynamicKeys = [
   "issue.linkDialog.provider.jira.name",
   "issue.linkDialog.provider.linear.description",
   "issue.linkDialog.provider.linear.name",
+  "issue.importDialog.filter.status.closed",
+  "issue.importDialog.filter.status.open",
+  "issue.importDialog.status.closed",
+  "issue.importDialog.status.open",
 ] as const;
 const localePrefixes = [
   "issue.createDialog.",
   "issue.detail.",
   "issue.linkDialog.",
   "issue.importDialog.",
+  "issue.worktreeSession.",
 ] as const;
 const requiredPlaceholders: Record<string, readonly string[]> = {
   "issue.detail.action.attachmentsSelected": ["count"],
@@ -65,6 +72,11 @@ const requiredPlaceholders: Record<string, readonly string[]> = {
   "issue.linkDialog.toast.repoLinked.message": ["repoName"],
   "issue.linkDialog.toast.repoUnlinked.message": ["repoName"],
   "issue.importDialog.toast.imported.message": ["number"],
+  "issue.importDialog.filter.labelSelected": ["label"],
+  "issue.importDialog.filter.status.closed": ["status"],
+  "issue.importDialog.filter.status.open": ["status"],
+  "issue.importDialog.time.daysAgo": ["count"],
+  "issue.importDialog.time.hoursAgo": ["count"],
   "issue.createDialog.removeAttachment": ["name"],
 };
 
@@ -101,6 +113,11 @@ const usedIssueLocaleKeys = () => {
     const text = readText(file);
     for (const match of text.matchAll(
       /tr\(\s*["'](issue\.(?:createDialog|detail|linkDialog|importDialog)\.[^"']+)["']/g,
+    )) {
+      keys.add(match[1]);
+    }
+    for (const match of text.matchAll(
+      /tr\(\s*["'](issue\.worktreeSession\.[^"']+)["']/g,
     )) {
       keys.add(match[1]);
     }

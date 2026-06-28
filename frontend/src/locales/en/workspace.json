@@ -322,5 +322,8 @@
   "worktree.merge.useCurrent": "Use current",
   "worktree.merge.useSession": "Use session",
   "worktree.merge.useSessionHint": "Use the session worktree version",
-  "worktree.merge.useSessionMissing": "File does not exist in session"
+  "worktree.merge.useSessionMissing": "File does not exist in session",
+  "createSession.isolateWorktree": "Isolate worktree",
+  "createSession.worktreeCheckingGit": "Checking Git workspace",
+  "createSession.worktreeRequiresGit": "Requires a Git workspace"
 }

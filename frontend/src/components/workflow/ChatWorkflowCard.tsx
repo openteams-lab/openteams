@@ -5,7 +5,7 @@ import {
 } from '@phosphor-icons/react';
 import { BookOpen } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { motion } from 'framer-motion';
 import type { WorkflowCardData } from '@/lib/api';
 import { AgentMarkdown } from '@/components/AgentMarkdown';
@@ -338,7 +338,7 @@ export function ChatWorkflowCard({
   onSubmitIterationFeedback,
   pendingActionId,
 }: ChatWorkflowCardProps) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   const projection =
     projectionProp ?? extractWorkflowCardProjection(message.meta);
   const roundGraphs = useMemo(

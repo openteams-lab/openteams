@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { chatMessagesApi, workflowApi } from '@/lib/api';
 import {
   shouldPollWorkflowProjection,
@@ -54,7 +54,7 @@ export function WorkflowCard({
   cardType,
   planGenerationMeta,
 }: WorkflowCardProps) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   const { sessionsAsync, workflowRuntimeLinesByExecution } = useWorkspace();
   const sessionTitle = useMemo(() => {
     const session = sessionsAsync.data.find((s) => s.id === sessionId);

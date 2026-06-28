@@ -13,6 +13,7 @@ const localeFiles = [
   "issue",
   "settings",
   "team",
+  "workflow",
 ] as const;
 
 export const readTextForTest = (path: string) =>

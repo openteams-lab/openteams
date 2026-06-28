@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useAppTranslation } from '@/hooks/useAppTranslation';
 import type { WorkflowPendingReviewData } from '@/lib/api';
 import { localizeWorkflowGeneratedText } from './workflowGeneratedText';
 
@@ -36,7 +36,7 @@ export function WorkflowPendingReviewCard({
   pendingActionId,
   onSubmit,
 }: WorkflowPendingReviewCardProps) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   const [expandedReject, setExpandedReject] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);

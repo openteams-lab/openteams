@@ -322,5 +322,8 @@
   "worktree.merge.useCurrent": "使用当前",
   "worktree.merge.useSession": "使用会话",
   "worktree.merge.useSessionHint": "使用会话 worktree 版本",
-  "worktree.merge.useSessionMissing": "会话侧不存在此文件"
+  "worktree.merge.useSessionMissing": "会话侧不存在此文件",
+  "createSession.isolateWorktree": "隔离 worktree",
+  "createSession.worktreeCheckingGit": "正在检查 Git 工作区",
+  "createSession.worktreeRequiresGit": "需要 Git 工作区"
 }

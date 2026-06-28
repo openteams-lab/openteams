@@ -209,7 +209,13 @@ export function IssueImportDialog({
       ? tr('issue.importDialog.filter.status', 'Status')
       : tr(
           `issue.importDialog.filter.status.${statusFilter}`,
-          `Status: ${titleCase(statusFilter)}`,
+          'Status: {status}',
+          {
+            status: tr(
+              `issue.importDialog.status.${statusFilter}`,
+              titleCase(statusFilter),
+            ),
+          },
         );
   const labelFilterLabel = labelFilter
     ? tr('issue.importDialog.filter.labelSelected', 'Label: {label}', {
@@ -377,7 +383,7 @@ export function IssueImportDialog({
               >
                 {status === 'all'
                   ? tr('issue.importDialog.filter.all', 'All')
-                  : titleCase(status)}
+                  : tr(`issue.importDialog.status.${status}`, titleCase(status))}
               </FilterMenuOption>
             ))}
           </FilterButton>
@@ -443,6 +449,7 @@ export function IssueImportDialog({
                   selected={selected}
                   imported={imported}
                   importing={importing}
+                  tr={tr}
                   onToggle={() => toggleIssue(issue)}
                 />
               );
@@ -568,12 +575,14 @@ function IssueImportRow({
   selected,
   imported,
   importing,
+  tr,
   onToggle,
 }: {
   issue: GitHubIssueSummary;
   selected: boolean;
   imported: boolean;
   importing: boolean;
+  tr: IssueImportTranslator;
   onToggle: () => void;
 }) {
   const label = issue.labels[0] ?? '';
@@ -634,7 +643,7 @@ function IssueImportRow({
       </h3>
       {imported && (
         <span className="ml-2 rounded-[10px] border border-[color-mix(in_srgb,var(--success)_42%,var(--hairline))] bg-[color-mix(in_srgb,var(--success)_14%,var(--surface-2))] px-[6px] py-[2px] text-[11px] font-medium leading-none text-[var(--success)]">
-          Imported
+          {tr('issue.importDialog.status.imported', 'Imported')}
         </span>
       )}
       {label && (
@@ -656,7 +665,7 @@ function IssueImportRow({
           imported ? 'text-[var(--ink-tertiary)]' : 'text-[var(--ink-subtle)]',
         )}
       >
-        {formatIssueTime(issue.updated_at ?? issue.last_synced_at)}
+        {formatIssueTime(issue.updated_at ?? issue.last_synced_at, tr)}
       </span>
     </article>
   );
@@ -666,14 +675,22 @@ function titleCase(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function formatIssueTime(value: string | null) {
+function formatIssueTime(value: string | null, tr: IssueImportTranslator) {
   if (!value) return '';
   const time = new Date(value).getTime();
   if (Number.isNaN(time)) return value;
   const diffHours = Math.max(1, Math.floor((Date.now() - time) / 3600000));
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffHours < 24) {
+    return tr('issue.importDialog.time.hoursAgo', '{count}h ago', {
+      count: diffHours,
+    });
+  }
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 30) return `${diffDays}d ago`;
+  if (diffDays < 30) {
+    return tr('issue.importDialog.time.daysAgo', '{count}d ago', {
+      count: diffDays,
+    });
+  }
   return new Date(value).toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',

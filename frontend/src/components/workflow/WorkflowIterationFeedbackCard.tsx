@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, ChevronUp, X } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { motion } from 'framer-motion';
 import type { WorkflowIterationSummaryData } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -51,7 +51,7 @@ export function WorkflowIterationFeedbackCard({
   pendingActionId,
   onSubmit,
 }: WorkflowIterationFeedbackCardProps) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [expandedReject, setExpandedReject] = useState(false);
   const [whatWrong, setWhatWrong] = useState('');

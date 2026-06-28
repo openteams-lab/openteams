@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { Bell, ListTodo, RefreshCw, X } from 'lucide-react';
 import type { WorkflowCardData } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -184,7 +184,7 @@ export function WorkflowReviewSettingsDialog({
   variant = 'modal',
   className,
 }: WorkflowReviewSettingsDialogProps) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   const [reviewSettingsDraft, setReviewSettingsDraft] =
     useState<ReviewSettingDraft>({});
 

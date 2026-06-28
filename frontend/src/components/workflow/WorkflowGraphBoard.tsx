@@ -5,7 +5,7 @@ import {
   ArrowsClockwiseIcon,
   ArrowsInSimpleIcon,
 } from '@phosphor-icons/react';
-import { useTranslation } from 'react-i18next';
+import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { motion } from 'framer-motion';
 import type { WorkflowCardData, WorkflowCardLoopData } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -387,7 +387,7 @@ export function WorkflowGraphBoard({
   compact = false,
   className,
 }: WorkflowGraphBoardProps) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   const [layout, setLayout] = useState<ElkLayoutNode | null>(null);
   const [layoutError, setLayoutError] = useState<string | null>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -827,7 +827,7 @@ export function WorkflowGraphBoard({
                     className={cn('size-3', isRetryPending && 'animate-spin')}
                     weight="bold"
                   />
-                  {t('workflow_retry', { defaultValue: '重试' })}
+                  {t('workflow.graph.retry', { defaultValue: 'Retry' })}
                 </button>
                 {retryDialogStepId === retryStepId && (
                   <div className="absolute right-0 bottom-full mb-1.5 z-[100] flex min-w-[140px] flex-col gap-1 rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] p-1.5 shadow-lg">
@@ -840,7 +840,9 @@ export function WorkflowGraphBoard({
                         onRetryStep?.(retryStepId);
                       }}
                     >
-                      {t('workflow_retry_task', { defaultValue: '重试任务' })}
+                      {t('workflow.graph.retryTask', {
+                        defaultValue: 'Retry task',
+                      })}
                     </button>
                     <button
                       type="button"
@@ -858,7 +860,9 @@ export function WorkflowGraphBoard({
                       }}
                       disabled={!canRetryReviewStep}
                     >
-                      {t('workflow_retry_review', { defaultValue: '重试审核' })}
+                      {t('workflow.graph.retryReview', {
+                        defaultValue: 'Retry review',
+                      })}
                     </button>
                     <button
                       type="button"
@@ -868,7 +872,9 @@ export function WorkflowGraphBoard({
                         setRetryDialogStepId(null);
                       }}
                     >
-                      {t('workflow_retry_cancel', { defaultValue: '取消' })}
+                      {t('workflow.graph.retryCancel', {
+                        defaultValue: 'Cancel',
+                      })}
                     </button>
                   </div>
                 )}

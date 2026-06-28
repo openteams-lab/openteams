@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MessageSquare } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { useAppTranslation } from '@/hooks/useAppTranslation';
 import type { WorkflowPendingInputData } from '@/lib/api';
 
 type WorkflowPendingInputCardProps = {
@@ -14,7 +14,7 @@ export function WorkflowPendingInputCard({
   pendingActionId,
   onSubmit,
 }: WorkflowPendingInputCardProps) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   const [value, setValue] = useState('');
 
   useEffect(() => {

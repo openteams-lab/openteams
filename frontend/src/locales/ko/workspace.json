@@ -298,5 +298,8 @@
   "worktree.merge.useCurrent": "현재 사용",
   "worktree.merge.useSession": "세션 사용",
   "worktree.merge.useSessionHint": "세션 worktree 버전 사용",
-  "worktree.merge.useSessionMissing": "세션 쪽에 파일이 없습니다"
+  "worktree.merge.useSessionMissing": "세션 쪽에 파일이 없습니다",
+  "createSession.isolateWorktree": "worktree 격리",
+  "createSession.worktreeCheckingGit": "Git 워크스페이스 확인 중",
+  "createSession.worktreeRequiresGit": "Git 워크스페이스가 필요합니다"
 }

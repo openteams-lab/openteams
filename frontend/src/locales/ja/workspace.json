@@ -298,5 +298,8 @@
   "worktree.merge.useCurrent": "現在を使用",
   "worktree.merge.useSession": "セッションを使用",
   "worktree.merge.useSessionHint": "セッション worktree の版を使用",
-  "worktree.merge.useSessionMissing": "セッションにファイルが存在しません"
+  "worktree.merge.useSessionMissing": "セッションにファイルが存在しません",
+  "createSession.isolateWorktree": "worktree に分離",
+  "createSession.worktreeCheckingGit": "Git ワークスペースを確認中",
+  "createSession.worktreeRequiresGit": "Git ワークスペースが必要です"
 }

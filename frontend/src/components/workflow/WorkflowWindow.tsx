@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@/lib/queryCompat';
-import { useTranslation } from 'react-i18next';
+import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight,
@@ -104,7 +104,7 @@ function WorkflowStepTokenUsageStrip({
   usage: WorkflowStepTokenEntry | null;
   loading: boolean;
 }) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
 
   if (loading) {
     return (
@@ -168,7 +168,7 @@ function WorkflowStepTokenUsageStrip({
           <span>
             {t('workflow.inspector.tokenRuns', {
               count: usage.run_count,
-              defaultValue: '{{count}} runs',
+              defaultValue: '{count} runs',
             })}
           </span>
         ) : null}
@@ -762,7 +762,7 @@ export function ApprovalCard({
   onReject: (stepId: string, transcriptId: string) => void;
   disabled?: boolean;
 }) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   return (
     <div className="rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-3">
       <div className="text-xs font-bold uppercase tracking-wider text-[#92400E]">
@@ -817,7 +817,7 @@ export function PermissionRequestCard({
   onDeny: (stepId: string, transcriptId: string) => void;
   disabled?: boolean;
 }) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   return (
     <div className="rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] p-3">
       <div className="text-xs font-bold uppercase tracking-wider text-[#1E40AF]">
@@ -868,7 +868,7 @@ export function ContinueConfirmationCard({
   onContinue: (stepId: string, transcriptId: string) => void;
   disabled?: boolean;
 }) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   return (
     <div className="rounded-2xl border border-[#D1FAE5] bg-[#ECFDF5] p-3">
       <div className="text-xs font-bold uppercase tracking-wider text-[#15803D]">
@@ -936,7 +936,7 @@ function InspectorCard({
   activeTab: ExecutionRecordTab;
   onActiveTabChange: (tab: ExecutionRecordTab) => void;
 }) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   const instruction =
     planNode?.data.instructions?.trim() ||
     t('workflow.inspector.noInstructions', {
@@ -1370,7 +1370,9 @@ function InspectorCard({
                         pendingActionId === step.id && 'animate-spin'
                       )}
                     />
-                    {t('workflow_retry_task', { defaultValue: '重试任务' })}
+                    {t('workflow.inspector.retryTask', {
+                      defaultValue: 'Retry task',
+                    })}
                     <kbd className="ml-0.5 text-[10px] text-[var(--ink-tertiary)] font-mono">⌘R</kbd>
                   </button>
                   <button
@@ -1395,7 +1397,9 @@ function InspectorCard({
                         pendingActionId === step.id && 'animate-spin'
                       )}
                     />
-                    {t('workflow_retry_review', { defaultValue: '重试审核' })}
+                    {t('workflow.inspector.retryReview', {
+                      defaultValue: 'Retry review',
+                    })}
                   </button>
                 </>
               ) : (
@@ -1411,7 +1415,7 @@ function InspectorCard({
                       pendingActionId === step.id && 'animate-spin'
                     )}
                   />
-                  {t('workflow_retry', { defaultValue: 'Retry' })}
+                  {t('workflow.inspector.retry', { defaultValue: 'Retry' })}
                   <kbd className="ml-0.5 text-[10px] text-[var(--ink-tertiary)] font-mono">⌘R</kbd>
                 </button>
               ))}
@@ -1461,7 +1465,7 @@ function ChatPanel({
   onSendInput?: (stepId: string, inputText: string) => void;
   canSendInput: boolean;
 }) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -1754,7 +1758,7 @@ export function WorkflowWindow({
   onSubmitIterationFeedback,
   pendingActionId,
 }: WorkflowWindowProps) {
-  const { t } = useTranslation('chat');
+  const { t } = useAppTranslation();
   const { showToast } = useWorkspace();
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   const [isChatVisible, setIsChatVisible] = useState(false);
@@ -2450,7 +2454,9 @@ export function WorkflowWindow({
             strokeWidth={2.4}
           />
           <h1 className="truncate text-[16px] font-semibold leading-none text-[var(--ink)]">
-            {t('workflow.breadcrumb.executionPlan', { defaultValue: '执行计划' })}
+            {t('workflow.breadcrumb.executionPlan', {
+              defaultValue: 'Execution Plan',
+            })}
           </h1>
         </div>
 
