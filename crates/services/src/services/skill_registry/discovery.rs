@@ -259,8 +259,9 @@ async fn discover_global_skills(home_dir: &Path) -> HashMap<String, DiscoveredSk
         loop {
             match entries.next_entry().await {
                 Ok(Some(entry)) => {
-                    let file_type = match entry.file_type().await {
-                        Ok(file_type) => file_type,
+                    let metadata = match tokio::fs::metadata(entry.path()).await {
+                        Ok(metadata) => metadata,
+                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
                         Err(err) => {
                             tracing::warn!(
                                 path = %entry.path().display(),
@@ -271,7 +272,7 @@ async fn discover_global_skills(home_dir: &Path) -> HashMap<String, DiscoveredSk
                         }
                     };
 
-                    if !file_type.is_dir() {
+                    if !metadata.is_dir() {
                         continue;
                     }
 
