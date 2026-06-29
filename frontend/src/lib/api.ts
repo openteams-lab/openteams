@@ -132,6 +132,9 @@ import type {
   UpdateProjectMemberRequest,
   UpdateTeamPresetRequest,
   ChatRunFilesResponse,
+  MarkUpgradeReadRequest,
+  OnboardingState,
+  UpdateOnboardingStateRequest,
 } from "../../../shared/types";
 import {
   ApiError,
@@ -312,6 +315,56 @@ export const teamPresetsApi = {
       { method: "DELETE" },
     );
     await handleApiResponse<void>(r);
+  },
+};
+
+// -----------------------------------------------------------------------------
+// Onboarding
+// -----------------------------------------------------------------------------
+
+export const onboardingApi = {
+  getState: async (): Promise<OnboardingState> => {
+    const r = await makeRequest("/api/onboarding/state", {
+      cache: "no-store",
+    });
+    return handleApiResponse<OnboardingState>(r);
+  },
+  updateState: async (
+    data: UpdateOnboardingStateRequest,
+  ): Promise<OnboardingState> => {
+    const r = await makeRequest("/api/onboarding/state", {
+      method: "PUT",
+      body: jsonBody(data),
+    });
+    return handleApiResponse<OnboardingState>(r);
+  },
+  complete: async (
+    data?: UpdateOnboardingStateRequest,
+  ): Promise<OnboardingState> => {
+    const r = await makeRequest("/api/onboarding/complete", {
+      method: "POST",
+      ...(data ? { body: jsonBody(data) } : {}),
+    });
+    return handleApiResponse<OnboardingState>(r);
+  },
+  reset: async (): Promise<OnboardingState> => {
+    const r = await makeRequest("/api/onboarding/reset", { method: "POST" });
+    return handleApiResponse<OnboardingState>(r);
+  },
+  markUpgradeRead: async (
+    data: MarkUpgradeReadRequest,
+  ): Promise<OnboardingState> => {
+    const r = await makeRequest("/api/onboarding/upgrade/read", {
+      method: "POST",
+      body: jsonBody(data),
+    });
+    return handleApiResponse<OnboardingState>(r);
+  },
+  resetUpgradeRead: async (): Promise<OnboardingState> => {
+    const r = await makeRequest("/api/onboarding/upgrade/reset", {
+      method: "POST",
+    });
+    return handleApiResponse<OnboardingState>(r);
   },
 };
 
@@ -2145,6 +2198,7 @@ export const api = {
   workflow: workflowApi,
   cliConfig: cliConfigApi,
   buildStats: buildStatsApi,
+  onboarding: onboardingApi,
   profiles: profilesApi,
   teamPresets: teamPresetsApi,
   githubAuth: githubAuthApi,

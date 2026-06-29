@@ -16,6 +16,7 @@ import {
   Keyboard,
   Route,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
   User,
   Users,
@@ -23,7 +24,11 @@ import {
 import { DropdownSelect, type DropdownSelectOption } from '@/components/DropdownSelect';
 import { ResourceStateNotice } from '@/components/ResourceState';
 import { ProviderSettingsPanel } from '@/components/settings/ProviderSettingsPanel';
-import { githubAuthApi } from '@/lib/api';
+import { githubAuthApi, onboardingApi } from '@/lib/api';
+import {
+  ONBOARDING_GUIDE_RESET_EVENT,
+  ONBOARDING_UPGRADE_REPLAY_EVENT,
+} from '@/lib/onboardingEvents';
 import { mockFrontendApi } from '@/lib/mockFrontendApi';
 import type { SettingsOptionsMock } from '@/mockApiData';
 import type { GitHubAccount, Session } from '@/types';
@@ -123,6 +128,11 @@ export const SettingsWorkspace: React.FC = () => {
     useState<string | null>(null);
   const [deleteArchivedSessionError, setDeleteArchivedSessionError] =
     useState<string | null>(null);
+  const [onboardingAction, setOnboardingAction] = useState<
+    'reset' | 'upgrade' | null
+  >(null);
+  const [onboardingActionMessage, setOnboardingActionMessage] =
+    useState<string | null>(null);
   const chatMessageFontSizeOptions: DropdownSelectOption[] =
     CHAT_MESSAGE_FONT_SIZE_OPTIONS.map((size) => ({
       id: String(size),
@@ -219,6 +229,48 @@ export const SettingsWorkspace: React.FC = () => {
     }
   };
 
+  const handleResetOnboardingGuide = async () => {
+    if (onboardingAction) return;
+    setOnboardingAction('reset');
+    setOnboardingActionMessage(null);
+    try {
+      const state = await onboardingApi.reset();
+      window.dispatchEvent(
+        new CustomEvent(ONBOARDING_GUIDE_RESET_EVENT, { detail: state }),
+      );
+      setOnboardingActionMessage(t('settings.onboarding.resetGuideDone'));
+    } catch (error) {
+      setOnboardingActionMessage(
+        error instanceof Error
+          ? error.message
+          : t('settings.onboarding.actionFailed'),
+      );
+    } finally {
+      setOnboardingAction(null);
+    }
+  };
+
+  const handleReplayUpgradeGuide = async () => {
+    if (onboardingAction) return;
+    setOnboardingAction('upgrade');
+    setOnboardingActionMessage(null);
+    try {
+      const state = await onboardingApi.resetUpgradeRead();
+      window.dispatchEvent(
+        new CustomEvent(ONBOARDING_UPGRADE_REPLAY_EVENT, { detail: state }),
+      );
+      setOnboardingActionMessage(t('settings.onboarding.replayUpgradeDone'));
+    } catch (error) {
+      setOnboardingActionMessage(
+        error instanceof Error
+          ? error.message
+          : t('settings.onboarding.actionFailed'),
+      );
+    } finally {
+      setOnboardingAction(null);
+    }
+  };
+
   const accountDisplayLabel =
     githubAccount?.login ?? settingsOptions?.account.email ?? '-';
 
@@ -309,6 +361,50 @@ export const SettingsWorkspace: React.FC = () => {
                   maxPanelHeightClassName="max-h-[180px]"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-[var(--ink)]">{t('settings.onboarding.title')}</h4>
+              <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)]">
+                <NotificationSettingRow
+                  title={t('settings.onboarding.resetGuide')}
+                  description={t('settings.onboarding.resetGuideDesc')}
+                  control={
+                    <button
+                      type="button"
+                      onClick={() => void handleResetOnboardingGuide()}
+                      disabled={Boolean(onboardingAction)}
+                      className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[var(--hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <RotateCcw className={`h-3.5 w-3.5 ${onboardingAction === 'reset' ? 'animate-spin' : ''}`} />
+                      {onboardingAction === 'reset'
+                        ? t('settings.onboarding.working')
+                        : t('settings.onboarding.resetGuide')}
+                    </button>
+                  }
+                />
+                <NotificationSettingRow
+                  title={t('settings.onboarding.replayUpgrade')}
+                  description={t('settings.onboarding.replayUpgradeDesc')}
+                  divided={false}
+                  control={
+                    <button
+                      type="button"
+                      onClick={() => void handleReplayUpgradeGuide()}
+                      disabled={Boolean(onboardingAction)}
+                      className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[var(--hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Sparkles className={`h-3.5 w-3.5 ${onboardingAction === 'upgrade' ? 'animate-pulse' : ''}`} />
+                      {onboardingAction === 'upgrade'
+                        ? t('settings.onboarding.working')
+                        : t('settings.onboarding.replayUpgrade')}
+                    </button>
+                  }
+                />
+              </div>
+              {onboardingActionMessage && (
+                <p className="text-xs text-[var(--ink-subtle)]">{onboardingActionMessage}</p>
+              )}
             </div>
           </div>
         );

@@ -13,6 +13,10 @@ import { CreateAgentSessionModal } from "@/components/CreateAgentSessionModal";
 import { DiffViewTab } from "@/components/DiffViewTab";
 import { NotificationToast } from "@/components/NotificationToast";
 import { ProjectSidebar } from "@/components/ProjectSidebar";
+import {
+  OnboardingGuide,
+  compareVersions,
+} from "@/components/onboarding/OnboardingGuide";
 import { GitHubRepositoryPage } from "@/pages/GitHubRepositoryPage";
 import { IssuePage } from "@/pages/IssuePage";
 import { RoutingPage } from "@/pages/RoutingPage";
@@ -42,9 +46,14 @@ import {
   chatAgentsApi,
   chatMessagesApi,
   chatSessionsApi,
+  onboardingApi,
   projectApi,
   projectWorkItemsApi,
 } from "@/lib/api";
+import {
+  ONBOARDING_GUIDE_RESET_EVENT,
+  ONBOARDING_UPGRADE_REPLAY_EVENT,
+} from "@/lib/onboardingEvents";
 import {
   ISSUE_NAVIGATION_EVENT,
   ISSUE_NAVIGATION_TARGET_CHANGED_EVENT,
@@ -70,11 +79,13 @@ import {
   type BaseCodingAgent as ProjectBaseCodingAgent,
   type ChatMemberPreset,
   type ChatTeamPreset,
+  type OnboardingState,
   ProjectMemberType,
   type CreateProjectRequest,
   type ProjectMemberWithRuntime,
   type UpdateProject,
 } from "../../shared/types";
+import rootPackage from "../../package.json";
 import type {
   AgentRuntimeStatus,
   ChatSessionWorktreeMode,
@@ -174,6 +185,12 @@ const maxAppScale = 1.2;
 const compactViewportLayoutRelief = 0.06;
 const compactViewportFontScale = 1.06;
 const blankTeamId = "blank_team";
+const currentUpgradeVersion = rootPackage.version || "0.0.0";
+
+type OnboardingOverlay =
+  | { mode: "onboarding"; state: OnboardingState | null }
+  | { mode: "upgrade"; state: OnboardingState | null }
+  | null;
 
 type CreateProjectOptions = {
   teamId?: string;
@@ -359,7 +376,10 @@ function AppScaleFrame({ children }: { children: React.ReactNode }) {
 function WorkspaceLayout() {
   const {
     t,
+    theme,
     locale,
+    setTheme,
+    setLocale,
     toast,
     sessions,
     setSessions,
@@ -394,6 +414,10 @@ function WorkspaceLayout() {
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   const [isCreateSessionModalOpen, setIsCreateSessionModalOpen] =
     useState(false);
+  const [onboardingOverlay, setOnboardingOverlay] =
+    useState<OnboardingOverlay>(null);
+  const [onboardingState, setOnboardingState] =
+    useState<OnboardingState | null>(null);
   const [openTabs, setOpenTabs] = useState<WorkspaceTab[]>(() =>
     activeSessionId ? [createSessionTab(activeSessionId)] : [],
   );
@@ -525,6 +549,23 @@ function WorkspaceLayout() {
   ) => {
     const translated = t(key, replacements);
     return translated && translated !== key ? translated : fallback;
+  };
+
+  const overlayForOnboardingState = (
+    nextState: OnboardingState,
+  ): OnboardingOverlay => {
+    if (!nextState.onboarding_completed_at) {
+      return { mode: "onboarding", state: nextState };
+    }
+    if (
+      compareVersions(
+        nextState.last_seen_upgrade_version,
+        currentUpgradeVersion,
+      ) < 0
+    ) {
+      return { mode: "upgrade", state: nextState };
+    }
+    return null;
   };
 
   const firstAvailableRuntime = (
@@ -674,6 +715,48 @@ function WorkspaceLayout() {
 
   useEffect(() => {
     void mockFrontendApi.getShellOptions().then(setShellOptions);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void onboardingApi.getState()
+      .then((nextState) => {
+        if (cancelled) return;
+        setOnboardingState(nextState);
+        setOnboardingOverlay(overlayForOnboardingState(nextState));
+      })
+      .catch((err) => {
+        console.error("Failed to load onboarding state", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleGuideReset = (event: Event) => {
+      const nextState = (event as CustomEvent<OnboardingState>).detail;
+      setOnboardingState(nextState);
+      setOnboardingOverlay({ mode: "onboarding", state: nextState });
+    };
+    const handleUpgradeReplay = (event: Event) => {
+      const nextState = (event as CustomEvent<OnboardingState>).detail;
+      setOnboardingState(nextState);
+      setOnboardingOverlay({ mode: "upgrade", state: nextState });
+    };
+
+    window.addEventListener(ONBOARDING_GUIDE_RESET_EVENT, handleGuideReset);
+    window.addEventListener(
+      ONBOARDING_UPGRADE_REPLAY_EVENT,
+      handleUpgradeReplay,
+    );
+    return () => {
+      window.removeEventListener(ONBOARDING_GUIDE_RESET_EVENT, handleGuideReset);
+      window.removeEventListener(
+        ONBOARDING_UPGRADE_REPLAY_EVENT,
+        handleUpgradeReplay,
+      );
+    };
   }, []);
 
   useEffect(() => {
@@ -1463,6 +1546,22 @@ function WorkspaceLayout() {
     );
   };
 
+  const handleOnboardingCompleted = (nextState: OnboardingState) => {
+    setOnboardingState(nextState);
+    setOnboardingOverlay(null);
+    setIsCreateSessionModalOpen(true);
+    closeMobileSidebar();
+  };
+
+  const handleOnboardingStateChange = (nextState: OnboardingState) => {
+    setOnboardingState(nextState);
+  };
+
+  const handleUpgradeRead = (nextState: OnboardingState) => {
+    setOnboardingState(nextState);
+    setOnboardingOverlay(null);
+  };
+
   const currentProject = projects.find(
     (project) => project.id === selectedProjectId,
   );
@@ -1519,6 +1618,23 @@ function WorkspaceLayout() {
         onClose={() => setIsCreateSessionModalOpen(false)}
         onCreate={handleCreateAgentSession}
       />
+
+      {onboardingOverlay && (
+        <OnboardingGuide
+          mode={onboardingOverlay.mode}
+          initialState={onboardingOverlay.state ?? onboardingState}
+          currentVersion={currentUpgradeVersion}
+          locale={locale}
+          theme={theme}
+          t={t}
+          setLocale={setLocale}
+          setTheme={setTheme}
+          onClose={() => setOnboardingOverlay(null)}
+          onOpenCreateSession={handleOnboardingCompleted}
+          onStateChange={handleOnboardingStateChange}
+          onUpgradeRead={handleUpgradeRead}
+        />
+      )}
 
       <aside
         className="relative h-full hidden md:block shrink-0"

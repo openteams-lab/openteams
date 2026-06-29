@@ -31,6 +31,7 @@ pub use build_stats::{model_pricing_sync, project_stats, token_cost_stats};
 pub mod native_skills;
 pub mod notification;
 pub mod oauth_credentials;
+pub mod onboarding;
 pub mod project;
 pub use project::{
     delivery as project_delivery, member as project_member, migration as project_migration,

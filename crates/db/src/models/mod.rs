@@ -19,6 +19,7 @@ pub mod member_execution_config;
 pub mod merge;
 pub mod model_price_cache;
 pub mod model_pricing;
+pub mod onboarding_state;
 pub mod project;
 pub mod project_delivery_event;
 pub mod project_delivery_record;

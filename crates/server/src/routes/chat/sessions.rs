@@ -2248,50 +2248,42 @@ pub struct ValidateWorkspacePathResponse {
     pub error: Option<String>,
 }
 
-pub async fn validate_workspace_path_endpoint(
-    Json(payload): Json<ValidateWorkspacePathRequest>,
-) -> Result<ResponseJson<ApiResponse<ValidateWorkspacePathResponse>>, ApiError> {
-    let trimmed = payload.workspace_path.trim();
+pub(crate) async fn validate_workspace_path_status(
+    workspace_path: &str,
+) -> ValidateWorkspacePathResponse {
+    let trimmed = workspace_path.trim();
 
     if trimmed.is_empty() {
-        return Ok(ResponseJson(ApiResponse::success(
-            ValidateWorkspacePathResponse {
-                valid: false,
-                is_git_repo: false,
-                error: Some("Workspace path is required.".to_string()),
-            },
-        )));
+        return ValidateWorkspacePathResponse {
+            valid: false,
+            is_git_repo: false,
+            error: Some("Workspace path is required.".to_string()),
+        };
     }
 
     if let Err(e) = validate_workspace_path_legality(trimmed) {
-        return Ok(ResponseJson(ApiResponse::success(
-            ValidateWorkspacePathResponse {
-                valid: false,
-                is_git_repo: false,
-                error: Some(e.to_string()),
-            },
-        )));
+        return ValidateWorkspacePathResponse {
+            valid: false,
+            is_git_repo: false,
+            error: Some(e.to_string()),
+        };
     }
 
     let parsed_path = PathBuf::from(trimmed);
     match tokio::fs::metadata(&parsed_path).await {
         Ok(metadata) => {
             if metadata.is_dir() {
-                Ok(ResponseJson(ApiResponse::success(
-                    ValidateWorkspacePathResponse {
-                        valid: true,
-                        is_git_repo: git2::Repository::open(&parsed_path).is_ok(),
-                        error: None,
-                    },
-                )))
+                ValidateWorkspacePathResponse {
+                    valid: true,
+                    is_git_repo: git2::Repository::open(&parsed_path).is_ok(),
+                    error: None,
+                }
             } else {
-                Ok(ResponseJson(ApiResponse::success(
-                    ValidateWorkspacePathResponse {
-                        valid: false,
-                        is_git_repo: false,
-                        error: Some("Workspace path must be an existing directory.".to_string()),
-                    },
-                )))
+                ValidateWorkspacePathResponse {
+                    valid: false,
+                    is_git_repo: false,
+                    error: Some("Workspace path must be an existing directory.".to_string()),
+                }
             }
         }
         Err(err) => {
@@ -2299,15 +2291,21 @@ pub async fn validate_workspace_path_endpoint(
                 std::io::ErrorKind::NotFound => "Workspace path does not exist.".to_string(),
                 _ => format!("Workspace path is not accessible: {err}"),
             };
-            Ok(ResponseJson(ApiResponse::success(
-                ValidateWorkspacePathResponse {
-                    valid: false,
-                    is_git_repo: false,
-                    error: Some(error_msg),
-                },
-            )))
+            ValidateWorkspacePathResponse {
+                valid: false,
+                is_git_repo: false,
+                error: Some(error_msg),
+            }
         }
     }
+}
+
+pub async fn validate_workspace_path_endpoint(
+    Json(payload): Json<ValidateWorkspacePathRequest>,
+) -> Result<ResponseJson<ApiResponse<ValidateWorkspacePathResponse>>, ApiError> {
+    Ok(ResponseJson(ApiResponse::success(
+        validate_workspace_path_status(&payload.workspace_path).await,
+    )))
 }
 
 #[cfg(test)]
