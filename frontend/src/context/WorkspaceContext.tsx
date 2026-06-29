@@ -28,6 +28,7 @@ import {
   QueuedMessageStatus,
   UpdateChatSession,
   WorkflowCardProjection,
+  WorkflowSidebarState,
   WorkspaceChangesResponse,
   JsonValue,
 } from '@/types';
@@ -313,9 +314,31 @@ const hasRunningSessionAgent = (
 type SessionRunningIndicators = {
   hasRunningAgent: boolean;
   hasRunningWorkflow: boolean;
+  workflowSidebarState: WorkflowSidebarState;
   pendingWorkflowInputId: string | null;
   pendingWorkflowReviewId: string | null;
 };
+
+const workflowRunningSidebarStates = new Set<WorkflowSidebarState>([
+  'running',
+  'reviewing',
+  'waiting',
+]);
+
+const resolveWorkflowSidebarState = (status: {
+  sidebar_workflow_state?: WorkflowSidebarState | null;
+  has_running_workflow: boolean;
+  pending_workflow_input_id?: string | null;
+  pending_workflow_review_id?: string | null;
+}): WorkflowSidebarState => {
+  if (status.sidebar_workflow_state) return status.sidebar_workflow_state;
+  if (status.pending_workflow_review_id) return 'waiting_user_review';
+  if (status.pending_workflow_input_id) return 'waiting_input';
+  return status.has_running_workflow ? 'running' : 'idle';
+};
+
+const isWorkflowSidebarRunning = (state: WorkflowSidebarState): boolean =>
+  workflowRunningSidebarStates.has(state);
 
 const loadSessionRunningIndicators = async (
   sessionIds: string[],
@@ -328,11 +351,13 @@ const loadSessionRunningIndicators = async (
         workflowApi
           .getSessionStatus(sessionId)
           .catch(() => ({
+            sidebar_workflow_state: 'idle' as const,
             has_running_workflow: false,
             pending_workflow_input_id: null,
             pending_workflow_review_id: null,
           })),
       ]);
+      const workflowSidebarState = resolveWorkflowSidebarState(workflowStatus);
       return [
         sessionId,
         {
@@ -340,7 +365,8 @@ const loadSessionRunningIndicators = async (
             sessionAgents,
             ignoredSessionAgentIds,
           ),
-          hasRunningWorkflow: workflowStatus.has_running_workflow,
+          hasRunningWorkflow: isWorkflowSidebarRunning(workflowSidebarState),
+          workflowSidebarState,
           pendingWorkflowInputId:
             workflowStatus.pending_workflow_input_id ?? null,
           pendingWorkflowReviewId:
@@ -1750,17 +1776,21 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const setSessionWorkflowRunningIndicator = useCallback(
     (sessionId: string, hasRunningWorkflow: boolean) => {
       if (!sessionId) return;
+      const workflowSidebarState: WorkflowSidebarState = hasRunningWorkflow
+        ? 'running'
+        : 'idle';
       setSessionsAsync((prev) => {
         let changed = false;
         const data = prev.data.map((session) => {
           if (
             session.id !== sessionId ||
-            session.hasRunningWorkflow === hasRunningWorkflow
+            (session.hasRunningWorkflow === hasRunningWorkflow &&
+              session.workflowSidebarState === workflowSidebarState)
           ) {
             return session;
           }
           changed = true;
-          return { ...session, hasRunningWorkflow };
+          return { ...session, hasRunningWorkflow, workflowSidebarState };
         });
         return changed ? { ...prev, data } : prev;
       });
@@ -1771,12 +1801,15 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     (
       sessionId: string,
       status: {
+        sidebar_workflow_state?: WorkflowSidebarState | null;
         has_running_workflow: boolean;
         pending_workflow_input_id?: string | null;
         pending_workflow_review_id?: string | null;
       },
     ) => {
       if (!sessionId) return;
+      const workflowSidebarState = resolveWorkflowSidebarState(status);
+      const hasRunningWorkflow = isWorkflowSidebarRunning(workflowSidebarState);
       const pendingWorkflowInputId = status.pending_workflow_input_id ?? null;
       const pendingWorkflowReviewId = status.pending_workflow_review_id ?? null;
       const hasPendingWorkflowInput = syncSessionWorkflowInputIndicator(
@@ -1789,7 +1822,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         const data = prev.data.map((session) => {
           if (
             session.id !== sessionId ||
-            (session.hasRunningWorkflow === status.has_running_workflow &&
+            (session.hasRunningWorkflow === hasRunningWorkflow &&
+              session.workflowSidebarState === workflowSidebarState &&
               session.pendingWorkflowInputId === pendingWorkflowInputId &&
               session.hasPendingWorkflowInput === hasPendingWorkflowInput &&
               session.pendingWorkflowReviewId === pendingWorkflowReviewId &&
@@ -1800,7 +1834,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           changed = true;
           return {
             ...session,
-            hasRunningWorkflow: status.has_running_workflow,
+            hasRunningWorkflow,
+            workflowSidebarState,
             pendingWorkflowInputId,
             hasPendingWorkflowInput,
             pendingWorkflowReviewId,
@@ -2074,6 +2109,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         (session) => {
           const indicators = runningIndicators.get(session.id);
           const hasRunningAgent = indicators?.hasRunningAgent ?? false;
+          const workflowSidebarState =
+            indicators?.workflowSidebarState ?? 'idle';
           const pendingWorkflowInputId =
             indicators?.pendingWorkflowInputId ?? null;
           const pendingWorkflowReviewId =
@@ -2081,7 +2118,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           return {
             ...session,
             hasRunningAgent,
-            hasRunningWorkflow: indicators?.hasRunningWorkflow ?? false,
+            hasRunningWorkflow: isWorkflowSidebarRunning(workflowSidebarState),
+            workflowSidebarState,
             pendingWorkflowInputId,
             hasPendingWorkflowInput: syncSessionWorkflowInputIndicator(
               session.id,

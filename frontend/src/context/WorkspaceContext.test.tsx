@@ -401,6 +401,8 @@ check(
 check(
   'workflow review status is tracked for the sidebar activity icon',
   source.includes('pending_workflow_review_id') &&
+    source.includes('sidebar_workflow_state') &&
+    source.includes('workflowSidebarState') &&
     source.includes('pendingWorkflowReviewId') &&
     source.includes('hasPendingWorkflowReview'),
   source,

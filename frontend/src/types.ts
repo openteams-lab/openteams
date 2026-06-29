@@ -44,6 +44,7 @@ export interface Session {
   active: boolean;
   hasRunningAgent?: boolean;
   hasRunningWorkflow?: boolean;
+  workflowSidebarState?: WorkflowSidebarState;
   hasUnreadAgentCompletion?: boolean;
   hasPendingWorkflowInput?: boolean;
   pendingWorkflowInputId?: string | null;
@@ -1235,10 +1236,21 @@ export type WorkflowCardState =
   | 'failed';
 
 export interface WorkflowSessionStatusResponse {
+  sidebar_workflow_state: WorkflowSidebarState;
   has_running_workflow: boolean;
   pending_workflow_input_id: string | null;
   pending_workflow_review_id: string | null;
 }
+
+export type WorkflowSidebarState =
+  | 'idle'
+  | 'running'
+  | 'reviewing'
+  | 'waiting'
+  | 'waiting_input'
+  | 'waiting_user_review'
+  | 'paused'
+  | 'failed';
 
 export interface WorkflowCardStep {
   id: string;

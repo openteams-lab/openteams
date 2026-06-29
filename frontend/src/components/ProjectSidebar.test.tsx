@@ -158,6 +158,25 @@ const workflowRunningSessionHtml = renderToStaticMarkup(
     onProjectAction={() => undefined}
   />,
 );
+const workflowReviewingSessionHtml = renderToStaticMarkup(
+  <ProjectSidebar
+    shellOptions={mockShellOptions}
+    sessions={[
+      {
+        ...mockWorkspaceBootstrap.sessions[0],
+        hasRunningWorkflow: true,
+        workflowSidebarState: "reviewing",
+      },
+    ]}
+    activeSessionId={mockWorkspaceBootstrap.sessions[0].id}
+    activePage="workspace"
+    weeklyCost={mockWorkspaceBootstrap.defaults.weeklyCost}
+    onNavigate={() => undefined}
+    onSessionSelect={() => undefined}
+    onPrimaryAction={() => undefined}
+    onProjectAction={() => undefined}
+  />,
+);
 const completedAgentSessionHtml = renderToStaticMarkup(
   <ProjectSidebar
     shellOptions={mockShellOptions}
@@ -304,6 +323,12 @@ check(
   workflowRunningSessionHtml,
 );
 check(
+  "renders reviewing workflow sessions with loading activity icon",
+  workflowReviewingSessionHtml.includes("animate-spin") &&
+    workflowReviewingSessionHtml.includes("reviewing"),
+  workflowReviewingSessionHtml,
+);
+check(
   "renders completed agent sessions with non-running highlighted icon",
   completedAgentSessionHtml.includes("text-[var(--primary)]") &&
     completedAgentSessionHtml.includes("agent completed") &&
@@ -318,8 +343,8 @@ check(
   pendingWorkflowInputSessionHtml,
 );
 check(
-  "renders pending workflow review sessions with spinning activity icon",
-  pendingWorkflowReviewSessionHtml.includes("animate-spin") &&
+  "renders pending workflow review sessions with non-running highlighted icon",
+  !pendingWorkflowReviewSessionHtml.includes("animate-spin") &&
     pendingWorkflowReviewSessionHtml.includes("text-[var(--primary)]") &&
     pendingWorkflowReviewSessionHtml.includes("waiting for review"),
   pendingWorkflowReviewSessionHtml,

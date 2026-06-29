@@ -26,6 +26,7 @@ import type {
   CliConfig,
   WorkflowCardMessageType,
   WorkflowPlanGenerationMeta,
+  WorkflowSidebarState,
 } from '@/types';
 import type { ProjectMemberWithRuntime } from '../../../shared/types';
 import { parseStructuredAgentReply } from './parseStructuredReply';
@@ -67,6 +68,7 @@ export const mapSession = (
     iconOverride?: string;
     hasRunningAgent?: boolean;
     hasRunningWorkflow?: boolean;
+    workflowSidebarState?: WorkflowSidebarState;
     hasUnreadAgentCompletion?: boolean;
     hasPendingWorkflowInput?: boolean;
     pendingWorkflowInputId?: string | null;
@@ -80,6 +82,7 @@ export const mapSession = (
   active: opts?.activeSessionId === backend.id,
   hasRunningAgent: opts?.hasRunningAgent,
   hasRunningWorkflow: opts?.hasRunningWorkflow,
+  workflowSidebarState: opts?.workflowSidebarState,
   hasUnreadAgentCompletion: opts?.hasUnreadAgentCompletion,
   hasPendingWorkflowInput: opts?.hasPendingWorkflowInput,
   pendingWorkflowInputId: opts?.pendingWorkflowInputId ?? null,
