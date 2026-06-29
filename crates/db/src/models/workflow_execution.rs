@@ -352,6 +352,14 @@ impl WorkflowExecution {
         .await
     }
 
+    pub async fn find_running(pool: &SqlitePool) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(&format!(
+            "{EXECUTION_SELECT}\nWHERE status = 'running'\nORDER BY updated_at ASC"
+        ))
+        .fetch_all(pool)
+        .await
+    }
+
     pub async fn find_non_terminal_by_session(
         pool: &SqlitePool,
         session_id: Uuid,
