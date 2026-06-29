@@ -243,6 +243,31 @@ impl WorkflowTranscript {
         limit: Option<i64>,
         offset: Option<i64>,
     ) -> Result<Vec<Self>, sqlx::Error> {
+        Self::find_by_execution_filtered(
+            pool,
+            execution_id,
+            step_id,
+            step_key,
+            workflow_agent_session_id,
+            None,
+            None,
+            limit,
+            offset,
+        )
+        .await
+    }
+
+    pub async fn find_by_execution_filtered(
+        pool: &SqlitePool,
+        execution_id: Uuid,
+        step_id: Option<Uuid>,
+        step_key: Option<&str>,
+        workflow_agent_session_id: Option<Uuid>,
+        entry_type: Option<&str>,
+        unresolved: Option<bool>,
+        limit: Option<i64>,
+        offset: Option<i64>,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         let mut sql =
             String::from("SELECT t.* FROM chat_workflow_transcripts t WHERE t.execution_id = ?");
         let mut param_idx: u32 = 1;
@@ -259,6 +284,21 @@ impl WorkflowTranscript {
         if workflow_agent_session_id.is_some() {
             param_idx += 1;
             sql.push_str(&format!(" AND t.workflow_agent_session_id = ?{param_idx}"));
+        }
+        if entry_type.is_some() {
+            param_idx += 1;
+            sql.push_str(&format!(" AND t.entry_type = ?{param_idx}"));
+        }
+        if let Some(unresolved) = unresolved {
+            if unresolved {
+                sql.push_str(
+                    " AND (t.meta_json IS NULL OR json_valid(t.meta_json) = 0 OR json_extract(t.meta_json, '$.resolved') IS NULL OR json_extract(t.meta_json, '$.resolved') = 0)",
+                );
+            } else {
+                sql.push_str(
+                    " AND json_valid(t.meta_json) = 1 AND json_extract(t.meta_json, '$.resolved') = 1",
+                );
+            }
         }
         sql.push_str(" ORDER BY t.created_at ASC");
 
@@ -282,6 +322,9 @@ impl WorkflowTranscript {
         }
         if let Some(was) = workflow_agent_session_id {
             query = query.bind(was);
+        }
+        if let Some(kind) = entry_type {
+            query = query.bind(kind);
         }
         if let Some(limit_val) = limit {
             query = query.bind(limit_val).bind(offset_val);
@@ -843,5 +886,79 @@ mod tests {
         .await
         .expect("filter by step_id with explicit pagination");
         assert_eq!(limited_entries.len(), 200);
+    }
+
+    #[tokio::test]
+    async fn filtered_query_can_return_unresolved_final_review_only() {
+        let pool = transcript_pool().await;
+        let execution_id = Uuid::new_v4();
+
+        WorkflowTranscript::create(
+            &pool,
+            &CreateWorkflowTranscript {
+                execution_id,
+                round_id: None,
+                workflow_agent_session_id: None,
+                step_id: None,
+                sender_type: "agent".to_string(),
+                entry_type: "thinking".to_string(),
+                content: "regular log".to_string(),
+                meta_json: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create regular log");
+
+        WorkflowTranscript::create(
+            &pool,
+            &CreateWorkflowTranscript {
+                execution_id,
+                round_id: None,
+                workflow_agent_session_id: None,
+                step_id: None,
+                sender_type: "control".to_string(),
+                entry_type: "final_review".to_string(),
+                content: "resolved final".to_string(),
+                meta_json: Some(serde_json::json!({"resolved": true}).to_string()),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create resolved final review");
+
+        WorkflowTranscript::create(
+            &pool,
+            &CreateWorkflowTranscript {
+                execution_id,
+                round_id: None,
+                workflow_agent_session_id: None,
+                step_id: None,
+                sender_type: "control".to_string(),
+                entry_type: "final_review".to_string(),
+                content: "unresolved final".to_string(),
+                meta_json: Some(serde_json::json!({"resolved": false}).to_string()),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create unresolved final review");
+
+        let entries = WorkflowTranscript::find_by_execution_filtered(
+            &pool,
+            execution_id,
+            None,
+            None,
+            None,
+            Some("final_review"),
+            Some(true),
+            Some(1),
+            Some(0),
+        )
+        .await
+        .expect("filter final reviews");
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].content, "unresolved final");
     }
 }

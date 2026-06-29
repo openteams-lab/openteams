@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
+import { useQuery } from '@/lib/queryCompat';
 import { chatMessagesApi, workflowApi } from '@/lib/api';
 import {
   shouldPollWorkflowProjection,
@@ -64,7 +65,6 @@ export function WorkflowCard({
   const [projection, setProjection] = useState<WorkflowCardProjection | null>(
     null,
   );
-  const [transcripts, setTranscripts] = useState<OldTranscriptEntry[]>([]);
   const [windowOpen, setWindowOpen] = useState(false);
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const [retryPlanGenerationError, setRetryPlanGenerationError] = useState<
@@ -99,42 +99,20 @@ export function WorkflowCard({
     }
   }, [cardType, messageId]);
 
-  const loadTranscripts = useCallback(async () => {
-    if (!projection?.execution_id) {
-      setTranscripts([]);
-      return;
-    }
-    try {
-      const entries = await workflowApi.getExecutionTranscripts(
-        sessionId,
-        projection.execution_id,
-      );
-      setTranscripts(entries.map(toOldTranscriptEntry));
-    } catch {
-      setTranscripts([]);
-    }
-  }, [projection?.execution_id, sessionId]);
-
   useEffect(() => {
     void loadProjection();
   }, [loadProjection]);
 
   useEffect(() => {
-    void loadTranscripts();
-  }, [loadTranscripts]);
-
-  useEffect(() => {
     if (!shouldPollWorkflowProjection(projection)) return undefined;
     const intervalId = window.setInterval(() => {
       void loadProjection();
-      void loadTranscripts();
     }, WORKFLOW_CARD_REFETCH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
-  }, [loadProjection, loadTranscripts, projection]);
+  }, [loadProjection, projection]);
 
   const refreshAll = async () => {
     await loadProjection();
-    await loadTranscripts();
   };
 
   const withPending = async (id: string, action: () => Promise<unknown>) => {
@@ -147,8 +125,43 @@ export function WorkflowCard({
     }
   };
 
+  const shouldLoadFinalReviewAction =
+    !!sessionId &&
+    !!projection?.execution_id &&
+    !(
+      projection.state === 'preview_ready' ||
+      projection.state === 'preview_invalid'
+    ) &&
+    (projection.state === 'waiting' ||
+      projection.execution_status === 'waiting');
+  const { data: finalReviewTranscripts = [] } = useQuery({
+    queryKey: [
+      'workflowFinalReviewAction',
+      sessionId,
+      projection?.execution_id,
+    ],
+    queryFn: () => {
+      if (!sessionId || !projection?.execution_id) return [];
+      return workflowApi
+        .getExecutionTranscripts(sessionId, projection.execution_id, {
+          entryType: 'final_review',
+          unresolved: true,
+          limit: 1,
+        })
+        .then((entries) => entries.map(toOldTranscriptEntry));
+    },
+    enabled: shouldLoadFinalReviewAction,
+    staleTime: 30_000,
+    gcTime: 5 * 60 * 1000,
+    refetchInterval: shouldPollWorkflowProjection(projection)
+      ? WORKFLOW_CARD_REFETCH_INTERVAL_MS
+      : false,
+  });
   const finalReviewAction = projection?.execution_id
-    ? toWorkflowFinalReviewAction(projection.execution_id, transcripts)
+    ? toWorkflowFinalReviewAction(
+        projection.execution_id,
+        finalReviewTranscripts,
+      )
     : null;
   const workflowRuntimeMessages = useMemo(() => {
     if (!projection?.execution_id) return [];
@@ -317,7 +330,7 @@ export function WorkflowCard({
           sessionId={sessionId}
           sessionTitle={sessionTitle}
           projection={projection}
-          transcript={transcripts}
+          finalReviewAction={finalReviewAction}
           runtimeMessages={workflowRuntimeMessages}
           isOpen={windowOpen}
           onClose={() => setWindowOpen(false)}

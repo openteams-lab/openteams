@@ -49,7 +49,7 @@ import {
 } from './workflowStepPresentation';
 import {
   parseWorkflowTranscriptMeta,
-  toWorkflowFinalReviewAction,
+  type WorkflowFinalReviewActionData,
 } from './WorkflowFinalReviewCard';
 import {
   canRetryWorkflowStepReview,
@@ -698,7 +698,7 @@ export type WorkflowWindowProps = {
   sessionId?: string | null;
   sessionTitle?: string | null;
   projection: WorkflowWindowProjection;
-  transcript?: WorkflowTranscriptEntry[];
+  finalReviewAction?: WorkflowFinalReviewActionData | null;
   runtimeMessages?: WorkflowRuntimeMessage[];
   isOpen: boolean;
   onClose: () => void;
@@ -1741,7 +1741,7 @@ export function WorkflowWindow({
   sessionId,
   sessionTitle,
   projection,
-  transcript = [],
+  finalReviewAction = null,
   runtimeMessages = [],
   isOpen,
   onClose,
@@ -2107,8 +2107,8 @@ export function WorkflowWindow({
     activeStepLatestReview
   );
   const transcriptWithLocalInputs = useMemo(
-    () => mergeAndSortTranscriptEntries(transcript, runtimeInputTranscripts),
-    [runtimeInputTranscripts, transcript]
+    () => mergeAndSortTranscriptEntries(runtimeInputTranscripts),
+    [runtimeInputTranscripts]
   );
 
   // Transcript for inspector card
@@ -2116,18 +2116,34 @@ export function WorkflowWindow({
     data: activeStepTranscriptData,
     isLoading: isLoadingActiveStepTranscript,
   } = useQuery({
-    queryKey: ['workflowStepTranscripts', sessionId, activeStep?.id],
+    queryKey: [
+      'workflowStepTranscripts',
+      sessionId,
+      projection.execution_id,
+      activeStep?.id,
+      activeStep?.step_key,
+    ],
     queryFn: () => {
-      if (!sessionId || !activeStep?.id) return [];
+      if (!sessionId || !projection.execution_id || !activeStep?.id) return [];
       return chatApi.getWorkflowStepTranscripts(sessionId, activeStep.id, {
         stepKey: activeStep.step_key,
       });
     },
-    enabled: !!sessionId && !!activeStep?.id && !isPreview && isOpen,
+    enabled:
+      !!sessionId &&
+      !!projection.execution_id &&
+      !!activeStep?.id &&
+      !isPreview &&
+      isOpen,
     staleTime: 30_000,
     gcTime: 5 * 60 * 1000,
     refetchInterval: getWorkflowTranscriptRefetchInterval({
-      isOpen: isOpen && !isPreview && !!sessionId && !!activeStep?.id,
+      isOpen:
+        isOpen &&
+        !isPreview &&
+        !!sessionId &&
+        !!projection.execution_id &&
+        !!activeStep?.id,
       projection,
     }),
   });
@@ -2230,17 +2246,13 @@ export function WorkflowWindow({
     : rawVisibleActiveTranscript;
 
   // Final review & iteration
-  const workflowFinalReviewAction = useMemo(
-    () => toWorkflowFinalReviewAction(projection.execution_id, transcript),
-    [projection.execution_id, transcript]
-  );
   const allStepViewsCompleted =
     projection.steps.length > 0 &&
     projection.steps.every((step) =>
       REVIEW_READY_STEP_STATUSES.has(step.status)
     );
   const canReviewCurrentRound =
-    !!workflowFinalReviewAction ||
+    !!finalReviewAction ||
     (allStepViewsCompleted &&
       (projection.state === 'waiting' ||
         projection.execution_status === 'waiting'));
@@ -2328,16 +2340,16 @@ export function WorkflowWindow({
     }
 
     if (
-      workflowFinalReviewAction &&
-      openedReviewNotificationId !== workflowFinalReviewAction.transcriptId
+      finalReviewAction &&
+      openedReviewNotificationId !== finalReviewAction.transcriptId
     ) {
       items.push({
-        id: workflowFinalReviewAction.transcriptId,
+        id: finalReviewAction.transcriptId,
         type: 'final_review',
         title: t('workflow.notifications.finalReviewTitle', {
           defaultValue: 'Final Review',
         }),
-        message: workflowFinalReviewAction.message,
+        message: finalReviewAction.message,
       });
     }
 
@@ -2348,9 +2360,9 @@ export function WorkflowWindow({
     isChatVisible,
     openedReviewNotificationId,
     pendingReviews,
+    finalReviewAction,
     projection.pending_input,
     t,
-    workflowFinalReviewAction,
   ]);
 
   const openStepDetails = useCallback(
@@ -2623,18 +2635,16 @@ export function WorkflowWindow({
 
                   {/* Action buttons */}
                   <div className="flex gap-2">
-                    {notif.type === 'final_review' &&
-                    workflowFinalReviewAction ? (
+                    {notif.type === 'final_review' && finalReviewAction ? (
                       <button
                         type="button"
                         onClick={() =>
                           setOpenedReviewNotificationId(
-                            workflowFinalReviewAction.transcriptId
+                            finalReviewAction.transcriptId
                           )
                         }
                         disabled={
-                          pendingActionId ===
-                          workflowFinalReviewAction.executionId
+                          pendingActionId === finalReviewAction.executionId
                         }
                         className="flex-1 py-1.5 border border-[var(--workflow-notification-action-border)] text-[var(--workflow-notification-action-text)] rounded bg-transparent text-[10px] font-semibold uppercase tracking-[0.04em] hover:bg-[var(--workflow-notification-action-hover-bg)] hover:border-[var(--workflow-notification-action-hover-border)] transition-colors disabled:opacity-40"
                       >
