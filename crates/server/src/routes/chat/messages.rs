@@ -214,6 +214,7 @@ pub async fn upload_message_attachments(
     let mut content: Option<String> = None;
     let mut sender_handle: Option<String> = None;
     let mut reference_message_id: Option<Uuid> = None;
+    let mut mentions: Vec<String> = Vec::new();
     let mut chat_input_mode: Option<&'static str> = None;
     let mut attachments: Vec<ChatAttachmentMeta> = Vec::new();
 
@@ -242,6 +243,16 @@ pub async fn upload_message_attachments(
                 let text = field.text().await?;
                 if let Ok(parsed) = Uuid::parse_str(text.trim()) {
                     reference_message_id = Some(parsed);
+                }
+            }
+            Some("mentions") => {
+                let text = field.text().await?;
+                if let Ok(parsed) = serde_json::from_str::<Vec<String>>(&text) {
+                    mentions.extend(
+                        parsed
+                            .into_iter()
+                            .filter(|mention| !mention.trim().is_empty()),
+                    );
                 }
             }
             Some("chat_input_mode") => {
@@ -313,6 +324,9 @@ pub async fn upload_message_attachments(
     }
     if let Some(reference_id) = reference_message_id {
         meta["reference"] = serde_json::json!({ "message_id": reference_id });
+    }
+    if !mentions.is_empty() {
+        meta["mentions"] = serde_json::json!(mentions);
     }
     if let Some(mode) = chat_input_mode {
         meta["chat_input_mode"] = serde_json::json!(mode);

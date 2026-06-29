@@ -304,6 +304,13 @@ check(
   source,
 );
 check(
+  "new session attachments upload through the backend attachment endpoint",
+  source.includes("chatMessagesApi.uploadAttachment") &&
+    source.includes("attachmentInitialMessage(attachedFiles)") &&
+    source.includes("mentions: shouldPersistRouteMentions"),
+  source,
+);
+check(
   "desktop sidebar keeps ProjectSidebar inside desktop-only aside",
   source.includes("hidden md:block"),
 );

@@ -78,6 +78,9 @@ const isRedo = (e: KeyboardEvent) =>
   ((isMac() && e.shiftKey && e.key.toLowerCase() === 'z') ||
     (!isMac() && !e.shiftKey && e.key.toLowerCase() === 'y'));
 
+const VSCODE_IFRAME_CLIPBOARD_FILES_EVENT =
+  'openteams:vscode-clipboard-files';
+
 /**
  * Returns the currently focused editable element (input/textarea/contentEditable)
  * or null when focus is not within an editable.
@@ -117,6 +120,35 @@ async function readClipboardText(): Promise<string> {
     return await navigator.clipboard.readText();
   } catch {
     return '';
+  }
+}
+
+const clipboardFileNameForType = (type: string, index: number): string => {
+  const rawExtension = type.split('/')[1]?.split('+')[0] || 'png';
+  const extension = rawExtension.replace(/[^a-z0-9]/gi, '') || 'png';
+  return `pasted-attachment-${Date.now()}-${index + 1}.${extension}`;
+};
+
+async function readClipboardFiles(): Promise<File[]> {
+  if (!navigator.clipboard?.read) return [];
+
+  try {
+    const items = await navigator.clipboard.read();
+    const files: File[] = [];
+    for (const item of items) {
+      const fileType = item.types.find((type) => type.startsWith('image/'));
+      if (!fileType) continue;
+      const blob = await item.getType(fileType);
+      files.push(
+        new File([blob], clipboardFileNameForType(fileType, files.length), {
+          type: blob.type || fileType,
+          lastModified: Date.now(),
+        }),
+      );
+    }
+    return files;
+  } catch {
+    return [];
   }
 }
 
@@ -220,6 +252,40 @@ function insertTextAtCaretGeneric(text: string) {
     } catch {
       (el as HTMLElement).innerText += text;
     }
+  }
+}
+
+function dispatchClipboardFiles(files: File[]) {
+  const el =
+    activeEditable() ||
+    (document.querySelector(EDITABLE_SELECTOR) as
+      | HTMLTextAreaElement
+      | HTMLInputElement
+      | null);
+  if (!el) return;
+
+  try {
+    const dataTransfer = new DataTransfer();
+    for (const file of files) {
+      dataTransfer.items.add(file);
+    }
+    el.dispatchEvent(
+      new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        clipboardData: dataTransfer,
+      }),
+    );
+    return;
+  } catch {
+    el.dispatchEvent(
+      new CustomEvent(VSCODE_IFRAME_CLIPBOARD_FILES_EVENT, {
+        bubbles: true,
+        composed: true,
+        detail: { files },
+      }),
+    );
   }
 }
 
@@ -409,6 +475,11 @@ export function installVSCodeIframeKeyboardBridge() {
       if (el) {
         e.preventDefault();
         e.stopPropagation();
+        const files = await readClipboardFiles();
+        if (files.length > 0) {
+          dispatchClipboardFiles(files);
+          return;
+        }
         let text = await readClipboardText();
         if (!text) text = await parentClipboardRead();
         insertTextAtCaretGeneric(text);

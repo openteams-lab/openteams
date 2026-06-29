@@ -40,6 +40,7 @@ import {
 import {
   agentRuntimeApi,
   chatAgentsApi,
+  chatMessagesApi,
   chatSessionsApi,
   projectApi,
   projectWorkItemsApi,
@@ -122,6 +123,11 @@ const extractAgentMentions = (text: string): string[] =>
       ),
     ),
   );
+
+const attachmentInitialMessage = (files: File[]): string => {
+  if (files.length === 1) return `Uploaded ${files[0].name}`;
+  return `Uploaded ${files.length} files`;
+};
 
 const pageTabConfig: Record<
   SidebarNavigationTarget,
@@ -353,6 +359,7 @@ function AppScaleFrame({ children }: { children: React.ReactNode }) {
 function WorkspaceLayout() {
   const {
     t,
+    locale,
     toast,
     sessions,
     setSessions,
@@ -374,6 +381,7 @@ function WorkspaceLayout() {
     setActiveSessionId,
     setSessionChatInputMode,
     sendMessageToSession,
+    stagePendingAgentPlaceholder,
     weeklyCost,
     showToast,
     setActiveSettingsTab,
@@ -1058,6 +1066,7 @@ function WorkspaceLayout() {
       memberModelName?: string;
       workItemId?: string;
       worktreeMode?: ChatSessionWorktreeMode;
+      attachments?: File[];
     },
   ) => {
     if (!selectedProjectId) {
@@ -1071,6 +1080,12 @@ function WorkspaceLayout() {
     }
 
     try {
+      const attachedFiles = options.attachments ?? [];
+      const sessionTitle =
+        prompt.trim() ||
+        (attachedFiles.length > 0
+          ? attachmentInitialMessage(attachedFiles)
+          : prompt);
       let workspacePath: string | null = null;
       let workflowLeadAgentId: string | null = null;
       let freeChatSelectedAgentName: string | null = null;
@@ -1117,7 +1132,7 @@ function WorkspaceLayout() {
       const backendSession = await projectApi.createSession(
         selectedProjectId,
         {
-          title: prompt,
+          title: sessionTitle,
           workspace_path: workspacePath,
           ...(worktreeMode ? { worktree_mode: worktreeMode } : {}),
         },
@@ -1150,7 +1165,7 @@ function WorkspaceLayout() {
         options.taskMode === 'workflow' ? 'workflow' : 'free';
       setSessionChatInputMode(backendSession.id, nextChatInputMode);
 
-      if (prompt.trim()) {
+      if (prompt.trim() || attachedFiles.length > 0) {
         const content = prompt;
         const mentions = extractAgentMentions(content);
         const routeMentions =
@@ -1185,14 +1200,43 @@ function WorkspaceLayout() {
               }
             : undefined);
 
-        sendMessageToSession(backendSession.id, content, {
-          chatInputMode: nextChatInputMode,
-          routeMentions,
-          fallbackMention,
-          workflowLeadAgentId,
-          persistToBackend: true,
-          placeholderMember,
-        });
+        if (attachedFiles.length > 0) {
+          const shouldPersistRouteMentions =
+            Boolean(routeMentions?.length) &&
+            (nextChatInputMode !== 'workflow' || mentions.length > 0);
+          const placeholderText =
+            content.trim() || attachmentInitialMessage(attachedFiles);
+
+          await chatMessagesApi.uploadAttachment(
+            backendSession.id,
+            attachedFiles,
+            {
+              chatInputMode: nextChatInputMode,
+              content: content.trim() ? content : undefined,
+              appLanguage: locale,
+              mentions: shouldPersistRouteMentions
+                ? routeMentions
+                : undefined,
+            },
+          );
+          stagePendingAgentPlaceholder(backendSession.id, placeholderText, {
+            chatInputMode: nextChatInputMode,
+            routeMentions,
+            fallbackMention,
+            workflowLeadAgentId,
+            persistToBackend: true,
+            placeholderMember,
+          });
+        } else {
+          sendMessageToSession(backendSession.id, content, {
+            chatInputMode: nextChatInputMode,
+            routeMentions,
+            fallbackMention,
+            workflowLeadAgentId,
+            persistToBackend: true,
+            placeholderMember,
+          });
+        }
       }
 
       const mappedSession = mapSession(sessionForUi, {

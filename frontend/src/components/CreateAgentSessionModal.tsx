@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Check,
   ChevronRight,
+  FileText,
   GitBranch,
   GitFork,
+  Image as ImageIcon,
   Maximize2,
   Paperclip,
   X,
@@ -57,6 +59,7 @@ interface CreateAgentSessionModalProps {
       memberModelName?: string;
       workItemId?: string;
       worktreeMode?: ChatSessionWorktreeMode;
+      attachments?: File[];
     },
   ) => void;
 }
@@ -69,6 +72,112 @@ const translate = (
 ) => {
   const translated = t(key, replacements);
   return translated && translated !== key ? translated : fallback;
+};
+
+const allowedTextAttachmentExtensions = [
+  '.txt',
+  '.csv',
+  '.md',
+  '.json',
+  '.xml',
+  '.yaml',
+  '.yml',
+  '.html',
+  '.htm',
+  '.css',
+  '.js',
+  '.ts',
+  '.jsx',
+  '.tsx',
+  '.py',
+  '.java',
+  '.c',
+  '.cpp',
+  '.h',
+  '.hpp',
+  '.rb',
+  '.php',
+  '.go',
+  '.rs',
+  '.sql',
+  '.sh',
+  '.bash',
+  '.svg',
+];
+
+const allowedImageAttachmentExtensions = [
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.bmp',
+];
+
+const CHAT_ATTACHMENT_ACCEPT = [
+  'text/*',
+  'image/*',
+  ...allowedTextAttachmentExtensions,
+  ...allowedImageAttachmentExtensions,
+].join(',');
+
+const VSCODE_IFRAME_CLIPBOARD_FILES_EVENT =
+  'openteams:vscode-clipboard-files';
+
+const isImageAttachment = (file: File) =>
+  file.type.startsWith('image/') ||
+  allowedImageAttachmentExtensions.some((ext) =>
+    file.name.toLowerCase().endsWith(ext),
+  );
+
+const isTextAttachment = (file: File) =>
+  file.type.startsWith('text/') ||
+  allowedTextAttachmentExtensions.some((ext) =>
+    file.name.toLowerCase().endsWith(ext),
+  );
+
+const isAllowedAttachment = (file: File) =>
+  isImageAttachment(file) || isTextAttachment(file);
+
+const fallbackClipboardFileName = (file: File, index: number) => {
+  if (file.name.trim()) return file.name;
+
+  const extension = file.type.startsWith('image/')
+    ? (file.type.split('/')[1] ?? 'png')
+    : file.type === 'text/plain'
+      ? 'txt'
+      : 'dat';
+
+  return `pasted-attachment-${Date.now()}-${index + 1}.${extension}`;
+};
+
+const normalizeClipboardFile = (file: File, index: number) =>
+  file.name.trim()
+    ? file
+    : new File([file], fallbackClipboardFileName(file, index), {
+        type: file.type,
+        lastModified: file.lastModified || Date.now(),
+      });
+
+const getClipboardFiles = (clipboardData: DataTransfer) => {
+  const itemFiles = Array.from(clipboardData.items)
+    .filter((item) => item.kind === 'file')
+    .map((item) => item.getAsFile())
+    .filter((file): file is File => Boolean(file));
+
+  const files =
+    itemFiles.length > 0 ? itemFiles : Array.from(clipboardData.files);
+
+  return files.map(normalizeClipboardFile);
+};
+
+const attachmentIdentity = (file: File) =>
+  `${file.name}:${file.size}:${file.lastModified}`;
+
+const formatFileSize = (size: number) => {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 export function CreateAgentSessionModal({
@@ -101,7 +210,10 @@ export function CreateAgentSessionModal({
   const [expanded, setExpanded] = useState(false);
   const [isolateWorktree, setIsolateWorktree] = useState(false);
   const [gitAvailable, setGitAvailable] = useState<boolean | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [attachmentError, setAttachmentError] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const workItemMenuRef = useRef<HTMLDivElement | null>(null);
   const workItemPortalRef = useRef<HTMLDivElement | null>(null);
   const activeWorkItemOptionRef = useRef<HTMLButtonElement | null>(null);
@@ -169,6 +281,45 @@ export function CreateAgentSessionModal({
       }));
   }, [workItemQuery, workItems]);
 
+  const addAttachedFiles = useCallback(
+    (files: FileList | File[]) => {
+      const list = Array.from(files);
+      if (list.length === 0) return;
+
+      const allowedFiles = list.filter((file) => isAllowedAttachment(file));
+      const rejectedCount = list.length - allowedFiles.length;
+
+      if (rejectedCount > 0) {
+        setAttachmentError(
+          translate(
+            t,
+            'attachment.unsupported',
+            `${rejectedCount} unsupported attachment(s) skipped. Only text files and images are allowed.`,
+            { count: rejectedCount },
+          ),
+        );
+      } else {
+        setAttachmentError('');
+      }
+
+      if (allowedFiles.length === 0) return;
+
+      setAttachedFiles((current) => {
+        const existing = new Set(current.map(attachmentIdentity));
+        const next = [...current];
+        for (const file of allowedFiles) {
+          const identity = attachmentIdentity(file);
+          if (!existing.has(identity)) {
+            existing.add(identity);
+            next.push(file);
+          }
+        }
+        return next;
+      });
+    },
+    [t],
+  );
+
   useEffect(() => {
     if (!open) return;
     const focusTimer = window.setTimeout(() => {
@@ -178,11 +329,47 @@ export function CreateAgentSessionModal({
   }, [open]);
 
   useEffect(() => {
+    if (!open) return;
+
+    const handleClipboardFiles = (event: Event) => {
+      const files =
+        (event as CustomEvent<{ files?: File[] }>).detail?.files ?? [];
+      if (files.length === 0) return;
+      event.preventDefault();
+      addAttachedFiles(files);
+    };
+
+    const textarea = textareaRef.current;
+    textarea?.addEventListener(
+      VSCODE_IFRAME_CLIPBOARD_FILES_EVENT,
+      handleClipboardFiles,
+    );
+    window.addEventListener(
+      VSCODE_IFRAME_CLIPBOARD_FILES_EVENT,
+      handleClipboardFiles,
+    );
+
+    return () => {
+      textarea?.removeEventListener(
+        VSCODE_IFRAME_CLIPBOARD_FILES_EVENT,
+        handleClipboardFiles,
+      );
+      window.removeEventListener(
+        VSCODE_IFRAME_CLIPBOARD_FILES_EVENT,
+        handleClipboardFiles,
+      );
+    };
+  }, [addAttachedFiles, open]);
+
+  useEffect(() => {
     if (open) return;
     setWorkItemMenuOpen(false);
     setWorkItemMenuRect(null);
     setWorkItemQuery('');
     setActiveWorkItemOptionIndex(0);
+    setAttachedFiles([]);
+    setAttachmentError('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }, [open]);
 
   useEffect(() => {
@@ -315,7 +502,9 @@ export function CreateAgentSessionModal({
   if (!open) return null;
 
   const trimmedPrompt = prompt.trim();
-  const canCreate = trimmedPrompt.length > 0 && Boolean(selectedMember);
+  const canCreate =
+    (trimmedPrompt.length > 0 || attachedFiles.length > 0) &&
+    Boolean(selectedMember);
   const projectLabel =
     projectName ?? translate(t, 'createSession.projectFallback', 'openteams');
 
@@ -332,8 +521,34 @@ export function CreateAgentSessionModal({
         isolateWorktree,
         gitAvailable,
       ),
+      attachments: attachedFiles,
     });
+    setAttachedFiles([]);
+    setAttachmentError('');
     onClose();
+  };
+
+  const handleAttachmentInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    if (event.target.files) {
+      addAttachedFiles(event.target.files);
+    }
+    event.target.value = '';
+  };
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = getClipboardFiles(event.clipboardData);
+    if (files.length === 0) return;
+
+    event.preventDefault();
+    addAttachedFiles(files);
+  };
+
+  const removeAttachedFile = (fileIndex: number) => {
+    setAttachedFiles((current) =>
+      current.filter((_, index) => index !== fileIndex),
+    );
   };
 
   const handleModeChange = (nextMode: CreateTaskMode) => {
@@ -570,11 +785,21 @@ export function CreateAgentSessionModal({
             )}
           </div>
 
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            accept={CHAT_ATTACHMENT_ACCEPT}
+            onChange={handleAttachmentInputChange}
+          />
+
           <textarea
             ref={textareaRef}
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={translate(
               t,
               'createSession.promptPlaceholder',
@@ -582,6 +807,56 @@ export function CreateAgentSessionModal({
             )}
             className="mt-2.5 min-h-[96px] flex-1 resize-none bg-transparent text-[14px] leading-6 text-[var(--ink)] outline-none placeholder:text-[var(--ink-subtle)]"
           />
+
+          {attachmentError && (
+            <div className="mt-2 rounded-md border border-[color-mix(in_srgb,#e11d48_32%,var(--hairline))] bg-[color-mix(in_srgb,#e11d48_8%,var(--surface-1))] px-3 py-2 text-[11px] font-medium text-[#be123c]">
+              {attachmentError}
+            </div>
+          )}
+
+          {attachedFiles.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {attachedFiles.map((file, index) => {
+                const AttachmentIcon = isImageAttachment(file)
+                  ? ImageIcon
+                  : FileText;
+                return (
+                  <div
+                    key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                    className="flex max-w-full items-center gap-2 rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] px-2.5 py-1.5 text-[11px] text-[var(--ink-muted)]"
+                  >
+                    <AttachmentIcon className="h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
+                    <span
+                      className="max-w-[180px] truncate font-medium text-[var(--ink)]"
+                      title={file.name}
+                    >
+                      {file.name}
+                    </span>
+                    <span className="shrink-0 font-mono text-[10px] text-[var(--ink-tertiary)]">
+                      {formatFileSize(file.size)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachedFile(index)}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+                      title={translate(
+                        t,
+                        'attachment.remove',
+                        'Remove attachment',
+                      )}
+                      aria-label={translate(
+                        t,
+                        'attachment.remove',
+                        'Remove attachment',
+                      )}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
@@ -799,6 +1074,7 @@ export function CreateAgentSessionModal({
             className="rounded-md p-1.5 text-[var(--ink-subtle)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
             aria-label={translate(t, 'createSession.attach', 'Attach file')}
             title={translate(t, 'createSession.attach', 'Attach file')}
+            onClick={() => fileInputRef.current?.click()}
           >
             <Paperclip className="h-4 w-4" />
           </button>

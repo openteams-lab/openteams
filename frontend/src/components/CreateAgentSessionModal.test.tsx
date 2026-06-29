@@ -158,6 +158,28 @@ check(
   html,
 );
 check(
+  'new session composer supports file attachment selection',
+  source.includes('accept={CHAT_ATTACHMENT_ACCEPT}') &&
+    source.includes('type="file"') &&
+    source.includes('multiple') &&
+    source.includes('fileInputRef.current?.click()'),
+  source,
+);
+check(
+  'new session composer adds pasted clipboard files as attachments',
+  source.includes('onPaste={handlePaste}') &&
+    source.includes('getClipboardFiles(event.clipboardData)') &&
+    source.includes('normalizeClipboardFile') &&
+    source.includes('openteams:vscode-clipboard-files'),
+  source,
+);
+check(
+  'new session can be created with attachments only',
+  source.includes('trimmedPrompt.length > 0 || attachedFiles.length > 0') &&
+    source.includes('attachments: attachedFiles'),
+  source,
+);
+check(
   'renders plan mode button instead of mode labels',
   html.includes('PLAN_MODE') &&
     !html.includes('WORKFLOW') &&

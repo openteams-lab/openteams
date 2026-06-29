@@ -604,6 +604,7 @@ export const chatMessagesApi = {
       content?: string;
       appLanguage?: string;
       referenceMessageId?: string;
+      mentions?: string[];
     },
   ): Promise<BackendChatMessage> => {
     const form = new FormData();
@@ -618,6 +619,9 @@ export const chatMessagesApi = {
     }
     if (options?.referenceMessageId) {
       form.append("reference_message_id", options.referenceMessageId);
+    }
+    if (options?.mentions && options.mentions.length > 0) {
+      form.append("mentions", JSON.stringify(options.mentions));
     }
     if (options?.chatInputMode === "workflow") {
       form.append("chat_input_mode", "workflow");
