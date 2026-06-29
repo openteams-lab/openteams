@@ -11,6 +11,7 @@ use dashmap::DashMap;
 use db::models::{
     chat_run::ChatRun,
     chat_session::{ChatSession, ChatSessionStatus, ChatSessionWorktreeMode},
+    chat_session_worktree::{SessionWorktree, SessionWorktreeStatus},
     project::Project,
     project_delivery_record::{ProjectDeliveryEventTypeV2, ProjectDeliveryRecord},
     project_path::{ProjectPath, ProjectPathKind},
@@ -474,11 +475,18 @@ impl SourceControlService {
         let context =
             resolve_workspace_context(pool, project_id, request.session_id, request.workspace_id)
                 .await?;
+        let paths = request.paths;
+        if let Some(op) = detect_operation_in_progress(&context.workspace_path) {
+            let failed = git_operation_blocked_failures(paths, op);
+            return self
+                .operation_response(pool, &context, Vec::new(), failed, fast_response)
+                .await;
+        }
         let (succeeded, failed) = self
             .mutate_paths(
                 pool,
                 &context,
-                request.paths,
+                paths,
                 request.force_shared.unwrap_or(false),
                 |workspace_path, path| {
                     git_with_paths(workspace_path, &["add"], &[path.to_string()])
@@ -523,11 +531,18 @@ impl SourceControlService {
         let context =
             resolve_workspace_context(pool, project_id, request.session_id, request.workspace_id)
                 .await?;
+        let paths = request.paths;
+        if let Some(op) = detect_operation_in_progress(&context.workspace_path) {
+            let failed = git_operation_blocked_failures(paths, op);
+            return self
+                .operation_response(pool, &context, Vec::new(), failed, fast_response)
+                .await;
+        }
         let (succeeded, failed) = self
             .mutate_paths(
                 pool,
                 &context,
-                request.paths,
+                paths,
                 false,
                 |workspace_path, path| {
                     git_with_paths(
@@ -629,6 +644,7 @@ impl SourceControlService {
         let message = request.message.trim().to_string();
         let force_shared = request.force_shared.unwrap_or(false);
         let requested_work_item_ids = request.work_item_ids.clone();
+        let raw_operation_in_progress = detect_operation_in_progress(&context.workspace_path);
         if message.is_empty() {
             return Err(commit_error(
                 SourceControlCommitErrorCode::EmptyMessage,
@@ -657,6 +673,14 @@ impl SourceControlService {
             ));
         };
 
+        if let Some(op) = raw_operation_in_progress {
+            return Err(commit_error(
+                SourceControlCommitErrorCode::GitOperationBlocked,
+                format!("A Git {op:?} operation is in progress."),
+                None,
+                Some(status),
+            ));
+        }
         if let Some(op) = operation_in_progress {
             return Err(commit_error(
                 SourceControlCommitErrorCode::GitOperationBlocked,
@@ -861,7 +885,16 @@ impl SourceControlService {
 
         let head_sha = current_head_sha(&context.workspace_path);
         let branch = current_branch(&context.workspace_path).unwrap_or_else(|| "HEAD".to_string());
-        let operation_in_progress = detect_operation_in_progress(&context.workspace_path);
+        let operation_in_progress =
+            if let Some(op) = detect_operation_in_progress(&context.workspace_path) {
+                if should_surface_operation_in_progress(pool, context).await? {
+                    Some(op)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
         let detached_head = is_detached_head(&context.workspace_path);
         let blocked_reason = match (operation_in_progress, detached_head) {
             (Some(op), _) => Some(format!("A Git {op:?} operation is in progress.")),
@@ -1040,6 +1073,44 @@ fn detect_operation_in_progress(workspace_path: &Path) -> Option<SourceControlOp
         .map(source_control_op)
 }
 
+async fn should_surface_operation_in_progress(
+    pool: &SqlitePool,
+    context: &WorkspaceContext,
+) -> Result<bool> {
+    let Some(owner_session_id) = find_worktree_merge_owner_for_workspace(pool, context).await?
+    else {
+        return Ok(true);
+    };
+    Ok(owner_session_id == context.session_id)
+}
+
+async fn find_worktree_merge_owner_for_workspace(
+    pool: &SqlitePool,
+    context: &WorkspaceContext,
+) -> Result<Option<Uuid>> {
+    let rows = SessionWorktree::find_merge_operations_by_project(pool, context.project_id).await?;
+    Ok(rows
+        .into_iter()
+        .find(|row| {
+            workspace_paths_equivalent(
+                Path::new(row.base_workspace_path.trim()),
+                &context.workspace_path,
+            )
+        })
+        .map(|row| row.session_id))
+}
+
+fn workspace_paths_equivalent(left: &Path, right: &Path) -> bool {
+    if left == right {
+        return true;
+    }
+
+    match (left.canonicalize(), right.canonicalize()) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
 async fn resolve_workspace_context(
     pool: &SqlitePool,
     project_id: Uuid,
@@ -1074,9 +1145,9 @@ async fn resolve_workspace_context(
                 other => SourceControlError::WorkspaceNotAccessible(other.to_string()),
             })?;
         if let Some(wt) = latest {
-            // Active worktree (creating/active/dirty/merging/needs_conflict_resolution/cleanup_pending)
-            // → use worktree path as the active workspace.
-            if wt.status.is_active_for_workspace() {
+            // Source-control stays in the isolated worktree while it can still
+            // hold unmerged session edits. After merge, show the base workspace.
+            if worktree_status_uses_isolated_source_control(wt.status) {
                 let workspace_path = PathBuf::from(&wt.worktree_path);
                 ensure_workspace_accessible(&workspace_path)?;
                 return Ok(WorkspaceContext {
@@ -1118,6 +1189,17 @@ async fn resolve_workspace_context(
         workspace_path,
         workspace_path_string,
     })
+}
+
+fn worktree_status_uses_isolated_source_control(status: SessionWorktreeStatus) -> bool {
+    matches!(
+        status,
+        SessionWorktreeStatus::Creating
+            | SessionWorktreeStatus::Active
+            | SessionWorktreeStatus::Dirty
+            | SessionWorktreeStatus::Merging
+            | SessionWorktreeStatus::NeedsConflictResolution
+    )
 }
 
 async fn resolve_project_workspace(
@@ -1915,6 +1997,22 @@ fn operation_failure(
         code,
         message: message.into(),
     }
+}
+
+fn git_operation_blocked_failures(
+    paths: Vec<String>,
+    op: SourceControlOperationInProgress,
+) -> Vec<SourceControlOperationFailure> {
+    dedup_paths(paths)
+        .into_iter()
+        .map(|path| {
+            operation_failure(
+                path,
+                SourceControlOperationFailureCode::GitOperationBlocked,
+                format!("A Git {op:?} operation is in progress."),
+            )
+        })
+        .collect()
 }
 
 fn commit_error(

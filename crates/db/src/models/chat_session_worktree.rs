@@ -380,6 +380,24 @@ impl SessionWorktree {
         .await
     }
 
+    /// Worktree rows whose merge operation can leave the base workspace in a
+    /// Git operation-in-progress state. Source-control uses this to scope that
+    /// state back to the owning isolated session.
+    pub async fn find_merge_operations_by_project(
+        pool: &SqlitePool,
+        project_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(&format!(
+            "{CHAT_SESSION_WORKTREE_SELECT}\n\
+             WHERE project_id = ?1\n\
+               AND status IN ('merging', 'needs_conflict_resolution')\n\
+             ORDER BY updated_at DESC"
+        ))
+        .bind(project_id)
+        .fetch_all(pool)
+        .await
+    }
+
     pub async fn create(
         pool: &SqlitePool,
         data: &CreateSessionWorktree,

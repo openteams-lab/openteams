@@ -25,7 +25,8 @@ use uuid::Uuid;
 use super::source_control::{
     SessionSourceControlStatus, SourceControlCommitErrorCode, SourceControlCommitRequest,
     SourceControlDiscardRequest, SourceControlError, SourceControlFileStatus,
-    SourceControlOperationFailureCode, SourceControlService, SourceControlStageRequest,
+    SourceControlOperationFailureCode, SourceControlOperationInProgress, SourceControlService,
+    SourceControlStageRequest,
 };
 
 async fn setup_pool() -> SqlitePool {
@@ -263,6 +264,32 @@ fn git_checkout_detached(repo_path: &Path) {
     GitCli::new()
         .git(repo_path, ["checkout", "--detach", "HEAD"])
         .expect("detach HEAD");
+}
+
+fn start_conflicting_merge(repo_path: &Path, branch_name: &str) {
+    let git = GitCli::new();
+    git.git(repo_path, ["checkout", "-b", branch_name])
+        .expect("create conflict branch");
+    fs::write(repo_path.join("tracked.txt"), "session branch\n")
+        .expect("write session branch change");
+    git_add(repo_path, "tracked.txt");
+    GitService::new()
+        .commit(repo_path, "session branch change")
+        .expect("commit session branch change");
+
+    git.git(repo_path, ["checkout", "main"])
+        .expect("checkout main");
+    fs::write(repo_path.join("tracked.txt"), "main branch\n").expect("write main branch change");
+    git_add(repo_path, "tracked.txt");
+    GitService::new()
+        .commit(repo_path, "main branch change")
+        .expect("commit main branch change");
+
+    let merge = git.git(repo_path, ["merge", "--no-ff", "--no-commit", branch_name]);
+    assert!(
+        merge.is_err(),
+        "merge should stop with a conflict so MERGE_HEAD remains"
+    );
 }
 
 fn git_head_sha(repo_path: &Path) -> String {
@@ -1104,6 +1131,35 @@ async fn status_maps_untracked_without_collapsing_to_added() {
     assert_eq!(changes[0].status, SourceControlFileStatus::Untracked);
 }
 
+#[tokio::test]
+async fn status_reports_unowned_git_operation_in_progress() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+    let session_id = seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
+
+    start_conflicting_merge(&repo_path, "manual-conflict");
+
+    let status = SourceControlService::new()
+        .session_status(&pool, project.id, session_id, None)
+        .await
+        .expect("status");
+
+    let SessionSourceControlStatus::Git {
+        operation_in_progress,
+        blocked_reason,
+        ..
+    } = status
+    else {
+        panic!("expected git status");
+    };
+    assert_eq!(
+        operation_in_progress,
+        Some(SourceControlOperationInProgress::Merge)
+    );
+    assert!(blocked_reason.is_some());
+}
+
 // ---------------------------------------------------------------------------
 // Session worktree workspace selection tests
 // ---------------------------------------------------------------------------
@@ -1283,4 +1339,84 @@ async fn source_control_switches_to_base_workspace_for_cleanup_failed() {
             panic!("expected git status from base workspace for cleanup_failed");
         }
     }
+}
+
+#[tokio::test]
+async fn source_control_hides_worktree_merge_operation_for_other_sessions() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+    let owner_session_id = seed_isolated_session(&pool, project.id, &repo_path).await;
+    let other_session_id =
+        seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
+
+    let worktree_dir = tempfile::TempDir::new().unwrap();
+    let worktree_path = worktree_dir.path();
+    fs::create_dir_all(worktree_path).unwrap();
+    seed_worktree_row(
+        &pool,
+        owner_session_id,
+        project.id,
+        &repo_path,
+        worktree_path,
+        SessionWorktreeStatus::NeedsConflictResolution,
+    )
+    .await;
+    start_conflicting_merge(&repo_path, "worktree-conflict");
+
+    let status = SourceControlService::new()
+        .session_status(&pool, project.id, other_session_id, None)
+        .await
+        .expect("status");
+
+    let SessionSourceControlStatus::Git {
+        operation_in_progress,
+        blocked_reason,
+        ..
+    } = status
+    else {
+        panic!("expected git status");
+    };
+    assert_eq!(operation_in_progress, None);
+    assert_eq!(blocked_reason, None);
+
+    let stage_response = SourceControlService::new()
+        .stage(
+            &pool,
+            project.id,
+            SourceControlStageRequest {
+                session_id: other_session_id,
+                workspace_id: None,
+                paths: vec!["tracked.txt".to_string()],
+                force_shared: None,
+            },
+        )
+        .await
+        .expect("stage response");
+    assert!(!stage_response.ok);
+    assert_eq!(
+        stage_response.failed[0].code,
+        SourceControlOperationFailureCode::GitOperationBlocked
+    );
+
+    let commit_err = SourceControlService::new()
+        .commit(
+            &pool,
+            project.id,
+            SourceControlCommitRequest {
+                session_id: other_session_id,
+                workspace_id: None,
+                message: "commit during worktree conflict".to_string(),
+                expected_staged_paths: vec!["tracked.txt".to_string()],
+                force_shared: None,
+                work_item_ids: None,
+                expected_head_sha: None,
+            },
+        )
+        .await
+        .expect_err("commit should remain blocked");
+    assert_eq!(
+        commit_error_code(commit_err),
+        SourceControlCommitErrorCode::GitOperationBlocked
+    );
 }
