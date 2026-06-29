@@ -106,7 +106,7 @@ interface ProjectSidebarProps {
   onCreateProject?: (
     data: CreateProjectRequest,
     options?: { teamId?: string },
-  ) => Promise<void>;
+  ) => Promise<unknown>;
   onUpdateProject?: (projectId: string, data: UpdateProject) => Promise<void>;
   onDeleteProject?: (projectId: string) => Promise<void>;
   teamPresets?: ChatTeamPreset[];
@@ -138,8 +138,18 @@ const sidebarItemClass =
 const visibleSessionLimit = 6;
 const blankTeamId = "blank_team";
 
+const runningWorkflowSidebarStates = new Set([
+  "running",
+  "reviewing",
+  "waiting",
+]);
+
+const hasRunningWorkflowActivity = (session: Session): boolean =>
+  Boolean(session.hasRunningWorkflow) ||
+  runningWorkflowSidebarStates.has(session.workflowSidebarState ?? "idle");
+
 const hasRunningSessionActivity = (session: Session): boolean =>
-  Boolean(session.hasRunningAgent || session.hasRunningWorkflow);
+  Boolean(session.hasRunningAgent) || hasRunningWorkflowActivity(session);
 
 const hasSidebarPrioritySessionActivity = (session: Session): boolean =>
   hasRunningSessionActivity(session) ||
@@ -2214,6 +2224,10 @@ export function ProjectSidebar({
                   const active =
                     activePage === "workspace" &&
                     session.id === activeSessionId;
+                  const workflowSidebarState =
+                    session.workflowSidebarState ?? "idle";
+                  const workflowReviewing =
+                    workflowSidebarState === "reviewing";
                   const isRunning = hasRunningSessionActivity(session);
                   const hasPendingWorkflowReview =
                     !isRunning && Boolean(session.hasPendingWorkflowReview);
@@ -2225,12 +2239,17 @@ export function ProjectSidebar({
                     !isRunning && Boolean(session.hasUnreadAgentCompletion);
                   const pinned = isPinnedSession(session);
                   const SessionIcon =
-                    isRunning || hasPendingWorkflowReview
+                    isRunning
                       ? LoaderCircle
-                      : hasPendingWorkflowInput
+                      : hasPendingWorkflowReview || hasPendingWorkflowInput
                         ? CircleDot
                         : Box;
-                  const sessionLabel = isRunning
+                  const sessionLabel = workflowReviewing
+                    ? `${session.title} - ${translate(
+                        "sidebar.sessionReviewing",
+                        "reviewing",
+                      )}`
+                    : isRunning
                     ? `${session.title} - ${translate(
                         "sidebar.sessionRunning",
                         "agent running",
@@ -2269,9 +2288,9 @@ export function ProjectSidebar({
                     >
                       <SessionIcon
                         className={`h-3.5 w-3.5 shrink-0 ${
-                          isRunning || hasPendingWorkflowReview
+                          isRunning
                             ? "animate-spin text-[var(--primary)]"
-                            : hasPendingWorkflowInput
+                            : hasPendingWorkflowReview || hasPendingWorkflowInput
                             ? "text-[var(--primary)]"
                             : hasUnreadAgentCompletion
                             ? "text-[var(--primary)]"

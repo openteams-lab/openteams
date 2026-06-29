@@ -45,13 +45,18 @@ import {
   teamPresetsApi,
 } from "@/lib/api";
 import {
+  buildTemplateMemberSpecs,
+  firstAvailableRuntime,
+  runtimeConfiguredModel,
+  type TemplateMemberBuild,
+} from "@/lib/teamTemplateRuntime";
+import {
   getRuntimeDisplayState,
   getRunnerLabel,
 } from "@/pages/agent-runtime/agentRuntimeViewModel";
 import type {
   AgentRuntimeStatus,
   BackendChatSkill,
-  JsonValue as FrontendJsonValue,
   UpdateChatSession,
 } from "@/types";
 import { ProjectMemberType } from "../../../shared/types";
@@ -66,6 +71,9 @@ import type {
   TeamPresetSummary,
   UpdateTeamPresetRequest,
 } from "../../../shared/types";
+
+export { buildTemplateMemberSpecs };
+export type { TemplateMemberBuild };
 
 type TranslateFn = (
   key: string,
@@ -315,36 +323,6 @@ const validateMemberToolsEnabled = (
 const errorText = (error: unknown, fallback: string): string =>
   error instanceof Error && error.message ? error.message : fallback;
 
-export type TemplateMemberBuild = {
-  allowedSkillIds: string[];
-  displayOrder: number;
-  modelName: string | null;
-  name: string;
-  role: string;
-  runnerType: string;
-  systemPrompt: string | null;
-  toolsEnabled: FrontendJsonValue;
-  workspacePath: string | null;
-};
-
-const isObjectRecord = (
-  value: unknown,
-): value is Record<string, FrontendJsonValue> =>
-  !!value && typeof value === "object" && !Array.isArray(value);
-
-const runtimeConfiguredModel = (
-  runtime?: AgentRuntimeStatus | null,
-): string =>
-  isObjectRecord(runtime?.executor_options) &&
-  typeof runtime.executor_options.model === "string"
-    ? runtime.executor_options.model.trim()
-    : "";
-
-const firstAvailableRuntime = (
-  runtimes: AgentRuntimeStatus[],
-): AgentRuntimeStatus | undefined =>
-  runtimes.find((runner) => getRuntimeDisplayState(runner) === "available");
-
 export const teamTemplateSessionUpdatePayload = (
   patch: Partial<UpdateChatSession>,
 ): UpdateChatSession => ({
@@ -358,52 +336,6 @@ export const teamTemplateSessionUpdatePayload = (
   default_workspace_path: null,
   ...patch,
 });
-
-export const buildTemplateMemberSpecs = (
-  detail: ChatTeamPreset,
-  workspacePath: string | null,
-  runtimes: AgentRuntimeStatus[],
-): TemplateMemberBuild[] => {
-  const selectedMembers = detail.members.filter(
-    (member) => member.enabled !== false,
-  );
-  const leadMemberId =
-    detail.lead_member_id &&
-    selectedMembers.some((member) => member.id === detail.lead_member_id)
-      ? detail.lead_member_id
-      : selectedMembers[0]?.id;
-
-  return selectedMembers.flatMap((member, index) => {
-    const configuredRunnerType = member.runner_type?.trim() ?? "";
-    const runtime = configuredRunnerType
-      ? runtimes.find((runner) => runner.runner_type === configuredRunnerType)
-      : firstAvailableRuntime(runtimes);
-    const runnerType = configuredRunnerType || runtime?.runner_type;
-    if (!runnerType) return [];
-
-    const recommendedModel = member.recommended_model?.trim() ?? "";
-    const modelName =
-      recommendedModel ||
-      (runtime
-        ? runtimeConfiguredModel(runtime) || runtime.discovered_models[0]
-        : "") ||
-      null;
-
-    return [
-      {
-        allowedSkillIds: member.selected_skill_ids,
-        displayOrder: index + 1,
-        modelName,
-        name: member.name,
-        role: member.id === leadMemberId ? "lead" : "agent",
-        runnerType,
-        systemPrompt: member.system_prompt,
-        toolsEnabled: (member.tools_enabled ?? {}) as unknown as FrontendJsonValue,
-        workspacePath: member.default_workspace_path?.trim() || workspacePath,
-      },
-    ];
-  });
-};
 
 const isAgentProjectMember = (member: ProjectMemberWithRuntime): boolean =>
   member.member_type === ProjectMemberType.agent;

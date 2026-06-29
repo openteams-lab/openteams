@@ -105,6 +105,8 @@ fn patch_from_request(
         recommended_team_name: trim_optional(request.recommended_team_name),
         team_config: request.team_config.map(normalize_team_config),
         project_path: trim_optional(request.project_path),
+        project_name: trim_optional(request.project_name),
+        created_project_id: trim_optional(request.created_project_id),
         project_path_is_git,
         language: request.language,
         appearance: request.appearance,
@@ -154,6 +156,12 @@ mod tests {
         .execute(&pool)
         .await
         .expect("create onboarding_state table");
+        sqlx::raw_sql(include_str!(
+            "../../../db/migrations/20260629142000_extend_onboarding_project_fields.sql"
+        ))
+        .execute(&pool)
+        .await
+        .expect("extend onboarding_state table");
         pool
     }
 
@@ -188,6 +196,7 @@ mod tests {
                         runner_type: Some(" codex ".to_string()),
                         model_name: Some(" gpt-5 ".to_string()),
                     }]),
+                    project_name: Some(" Onboarding Project ".to_string()),
                     appearance: Some(OnboardingAppearance::System),
                     ..Default::default()
                 },
@@ -202,6 +211,7 @@ mod tests {
             updated.recommended_team_name.as_deref(),
             Some("Software team")
         );
+        assert_eq!(updated.project_name.as_deref(), Some("Onboarding Project"));
         assert_eq!(
             updated
                 .team_config
@@ -212,12 +222,24 @@ mod tests {
         );
 
         let completed = service
-            .complete(&pool, UpdateOnboardingStateRequest::default(), None)
+            .complete(
+                &pool,
+                UpdateOnboardingStateRequest {
+                    created_project_id: Some(" project-123 ".to_string()),
+                    ..Default::default()
+                },
+                None,
+            )
             .await
             .expect("complete onboarding");
 
         assert!(completed.onboarding_completed_at.is_some());
         assert_eq!(completed.current_step, OnboardingStep::Appearance);
+        assert_eq!(
+            completed.project_name.as_deref(),
+            Some("Onboarding Project")
+        );
+        assert_eq!(completed.created_project_id.as_deref(), Some("project-123"));
     }
 
     #[tokio::test]
@@ -244,6 +266,8 @@ mod tests {
                 selected_scenario: Some(OnboardingScenario::Design),
                 recommended_team_name: Some("Design team".to_string()),
                 project_path: Some("/workspace/design".to_string()),
+                project_name: Some("Design Workspace".to_string()),
+                created_project_id: Some("project-456".to_string()),
                 project_path_is_git: Some(true),
                 last_seen_upgrade_version: Some("0.0.2".to_string()),
                 ..Default::default()
@@ -270,6 +294,8 @@ mod tests {
         assert_eq!(reset.current_step, OnboardingStep::Scenario);
         assert!(reset.onboarding_completed_at.is_none());
         assert!(reset.project_path.is_none());
+        assert!(reset.project_name.is_none());
+        assert!(reset.created_project_id.is_none());
         assert_eq!(project_count, 1);
         assert_eq!(row.get::<String, _>("name"), "Business project");
         assert_eq!(reset.last_seen_upgrade_version.as_deref(), Some("0.0.2"));

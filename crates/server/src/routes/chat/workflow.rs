@@ -70,15 +70,114 @@ pub struct RetryPlanGenerationResponse {
     pub message_id: Uuid,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkflowSidebarState {
+    Idle,
+    Running,
+    Reviewing,
+    Waiting,
+    WaitingInput,
+    WaitingUserReview,
+    Paused,
+    Failed,
+}
+
 #[derive(Debug, Serialize)]
 pub struct WorkflowSessionStatusResponse {
+    pub sidebar_workflow_state: WorkflowSidebarState,
     pub has_running_workflow: bool,
     pub pending_workflow_input_id: Option<String>,
     pub pending_workflow_review_id: Option<String>,
 }
 
-fn is_sidebar_running_workflow_status(status: &WorkflowExecutionStatus) -> bool {
-    matches!(status, WorkflowExecutionStatus::Running)
+fn is_sidebar_running_workflow_state(state: WorkflowSidebarState) -> bool {
+    matches!(
+        state,
+        WorkflowSidebarState::Running
+            | WorkflowSidebarState::Reviewing
+            | WorkflowSidebarState::Waiting
+    )
+}
+
+async fn derive_sidebar_workflow_state(
+    pool: &SqlitePool,
+    executions: &[WorkflowExecution],
+    pending_workflow_input_id: Option<&str>,
+    pending_workflow_review_id: Option<&str>,
+) -> Result<WorkflowSidebarState, sqlx::Error> {
+    if pending_workflow_review_id.is_some() {
+        return Ok(WorkflowSidebarState::WaitingUserReview);
+    }
+    if pending_workflow_input_id.is_some() {
+        return Ok(WorkflowSidebarState::WaitingInput);
+    }
+
+    let mut saw_running_execution = false;
+    let mut saw_waiting_execution = false;
+    let mut saw_paused_execution = false;
+    let mut saw_failed_execution = false;
+    let mut saw_waiting_step = false;
+
+    for execution in executions {
+        match execution.status {
+            WorkflowExecutionStatus::Pending
+            | WorkflowExecutionStatus::Running
+            | WorkflowExecutionStatus::Recompiling => {
+                saw_running_execution = true;
+            }
+            WorkflowExecutionStatus::Waiting => {
+                saw_waiting_execution = true;
+            }
+            WorkflowExecutionStatus::Paused => {
+                saw_paused_execution = true;
+            }
+            WorkflowExecutionStatus::Failed => {
+                saw_failed_execution = true;
+            }
+            WorkflowExecutionStatus::Completed => {}
+        }
+
+        let steps = WorkflowStep::find_by_execution(pool, execution.id).await?;
+        if steps
+            .iter()
+            .any(|step| step.status == WorkflowStepStatus::WaitingReview)
+        {
+            return Ok(WorkflowSidebarState::Reviewing);
+        }
+        if steps.iter().any(|step| {
+            matches!(
+                step.status,
+                WorkflowStepStatus::WaitingInput | WorkflowStepStatus::PreCompleted
+            )
+        }) {
+            saw_waiting_step = true;
+        }
+        if steps.iter().any(|step| {
+            matches!(
+                step.status,
+                WorkflowStepStatus::Pending
+                    | WorkflowStepStatus::Ready
+                    | WorkflowStepStatus::Running
+                    | WorkflowStepStatus::Revising
+                    | WorkflowStepStatus::InterruptRequested
+            )
+        }) {
+            saw_running_execution = true;
+        }
+    }
+
+    if saw_running_execution {
+        Ok(WorkflowSidebarState::Running)
+    } else if saw_waiting_execution || saw_waiting_step {
+        Ok(WorkflowSidebarState::Waiting)
+    } else if saw_paused_execution {
+        Ok(WorkflowSidebarState::Paused)
+    } else if saw_failed_execution {
+        Ok(WorkflowSidebarState::Failed)
+    } else {
+        Ok(WorkflowSidebarState::Idle)
+    }
 }
 
 async fn find_pending_workflow_input_id(
@@ -126,9 +225,8 @@ async fn find_pending_workflow_review_id(
             r#"
             SELECT t.id
             FROM chat_workflow_transcripts t
-            INNER JOIN chat_workflow_steps s ON s.id = t.step_id
             WHERE t.execution_id = ?1
-              AND t.entry_type IN ('step_review', 'loop_review')
+              AND t.entry_type IN ('step_review', 'loop_review', 'final_review')
               AND (
                 t.meta_json IS NULL
                 OR json_valid(t.meta_json) = 0
@@ -158,9 +256,6 @@ pub async fn get_workflow_status(
     let executions =
         WorkflowExecution::find_generation_blocking_by_session(&deployment.db().pool, session.id)
             .await?;
-    let has_running_workflow = executions
-        .iter()
-        .any(|execution| is_sidebar_running_workflow_status(&execution.status));
     let pending_workflow_input_id =
         find_pending_workflow_input_id(&deployment.db().pool, &executions)
             .await?
@@ -169,9 +264,18 @@ pub async fn get_workflow_status(
         find_pending_workflow_review_id(&deployment.db().pool, &executions)
             .await?
             .map(|id| id.to_string());
+    let sidebar_workflow_state = derive_sidebar_workflow_state(
+        &deployment.db().pool,
+        &executions,
+        pending_workflow_input_id.as_deref(),
+        pending_workflow_review_id.as_deref(),
+    )
+    .await?;
+    let has_running_workflow = is_sidebar_running_workflow_state(sidebar_workflow_state);
 
     Ok(ResponseJson(ApiResponse::success(
         WorkflowSessionStatusResponse {
+            sidebar_workflow_state,
             has_running_workflow,
             pending_workflow_input_id,
             pending_workflow_review_id,
@@ -1641,20 +1745,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sidebar_running_workflow_status_only_counts_running() {
-        assert!(is_sidebar_running_workflow_status(
-            &WorkflowExecutionStatus::Running
-        ));
-
-        for status in [
-            WorkflowExecutionStatus::Pending,
-            WorkflowExecutionStatus::Failed,
-            WorkflowExecutionStatus::Paused,
-            WorkflowExecutionStatus::Recompiling,
-            WorkflowExecutionStatus::Completed,
-            WorkflowExecutionStatus::Waiting,
+    fn sidebar_running_workflow_state_only_counts_active_states() {
+        for state in [
+            WorkflowSidebarState::Running,
+            WorkflowSidebarState::Reviewing,
+            WorkflowSidebarState::Waiting,
         ] {
-            assert!(!is_sidebar_running_workflow_status(&status));
+            assert!(is_sidebar_running_workflow_state(state));
+        }
+
+        for state in [
+            WorkflowSidebarState::Idle,
+            WorkflowSidebarState::WaitingInput,
+            WorkflowSidebarState::WaitingUserReview,
+            WorkflowSidebarState::Paused,
+            WorkflowSidebarState::Failed,
+        ] {
+            assert!(!is_sidebar_running_workflow_state(state));
         }
     }
 }

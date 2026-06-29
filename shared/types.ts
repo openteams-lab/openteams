@@ -36,7 +36,7 @@ export type CreateProjectPath = { path: string, label: string | null, kind: Proj
 
 export type UpdateProjectPath = { path: string | null, label: string | null, kind: ProjectPathKind | null, is_default: boolean | null, };
 
-export type OnboardingState = { welcome_seen_at: Date | null, onboarding_completed_at: Date | null, current_step: OnboardingStep, selected_scenario: OnboardingScenario | null, recommended_team_name: string | null, team_config: Array<OnboardingTeamMemberConfig> | null, project_path: string | null, project_path_is_git: boolean, language: OnboardingLanguage | null, appearance: OnboardingAppearance | null, last_seen_upgrade_version: string | null, created_at: Date, updated_at: Date, };
+export type OnboardingState = { welcome_seen_at: Date | null, onboarding_completed_at: Date | null, current_step: OnboardingStep, selected_scenario: OnboardingScenario | null, recommended_team_name: string | null, team_config: Array<OnboardingTeamMemberConfig> | null, project_path: string | null, project_name: string | null, created_project_id: string | null, project_path_is_git: boolean, language: OnboardingLanguage | null, appearance: OnboardingAppearance | null, last_seen_upgrade_version: string | null, created_at: Date, updated_at: Date, };
 
 export enum OnboardingStep { scenario = "scenario", executor = "executor", project_path = "project_path", appearance = "appearance" }
 
@@ -48,7 +48,7 @@ export enum OnboardingAppearance { light = "light", dark = "dark", system = "sys
 
 export type OnboardingTeamMemberConfig = { member: string, runner_type?: string, model_name?: string, };
 
-export type UpdateOnboardingStateRequest = { welcome_seen?: boolean, current_step?: OnboardingStep, selected_scenario?: OnboardingScenario, recommended_team_name?: string, team_config?: Array<OnboardingTeamMemberConfig>, project_path?: string, language?: OnboardingLanguage, appearance?: OnboardingAppearance, };
+export type UpdateOnboardingStateRequest = { welcome_seen?: boolean, current_step?: OnboardingStep, selected_scenario?: OnboardingScenario, recommended_team_name?: string, team_config?: Array<OnboardingTeamMemberConfig>, project_path?: string, project_name?: string, created_project_id?: string, language?: OnboardingLanguage, appearance?: OnboardingAppearance, };
 
 export type MarkUpgradeReadRequest = { version: string, };
 

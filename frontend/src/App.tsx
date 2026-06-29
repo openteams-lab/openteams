@@ -71,14 +71,19 @@ import { mapSession } from "@/lib/mappers";
 import { mockFrontendApi } from "@/lib/mockFrontendApi";
 import { projectDisplayName } from "@/lib/projectDisplay";
 import {
+  buildTemplateMemberSpecs,
+  firstAvailableRuntime,
+  runtimeConfiguredModel,
+} from "@/lib/teamTemplateRuntime";
+import {
   getRunnerLabel,
-  getRuntimeDisplayState,
 } from "@/pages/agent-runtime/agentRuntimeViewModel";
 import type { ShellOptionsMock } from "@/mockApiData";
 import {
   type BaseCodingAgent as ProjectBaseCodingAgent,
   type ChatMemberPreset,
   type ChatTeamPreset,
+  OnboardingAppearance,
   type OnboardingState,
   ProjectMemberType,
   type CreateProjectRequest,
@@ -199,20 +204,6 @@ type CreateProjectOptions = {
 type ChatPresetConfigView = {
   members?: ChatMemberPreset[];
   teams?: ChatTeamPreset[];
-};
-
-const isObjectRecord = (value: unknown): value is Record<string, JsonValue> =>
-  !!value && typeof value === "object" && !Array.isArray(value);
-
-const runtimeConfiguredModel = (
-  runtime?: AgentRuntimeStatus | null,
-): string => {
-  return (
-    isObjectRecord(runtime?.executor_options) &&
-    typeof runtime.executor_options.model === "string"
-      ? runtime.executor_options.model.trim()
-      : ""
-  );
 };
 
 const chatSessionUpdatePayload = (
@@ -568,11 +559,6 @@ function WorkspaceLayout() {
     return null;
   };
 
-  const firstAvailableRuntime = (
-    runtimes: AgentRuntimeStatus[],
-  ): AgentRuntimeStatus | undefined =>
-    runtimes.find((runner) => getRuntimeDisplayState(runner) === "available");
-
   const loadRuntimeStatuses = async (): Promise<AgentRuntimeStatus[]> => {
     try {
       return (await agentRuntimeApi.list()).runners;
@@ -665,44 +651,16 @@ function WorkspaceLayout() {
     teamPreset: ChatTeamPreset,
     runtimes: AgentRuntimeStatus[],
   ): Promise<number> => {
-    const selectedMembers = teamPreset.members.filter(
-      (preset) => preset.enabled !== false,
-    );
-    const leadMemberId =
-      teamPreset.lead_member_id &&
-      selectedMembers.some((member) => member.id === teamPreset.lead_member_id)
-        ? teamPreset.lead_member_id
-        : selectedMembers[0]?.id;
-
     let created = 0;
-    for (const [index, memberPreset] of selectedMembers.entries()) {
-      const configuredRunnerType = memberPreset.runner_type?.trim() ?? "";
-      const runtime = configuredRunnerType
-        ? runtimes.find((runner) => runner.runner_type === configuredRunnerType)
-        : firstAvailableRuntime(runtimes);
-      const runnerType = configuredRunnerType || runtime?.runner_type;
-      if (!runnerType) continue;
-
-      const recommendedModel = memberPreset.recommended_model?.trim() ?? "";
-      const modelName =
-        recommendedModel ||
-        (runtime
-          ? runtimeConfiguredModel(runtime) || runtime.discovered_models[0]
-          : "") ||
-        null;
-
+    const memberSpecs = buildTemplateMemberSpecs(
+      teamPreset,
+      workspacePath,
+      runtimes,
+    );
+    for (const spec of memberSpecs) {
       await createProjectAgentMember({
         projectId,
-        workspacePath:
-          memberPreset.default_workspace_path?.trim() || workspacePath,
-        name: memberPreset.name,
-        runnerType,
-        systemPrompt: memberPreset.system_prompt,
-        toolsEnabled: (memberPreset.tools_enabled ?? {}) as JsonValue,
-        modelName,
-        allowedSkillIds: memberPreset.selected_skill_ids,
-        role: memberPreset.id === leadMemberId ? "lead" : "agent",
-        displayOrder: index + 1,
+        ...spec,
       });
       created += 1;
     }
@@ -1509,6 +1467,7 @@ function WorkspaceLayout() {
             });
     showToast(createdProjectToast);
     closeMobileSidebar();
+    return { project, session };
   };
 
   const handleUpdateProject = async (
@@ -1551,6 +1510,46 @@ function WorkspaceLayout() {
     setOnboardingOverlay(null);
     setIsCreateSessionModalOpen(true);
     closeMobileSidebar();
+  };
+
+  const handleCreateOnboardingProject = async ({
+    name,
+    path,
+    teamId,
+  }: {
+    name: string;
+    path: string;
+    teamId: string | null;
+  }) => {
+    const { project, session } = await handleCreateProject(
+      {
+        name,
+        repositories: [],
+        description: null,
+        status: null,
+        default_workspace_path: path,
+        active_repo_id: null,
+      },
+      { teamId: teamId ?? blankTeamId },
+    );
+    return { projectId: project.id, sessionId: session?.id ?? null };
+  };
+
+  const handleOnboardingPreviewAppearanceChange = (
+    appearance: OnboardingAppearance,
+  ) => {
+    if (appearance === OnboardingAppearance.light) {
+      setTheme("light");
+      return;
+    }
+    if (appearance === OnboardingAppearance.system) {
+      const prefersLight =
+        typeof window !== "undefined" &&
+        window.matchMedia?.("(prefers-color-scheme: light)").matches;
+      setTheme(prefersLight ? "light" : "dark");
+      return;
+    }
+    setTheme("dark");
   };
 
   const handleOnboardingStateChange = (nextState: OnboardingState) => {
@@ -1627,8 +1626,10 @@ function WorkspaceLayout() {
           locale={locale}
           theme={theme}
           t={t}
-          setLocale={setLocale}
-          setTheme={setTheme}
+          teamPresets={teamPresets}
+          onCreateProjectFromOnboarding={handleCreateOnboardingProject}
+          onPreviewLocaleChange={setLocale}
+          onPreviewAppearanceChange={handleOnboardingPreviewAppearanceChange}
           onClose={() => setOnboardingOverlay(null)}
           onOpenCreateSession={handleOnboardingCompleted}
           onStateChange={handleOnboardingStateChange}

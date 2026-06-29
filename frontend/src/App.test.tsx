@@ -122,7 +122,7 @@ check(
 check(
   "creates a blank-team starter member from the first available runtime",
   source.includes("agentRuntimeApi.list()") &&
-    source.includes('getRuntimeDisplayState(runner) === "available"') &&
+    source.includes("firstAvailableRuntime(runtimes)") &&
     source.includes("chatAgentsApi.create({") &&
     source.includes("owner_project_id: projectId") &&
     source.includes("projectApi.addMember(projectId"),
@@ -131,10 +131,27 @@ check(
 check(
   "creates selected team preset members during project creation",
   source.includes("createTeamPresetMembers") &&
+    source.includes("buildTemplateMemberSpecs") &&
     source.includes("teamPresets.find") &&
-    source.includes("memberPreset.system_prompt") &&
-    source.includes("memberPreset.selected_skill_ids") &&
+    source.includes("for (const spec of memberSpecs)") &&
     source.includes("toast.projectCreatedWithTeam"),
+  source,
+);
+check(
+  "onboarding creates a real project before opening the existing composer",
+  source.includes("handleCreateOnboardingProject") &&
+    source.includes("onCreateProjectFromOnboarding={handleCreateOnboardingProject}") &&
+    source.includes("return { project, session }") &&
+    source.includes("return { projectId: project.id, sessionId: session?.id ?? null }") &&
+    source.includes("setIsCreateSessionModalOpen(true)"),
+  source,
+);
+check(
+  "onboarding previews locale and appearance through existing app setters",
+  source.includes("onPreviewLocaleChange={setLocale}") &&
+    source.includes("handleOnboardingPreviewAppearanceChange") &&
+    source.includes("setTheme(prefersLight ?") &&
+    source.includes("OnboardingAppearance.system"),
   source,
 );
 check(

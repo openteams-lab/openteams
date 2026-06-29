@@ -13,6 +13,8 @@ const ONBOARDING_STATE_COLUMNS: &str = r#"
     recommended_team_name,
     team_config_json,
     project_path,
+    project_name,
+    created_project_id,
     project_path_is_git,
     language,
     appearance,
@@ -101,6 +103,8 @@ pub struct OnboardingState {
     pub recommended_team_name: Option<String>,
     pub team_config: Option<Vec<OnboardingTeamMemberConfig>>,
     pub project_path: Option<String>,
+    pub project_name: Option<String>,
+    pub created_project_id: Option<String>,
     pub project_path_is_git: bool,
     pub language: Option<OnboardingLanguage>,
     pub appearance: Option<OnboardingAppearance>,
@@ -133,6 +137,12 @@ pub struct UpdateOnboardingStateRequest {
     pub project_path: Option<String>,
     #[serde(default)]
     #[ts(optional)]
+    pub project_name: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub created_project_id: Option<String>,
+    #[serde(default)]
+    #[ts(optional)]
     pub language: Option<OnboardingLanguage>,
     #[serde(default)]
     #[ts(optional)]
@@ -153,6 +163,8 @@ pub struct OnboardingStatePatch {
     pub recommended_team_name: Option<String>,
     pub team_config: Option<Vec<OnboardingTeamMemberConfig>>,
     pub project_path: Option<String>,
+    pub project_name: Option<String>,
+    pub created_project_id: Option<String>,
     pub project_path_is_git: Option<bool>,
     pub language: Option<OnboardingLanguage>,
     pub appearance: Option<OnboardingAppearance>,
@@ -169,6 +181,8 @@ struct OnboardingStateRow {
     recommended_team_name: Option<String>,
     team_config_json: Option<String>,
     project_path: Option<String>,
+    project_name: Option<String>,
+    created_project_id: Option<String>,
     project_path_is_git: bool,
     language: Option<OnboardingLanguage>,
     appearance: Option<OnboardingAppearance>,
@@ -197,6 +211,8 @@ impl TryFrom<OnboardingStateRow> for OnboardingState {
             recommended_team_name: row.recommended_team_name,
             team_config,
             project_path: row.project_path,
+            project_name: row.project_name,
+            created_project_id: row.created_project_id,
             project_path_is_git: row.project_path_is_git,
             language: row.language,
             appearance: row.appearance,
@@ -239,10 +255,12 @@ impl OnboardingState {
                  recommended_team_name = ?6,
                  team_config_json = ?7,
                  project_path = ?8,
-                 project_path_is_git = ?9,
-                 language = ?10,
-                 appearance = ?11,
-                 last_seen_upgrade_version = ?12,
+                 project_name = ?9,
+                 created_project_id = ?10,
+                 project_path_is_git = ?11,
+                 language = ?12,
+                 appearance = ?13,
+                 last_seen_upgrade_version = ?14,
                  updated_at = datetime('now', 'subsec')
              WHERE id = ?1
              RETURNING {ONBOARDING_STATE_COLUMNS}"
@@ -264,6 +282,13 @@ impl OnboardingState {
         )
         .bind(team_config_json)
         .bind(patch.project_path.clone().or(existing.project_path))
+        .bind(patch.project_name.clone().or(existing.project_name))
+        .bind(
+            patch
+                .created_project_id
+                .clone()
+                .or(existing.created_project_id),
+        )
         .bind(
             patch
                 .project_path_is_git
@@ -294,6 +319,8 @@ impl OnboardingState {
                  recommended_team_name = NULL,
                  team_config_json = NULL,
                  project_path = NULL,
+                 project_name = NULL,
+                 created_project_id = NULL,
                  project_path_is_git = 0,
                  language = NULL,
                  appearance = NULL,
@@ -358,6 +385,12 @@ mod tests {
         .execute(&pool)
         .await
         .expect("create onboarding_state table");
+        sqlx::raw_sql(include_str!(
+            "../../migrations/20260629142000_extend_onboarding_project_fields.sql"
+        ))
+        .execute(&pool)
+        .await
+        .expect("extend onboarding_state table");
         pool
     }
 
@@ -375,6 +408,8 @@ mod tests {
         assert!(state.selected_scenario.is_none());
         assert!(state.team_config.is_none());
         assert!(state.project_path.is_none());
+        assert!(state.project_name.is_none());
+        assert!(state.created_project_id.is_none());
         assert!(!state.project_path_is_git);
     }
 
@@ -396,6 +431,8 @@ mod tests {
                     model_name: Some("gpt-5".to_string()),
                 }]),
                 project_path: Some("/workspace/project".to_string()),
+                project_name: Some("Launch Workspace".to_string()),
+                created_project_id: Some("project-123".to_string()),
                 project_path_is_git: Some(true),
                 language: Some(OnboardingLanguage::En),
                 appearance: Some(OnboardingAppearance::Dark),
@@ -420,6 +457,8 @@ mod tests {
             })
         );
         assert_eq!(state.project_path.as_deref(), Some("/workspace/project"));
+        assert_eq!(state.project_name.as_deref(), Some("Launch Workspace"));
+        assert_eq!(state.created_project_id.as_deref(), Some("project-123"));
         assert!(state.project_path_is_git);
         assert_eq!(state.language, Some(OnboardingLanguage::En));
         assert_eq!(state.appearance, Some(OnboardingAppearance::Dark));
@@ -437,6 +476,8 @@ mod tests {
                 selected_scenario: Some(OnboardingScenario::Research),
                 recommended_team_name: Some("Research team".to_string()),
                 project_path: Some("/workspace/research".to_string()),
+                project_name: Some("Research Workspace".to_string()),
+                created_project_id: Some("project-456".to_string()),
                 project_path_is_git: Some(true),
                 last_seen_upgrade_version: Some("0.0.2".to_string()),
                 ..Default::default()
@@ -454,6 +495,8 @@ mod tests {
         assert!(reset.onboarding_completed_at.is_none());
         assert!(reset.selected_scenario.is_none());
         assert!(reset.project_path.is_none());
+        assert!(reset.project_name.is_none());
+        assert!(reset.created_project_id.is_none());
         assert!(!reset.project_path_is_git);
         assert_eq!(reset.last_seen_upgrade_version.as_deref(), Some("0.0.2"));
     }

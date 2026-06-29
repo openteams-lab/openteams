@@ -210,7 +210,9 @@ mod tests {
             "/api/onboarding/state",
             Some(json!({
                 "current_step": "project_path",
-                "project_path": format!(" {} ", git_dir.path().to_string_lossy())
+                "project_path": format!(" {} ", git_dir.path().to_string_lossy()),
+                "project_name": " Onboarding Project ",
+                "created_project_id": " project-123 "
             })),
         )
         .await;
@@ -223,6 +225,8 @@ mod tests {
         );
         assert_eq!(data["project_path_is_git"], true);
         assert_eq!(data["current_step"], "project_path");
+        assert_eq!(data["project_name"], "Onboarding Project");
+        assert_eq!(data["created_project_id"], "project-123");
     }
 
     #[tokio::test]
