@@ -139,7 +139,15 @@ export const mockSessionWorkspaceChanges: Record<
           has_diff: false,
         },
       ],
-      deleted: [{ path: 'src/components/SessionIconPickerPage.tsx' }],
+      deleted: [
+        {
+          path: 'src/components/SessionIconPickerPage.tsx',
+          additions: 0,
+          deletions: 0,
+          unified_diff: null,
+          has_diff: false,
+        },
+      ],
       untracked: [],
     },
   },

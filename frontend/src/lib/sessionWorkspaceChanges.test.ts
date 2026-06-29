@@ -46,7 +46,15 @@ const response: WorkspaceChangesResponse = {
         has_diff: true,
       },
     ],
-    deleted: [{ path: "src/old.ts" }],
+    deleted: [
+      {
+        path: "src/old.ts",
+        additions: 0,
+        deletions: 5,
+        unified_diff: "@@ deleted diff",
+        has_diff: true,
+      },
+    ],
     untracked: [
       {
         path: "notes.txt",
@@ -77,7 +85,7 @@ check(
 check(
   "detects usable inline diff only when both flag and diff text exist",
   hasRelatedFileDiff(files[0]) &&
-    !hasRelatedFileDiff(files[2]) &&
+    hasRelatedFileDiff(files[2]) &&
     !hasRelatedFileDiff(files[3]),
   files,
 );

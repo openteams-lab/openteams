@@ -200,7 +200,7 @@ pub struct WorkspacePathEntry {
 pub struct WorkspaceChanges {
     pub modified: Vec<WorkspaceChangedFile>,
     pub added: Vec<WorkspaceChangedFile>,
-    pub deleted: Vec<WorkspacePathEntry>,
+    pub deleted: Vec<WorkspaceChangedFile>,
     pub untracked: Vec<WorkspaceChangedFile>,
 }
 
@@ -362,7 +362,9 @@ fn build_workspace_changes(
                     .push(diff_to_workspace_changed_file(diff, path, include_diff));
             }
             DiffChangeKind::Deleted => {
-                changes.deleted.push(WorkspacePathEntry { path });
+                changes
+                    .deleted
+                    .push(diff_to_workspace_changed_file(diff, path, include_diff));
             }
             DiffChangeKind::Modified
             | DiffChangeKind::Renamed
@@ -792,13 +794,13 @@ fn retain_workspace_changes_to_paths(changes: &mut WorkspaceChanges, paths: &Has
 /// This is the per-run counterpart of `collect_workspace_changes`: it inspects
 /// the run's captured git diff patch (`{prefix}_diff.patch`), classifies each
 /// touched file, counts `+`/`-` lines, then overlays validated artifact paths.
-/// When artifact paths are present they are authoritative: matching scoped-diff
-/// files keep their diff, while artifact-only existing files appear without a
-/// diff.
+/// Artifact paths are authoritative: matching scoped-diff files keep their
+/// diff, while artifact-only existing files appear without a diff. Scoped diff
+/// files that were not reported as artifacts are intentionally suppressed.
 ///
-/// Returns an empty `WorkspaceChanges` when no run-scoped diff data exists
-/// (e.g. non-git workspaces, runs created before change capture, or runs that
-/// made no tracked changes).
+/// Returns an empty `WorkspaceChanges` when no artifact paths are recorded for
+/// the run, no run-scoped diff data exists, or no recorded artifact path still
+/// matches a valid workspace/diff path.
 pub(crate) fn collect_run_files(run: &ChatRun, include_diff: bool) -> WorkspaceChanges {
     let mut changes = empty_workspace_changes();
     let workspace_root = run
@@ -810,7 +812,6 @@ pub(crate) fn collect_run_files(run: &ChatRun, include_diff: bool) -> WorkspaceC
 
     let mut covered: HashSet<String> = HashSet::new();
     let mut artifact_paths: HashSet<String> = HashSet::new();
-    let mut saw_artifact_candidates = false;
 
     if let Some(patch) = read_first_existing_file(&run_scoped_diff_paths(run)) {
         for block in parse_run_diff_blocks(&patch) {
@@ -833,7 +834,17 @@ pub(crate) fn collect_run_files(run: &ChatRun, include_diff: bool) -> WorkspaceC
                     },
                     has_diff: true,
                 }),
-                DiffFileStatus::Deleted => changes.deleted.push(WorkspacePathEntry { path }),
+                DiffFileStatus::Deleted => changes.deleted.push(WorkspaceChangedFile {
+                    path,
+                    additions: block.additions,
+                    deletions: block.deletions,
+                    unified_diff: if include_diff {
+                        Some(block.text.clone())
+                    } else {
+                        None
+                    },
+                    has_diff: true,
+                }),
                 DiffFileStatus::Modified => changes.modified.push(WorkspaceChangedFile {
                     path,
                     additions: block.additions,
@@ -868,9 +879,6 @@ pub(crate) fn collect_run_files(run: &ChatRun, include_diff: bool) -> WorkspaceC
         else {
             continue;
         };
-        if is_artifact {
-            saw_artifact_candidates = true;
-        }
         if is_artifact && !covered.contains(&path) && !workspace_file_exists(root, &path) {
             continue;
         }
@@ -903,7 +911,6 @@ pub(crate) fn collect_run_files(run: &ChatRun, include_diff: bool) -> WorkspaceC
     // capture, so read them at request time as a fallback for message-bottom
     // run files. These rows deliberately have no inline diff.
     let work_record_artifacts = load_run_artifact_work_record_paths(run, root, &covered);
-    saw_artifact_candidates |= work_record_artifacts.saw_candidates;
     for path in work_record_artifacts.paths {
         artifact_paths.insert(path.clone());
         if !covered.insert(path.clone()) {
@@ -919,9 +926,7 @@ pub(crate) fn collect_run_files(run: &ChatRun, include_diff: bool) -> WorkspaceC
         });
     }
 
-    if saw_artifact_candidates {
-        retain_workspace_changes_to_paths(&mut changes, &artifact_paths);
-    }
+    retain_workspace_changes_to_paths(&mut changes, &artifact_paths);
 
     changes.modified.sort_by(|a, b| a.path.cmp(&b.path));
     changes.added.sort_by(|a, b| a.path.cmp(&b.path));
@@ -998,7 +1003,6 @@ fn load_work_record_lines(session_id: Uuid) -> Vec<WorkRecordJsonLine> {
 
 struct LoadedArtifactPaths {
     paths: HashSet<String>,
-    saw_candidates: bool,
 }
 
 fn load_run_artifact_work_record_paths(
@@ -1007,8 +1011,6 @@ fn load_run_artifact_work_record_paths(
     scoped_paths: &HashSet<String>,
 ) -> LoadedArtifactPaths {
     let mut paths = HashSet::new();
-    let mut saw_candidates = false;
-
     for record in load_work_record_lines(run.session_id)
         .into_iter()
         .filter(|record| {
@@ -1018,17 +1020,13 @@ fn load_run_artifact_work_record_paths(
         })
     {
         for path in extract_workspace_paths_from_artifact_text(&record.content, workspace_path) {
-            saw_candidates = true;
             if scoped_paths.contains(&path) || workspace_file_exists(workspace_path, &path) {
                 paths.insert(path);
             }
         }
     }
 
-    LoadedArtifactPaths {
-        paths,
-        saw_candidates,
-    }
+    LoadedArtifactPaths { paths }
 }
 
 fn collect_session_git_path_union(
@@ -1134,8 +1132,12 @@ fn build_plain_workspace_changes(
                 }
             }
             _ if state.existed_after_run => {
-                changes.deleted.push(WorkspacePathEntry {
+                changes.deleted.push(WorkspaceChangedFile {
                     path: relative_path,
+                    additions: 0,
+                    deletions: 0,
+                    unified_diff: None,
+                    has_diff: false,
                 });
             }
             _ => {}
@@ -2628,7 +2630,7 @@ diff --git a/x b/x
     }
 
     #[test]
-    fn collect_run_files_reads_patch_and_untracked_snapshot() {
+    fn collect_run_files_reads_artifact_scoped_patch_and_untracked_snapshot() {
         let tempdir = tempfile::tempdir().expect("create tempdir");
         let run_dir = tempdir.path().join("run-record");
         let workspace = tempdir.path().join("workspace");
@@ -2658,6 +2660,12 @@ new file mode 100644
         fs::write(run_dir.join(format!("{prefix}_diff.patch")), patch).expect("write patch");
 
         // Untracked snapshot for a brand-new file not present in the patch.
+        fs::create_dir_all(workspace.join("src/new")).expect("create workspace untracked dir");
+        fs::write(
+            workspace.join("src/new/file.ts"),
+            "export const x = 1;\nexport const y = 2;\n",
+        )
+        .expect("write workspace untracked file");
         fs::write(
             run_dir
                 .join(format!("{prefix}_untracked"))
@@ -2666,11 +2674,11 @@ new file mode 100644
         )
         .expect("write untracked snapshot");
 
-        // meta.json records an untracked file so collect_run_files picks it up
-        // for the run-scoped list when no artifact list is present.
+        // meta.json marks all visible files as artifacts. Diff-only paths are
+        // suppressed by collect_run_files.
         fs::write(
             run_dir.join("meta.json"),
-            "{\"workspace_observed_paths\":[{\"path\":\"src/new/file.ts\",\"source\":\"git_untracked\",\"existed_after_run\":true}]}",
+            "{\"workspace_observed_paths\":[{\"path\":\"src/modified.rs\",\"source\":\"git_diff,artifact_record\",\"existed_after_run\":true},{\"path\":\"src/created.txt\",\"source\":\"git_diff,artifact_record\",\"existed_after_run\":true},{\"path\":\"src/new/file.ts\",\"source\":\"git_untracked,artifact_record\",\"existed_after_run\":true}]}",
         )
         .expect("write meta");
 
@@ -2709,6 +2717,35 @@ new file mode 100644
         assert_eq!(untracked_paths, vec!["src/new/file.ts"]);
         assert_eq!(changes.untracked[0].additions, 2);
         assert!(changes.untracked[0].has_diff);
+    }
+
+    #[test]
+    fn collect_run_files_suppresses_diff_paths_without_artifacts() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let run_dir = tempdir.path().join("run-record");
+        let workspace = tempdir.path().join("workspace");
+        fs::create_dir_all(&run_dir).expect("create run dir");
+        fs::create_dir_all(&workspace).expect("create workspace");
+        fs::write(
+            run_dir.join("diff.patch"),
+            "diff --git a/src/polluted.rs b/src/polluted.rs\n--- a/src/polluted.rs\n+++ b/src/polluted.rs\n@@ -1 +1 @@\n-old\n+new\n",
+        )
+        .expect("write diff");
+        fs::write(
+            run_dir.join("meta.json"),
+            "{\"workspace_observed_paths\":[{\"path\":\"src/polluted.rs\",\"source\":\"git_diff\",\"existed_after_run\":true}]}",
+        )
+        .expect("write meta");
+
+        let mut run = test_run(Uuid::new_v4(), Uuid::new_v4(), 1, &run_dir, Utc::now());
+        run.workspace_path = Some(workspace.to_string_lossy().to_string());
+
+        let changes = collect_run_files(&run, true);
+
+        assert!(changes.modified.is_empty());
+        assert!(changes.added.is_empty());
+        assert!(changes.deleted.is_empty());
+        assert!(changes.untracked.is_empty());
     }
 
     #[test]
@@ -2871,6 +2908,15 @@ new file mode 100644
 
         assert_eq!(changes.deleted.len(), 1);
         assert_eq!(changes.deleted[0].path, "docs/deleted.md");
+        assert_eq!(changes.deleted[0].deletions, 1);
+        assert!(changes.deleted[0].has_diff);
+        assert!(
+            changes.deleted[0]
+                .unified_diff
+                .as_deref()
+                .unwrap_or_default()
+                .contains("deleted file mode")
+        );
         assert!(changes.modified.is_empty());
         assert!(changes.added.is_empty());
         assert!(changes.untracked.is_empty());
@@ -3065,12 +3111,11 @@ new file mode 100644
         assert_eq!(changes.added.len(), 1);
         assert_eq!(changes.added[0].path, "src/staged.ts");
         assert!(changes.added[0].unified_diff.is_some());
-        assert_eq!(
-            changes.deleted,
-            vec![WorkspacePathEntry {
-                path: "src/old.ts".to_string()
-            }]
-        );
+        assert_eq!(changes.deleted.len(), 1);
+        assert_eq!(changes.deleted[0].path, "src/old.ts");
+        assert_eq!(changes.deleted[0].deletions, 1);
+        assert!(changes.deleted[0].has_diff);
+        assert!(changes.deleted[0].unified_diff.is_some());
         assert_eq!(changes.untracked.len(), 1);
         assert_eq!(changes.untracked[0].path, "tmp/debug.log");
         assert_eq!(changes.untracked[0].additions, 1);

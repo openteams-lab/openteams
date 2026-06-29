@@ -42,14 +42,7 @@ export const flattenWorkspaceChanges = (
   return [
     ...changes.modified.map((file) => withDiffFields("modified", "M", file)),
     ...changes.added.map((file) => withDiffFields("added", "A", file)),
-    ...changes.deleted.map(
-      (file): RelatedFileChange => ({
-        path: file.path,
-        kind: "deleted",
-        status: "D",
-        has_diff: false,
-      }),
-    ),
+    ...changes.deleted.map((file) => withDiffFields("deleted", "D", file)),
     ...changes.untracked.map((file) =>
       withDiffFields("untracked", "U", file),
     ),

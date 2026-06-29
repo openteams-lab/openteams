@@ -53,7 +53,13 @@ interface RunFileChanges {
     has_diff?: boolean;
     unified_diff?: string | null;
   }>;
-  deleted: Array<{ path: string }>;
+  deleted: Array<{
+    path: string;
+    additions?: number;
+    deletions?: number;
+    has_diff?: boolean;
+    unified_diff?: string | null;
+  }>;
   untracked: Array<{
     path: string;
     additions?: number;
@@ -112,7 +118,10 @@ export const flattenRunFileChanges = (
       path: file.path,
       runId,
       workspacePath,
-      hasDiff: false,
+      additions: file.additions,
+      deletions: file.deletions,
+      hasDiff: file.has_diff,
+      unifiedDiff: file.unified_diff ?? undefined,
       status: 'D',
     });
   }
