@@ -40,10 +40,13 @@ const BINARY_SNIFF_BYTES: usize = 8 * 1024;
 const SOURCE_CONTROL_DIFF_STAT_PATH_CHUNK: usize = 200;
 const SOURCE_CONTROL_STATUS_SHARED_PATH_LIMIT: usize = 200;
 const SOURCE_CONTROL_CACHE_TTL: Duration = Duration::from_secs(2);
+const SOURCE_CONTROL_SHARED_PATH_INDEX_TTL: Duration = Duration::from_secs(30);
 
 static SESSION_PATH_CACHE: Lazy<DashMap<SessionPathCacheKey, SessionPathCacheEntry>> =
     Lazy::new(DashMap::new);
 static STATUS_CACHE: Lazy<DashMap<SourceControlStatusCacheKey, SourceControlStatusCacheEntry>> =
+    Lazy::new(DashMap::new);
+static SHARED_PATH_INDEX_CACHE: Lazy<DashMap<SharedPathIndexCacheKey, SharedPathIndexCacheEntry>> =
     Lazy::new(DashMap::new);
 static INLINE_CODE_PATH_RE: Lazy<regex::Regex> =
     Lazy::new(|| regex::Regex::new(r"`([^`\r\n]+)`").expect("inline code path regex"));
@@ -362,6 +365,18 @@ struct SourceControlStatusCacheKey {
 struct SourceControlStatusCacheEntry {
     captured_at: Instant,
     status: SessionSourceControlStatus,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+struct SharedPathIndexCacheKey {
+    project_id: Uuid,
+    workspace_path: String,
+}
+
+#[derive(Debug, Clone)]
+struct SharedPathIndexCacheEntry {
+    captured_at: Instant,
+    by_path: HashMap<String, BTreeSet<Uuid>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1371,21 +1386,74 @@ async fn collect_shared_paths(
         return Ok(HashMap::new());
     }
 
-    let sessions = ChatSession::find_by_project(pool, context.project_id).await?;
+    let key = SharedPathIndexCacheKey {
+        project_id: context.project_id,
+        workspace_path: context.workspace_path_string.clone(),
+    };
+    let now = Instant::now();
+    if let Some(entry) = SHARED_PATH_INDEX_CACHE.get(&key)
+        && now.duration_since(entry.captured_at) <= SOURCE_CONTROL_SHARED_PATH_INDEX_TTL
+    {
+        return Ok(shared_paths_from_index(
+            &entry.by_path,
+            context.session_id,
+            target_paths,
+        ));
+    }
+
+    let index = build_shared_path_index(pool, context).await?;
+    let shared_paths = shared_paths_from_index(&index, context.session_id, target_paths);
+    SHARED_PATH_INDEX_CACHE.insert(
+        key,
+        SharedPathIndexCacheEntry {
+            captured_at: Instant::now(),
+            by_path: index,
+        },
+    );
+    Ok(shared_paths)
+}
+
+fn shared_paths_from_index(
+    index: &HashMap<String, BTreeSet<Uuid>>,
+    current_session_id: Uuid,
+    target_paths: &BTreeSet<String>,
+) -> HashMap<String, Vec<Uuid>> {
     let mut by_path = HashMap::<String, BTreeSet<Uuid>>::new();
-    for session in sessions.into_iter().filter(|session| {
-        session.status == ChatSessionStatus::Active && session.id != context.session_id
-    }) {
-        let paths = collect_session_paths(pool, session.id, context).await?;
-        for path in paths.keys().filter(|path| target_paths.contains(*path)) {
-            by_path.entry(path.clone()).or_default().insert(session.id);
+
+    for path in target_paths {
+        if let Some(session_ids) = index.get(path) {
+            for session_id in session_ids
+                .iter()
+                .copied()
+                .filter(|session_id| *session_id != current_session_id)
+            {
+                by_path.entry(path.clone()).or_default().insert(session_id);
+            }
         }
     }
 
-    Ok(by_path
+    by_path
         .into_iter()
         .map(|(path, sessions)| (path, sessions.into_iter().collect::<Vec<_>>()))
-        .collect())
+        .collect()
+}
+
+async fn build_shared_path_index(
+    pool: &SqlitePool,
+    context: &WorkspaceContext,
+) -> Result<HashMap<String, BTreeSet<Uuid>>> {
+    let sessions = ChatSession::find_by_project(pool, context.project_id).await?;
+    let mut by_path = HashMap::<String, BTreeSet<Uuid>>::new();
+    for session in sessions
+        .into_iter()
+        .filter(|session| session.status == ChatSessionStatus::Active)
+    {
+        let paths = collect_session_paths(pool, session.id, context).await?;
+        for path in paths.keys() {
+            by_path.entry(path.clone()).or_default().insert(session.id);
+        }
+    }
+    Ok(by_path)
 }
 
 async fn resolve_commit_work_item_ids(
@@ -1440,6 +1508,15 @@ fn invalidate_source_control_caches(workspace_path: &str) {
     for key in status_keys {
         STATUS_CACHE.remove(&key);
     }
+
+    let shared_index_keys = SHARED_PATH_INDEX_CACHE
+        .iter()
+        .filter(|entry| entry.key().workspace_path.as_str() == workspace_path)
+        .map(|entry| entry.key().clone())
+        .collect::<Vec<_>>();
+    for key in shared_index_keys {
+        SHARED_PATH_INDEX_CACHE.remove(&key);
+    }
 }
 
 fn invalidate_source_control_session_caches(session_id: Uuid) {
@@ -1460,6 +1537,10 @@ fn invalidate_source_control_session_caches(session_id: Uuid) {
     for key in status_keys {
         STATUS_CACHE.remove(&key);
     }
+
+    // A session path change can make an existing project/workspace index stale
+    // even if that session was not present when the index was built.
+    SHARED_PATH_INDEX_CACHE.clear();
 }
 
 fn session_work_records_path(session_id: Uuid) -> PathBuf {
