@@ -4,6 +4,7 @@ use std::{
     fs,
     io::Read,
     path::{Component, Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
     time::{Duration, Instant},
 };
 
@@ -48,6 +49,7 @@ static STATUS_CACHE: Lazy<DashMap<SourceControlStatusCacheKey, SourceControlStat
     Lazy::new(DashMap::new);
 static SHARED_PATH_INDEX_CACHE: Lazy<DashMap<SharedPathIndexCacheKey, SharedPathIndexCacheEntry>> =
     Lazy::new(DashMap::new);
+static SOURCE_CONTROL_CACHE_EPOCH: AtomicU64 = AtomicU64::new(0);
 static INLINE_CODE_PATH_RE: Lazy<regex::Regex> =
     Lazy::new(|| regex::Regex::new(r"`([^`\r\n]+)`").expect("inline code path regex"));
 
@@ -955,14 +957,17 @@ impl SourceControlService {
             return Ok(entry.status.clone());
         }
 
+        let cache_epoch = source_control_cache_epoch();
         let status = self.status_for_context(pool, context).await?;
-        STATUS_CACHE.insert(
-            key,
-            SourceControlStatusCacheEntry {
-                captured_at: Instant::now(),
-                status: status.clone(),
-            },
-        );
+        if source_control_cache_epoch() == cache_epoch {
+            STATUS_CACHE.insert(
+                key,
+                SourceControlStatusCacheEntry {
+                    captured_at: Instant::now(),
+                    status: status.clone(),
+                },
+            );
+        }
         Ok(status)
     }
 
@@ -1275,6 +1280,7 @@ async fn collect_session_paths(
         return Ok(entry.paths.clone());
     }
 
+    let cache_epoch = source_control_cache_epoch();
     let runs =
         ChatRun::list_for_session_workspace(pool, session_id, &context.workspace_path_string)
             .await?;
@@ -1285,13 +1291,15 @@ async fn collect_session_paths(
         .collect::<Vec<_>>();
     let paths = collect_paths_from_runs(&context.workspace_path, &runs, &work_items)?;
     let paths = filter_committed_session_paths(pool, session_id, context, paths).await?;
-    SESSION_PATH_CACHE.insert(
-        key,
-        SessionPathCacheEntry {
-            captured_at: Instant::now(),
-            paths: paths.clone(),
-        },
-    );
+    if source_control_cache_epoch() == cache_epoch {
+        SESSION_PATH_CACHE.insert(
+            key,
+            SessionPathCacheEntry {
+                captured_at: Instant::now(),
+                paths: paths.clone(),
+            },
+        );
+    }
     Ok(paths)
 }
 
@@ -1390,15 +1398,18 @@ async fn collect_shared_paths(
         ));
     }
 
+    let cache_epoch = source_control_cache_epoch();
     let index = build_shared_path_index(pool, context).await?;
     let shared_paths = shared_paths_from_index(&index, context.session_id, target_paths);
-    SHARED_PATH_INDEX_CACHE.insert(
-        key,
-        SharedPathIndexCacheEntry {
-            captured_at: Instant::now(),
-            by_path: index,
-        },
-    );
+    if source_control_cache_epoch() == cache_epoch {
+        SHARED_PATH_INDEX_CACHE.insert(
+            key,
+            SharedPathIndexCacheEntry {
+                captured_at: Instant::now(),
+                by_path: index,
+            },
+        );
+    }
     Ok(shared_paths)
 }
 
@@ -1480,6 +1491,8 @@ async fn resolve_commit_work_item_ids(
 }
 
 fn invalidate_source_control_caches(workspace_path: &str) {
+    bump_source_control_cache_epoch();
+
     let path_keys = SESSION_PATH_CACHE
         .iter()
         .filter(|entry| entry.key().workspace_path.as_str() == workspace_path)
@@ -1509,6 +1522,8 @@ fn invalidate_source_control_caches(workspace_path: &str) {
 }
 
 fn invalidate_source_control_session_caches(session_id: Uuid) {
+    bump_source_control_cache_epoch();
+
     let path_keys = SESSION_PATH_CACHE
         .iter()
         .filter(|entry| entry.key().session_id == session_id)
@@ -1530,6 +1545,28 @@ fn invalidate_source_control_session_caches(session_id: Uuid) {
     // A session path change can make an existing project/workspace index stale
     // even if that session was not present when the index was built.
     SHARED_PATH_INDEX_CACHE.clear();
+}
+
+fn source_control_cache_epoch() -> u64 {
+    SOURCE_CONTROL_CACHE_EPOCH.load(Ordering::Acquire)
+}
+
+fn bump_source_control_cache_epoch() {
+    SOURCE_CONTROL_CACHE_EPOCH.fetch_add(1, Ordering::AcqRel);
+}
+
+#[cfg(test)]
+mod cache_tests {
+    use super::*;
+
+    #[test]
+    fn cache_epoch_advances_on_workspace_invalidation() {
+        let before = source_control_cache_epoch();
+
+        invalidate_source_control_caches("__source_control_epoch_test__");
+
+        assert!(source_control_cache_epoch() > before);
+    }
 }
 
 fn session_work_records_path(session_id: Uuid) -> PathBuf {

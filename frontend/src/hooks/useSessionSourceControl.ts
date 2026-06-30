@@ -187,6 +187,13 @@ export function useSessionSourceControl({
     [],
   );
 
+  const invalidatePendingRefresh = useCallback(() => {
+    requestIdRef.current += 1;
+    refreshQueuedRef.current = false;
+    refreshInFlightRef.current = null;
+    setLoading(false);
+  }, []);
+
   const runRefreshRequest = useCallback(async () => {
     if (!enabled || !projectId || !sessionId) {
       setLoading(false);
@@ -485,10 +492,12 @@ export function useSessionSourceControl({
       try {
         await flushBatchedOperation("stage");
         await flushBatchedOperation("unstage");
+        invalidatePendingRefresh();
         const response = await projectSourceControlApi.commit(context.projectId, {
           ...request,
           session_id: context.sessionId,
         });
+        invalidatePendingRefresh();
         if (response.status) {
           applyStatus(response.status);
         } else {
@@ -513,7 +522,14 @@ export function useSessionSourceControl({
         throw err;
       }
     },
-    [applyStatus, flushBatchedOperation, projectId, refresh, sessionId],
+    [
+      applyStatus,
+      flushBatchedOperation,
+      invalidatePendingRefresh,
+      projectId,
+      refresh,
+      sessionId,
+    ],
   );
 
   return {

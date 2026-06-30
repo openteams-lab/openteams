@@ -106,6 +106,15 @@ check(
 );
 
 check(
+  'commit invalidates stale in-flight refreshes before post-commit refresh',
+  source.includes('const invalidatePendingRefresh = useCallback') &&
+    (source.match(/invalidatePendingRefresh\(\);/g) ?? []).length >= 2 &&
+    source.includes('refreshInFlightRef.current = null') &&
+    source.includes('refreshQueuedRef.current = false'),
+  source,
+);
+
+check(
   'updates local status from embedded commit errors',
   source.includes('sourceControlStatusFromError') &&
     source.includes('errorData?.status ?? null') &&

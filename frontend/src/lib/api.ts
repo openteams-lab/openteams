@@ -1513,6 +1513,7 @@ export const projectSourceControlApi = {
       `/api/projects/${encodeURIComponent(
         projectId,
       )}/source-control/session-status${qs({ session_id: sessionId })}`,
+      { cache: "no-store" },
     );
     return handleApiResponse<SessionSourceControlStatus>(r);
   },
