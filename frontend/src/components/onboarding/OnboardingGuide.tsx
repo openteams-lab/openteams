@@ -1,20 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
   Bot,
   Check,
   ChevronUp,
-  Code2,
   FileText,
   Folder,
   FolderOpen,
   Home,
   LoaderCircle,
-  Palette,
   RefreshCw,
   Rocket,
+  Search,
   Sparkles,
-  TerminalSquare,
   Users,
+  Zap,
 } from 'lucide-react';
 import { DropdownSelect, type DropdownSelectOption } from '@/components/DropdownSelect';
 import { cn } from '@/lib/utils';
@@ -80,6 +79,25 @@ interface OnboardingGuideProps {
   onStateChange?: (state: OnboardingState) => void;
   onUpgradeRead: (state: OnboardingState) => void;
 }
+
+const onboardingDarkThemeVars = {
+  '--canvas': '#010102',
+  '--surface-1': '#0f1011',
+  '--surface-2': '#141516',
+  '--surface-3': '#18191a',
+  '--surface-4': '#191a1b',
+  '--hairline': '#23252a',
+  '--hairline-strong': '#34343a',
+  '--hairline-tertiary': '#3e3e44',
+  '--ink': '#f7f8f8',
+  '--ink-muted': '#d0d6e0',
+  '--ink-subtle': '#8a8f98',
+  '--ink-tertiary': '#62666d',
+  '--primary': '#5e6ad2',
+  '--primary-hover': '#828fff',
+  '--on-primary': '#ffffff',
+  '--primary-tint': 'rgba(94, 106, 210, 0.12)',
+} as CSSProperties;
 
 type ScenarioDefinition = {
   key: OnboardingScenario;
@@ -814,7 +832,7 @@ export function OnboardingGuide({
   };
 
   const renderUpgradeGuide = () => (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[12px] border border-[var(--hairline-strong)] bg-[var(--surface-1)]">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)]">
       <div className="flex min-h-12 items-center justify-between border-b border-[var(--hairline)] px-5">
         <div className="flex min-w-0 items-center gap-2">
           <Sparkles className="h-4 w-4 text-[var(--primary)]" />
@@ -825,18 +843,18 @@ export function OnboardingGuide({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-md px-2.5 py-1.5 text-[12px] font-medium text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+          className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-3)] px-[14px] py-2 text-[12px] font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-4)] hover:text-[var(--ink)]"
         >
           {t('onboarding.upgrade.later')}
         </button>
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-5 lg:grid-cols-[1fr_280px]">
         <div className="space-y-4">
-          <div className="rounded-[10px] border border-[var(--hairline)] bg-[var(--surface-2)] p-5">
-            <h1 className="text-[22px] font-semibold tracking-tight text-[var(--ink)]">
+          <div className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] p-6">
+            <h1 className="font-sans text-[22px] font-semibold tracking-[-0.02em] text-[var(--ink)]">
               {t('onboarding.upgrade.title')}
             </h1>
-            <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-[var(--ink-subtle)]">
+            <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-[var(--ink-muted)]">
               {t('onboarding.upgrade.desc')}
             </p>
           </div>
@@ -860,20 +878,20 @@ export function OnboardingGuide({
             ].map(({ title, desc, Icon }) => (
               <div
                 key={title}
-                className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] p-4"
+                className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] p-6"
               >
                 <Icon className="h-4 w-4 text-[var(--primary)]" />
                 <h2 className="mt-3 text-[13px] font-semibold text-[var(--ink)]">
                   {title}
                 </h2>
-                <p className="mt-1 text-[12px] leading-relaxed text-[var(--ink-subtle)]">
+                <p className="mt-1 text-[12px] leading-relaxed text-[var(--ink-muted)]">
                   {desc}
                 </p>
               </div>
             ))}
           </div>
         </div>
-        <aside className="rounded-[10px] border border-[var(--hairline)] bg-[var(--surface-2)] p-4">
+        <aside className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] p-6">
           <h2 className="text-[13px] font-semibold text-[var(--ink)]">
             {t('onboarding.upgrade.stateTitle')}
           </h2>
@@ -896,7 +914,7 @@ export function OnboardingGuide({
             type="button"
             onClick={() => void handleMarkUpgradeRead()}
             disabled={saving}
-            className="mt-4 inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-[var(--primary)] px-4 text-[13px] font-semibold text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-4 inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] bg-[#5e6ad2] px-[14px] py-2 text-[13px] font-semibold text-white transition hover:bg-[#6f7ae6] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
             {t('onboarding.upgrade.markRead')}
@@ -908,20 +926,12 @@ export function OnboardingGuide({
 
   const renderExecutorStep = () => (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-[16px] font-semibold text-[var(--ink)]">
-          {t('onboarding.executor.teamTitle', { team: recommendedTeamName })}
-        </h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-[var(--ink-subtle)]">
-          {t('onboarding.executor.desc')}
-        </p>
-      </div>
       {runtimeError && (
         <p className="rounded-[8px] border border-yellow-500/25 bg-yellow-500/10 px-3 py-2 text-[12px] text-yellow-200">
           {runtimeError}
         </p>
       )}
-      <div className="overflow-hidden rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)]">
+      <div className="overflow-hidden rounded-[10px] border border-white/10 bg-[#161616]/85">
         {teamMembers.map((member, index) => {
           const runnerValue = member.runner_type || runnerOptions[0]?.id || '';
           const modelOptions = modelOptionsForRunner(runnerValue);
@@ -930,12 +940,12 @@ export function OnboardingGuide({
             <div
               key={`${member.member}-${index}`}
               className={cn(
-                'grid gap-3 px-4 py-3 md:grid-cols-[minmax(150px,1fr)_minmax(160px,220px)_minmax(160px,220px)] md:items-center',
-                index < teamMembers.length - 1 && 'border-b border-[var(--hairline)]',
+                'grid gap-3 px-6 py-4 md:grid-cols-[minmax(150px,1fr)_minmax(160px,220px)_minmax(160px,220px)] md:items-center',
+                index < teamMembers.length - 1 && 'border-b border-white/5',
               )}
             >
               <div className="flex min-w-0 items-center gap-2">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[var(--hairline)] bg-[var(--surface-2)] text-[11px] font-semibold text-[var(--ink-muted)]">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] font-mono text-[11px] font-semibold text-[#d0d6e0]">
                   {member.member.slice(0, 2).toUpperCase()}
                 </span>
                 <span className="truncate text-[13px] font-semibold text-[var(--ink)]">
@@ -971,14 +981,6 @@ export function OnboardingGuide({
 
   const renderScenarioStep = () => (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-[16px] font-semibold text-[var(--ink)]">
-          {t('onboarding.scenario.title')}
-        </h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-[var(--ink-subtle)]">
-          {t('onboarding.scenario.desc')}
-        </p>
-      </div>
       <div className="grid gap-3 md:grid-cols-2">
         {scenarios.map((scenario) => {
           const selected = scenario.key === selectedScenario;
@@ -988,10 +990,10 @@ export function OnboardingGuide({
               type="button"
               onClick={() => handleScenarioSelect(scenario.key)}
               className={cn(
-                'min-h-[118px] cursor-pointer rounded-[8px] border bg-[var(--surface-1)] p-4 text-left transition hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)]',
+                'min-h-[118px] cursor-pointer rounded-[10px] border bg-[#161616]/75 p-6 text-left transition hover:border-white/20 hover:bg-white/[0.06]',
                 selected
-                  ? 'border-[var(--primary)] bg-[var(--primary-tint)]'
-                  : 'border-[var(--hairline)]',
+                  ? 'border-white/25 bg-white/[0.08]'
+                  : 'border-white/10',
               )}
             >
               <div className="flex items-center justify-between gap-3">
@@ -1000,24 +1002,24 @@ export function OnboardingGuide({
                 </h3>
                 {selected && <Check className="h-4 w-4 text-[var(--primary)]" />}
               </div>
-              <p className="mt-2 text-[12px] leading-relaxed text-[var(--ink-subtle)]">
+              <p className="mt-2 text-[12px] leading-relaxed text-[#aeb8c8]">
                 {scenario.desc}
               </p>
             </button>
           );
         })}
       </div>
-      <div className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)] p-4">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--ink-tertiary)]">
+      <div className="rounded-[10px] border border-white/10 bg-[#161616]/70 p-6">
+        <p className="text-[12px] font-semibold text-[#7e8795]">
           {t('onboarding.scenario.recommendedTeam')}
         </p>
-        <div className="mt-3 flex items-center gap-3 rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] px-3 py-3">
+        <div className="mt-3 flex items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.04] px-3 py-3">
           <Users className="h-4 w-4 shrink-0 text-[var(--primary)]" />
           <div className="min-w-0">
             <p className="truncate text-[13px] font-semibold text-[var(--ink)]">
               {recommendedTeamName}
             </p>
-            <p className="mt-0.5 text-[12px] text-[var(--ink-subtle)]">
+            <p className="mt-0.5 text-[12px] text-[#aeb8c8]">
               {t('onboarding.scenario.memberDetailsHint')}
             </p>
           </div>
@@ -1028,16 +1030,8 @@ export function OnboardingGuide({
 
   const renderProjectPathStep = () => (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-[16px] font-semibold text-[var(--ink)]">
-          {t('onboarding.project.createTitle')}
-        </h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-[var(--ink-subtle)]">
-          {t('onboarding.project.createDesc')}
-        </p>
-      </div>
-      <section className="grid gap-3 rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)] p-4 md:grid-cols-[minmax(0,1fr)_260px]">
-        <label className="block min-w-0 text-[12px] font-semibold text-[var(--ink-tertiary)]">
+      <section className="grid gap-3 rounded-[10px] border border-white/10 bg-[#161616]/75 p-6 md:grid-cols-[minmax(0,1fr)_260px]">
+        <label className="block min-w-0 text-[12px] font-semibold text-[#7e8795]">
           {t('onboarding.project.nameTitle')}
           <input
             value={projectName}
@@ -1045,12 +1039,12 @@ export function OnboardingGuide({
               setProjectName(sanitizeProjectName(event.target.value));
               setProjectNameTouched(true);
             }}
-            className="mt-2 h-9 w-full rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] px-3 text-[13px] text-[var(--ink)] outline-none transition placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)]"
+            className="mt-2 h-9 w-full rounded-[8px] border border-white/10 bg-white/[0.04] px-3 text-[13px] text-white outline-none transition placeholder:text-[#7e8795] focus:border-white/25"
             placeholder={t('onboarding.project.namePlaceholder')}
           />
         </label>
-        <div className="min-w-0 rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] px-3 py-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--ink-tertiary)]">
+        <div className="min-w-0 rounded-[8px] border border-white/10 bg-white/[0.04] px-3 py-2">
+          <p className="font-mono text-[11px] font-semibold text-[#7e8795]">
             {t('onboarding.scenario.recommendedTemplate')}
           </p>
           <p className="mt-1 truncate text-[13px] font-semibold text-[var(--ink)]">
@@ -1059,15 +1053,15 @@ export function OnboardingGuide({
         </div>
       </section>
       <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
-        <section className="overflow-hidden rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)]">
-          <div className="flex items-center gap-1.5 border-b border-[var(--hairline)] px-3 py-2">
-            <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[var(--ink-tertiary)]">
+        <section className="overflow-hidden rounded-[10px] border border-white/10 bg-[#161616]/75">
+          <div className="flex items-center gap-1.5 border-b border-white/5 px-3 py-2">
+            <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[#7e8795]">
               {currentPath || t('onboarding.project.localRoots')}
             </span>
             <button
               type="button"
               onClick={() => void loadRoots()}
-              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[#7e8795] transition hover:bg-white/[0.06] hover:text-white"
               aria-label={t('onboarding.project.roots')}
               title={t('onboarding.project.roots')}
             >
@@ -1080,7 +1074,7 @@ export function OnboardingGuide({
                 const parent = getParentPath(currentPath);
                 if (parent) void loadDirectory(parent);
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[#7e8795] transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
               aria-label={t('onboarding.project.up')}
               title={t('onboarding.project.up')}
             >
@@ -1089,7 +1083,7 @@ export function OnboardingGuide({
             <button
               type="button"
               onClick={() => void loadDirectory(projectPath)}
-              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[#7e8795] transition hover:bg-white/[0.06] hover:text-white"
               aria-label={t('onboarding.project.refresh')}
               title={t('onboarding.project.refresh')}
             >
@@ -1098,11 +1092,11 @@ export function OnboardingGuide({
           </div>
           <div className="h-[236px] overflow-y-auto p-1.5">
             {pathLoading ? (
-              <div className="px-2 py-2 text-[12px] text-[var(--ink-tertiary)]">
+              <div className="px-2 py-2 text-[12px] text-[#7e8795]">
                 {t('onboarding.project.loading')}
               </div>
             ) : entries.length === 0 ? (
-              <div className="px-2 py-2 text-[12px] text-[var(--ink-tertiary)]">
+              <div className="px-2 py-2 text-[12px] text-[#7e8795]">
                 {t('onboarding.project.empty')}
               </div>
             ) : (
@@ -1114,7 +1108,7 @@ export function OnboardingGuide({
                     key={`${entry.path}-${directoryEntryTime(entry)}`}
                     className={cn(
                       'group/path-entry flex items-center rounded-[6px]',
-                      selected && 'bg-[var(--surface-3)]',
+                      selected && 'bg-white/[0.06]',
                     )}
                   >
                     <button
@@ -1123,14 +1117,14 @@ export function OnboardingGuide({
                       onClick={() => {
                         if (entry.is_directory) void loadDirectory(entry.path);
                       }}
-                      className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[12px] text-[var(--ink-subtle)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-default disabled:opacity-55"
+                      className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[12px] text-[#aeb8c8] transition hover:bg-white/[0.06] hover:text-white disabled:cursor-default disabled:opacity-55"
                     >
                       <Icon
                         className={cn(
                           'h-4 w-4 shrink-0',
                           entry.is_git_repo
                             ? 'text-[var(--primary)]'
-                            : 'text-[var(--ink-tertiary)]',
+                            : 'text-[#7e8795]',
                         )}
                       />
                       <span className="min-w-0 flex-1 truncate font-mono">
@@ -1150,7 +1144,7 @@ export function OnboardingGuide({
                           void validateProjectPath(entry.path);
                         }}
                         className={cn(
-                          'mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[5px] text-[var(--ink-tertiary)] opacity-0 transition hover:bg-[var(--surface-2)] hover:text-[var(--ink)] group-hover/path-entry:opacity-100',
+                          'mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[5px] text-[#7e8795] opacity-0 transition hover:bg-white/[0.06] hover:text-white group-hover/path-entry:opacity-100',
                           selected && '!opacity-100',
                         )}
                         aria-label={t('onboarding.project.select')}
@@ -1166,13 +1160,13 @@ export function OnboardingGuide({
           </div>
         </section>
 
-        <aside className="space-y-3 rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)] p-3">
-          <label className="block text-[12px] font-semibold text-[var(--ink-tertiary)]">
+        <aside className="space-y-3 rounded-[10px] border border-white/10 bg-[#161616]/75 p-4">
+          <label className="block text-[12px] font-semibold text-[#7e8795]">
             {t('onboarding.project.selectedPath')}
             <input
               value={projectPath}
               onChange={(event) => setProjectPath(event.target.value)}
-              className="mt-2 h-9 w-full rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] px-3 font-mono text-[12px] text-[var(--ink)] outline-none transition placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)]"
+              className="mt-2 h-9 w-full rounded-[8px] border border-white/10 bg-white/[0.04] px-3 font-mono text-[12px] text-white outline-none transition placeholder:text-[#7e8795] focus:border-white/25"
               placeholder={t('onboarding.project.pathPlaceholder')}
             />
           </label>
@@ -1180,12 +1174,12 @@ export function OnboardingGuide({
             type="button"
             onClick={() => void validateProjectPath(projectPath)}
             disabled={!projectPath.trim() || pathLoading}
-            className="inline-flex h-8 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-[var(--hairline-strong)] px-3 text-[12px] font-semibold text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.06] px-[14px] py-2 text-[12px] font-semibold text-[#d0d6e0] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <FolderOpen className="h-3.5 w-3.5" />
             {t('onboarding.project.validate')}
           </button>
-          <div className="divide-y divide-[var(--hairline)] rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] text-[12px]">
+          <div className="divide-y divide-white/5 rounded-[8px] border border-white/10 bg-white/[0.04] text-[12px]">
             <div className="flex items-center justify-between gap-2 px-3 py-2">
               <span className="text-[var(--ink-subtle)]">
                 {t('onboarding.project.status')}
@@ -1243,14 +1237,6 @@ export function OnboardingGuide({
 
     return (
       <div className="space-y-5">
-        <div>
-          <h2 className="text-[16px] font-semibold text-[var(--ink)]">
-            {t('onboarding.appearance.title')}
-          </h2>
-          <p className="mt-1 text-[13px] leading-relaxed text-[var(--ink-subtle)]">
-            {t('onboarding.appearance.desc')}
-          </p>
-        </div>
         <section className="space-y-2">
           <h3 className="text-[13px] font-semibold text-[var(--ink)]">
             {t('onboarding.appearance.languageTitle')}
@@ -1262,8 +1248,8 @@ export function OnboardingGuide({
                 className={cn(
                   'flex cursor-pointer items-center gap-2 rounded-[8px] border px-3 py-2 text-[13px] transition',
                   selectedLocale === option.id
-                    ? 'border-[var(--primary)] bg-[var(--primary-tint)] text-[var(--ink)]'
-                    : 'border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--ink-subtle)] hover:border-[var(--hairline-strong)] hover:text-[var(--ink)]',
+                    ? 'border-white/25 bg-white/[0.08] text-white'
+                    : 'border-white/10 bg-[#161616]/75 text-[#aeb8c8] hover:border-white/20 hover:text-white',
                 )}
               >
                 <input
@@ -1290,14 +1276,14 @@ export function OnboardingGuide({
                 type="button"
                 onClick={() => handleAppearanceSelect(option)}
                 className={cn(
-                  'cursor-pointer rounded-[8px] border p-3 text-left transition',
+                  'cursor-pointer rounded-[8px] border p-6 text-left transition',
                   selectedAppearance === option.id
-                    ? 'border-[var(--primary)] bg-[var(--primary-tint)]'
-                    : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)]',
+                    ? 'border-white/25 bg-white/[0.08]'
+                    : 'border-white/10 bg-[#161616]/75 hover:border-white/20 hover:bg-white/[0.06]',
                 )}
               >
-                <div className="h-12 rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-2)] p-2">
-                  <div className="h-2 rounded bg-[var(--surface-3)]" />
+                <div className="h-12 rounded-[6px] border border-white/10 bg-white/[0.04] p-2">
+                  <div className="h-2 rounded bg-white/10" />
                   <div className="mt-3 h-2 w-1/2 rounded bg-[var(--primary)]" />
                 </div>
                 <p className="mt-2 text-[13px] font-semibold text-[var(--ink)]">
@@ -1311,59 +1297,8 @@ export function OnboardingGuide({
     );
   };
 
-  const renderStepBody = () => {
-    if (isWelcome) {
-      return (
-        <div className="grid min-h-0 flex-1 place-items-center p-6">
-          <div className="grid w-full max-w-5xl gap-8 lg:grid-cols-[1fr_340px] lg:items-center">
-            <div className="min-w-0">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--primary)]">
-                OpenTeams
-              </p>
-              <h1 className="mt-3 max-w-2xl text-[28px] font-semibold leading-tight tracking-tight text-[var(--ink)]">
-                {t('onboarding.welcome.title')}
-              </h1>
-              <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-[var(--ink-subtle)]">
-                {t('onboarding.welcome.desc')}
-              </p>
-              <div className="mt-5 grid gap-2 sm:grid-cols-3">
-                {[
-                  t('onboarding.welcome.pointLocal'),
-                  t('onboarding.welcome.pointTeams'),
-                  t('onboarding.welcome.pointWorkflow'),
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] px-3 py-2 text-[12px] font-medium text-[var(--ink-muted)]"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="relative h-[310px] overflow-hidden rounded-[18px] border border-[var(--hairline)] bg-[var(--surface-2)]">
-              <div className="absolute inset-5 rounded-[14px] border border-[var(--hairline)]" />
-              <div className="absolute left-8 top-8 flex h-11 w-16 items-center justify-center rounded-[10px] border border-[var(--hairline-strong)] bg-[var(--surface-1)]">
-                <TerminalSquare className="h-5 w-5 text-[var(--primary)]" />
-              </div>
-              <div className="absolute right-9 top-16 flex h-11 w-16 items-center justify-center rounded-[10px] border border-[var(--hairline-strong)] bg-[var(--surface-1)]">
-                <Code2 className="h-5 w-5 text-[var(--ink-muted)]" />
-              </div>
-              <div className="absolute left-24 top-32 flex h-11 w-16 items-center justify-center rounded-[10px] border border-[var(--hairline-strong)] bg-[var(--surface-1)]">
-                <Bot className="h-5 w-5 text-[var(--ink-muted)]" />
-              </div>
-              <div className="absolute bottom-8 left-8 right-8 rounded-[12px] border border-[var(--hairline-strong)] bg-[var(--canvas)] p-4">
-                <div className="h-2.5 w-3/4 rounded-full bg-[var(--primary)]" />
-                <div className="mt-3 h-2.5 w-1/2 rounded-full bg-[var(--hairline-strong)]" />
-                <div className="mt-3 h-2.5 w-5/6 rounded-full bg-[var(--hairline-strong)]" />
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    switch (activeStepKey) {
+  const renderActiveConfigurationContent = (stepKey: OnboardingStepKey) => {
+    switch (stepKey) {
       case 'executor':
         return renderExecutorStep();
       case 'project_path':
@@ -1376,9 +1311,234 @@ export function OnboardingGuide({
     }
   };
 
+  const renderConfigurationStep = () => {
+    const stepKey =
+      activeStepKey === welcomeStepKey ? 'scenario' : activeStepKey;
+    const stepTitle =
+      stepKey === 'executor'
+        ? t('onboarding.executor.teamTitle', { team: recommendedTeamName })
+        : stepKey === 'project_path'
+          ? t('onboarding.project.createTitle')
+          : stepKey === 'appearance'
+            ? t('onboarding.appearance.title')
+            : t('onboarding.scenario.title');
+    const stepDescription =
+      stepKey === 'executor'
+        ? t('onboarding.executor.desc')
+        : stepKey === 'project_path'
+          ? t('onboarding.project.createDesc')
+          : stepKey === 'appearance'
+            ? t('onboarding.appearance.desc')
+            : t('onboarding.scenario.desc');
+    const stepLabel = t(`onboarding.step.${stepI18nKeys[stepKey]}.title`);
+
+    return (
+      <div className="relative isolate flex min-h-0 flex-1 flex-col items-center overflow-hidden px-6 text-center">
+        <div className="pointer-events-none absolute inset-0 bg-[#030303]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(94,106,210,0.22)_0%,rgba(3,3,3,0)_58%)]" />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.08]"
+          style={{
+            backgroundImage:
+              'linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)',
+            backgroundSize: '40px 40px',
+          }}
+        />
+
+        <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto pb-10 pt-10">
+          <div className="flex gap-3">
+            {onboardingSteps.map((step, index) => (
+              <div
+                key={step}
+                className={cn(
+                  'h-0.5 w-10 rounded-full',
+                  index <= activeStepIndex ? 'bg-white' : 'bg-white/10',
+                )}
+              />
+            ))}
+          </div>
+
+          <div className="mt-12 max-w-4xl">
+            <h1 className="font-sans text-[44px] font-semibold leading-[1.08] tracking-[-1.2px] text-white">
+              {stepTitle}
+            </h1>
+            <p className="mx-auto mt-5 max-w-3xl text-[17px] leading-relaxed text-[#aeb8c8]">
+              {stepDescription}
+            </p>
+          </div>
+
+          <div className="relative mt-12 w-full max-w-5xl rounded-[14px] border border-white/10 bg-white/[0.03] p-6 text-left shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-8">
+            {renderActiveConfigurationContent(stepKey)}
+          </div>
+
+          {error && (
+            <p className="mt-4 max-w-3xl text-center text-[12px] leading-relaxed text-red-300">
+              {error}
+            </p>
+          )}
+
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => void handleSkip()}
+                disabled={saving}
+                className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/[0.06] px-5 py-2 text-[13px] font-medium text-[#d0d6e0] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t('onboarding.action.skip')}
+              </button>
+              <button
+                type="button"
+                onClick={handleStepBack}
+                disabled={saving || activeStepIndex === 0}
+                className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/[0.06] px-5 py-2 text-[13px] font-medium text-[#d0d6e0] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {t('onboarding.action.back')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleStepNext()}
+                disabled={saving}
+                className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-8 py-3 text-[15px] font-semibold text-black transition hover:bg-[#e7e9ee] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                {stepKey === 'appearance'
+                  ? t('onboarding.action.startNow')
+                  : t('onboarding.action.next')}
+              </button>
+            </div>
+            <p className="font-mono text-[12px] uppercase tracking-[0.2em] text-[#5f6d82]">
+              Step {activeStepIndex + 1} of {onboardingSteps.length}: {stepLabel}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderStepBody = () => {
+    if (isWelcome) {
+      return (
+        <div className="relative isolate flex min-h-0 flex-1 flex-col items-center overflow-hidden px-6 text-center">
+          <div className="pointer-events-none absolute inset-0 bg-[#030303]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(94,106,210,0.22)_0%,rgba(3,3,3,0)_58%)]" />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.08]"
+            style={{
+              backgroundImage:
+                'linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)',
+              backgroundSize: '40px 40px',
+            }}
+          />
+
+          <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto pb-10 pt-10">
+            <div className="flex gap-3">
+              <div className="h-0.5 w-10 rounded-full bg-white" />
+              <div className="h-0.5 w-10 rounded-full bg-white/10" />
+              <div className="h-0.5 w-10 rounded-full bg-white/10" />
+              <div className="h-0.5 w-10 rounded-full bg-white/10" />
+            </div>
+
+            <div className="mt-16 max-w-4xl">
+              <h1 className="font-sans text-[48px] font-semibold leading-[1.06] tracking-[-1.3px] text-white">
+                {t('onboarding.welcome.title')}
+              </h1>
+              <p className="mx-auto mt-5 max-w-3xl text-[18px] leading-relaxed text-[#aeb8c8]">
+                {t('onboarding.welcome.desc')}
+              </p>
+            </div>
+
+            <div className="relative mt-14 w-full max-w-5xl rounded-[14px] border border-white/10 bg-white/[0.03] p-2 shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+              <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
+                <div className="h-2 w-2 rounded-full bg-white/10" />
+                <div className="h-2 w-2 rounded-full bg-white/10" />
+                <div className="h-2 w-2 rounded-full bg-white/10" />
+                <div className="ml-4 h-3 w-32 rounded bg-white/5" />
+              </div>
+
+              <div className="flex justify-center px-4 py-12 sm:px-20">
+                <div className="w-full max-w-md overflow-hidden rounded-[10px] border border-white/10 bg-[#161616]/95 text-left shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+                  <div className="flex items-center border-b border-white/5 p-4">
+                    <span className="mr-3 font-mono text-[15px] text-[#8a8f98]">/</span>
+                    <span className="min-w-0 flex-1 truncate text-[14px] text-white/80">
+                      {t('onboarding.welcome.pointWorkflow')}
+                    </span>
+                  </div>
+                  <div className="p-2">
+                    {[
+                      {
+                        label: t('onboarding.welcome.pointTeams'),
+                        Icon: Users,
+                        keyHint: 'T',
+                        active: true,
+                      },
+                      {
+                        label: t('onboarding.welcome.pointLocal'),
+                        Icon: Search,
+                        keyHint: 'L',
+                        active: false,
+                      },
+                      {
+                        label: t('onboarding.welcome.pointWorkflow'),
+                        Icon: Zap,
+                        keyHint: 'W',
+                        active: false,
+                      },
+                    ].map(({ label, Icon, keyHint, active }) => (
+                      <div
+                        key={label}
+                        className={cn(
+                          'flex items-center justify-between rounded-[8px] px-3 py-2 text-[14px]',
+                          active
+                            ? 'bg-white/[0.06] text-white'
+                            : 'text-[#7e8795]',
+                        )}
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{label}</span>
+                        </div>
+                        <span className="ml-3 rounded-[4px] border border-white/10 bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-[#8a8f98]">
+                          {keyHint}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-3/4 w-3/4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#5e6ad2]/10 blur-[100px]" />
+            </div>
+
+            <div className="mt-16 flex flex-col items-center gap-4">
+              <button
+                type="button"
+                onClick={() => void handleWelcomeNext()}
+                disabled={saving}
+                className="inline-flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-10 py-3 text-[16px] font-semibold text-black transition hover:bg-[#e7e9ee] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                {t('onboarding.welcome.next')}
+                <span className="font-mono text-[12px] font-normal text-black/45">Enter</span>
+              </button>
+              <p className="font-mono text-[12px] uppercase tracking-[0.2em] text-[#5f6d82]">
+                Step 1 of {onboardingSteps.length}: Command center
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return renderConfigurationStep();
+  };
+
   if (mode === 'upgrade') {
     return (
-      <div className="fixed inset-0 z-[90] bg-black/55 p-4 backdrop-blur-sm">
+      <div
+        className="fixed inset-0 z-[90] bg-[var(--canvas)] p-4 text-[var(--ink)]"
+        style={onboardingDarkThemeVars}
+      >
         <div className="mx-auto flex h-full max-w-6xl flex-col">
           {renderUpgradeGuide()}
         </div>
@@ -1387,145 +1547,16 @@ export function OnboardingGuide({
   }
 
   return (
-    <div className="fixed inset-0 z-[90] bg-[var(--canvas)] p-3 text-[var(--ink)]">
-      <section className="mx-auto flex h-full max-w-7xl flex-col overflow-hidden rounded-[12px] border border-[var(--hairline-strong)] bg-[var(--surface-1)]">
-        {!isWelcome && (
-          <header className="flex min-h-12 items-center justify-between border-b border-[var(--hairline)] px-5">
-            <div className="flex min-w-0 items-center gap-2">
-              <Rocket className="h-4 w-4 text-[var(--primary)]" />
-              <span className="truncate text-[13px] font-semibold text-[var(--ink)]">
-                {t('onboarding.header.title')}
-              </span>
-            </div>
-            <span className="rounded-full border border-[var(--hairline)] bg-[var(--surface-2)] px-2.5 py-1 text-[12px] font-medium text-[var(--ink-subtle)]">
-              {t('onboarding.header.step', {
-                current: activeStepIndex + 1,
-                total: onboardingSteps.length,
-              })}
-            </span>
-          </header>
-        )}
-
-        <div className={cn('grid min-h-0 flex-1', !isWelcome && 'lg:grid-cols-[280px_1fr]')}>
-          {!isWelcome && (
-            <aside className="hidden min-h-0 border-r border-[var(--hairline)] bg-[var(--surface-2)] p-4 lg:block">
-              <p className="text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--ink-tertiary)]">
-                {t('onboarding.steps.title')}
-              </p>
-              <div className="mt-4 space-y-1.5">
-                {onboardingSteps.map((step, index) => {
-                  const active = step === activeStepKey;
-                  const done = index < activeStepIndex;
-                  const Icon =
-                    step === 'scenario'
-                      ? Users
-                      : step === 'executor'
-                        ? Bot
-                        : step === 'project_path'
-                          ? FolderOpen
-                          : Palette;
-                  return (
-                    <button
-                      key={step}
-                      type="button"
-                      onClick={() => {
-                        if (index <= activeStepIndex) setActiveStepKey(step);
-                      }}
-                      disabled={index > activeStepIndex}
-                      className={cn(
-                        'grid w-full cursor-pointer grid-cols-[28px_1fr] gap-2 rounded-[8px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60',
-                        active
-                          ? 'border-[var(--hairline-strong)] bg-[var(--surface-1)] text-[var(--ink)]'
-                          : 'border-transparent text-[var(--ink-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--ink)]',
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'grid h-7 w-7 place-items-center rounded-[7px] border border-[var(--hairline)] bg-[var(--surface-2)] text-[11px] font-semibold',
-                          done && 'border-[var(--primary)] text-[var(--primary)]',
-                        )}
-                      >
-                        {done ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-[12px] font-semibold">
-                          {t(`onboarding.step.${stepI18nKeys[step]}.title`)}
-                        </span>
-                        <span className="mt-0.5 block truncate text-[11px] text-[var(--ink-tertiary)]">
-                          {t(`onboarding.step.${stepI18nKeys[step]}.hint`)}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-5 h-1 overflow-hidden rounded-full bg-[var(--surface-4)]">
-                <div
-                  className="h-full rounded-full bg-[var(--primary)] transition-[width]"
-                  style={{
-                    width: `${((activeStepIndex + 1) / onboardingSteps.length) * 100}%`,
-                  }}
-                />
-              </div>
-            </aside>
-          )}
-
-          <main className="flex min-h-0 min-w-0 flex-col">
-            <div className={cn('min-h-0 flex-1 overflow-y-auto', isWelcome ? 'flex flex-col' : 'p-5')}>
-              {renderStepBody()}
-            </div>
-            {error && !isWelcome && (
-              <p className="border-t border-[var(--hairline)] px-5 py-2 text-[12px] text-red-400">
-                {error}
-              </p>
-            )}
-            {isWelcome ? (
-              <footer className="flex justify-center border-t border-[var(--hairline)] px-5 py-4">
-                <button
-                  type="button"
-                  onClick={() => void handleWelcomeNext()}
-                  disabled={saving}
-                  className="inline-flex h-11 min-w-[180px] cursor-pointer items-center justify-center gap-2 rounded-md bg-[var(--primary)] px-6 text-[14px] font-semibold text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                  {t('onboarding.welcome.next')}
-                </button>
-              </footer>
-            ) : (
-              <footer className="flex min-h-[64px] items-center justify-between gap-3 border-t border-[var(--hairline)] px-5">
-                <button
-                  type="button"
-                  onClick={() => void handleSkip()}
-                  disabled={saving}
-                  className="cursor-pointer rounded-md px-3 py-2 text-[12px] font-medium text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {t('onboarding.action.skip')}
-                </button>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleStepBack}
-                    disabled={saving || activeStepIndex === 0}
-                    className="h-9 cursor-pointer rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] px-4 text-[13px] font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    {t('onboarding.action.back')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleStepNext()}
-                    disabled={saving}
-                    className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md bg-[var(--primary)] px-4 text-[13px] font-semibold text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
-                    {activeStepKey === 'appearance'
-                      ? t('onboarding.action.startNow')
-                      : t('onboarding.action.next')}
-                  </button>
-                </div>
-              </footer>
-            )}
-          </main>
-        </div>
+    <div
+      className="fixed inset-0 z-[90] bg-[var(--canvas)] text-[var(--ink)]"
+      style={onboardingDarkThemeVars}
+    >
+      <section className="mx-auto flex h-full w-full max-w-none flex-col overflow-hidden bg-transparent">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {renderStepBody()}
+          </div>
+        </main>
       </section>
     </div>
   );
