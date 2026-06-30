@@ -12,7 +12,7 @@ use dashmap::DashMap;
 use db::models::{
     chat_run::ChatRun,
     chat_session::{ChatSession, ChatSessionStatus, ChatSessionWorktreeMode},
-    chat_session_worktree::{SessionWorktree, SessionWorktreeStatus},
+    chat_session_worktree::SessionWorktree,
     chat_work_item::{ChatWorkItem, ChatWorkItemType},
     project::Project,
     project_delivery_record::{ProjectDeliveryEventTypeV2, ProjectDeliveryRecord},
@@ -1166,9 +1166,10 @@ async fn resolve_workspace_context(
                 other => SourceControlError::WorkspaceNotAccessible(other.to_string()),
             })?;
         if let Some(wt) = latest {
-            // Source-control stays in the isolated worktree while it can still
-            // hold unmerged session edits. After merge, show the base workspace.
-            if worktree_status_uses_isolated_source_control(wt.status) {
+            // Source-control follows the same workspace routing as runners:
+            // merged worktrees stay selected so follow-up commits can be made
+            // and merged again from the same session workspace.
+            if wt.status.is_active_for_workspace() {
                 let workspace_path = PathBuf::from(&wt.worktree_path);
                 ensure_workspace_accessible(&workspace_path)?;
                 return Ok(WorkspaceContext {
@@ -1179,9 +1180,8 @@ async fn resolve_workspace_context(
                     workspace_path,
                 });
             }
-            // Terminal/audit states (merged/archived/cleanup_failed)
-            // → switch back to the worktree row's base_workspace_path,
-            // not the (possibly changed) project default.
+            // Terminal/audit states switch back to the worktree row's
+            // base_workspace_path, not the (possibly changed) project default.
             let workspace_path = PathBuf::from(&wt.base_workspace_path);
             ensure_workspace_accessible(&workspace_path)?;
             return Ok(WorkspaceContext {
@@ -1210,17 +1210,6 @@ async fn resolve_workspace_context(
         workspace_path,
         workspace_path_string,
     })
-}
-
-fn worktree_status_uses_isolated_source_control(status: SessionWorktreeStatus) -> bool {
-    matches!(
-        status,
-        SessionWorktreeStatus::Creating
-            | SessionWorktreeStatus::Active
-            | SessionWorktreeStatus::Dirty
-            | SessionWorktreeStatus::Merging
-            | SessionWorktreeStatus::NeedsConflictResolution
-    )
 }
 
 async fn resolve_project_workspace(

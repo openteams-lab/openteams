@@ -1306,7 +1306,7 @@ async fn source_control_uses_worktree_path_for_active_worktree() {
 }
 
 #[tokio::test]
-async fn source_control_switches_to_base_workspace_after_merge() {
+async fn source_control_uses_worktree_path_after_merge() {
     let pool = setup_pool().await;
     let (_tempdir, repo_path) = setup_git_workspace();
     let project = seed_project(&pool, &repo_path).await;
@@ -1316,7 +1316,8 @@ async fn source_control_switches_to_base_workspace_after_merge() {
     let worktree_path = worktree_dir.path();
     fs::create_dir_all(worktree_path).unwrap();
 
-    // Seed a merged worktree — source-control should use base_workspace_path
+    // Seed a merged worktree: source-control should keep using worktree_path,
+    // matching runner workspace routing for follow-up session commits.
     seed_worktree_row(
         &pool,
         session_id,
@@ -1327,18 +1328,15 @@ async fn source_control_switches_to_base_workspace_after_merge() {
     )
     .await;
 
-    // session_status should succeed and use the base workspace (repo_path),
-    // NOT the worktree_path (which is a temp dir with no git).
     let status = SourceControlService::new()
         .session_status(&pool, project.id, session_id, None)
         .await
         .expect("status with merged worktree");
 
-    // The status should be Git (from repo_path), not Plain.
     match status {
-        SessionSourceControlStatus::Git { .. } => {}
-        SessionSourceControlStatus::Plain { .. } => {
-            panic!("expected git status from base workspace after merge");
+        SessionSourceControlStatus::Git { workspace_path, .. }
+        | SessionSourceControlStatus::Plain { workspace_path, .. } => {
+            assert_eq!(workspace_path, worktree_path.to_string_lossy());
         }
     }
 }
