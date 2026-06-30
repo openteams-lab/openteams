@@ -622,7 +622,7 @@ has_diff: boolean, };
 
 export type WorkspacePathEntry = { path: string, };
 
-export type WorkspaceChanges = { modified: Array<WorkspaceChangedFile>, added: Array<WorkspaceChangedFile>, deleted: Array<WorkspacePathEntry>, untracked: Array<WorkspaceChangedFile>, };
+export type WorkspaceChanges = { modified: Array<WorkspaceChangedFile>, added: Array<WorkspaceChangedFile>, deleted: Array<WorkspaceChangedFile>, untracked: Array<WorkspaceChangedFile>, };
 
 export type WorkspaceChangesResponse = { workspace_path: string, is_git_repo: boolean, changes: WorkspaceChanges | null, error: string | null, };
 

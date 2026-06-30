@@ -34,6 +34,7 @@ const session = (
   >,
 ): SessionCostEntry => ({
   ...item,
+  run_count: 0,
   cache_read_tokens: 0,
   reasoning_output_tokens: 0,
   estimated_cost: 0,

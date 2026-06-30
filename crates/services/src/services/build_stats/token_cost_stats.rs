@@ -25,6 +25,7 @@ pub struct DailyTokenStats {
 pub struct SessionTokenStats {
     pub session_id: String,
     pub title: String,
+    pub run_count: i64,
     pub input_tokens: i64,
     pub output_tokens: i64,
     pub cache_read_tokens: i64,
@@ -94,7 +95,7 @@ struct TokenMessageRow {
 }
 
 #[derive(Debug, FromRow)]
-struct TokenWorkflowRunRow {
+struct TokenRunRow {
     run_id: String,
     date: String,
     session_id: String,
@@ -296,33 +297,7 @@ impl TokenCostStatsService {
             .load_real_usage_records(pool, project_id, None, None)
             .await?;
         let prices = self.load_effective_prices(pool, project_id).await?;
-        let mut by_session: HashMap<String, (String, TokenAccumulator)> = HashMap::new();
-
-        for record in &records {
-            let resolved = resolve_usage_price(record, find_effective_price(&prices, record));
-            let estimated_cost = estimated_cost_for_record(record, &resolved);
-            let entry = by_session
-                .entry(record.session_id.clone())
-                .or_insert_with(|| (record.title.clone(), TokenAccumulator::default()));
-            entry.1.add(record, estimated_cost);
-        }
-
-        let mut sessions: Vec<_> = by_session
-            .into_iter()
-            .map(|(session_id, (title, totals))| SessionTokenStats {
-                session_id,
-                title,
-                input_tokens: totals.input_tokens,
-                output_tokens: totals.output_tokens,
-                cache_read_tokens: totals.cache_read_tokens,
-                reasoning_output_tokens: totals.reasoning_output_tokens,
-                total_tokens: totals.total_tokens,
-                estimated_cost: totals.estimated_cost,
-            })
-            .collect();
-        sessions.sort_by(|a, b| b.total_tokens.cmp(&a.total_tokens));
-        sessions.truncate(limit as usize);
-        Ok(sessions)
+        Ok(session_tokens_from_records(records, prices, limit))
     }
 
     pub async fn model_usage(
@@ -472,7 +447,7 @@ impl TokenCostStatsService {
         .fetch_all(pool)
         .await?;
 
-        let workflow_rows = sqlx::query_as::<_, TokenWorkflowRunRow>(
+        let run_rows = sqlx::query_as::<_, TokenRunRow>(
             r#"
             SELECT
                 CASE
@@ -506,7 +481,6 @@ impl TokenCostStatsService {
                 replace(lower(json_extract(cr.retention_summary_json, '$.workflow_step_id')), '-', '')
               )
             WHERE cr.retention_summary_json IS NOT NULL
-              AND json_extract(cr.retention_summary_json, '$.workflow_step_id') IS NOT NULL
               AND json_extract(cr.retention_summary_json, '$.token_usage') IS NOT NULL
               AND (
                 cs.project_id = ?1
@@ -521,7 +495,7 @@ impl TokenCostStatsService {
         .fetch_all(pool)
         .await?;
 
-        let candidates = usage_candidates_from_rows(message_rows, workflow_rows);
+        let candidates = usage_candidates_from_rows(message_rows, run_rows);
         Ok(real_usage_records_from_candidates(
             candidates, start_date, end_date,
         ))
@@ -628,7 +602,7 @@ fn real_usage_records_from_rows(
 
 fn usage_candidates_from_rows(
     message_rows: Vec<TokenMessageRow>,
-    workflow_rows: Vec<TokenWorkflowRunRow>,
+    run_rows: Vec<TokenRunRow>,
 ) -> Vec<TokenUsageCandidate> {
     let mut candidates = Vec::new();
     for (order, row) in message_rows.into_iter().enumerate() {
@@ -637,8 +611,8 @@ fn usage_candidates_from_rows(
         }
     }
     let base_order = candidates.len();
-    for (index, row) in workflow_rows.into_iter().enumerate() {
-        if let Some(candidate) = parse_workflow_run_usage_candidate(row, base_order + index) {
+    for (index, row) in run_rows.into_iter().enumerate() {
+        if let Some(candidate) = parse_run_usage_candidate(row, base_order + index) {
             candidates.push(candidate);
         }
     }
@@ -656,7 +630,13 @@ fn real_usage_records_from_candidates(
 
     for candidate in candidates {
         let dedupe_key = candidate_dedupe_key(&candidate);
-        deduped.insert(dedupe_key, candidate);
+        if let Some(existing) = deduped.get_mut(&dedupe_key) {
+            if existing.workflow_step_id.is_none() && candidate.workflow_step_id.is_some() {
+                *existing = candidate;
+            }
+        } else {
+            deduped.insert(dedupe_key, candidate);
+        }
     }
 
     let mut candidates: Vec<_> = deduped.into_values().collect();
@@ -714,10 +694,7 @@ fn parse_message_usage_candidate(
     })
 }
 
-fn parse_workflow_run_usage_candidate(
-    row: TokenWorkflowRunRow,
-    order: usize,
-) -> Option<TokenUsageCandidate> {
+fn parse_run_usage_candidate(row: TokenRunRow, order: usize) -> Option<TokenUsageCandidate> {
     let summary: Value = serde_json::from_str(&row.retention_summary_json).ok()?;
     let token_usage = summary.get("token_usage")?.clone();
     let mut meta = serde_json::Map::new();
@@ -1103,6 +1080,44 @@ fn estimated_cost_for_record(record: &TokenUsageRecord, price: &ResolvedUsagePri
         + (record.cache_read_tokens as f64 / 1_000_000.0) * price.cache_read_price_per_1m
 }
 
+fn session_tokens_from_records(
+    records: Vec<TokenUsageRecord>,
+    prices: HashMap<String, EffectivePrice>,
+    limit: u32,
+) -> Vec<SessionTokenStats> {
+    let mut by_session: HashMap<String, (String, TokenAccumulator, i64)> = HashMap::new();
+
+    for record in &records {
+        let resolved = resolve_usage_price(record, find_effective_price(&prices, record));
+        let estimated_cost = estimated_cost_for_record(record, &resolved);
+        let entry = by_session
+            .entry(record.session_id.clone())
+            .or_insert_with(|| (record.title.clone(), TokenAccumulator::default(), 0));
+        entry.1.add(record, estimated_cost);
+        entry.2 += 1;
+    }
+
+    let mut sessions: Vec<_> = by_session
+        .into_iter()
+        .map(
+            |(session_id, (title, totals, run_count))| SessionTokenStats {
+                session_id,
+                title,
+                run_count,
+                input_tokens: totals.input_tokens,
+                output_tokens: totals.output_tokens,
+                cache_read_tokens: totals.cache_read_tokens,
+                reasoning_output_tokens: totals.reasoning_output_tokens,
+                total_tokens: totals.total_tokens,
+                estimated_cost: totals.estimated_cost,
+            },
+        )
+        .collect();
+    sessions.sort_by(|a, b| b.total_tokens.cmp(&a.total_tokens));
+    sessions.truncate(limit as usize);
+    sessions
+}
+
 #[derive(Default)]
 struct WorkflowStepAccumulator {
     session_id: String,
@@ -1307,8 +1322,8 @@ mod tests {
         input_tokens: i64,
         output_tokens: i64,
         is_estimated: bool,
-    ) -> TokenWorkflowRunRow {
-        TokenWorkflowRunRow {
+    ) -> TokenRunRow {
+        TokenRunRow {
             run_id: run_id.to_string(),
             date: "2026-06-13".to_string(),
             session_id: session_id.to_string(),
@@ -1328,6 +1343,38 @@ mod tests {
                     "input_tokens": input_tokens,
                     "output_tokens": output_tokens,
                     "cache_read_tokens": 100,
+                    "runtime_model_id": "gpt-5-codex",
+                    "usage_scope": "turn_delta",
+                    "is_estimated": is_estimated
+                }
+            })
+            .to_string(),
+        }
+    }
+
+    fn non_workflow_run_row(
+        run_id: &str,
+        session_id: &str,
+        input_tokens: i64,
+        output_tokens: i64,
+        is_estimated: bool,
+    ) -> TokenRunRow {
+        TokenRunRow {
+            run_id: run_id.to_string(),
+            date: "2026-06-13".to_string(),
+            session_id: session_id.to_string(),
+            title: Some("Free chat session".to_string()),
+            session_agent_id: "session-agent-1".to_string(),
+            runner_type: Some("codex".to_string()),
+            model_name: Some("gpt-5-codex".to_string()),
+            agent_name: Some("Codex".to_string()),
+            step_title: None,
+            retention_summary_json: serde_json::json!({
+                "token_usage": {
+                    "total_tokens": input_tokens + output_tokens,
+                    "model_context_window": 200000,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
                     "runtime_model_id": "gpt-5-codex",
                     "usage_scope": "turn_delta",
                     "is_estimated": is_estimated
@@ -1420,6 +1467,74 @@ mod tests {
         assert_eq!(step.output_tokens, 60);
         assert_eq!(step.cache_read_tokens, 200);
         assert_eq!(step.total_tokens, 260);
+    }
+
+    #[test]
+    fn non_workflow_run_records_contribute_to_session_totals() {
+        let candidates = usage_candidates_from_rows(
+            Vec::new(),
+            vec![
+                workflow_run_row("run-1", "session-1", "step-1", "task_1", 120, 40, false),
+                non_workflow_run_row("run-2", "session-1", 30, 20, false),
+            ],
+        );
+        let records_with_metadata = real_usage_records_from_candidates(candidates, None, None);
+        assert_eq!(records_with_metadata.len(), 2);
+
+        let step_rows = workflow_step_tokens_from_records(
+            records_with_metadata.clone(),
+            HashMap::new(),
+            Some("session-1"),
+            None,
+        );
+        assert_eq!(step_rows.len(), 1);
+        assert_eq!(step_rows[0].run_count, 1);
+        assert_eq!(step_rows[0].total_tokens, 160);
+
+        let mut prices = HashMap::new();
+        prices.insert(
+            "gpt-5-codex".to_string(),
+            EffectivePrice {
+                input_price_per_1m: 1.0,
+                output_price_per_1m: 2.0,
+                cache_read_price_per_1m: Some(0.1),
+                source: "test".to_string(),
+                cache_source: "test".to_string(),
+            },
+        );
+        let records = records_with_metadata
+            .into_iter()
+            .map(|item| item.record)
+            .collect();
+        let sessions = session_tokens_from_records(records, prices, 50);
+
+        assert_eq!(sessions.len(), 1);
+        let session = &sessions[0];
+        assert_eq!(session.run_count, 2);
+        assert_eq!(session.input_tokens, 150);
+        assert_eq!(session.output_tokens, 60);
+        assert_eq!(session.cache_read_tokens, 100);
+        assert_eq!(session.total_tokens, 210);
+        assert!((session.estimated_cost - 0.00028).abs() < 1e-12);
+    }
+
+    #[test]
+    fn run_retention_summary_dedupes_matching_message_run_id() {
+        let candidates = usage_candidates_from_rows(
+            vec![row(
+                "m1",
+                "run-1",
+                "codex",
+                Some("gpt-5-codex"),
+                usage(100, 50, false),
+            )],
+            vec![non_workflow_run_row("run-1", "session-1", 100, 50, false)],
+        );
+        let records = real_usage_records_from_candidates(candidates, None, None);
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].record.input_tokens, 100);
+        assert_eq!(records[0].record.output_tokens, 50);
     }
 
     #[test]

@@ -1121,6 +1121,10 @@ export const workflowApi = {
       stepId?: string;
       stepKey?: string;
       workflowAgentSessionId?: string;
+      entryType?: string;
+      unresolved?: boolean;
+      limit?: number;
+      offset?: number;
     },
   ): Promise<WorkflowTranscriptEntry[]> => {
     const r = await makeRequest(
@@ -1130,6 +1134,10 @@ export const workflowApi = {
         step_id: opts?.stepId,
         step_key: opts?.stepKey,
         workflow_agent_session_id: opts?.workflowAgentSessionId,
+        entry_type: opts?.entryType,
+        unresolved: opts?.unresolved,
+        limit: opts?.limit,
+        offset: opts?.offset,
       })}`,
       { method: "GET" },
     );

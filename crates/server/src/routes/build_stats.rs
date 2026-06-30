@@ -77,6 +77,7 @@ pub struct DailyTokensResponse {
 pub struct SessionTokenEntry {
     pub session_id: String,
     pub title: String,
+    pub run_count: i64,
     pub total_tokens: i64,
     pub input_tokens: i64,
     pub output_tokens: i64,
@@ -385,6 +386,7 @@ async fn get_session_tokens(
         .map(|stats| SessionTokenEntry {
             session_id: stats.session_id,
             title: stats.title,
+            run_count: stats.run_count,
             total_tokens: stats.total_tokens,
             input_tokens: stats.input_tokens,
             output_tokens: stats.output_tokens,

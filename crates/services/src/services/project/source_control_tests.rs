@@ -98,7 +98,14 @@ async fn seed_session_with_paths(
     workspace_path: &Path,
     paths: &[&str],
 ) -> Uuid {
-    seed_session_with_observed_source(pool, project_id, workspace_path, paths, "git_diff").await
+    seed_session_with_observed_source(
+        pool,
+        project_id,
+        workspace_path,
+        paths,
+        "git_diff,artifact_record",
+    )
+    .await
 }
 
 async fn seed_session_with_observed_source(
@@ -211,7 +218,7 @@ async fn append_session_run_with_paths(
         .map(|path| {
             json!({
                 "path": path,
-                "source": "git_diff",
+                "source": "git_diff,artifact_record",
                 "existed_after_run": true
             })
         })
@@ -445,7 +452,7 @@ async fn git_workspace_ignores_openteams_artifact_observed_paths() {
 }
 
 #[tokio::test]
-async fn git_workspace_ignores_artifact_only_observed_paths() {
+async fn git_workspace_keeps_artifact_paths_that_are_in_current_diff() {
     let pool = setup_pool().await;
     let (_tempdir, repo_path) = setup_git_workspace();
     let project = seed_project(&pool, &repo_path).await;
@@ -467,10 +474,7 @@ async fn git_workspace_ignores_artifact_only_observed_paths() {
         .expect("status");
 
     let (changes, staged) = git_status_paths(&status);
-    assert!(
-        changes.is_empty(),
-        "artifact_record-only paths must not own source-control changes: {changes:?}"
-    );
+    assert_eq!(changes, vec!["tracked.txt"]);
     assert!(staged.is_empty());
 }
 
@@ -505,7 +509,7 @@ async fn git_workspace_keeps_git_source_with_artifact_record_combo() {
 }
 
 #[tokio::test]
-async fn git_workspace_ignores_work_records_artifact_paths() {
+async fn git_workspace_keeps_work_records_artifact_paths_in_current_diff() {
     let pool = setup_pool().await;
     let (_tempdir, repo_path) = setup_git_workspace();
     let project = seed_project(&pool, &repo_path).await;
@@ -553,10 +557,49 @@ async fn git_workspace_ignores_work_records_artifact_paths() {
 
     let (changes, staged) = git_status_paths(&status);
     assert!(
-        !changes.iter().any(|path| path == "binaries/test.txt"),
-        "work_records artifact paths must not own source-control changes: {changes:?}"
+        changes.iter().any(|path| path == "binaries/test.txt"),
+        "work_records artifact paths should own current source-control changes: {changes:?}"
     );
     assert!(staged.is_empty());
+}
+
+#[tokio::test]
+async fn git_workspace_excludes_other_session_artifact_paths() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+
+    fs::write(repo_path.join("session_a.txt"), "base a\n").expect("write a");
+    fs::write(repo_path.join("session_b.txt"), "base b\n").expect("write b");
+    git_add(&repo_path, "session_a.txt");
+    git_add(&repo_path, "session_b.txt");
+    GitService::new()
+        .commit(&repo_path, "track session files")
+        .expect("commit session files");
+
+    let session_a =
+        seed_session_with_paths(&pool, project.id, &repo_path, &["session_a.txt"]).await;
+    let session_b =
+        seed_session_with_paths(&pool, project.id, &repo_path, &["session_b.txt"]).await;
+
+    fs::write(repo_path.join("session_a.txt"), "changed by a\n").expect("modify a");
+    fs::write(repo_path.join("session_b.txt"), "changed by b\n").expect("modify b");
+
+    let status_a = SourceControlService::new()
+        .session_status(&pool, project.id, session_a, None)
+        .await
+        .expect("status a");
+    let status_b = SourceControlService::new()
+        .session_status(&pool, project.id, session_b, None)
+        .await
+        .expect("status b");
+
+    let (changes_a, staged_a) = git_status_paths(&status_a);
+    let (changes_b, staged_b) = git_status_paths(&status_b);
+    assert_eq!(changes_a, vec!["session_a.txt"]);
+    assert_eq!(changes_b, vec!["session_b.txt"]);
+    assert!(staged_a.is_empty());
+    assert!(staged_b.is_empty());
 }
 
 #[tokio::test]

@@ -1672,7 +1672,7 @@ export interface WorkspacePathEntry {
 export interface WorkspaceChanges {
   modified: WorkspaceChangedFile[];
   added: WorkspaceChangedFile[];
-  deleted: WorkspacePathEntry[];
+  deleted: WorkspaceChangedFile[];
   untracked: WorkspaceChangedFile[];
 }
 
@@ -1804,6 +1804,7 @@ export interface DailyTokensResponse {
 export interface SessionCostEntry {
   session_id: string;
   title: string;
+  run_count: number;
   total_tokens: number;
   input_tokens: number;
   output_tokens: number;

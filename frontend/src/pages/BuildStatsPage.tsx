@@ -383,13 +383,20 @@ export function BuildStatsPage() {
   }, [selectedProjectId]);
 
   useEffect(() => {
-    if (
-      selectedSession &&
-      !sessions.some((session) => session.session_id === selectedSession.session_id)
-    ) {
+    if (!selectedSession) return;
+
+    const refreshedSession = sessions.find(
+      (session) => session.session_id === selectedSession.session_id,
+    );
+    if (!refreshedSession) {
       setSelectedSession(null);
       setWorkflowStepTokens([]);
       setWorkflowStepTokensError(null);
+      return;
+    }
+
+    if (refreshedSession !== selectedSession) {
+      setSelectedSession(refreshedSession);
     }
   }, [selectedSession, sessions]);
 
@@ -567,7 +574,7 @@ function WorkflowStepTokenDrilldown({
   onRetry: () => void;
   t: (key: string, fallback: string) => string;
 }) {
-  const totals = steps.reduce(
+  const workflowTotals = steps.reduce(
     (sum, step) => ({
       tokens: sum.tokens + asNumber(step.total_tokens),
       cost: sum.cost + asNumber(step.estimated_cost),
@@ -575,6 +582,14 @@ function WorkflowStepTokenDrilldown({
     }),
     { tokens: 0, cost: 0, runs: 0 },
   );
+  const sessionRunCount = asNumber(
+    (session as SessionCostEntry & { run_count?: unknown }).run_count,
+  );
+  const totals = {
+    tokens: asNumber(session.total_tokens) || workflowTotals.tokens,
+    cost: asNumber(session.estimated_cost) || workflowTotals.cost,
+    runs: sessionRunCount || workflowTotals.runs,
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">

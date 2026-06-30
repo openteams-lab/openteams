@@ -1385,6 +1385,8 @@ pub struct WorkflowTranscriptQuery {
     pub step_id: Option<Uuid>,
     pub step_key: Option<String>,
     pub workflow_agent_session_id: Option<Uuid>,
+    pub entry_type: Option<String>,
+    pub unresolved: Option<bool>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
 }
@@ -1464,15 +1466,19 @@ async fn list_transcript_response(
 
     let has_filter = query.step_id.is_some()
         || query.step_key.is_some()
-        || query.workflow_agent_session_id.is_some();
+        || query.workflow_agent_session_id.is_some()
+        || query.entry_type.is_some()
+        || query.unresolved.is_some();
 
     let transcripts = if has_filter {
-        WorkflowTranscript::find_by_execution_with_step_filter(
+        WorkflowTranscript::find_by_execution_filtered(
             pool,
             execution_id,
             query.step_id,
             query.step_key.as_deref(),
             query.workflow_agent_session_id,
+            query.entry_type.as_deref(),
+            query.unresolved,
             query.limit,
             query.offset,
         )
