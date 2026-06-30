@@ -180,6 +180,12 @@ check(
   source,
 );
 check(
+  'clears submitted prompt before the next new session composer opens',
+  source.includes("attachments: attachedFiles,\n    });\n    setPrompt('');") &&
+    source.includes("setPrompt('');\n    setAttachedFiles([]);\n    setAttachmentError('');\n    onClose();"),
+  source,
+);
+check(
   'renders plan mode button instead of mode labels',
   html.includes('PLAN_MODE') &&
     !html.includes('WORKFLOW') &&

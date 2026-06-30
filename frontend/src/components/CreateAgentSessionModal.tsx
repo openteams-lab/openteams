@@ -523,6 +523,7 @@ export function CreateAgentSessionModal({
       ),
       attachments: attachedFiles,
     });
+    setPrompt('');
     setAttachedFiles([]);
     setAttachmentError('');
     onClose();
