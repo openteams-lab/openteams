@@ -1710,6 +1710,7 @@ export interface Config {
   language: UiLanguage;
   analytics_enabled: boolean;
   workspace_dir: string | null;
+  worktree_sessions_dir: string | null;
   // The remaining backend fields are preserved verbatim for round-trip safety.
   [key: string]: JsonValue | undefined;
 }

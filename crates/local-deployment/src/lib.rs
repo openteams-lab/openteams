@@ -92,10 +92,20 @@ impl Deployment for LocalDeployment {
         // Always save config (may have been migrated or version updated)
         save_config_to_file(&raw_config, &config_path()).await?;
 
-        if let Some(workspace_dir) = &raw_config.workspace_dir {
-            let path = utils::path::expand_tilde(workspace_dir);
-            WorktreeManager::set_workspace_dir_override(path);
-        }
+        WorktreeManager::set_workspace_dir_override_option(
+            raw_config
+                .workspace_dir
+                .as_deref()
+                .filter(|path| !path.trim().is_empty())
+                .map(utils::path::expand_tilde),
+        );
+        WorktreeManager::set_session_worktree_dir_override(
+            raw_config
+                .worktree_sessions_dir
+                .as_deref()
+                .filter(|path| !path.trim().is_empty())
+                .map(utils::path::expand_tilde),
+        );
 
         let config = Arc::new(RwLock::new(raw_config));
         let analytics_enabled = Arc::new(AtomicBool::new(config.read().await.analytics_enabled));

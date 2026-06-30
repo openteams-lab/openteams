@@ -96,6 +96,7 @@ async fn update_config(
             *config = new_config.clone();
             drop(config);
             deployment.set_analytics_enabled(new_config.analytics_enabled);
+            apply_worktree_dir_config(&new_config);
 
             // Track config events when fields transition from false → true and run side effects
             handle_config_events(&deployment, &old_config, &new_config).await;
@@ -104,6 +105,22 @@ async fn update_config(
         }
         Err(e) => ResponseJson(ApiResponse::error(&format!("Failed to save config: {}", e))),
     }
+}
+
+fn configured_path(value: Option<&str>) -> Option<std::path::PathBuf> {
+    value
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(expand_tilde)
+}
+
+fn apply_worktree_dir_config(config: &Config) {
+    WorktreeManager::set_workspace_dir_override_option(configured_path(
+        config.workspace_dir.as_deref(),
+    ));
+    WorktreeManager::set_session_worktree_dir_override(configured_path(
+        config.worktree_sessions_dir.as_deref(),
+    ));
 }
 
 /// Track config events when fields transition from false → true

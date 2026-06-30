@@ -40,12 +40,16 @@ use services::services::{
         save_config_to_file,
     },
     container::ContainerService,
+    worktree_manager::WorktreeManager,
 };
 use tokio::fs;
 use ts_rs::TS;
 use url::{Host, Url};
 use utils::{
-    api::oauth::LoginStatus, assets::config_path, log_msg::LogMsg, path::home_directory,
+    api::oauth::LoginStatus,
+    assets::config_path,
+    log_msg::LogMsg,
+    path::{expand_tilde, home_directory},
     response::ApiResponse,
 };
 use uuid::Uuid;

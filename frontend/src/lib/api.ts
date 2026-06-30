@@ -378,6 +378,16 @@ export const onboardingApi = {
 // Filesystem
 // -----------------------------------------------------------------------------
 
+export interface SelectDirectoryRequest {
+  title?: string;
+  initial_directory?: string;
+}
+
+export interface SelectDirectoryResponse {
+  path: string | null;
+  cancelled: boolean;
+}
+
 export const filesystemApi = {
   listRoots: async (): Promise<DirectoryEntry[]> => {
     const r = await makeRequest("/api/filesystem/roots");
@@ -390,6 +400,15 @@ export const filesystemApi = {
   listGitRepos: async (path?: string): Promise<DirectoryEntry[]> => {
     const r = await makeRequest(`/api/filesystem/git-repos${qs({ path })}`);
     return handleApiResponse<DirectoryEntry[]>(r);
+  },
+  selectDirectory: async (
+    data: SelectDirectoryRequest = {},
+  ): Promise<SelectDirectoryResponse> => {
+    const r = await makeRequest("/api/filesystem/select-directory", {
+      method: "POST",
+      body: jsonBody(data),
+    });
+    return handleApiResponse<SelectDirectoryResponse>(r);
   },
   openInExplorer: async (
     path: string,

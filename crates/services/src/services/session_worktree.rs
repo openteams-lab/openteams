@@ -27,10 +27,6 @@ const SHORT_ID_LEN: usize = 8;
 /// branches in their git UI and so reconciliation can identify orphans.
 const SESSION_BRANCH_PREFIX: &str = "openteams/session/";
 
-/// Directory name reserved for session-scoped isolated worktrees under the
-/// app-managed worktree base dir.
-pub const SESSION_WORKTREE_NAMESPACE: &str = "sessions";
-
 const GIT_COMMAND_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Debug, Error)]
@@ -337,16 +333,12 @@ pub fn branch_name_for_session(session_id: Uuid) -> String {
     format!("{SESSION_BRANCH_PREFIX}{}", short_session_id(session_id))
 }
 
-/// Worktree path under the app-managed worktree base dir.
+/// Worktree path under the app-managed session worktree base dir.
 ///
-/// Layout: `<worktree_base>/sessions/<short-id>`. The `sessions/` namespace
-/// avoids collisions with the existing project-workspace worktrees (which
-/// live directly under `<worktree_base>/<workspace_dir>`) and keeps paths
-/// short for Windows.
+/// Layout: `<session_worktree_base>/<short-id>`. By default the session base is
+/// `<worktree_base>/sessions`; users may override it from settings.
 pub fn worktree_path_for_session(session_id: Uuid) -> PathBuf {
-    WorktreeManager::get_worktree_base_dir()
-        .join(SESSION_WORKTREE_NAMESPACE)
-        .join(short_session_id(session_id))
+    WorktreeManager::get_session_worktree_base_dir().join(short_session_id(session_id))
 }
 
 /// Walk up from `start` looking for a `.git` entry. Returns the first

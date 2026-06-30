@@ -2,10 +2,13 @@ use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
-    sync::{Arc, LazyLock, Mutex, OnceLock},
+    sync::{Arc, LazyLock, Mutex, RwLock},
 };
 
-static WORKSPACE_DIR_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
+static WORKSPACE_DIR_OVERRIDE: LazyLock<RwLock<Option<PathBuf>>> =
+    LazyLock::new(|| RwLock::new(None));
+static SESSION_WORKTREE_DIR_OVERRIDE: LazyLock<RwLock<Option<PathBuf>>> =
+    LazyLock::new(|| RwLock::new(None));
 
 use git::{GitService, GitServiceError};
 use git2::{Error as GitError, Repository};
@@ -56,7 +59,35 @@ pub struct WorktreeManager;
 
 impl WorktreeManager {
     pub fn set_workspace_dir_override(path: PathBuf) {
-        let _ = WORKSPACE_DIR_OVERRIDE.set(path);
+        Self::set_workspace_dir_override_option(Some(path));
+    }
+
+    pub fn set_workspace_dir_override_option(path: Option<PathBuf>) {
+        let mut override_path = WORKSPACE_DIR_OVERRIDE
+            .write()
+            .expect("workspace dir override lock poisoned");
+        *override_path = path;
+    }
+
+    pub fn set_session_worktree_dir_override(path: Option<PathBuf>) {
+        let mut override_path = SESSION_WORKTREE_DIR_OVERRIDE
+            .write()
+            .expect("session worktree dir override lock poisoned");
+        *override_path = path;
+    }
+
+    fn workspace_dir_override() -> Option<PathBuf> {
+        WORKSPACE_DIR_OVERRIDE
+            .read()
+            .expect("workspace dir override lock poisoned")
+            .clone()
+    }
+
+    fn session_worktree_dir_override() -> Option<PathBuf> {
+        SESSION_WORKTREE_DIR_OVERRIDE
+            .read()
+            .expect("session worktree dir override lock poisoned")
+            .clone()
     }
 
     /// Create a worktree with a new branch
@@ -644,7 +675,7 @@ impl WorktreeManager {
 
     /// Get the base directory for openteams worktrees
     pub fn get_worktree_base_dir() -> std::path::PathBuf {
-        if let Some(override_path) = WORKSPACE_DIR_OVERRIDE.get() {
+        if let Some(override_path) = Self::workspace_dir_override() {
             // Always use app-owned subdirectory within custom path for safety.
             // This ensures orphan cleanup never touches user's existing folders.
             return override_path.join(".openteams-workspaces");
@@ -655,6 +686,21 @@ impl WorktreeManager {
     /// Get the default base directory (ignoring any override)
     pub fn get_default_worktree_base_dir() -> std::path::PathBuf {
         utils::path::get_agent_chatgroup_temp_dir().join("worktrees")
+    }
+
+    /// Get the base directory for session-scoped isolated worktrees.
+    ///
+    /// When configured, this is the exact directory that will contain
+    /// `<short-session-id>` folders. Without a specific override, session
+    /// worktrees remain under the normal app-owned worktree base in a
+    /// `sessions/` namespace.
+    pub fn get_session_worktree_base_dir() -> std::path::PathBuf {
+        Self::session_worktree_dir_override()
+            .unwrap_or_else(Self::get_default_session_worktree_base_dir)
+    }
+
+    pub fn get_default_session_worktree_base_dir() -> std::path::PathBuf {
+        Self::get_worktree_base_dir().join("sessions")
     }
 
     pub async fn cleanup_suspected_worktree(path: &Path) -> Result<bool, WorktreeError> {

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import type React from 'react';
+import { useEffect, useState } from 'react';
 import {
   CHAT_MESSAGE_FONT_SIZE_OPTIONS,
   useWorkspace,
@@ -11,6 +12,7 @@ import {
   Cpu,
   CreditCard,
   FlaskConical,
+  FolderOpen,
   Github,
   Key,
   Keyboard,
@@ -24,14 +26,19 @@ import {
 import { DropdownSelect, type DropdownSelectOption } from '@/components/DropdownSelect';
 import { ResourceStateNotice } from '@/components/ResourceState';
 import { ProviderSettingsPanel } from '@/components/settings/ProviderSettingsPanel';
-import { githubAuthApi, onboardingApi } from '@/lib/api';
+import {
+  filesystemApi,
+  githubAuthApi,
+  onboardingApi,
+  systemApi,
+} from '@/lib/api';
 import {
   ONBOARDING_GUIDE_RESET_EVENT,
   ONBOARDING_UPGRADE_REPLAY_EVENT,
 } from '@/lib/onboardingEvents';
 import { mockFrontendApi } from '@/lib/mockFrontendApi';
 import type { SettingsOptionsMock } from '@/mockApiData';
-import type { GitHubAccount, Session } from '@/types';
+import type { GitHubAccount, Session, UserSystemInfo } from '@/types';
 
 type NotificationToggleKey =
   | 'newMessage'
@@ -39,6 +46,81 @@ type NotificationToggleKey =
   | 'agentActivity'
   | 'systemBanner'
   | 'soundEnabled';
+
+const trimTrailingPathSeparators = (path: string): string =>
+  path.replace(/[\\/]+$/, '');
+
+const pathSeparatorFor = (path: string, osType?: string): '\\' | '/' => {
+  if (path.includes('\\')) return '\\';
+  return osType?.toLowerCase().includes('windows') ? '\\' : '/';
+};
+
+const joinPath = (
+  basePath: string,
+  segments: string[],
+  osType?: string,
+): string => {
+  const separator = pathSeparatorFor(basePath, osType);
+  const base = trimTrailingPathSeparators(basePath);
+  return [base, ...segments].filter(Boolean).join(separator);
+};
+
+const expandHomePath = (path: string, homeDirectory?: string): string => {
+  if (!path.startsWith('~') || !homeDirectory) return path;
+  if (path === '~') return homeDirectory;
+  if (path.startsWith('~/') || path.startsWith('~\\')) {
+    return joinPath(homeDirectory, [path.slice(2)]);
+  }
+  return path;
+};
+
+const defaultWorktreeTempRoot = (
+  osType: string | undefined,
+  homeDirectory: string | undefined,
+): string => {
+  const normalizedOs = osType?.toLowerCase() ?? '';
+  if (
+    normalizedOs.includes('linux') ||
+    normalizedOs.includes('ubuntu') ||
+    normalizedOs.includes('debian')
+  ) {
+    return '/var/tmp';
+  }
+  if (normalizedOs.includes('windows') && homeDirectory) {
+    return joinPath(homeDirectory, ['AppData', 'Local', 'Temp'], 'windows');
+  }
+  return '/var/tmp';
+};
+
+const getDefaultWorktreeSessionsDir = (
+  config: UserSystemInfo['config'] | null,
+  systemInfo: Pick<UserSystemInfo, 'home_directory' | 'environment'> | null,
+): string => {
+  if (!systemInfo) return '';
+
+  const osType = systemInfo?.environment.os_type;
+  const workspaceDir =
+    typeof config?.workspace_dir === 'string'
+      ? config.workspace_dir.trim()
+      : '';
+  const expandedWorkspaceDir = workspaceDir
+    ? expandHomePath(workspaceDir, systemInfo?.home_directory)
+    : '';
+  if (expandedWorkspaceDir) {
+    return joinPath(
+      expandedWorkspaceDir,
+      ['.openteams-workspaces', 'sessions'],
+      osType,
+    );
+  }
+
+  const appTempName = import.meta.env.DEV ? 'openteams-dev' : 'openteams';
+  return joinPath(
+    defaultWorktreeTempRoot(osType, systemInfo?.home_directory),
+    [appTempName, 'worktrees', 'sessions'],
+    osType,
+  );
+};
 
 interface NotificationSettingRowProps {
   title: string;
@@ -133,6 +215,26 @@ export const SettingsWorkspace: React.FC = () => {
   >(null);
   const [onboardingActionMessage, setOnboardingActionMessage] =
     useState<string | null>(null);
+  const [worktreeSessionsDirDraft, setWorktreeSessionsDirDraft] =
+    useState('');
+  const [worktreeSessionsDirSaving, setWorktreeSessionsDirSaving] =
+    useState(false);
+  const [worktreeSessionsDirMessage, setWorktreeSessionsDirMessage] =
+    useState<string | null>(null);
+  const [worktreeSessionsDirSelecting, setWorktreeSessionsDirSelecting] =
+    useState(false);
+  const [worktreeDefaultSystemInfo, setWorktreeDefaultSystemInfo] =
+    useState<Pick<UserSystemInfo, 'home_directory' | 'environment'> | null>(
+      null,
+    );
+  const configuredWorktreeSessionsDir =
+    typeof configAsync.data?.worktree_sessions_dir === 'string'
+      ? configAsync.data.worktree_sessions_dir.trim()
+      : '';
+  const worktreeSessionsDirPlaceholder = getDefaultWorktreeSessionsDir(
+    configAsync.data,
+    worktreeDefaultSystemInfo,
+  );
   const chatMessageFontSizeOptions: DropdownSelectOption[] =
     CHAT_MESSAGE_FONT_SIZE_OPTIONS.map((size) => ({
       id: String(size),
@@ -161,6 +263,29 @@ export const SettingsWorkspace: React.FC = () => {
     if (activeSettingsTab !== 'archived-sessions') return;
     void refreshArchivedSessions();
   }, [activeSettingsTab, refreshArchivedSessions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void systemApi
+      .getInfo()
+      .then((info) => {
+        if (cancelled) return;
+        setWorktreeDefaultSystemInfo({
+          home_directory: info.home_directory,
+          environment: info.environment,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setWorktreeDefaultSystemInfo(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setWorktreeSessionsDirDraft(configuredWorktreeSessionsDir);
+  }, [configuredWorktreeSessionsDir]);
 
   const translate = (
     key: string,
@@ -271,6 +396,77 @@ export const SettingsWorkspace: React.FC = () => {
     }
   };
 
+  const handleSelectWorktreeSessionsDir = async () => {
+    if (
+      !configAsync.data ||
+      worktreeSessionsDirSaving ||
+      worktreeSessionsDirSelecting
+    ) {
+      return;
+    }
+
+    setWorktreeSessionsDirSelecting(true);
+    setWorktreeSessionsDirMessage(null);
+    try {
+      const response = await filesystemApi.selectDirectory({
+        title: translate(
+          'settings.storage.worktreeSessionsDirPickerTitle',
+          'Select session worktree directory',
+        ),
+        initial_directory:
+          worktreeSessionsDirDraft.trim() ||
+          worktreeSessionsDirPlaceholder ||
+          undefined,
+      });
+      if (response.cancelled || !response.path) return;
+
+      setWorktreeSessionsDirDraft(response.path);
+      await persistWorktreeSessionsDir(response.path);
+    } catch (error) {
+      setWorktreeSessionsDirMessage(
+        error instanceof Error
+          ? error.message
+          : translate(
+              'settings.storage.worktreeSessionsDirSelectFailed',
+              'Failed to select folder.',
+            ),
+      );
+    } finally {
+      setWorktreeSessionsDirSelecting(false);
+    }
+  };
+
+  const persistWorktreeSessionsDir = async (nextDir: string) => {
+    const currentConfig = configAsync.data;
+    if (!currentConfig || worktreeSessionsDirSaving) return;
+
+    const trimmed = nextDir.trim();
+    const currentTrimmed =
+      typeof currentConfig.worktree_sessions_dir === 'string'
+        ? currentConfig.worktree_sessions_dir.trim()
+        : '';
+    if (trimmed === currentTrimmed) return;
+
+    setWorktreeSessionsDirSaving(true);
+    setWorktreeSessionsDirMessage(null);
+    try {
+      await systemApi.saveConfig({
+        ...currentConfig,
+        worktree_sessions_dir: trimmed || null,
+      });
+      await refreshConfig();
+      setWorktreeSessionsDirDraft(trimmed);
+    } catch (error) {
+      setWorktreeSessionsDirMessage(
+        error instanceof Error
+          ? error.message
+          : translate('settings.storage.saveFailed', 'Failed to save settings.'),
+      );
+    } finally {
+      setWorktreeSessionsDirSaving(false);
+    }
+  };
+
   const accountDisplayLabel =
     githubAccount?.login ?? settingsOptions?.account.email ?? '-';
 
@@ -360,6 +556,64 @@ export const SettingsWorkspace: React.FC = () => {
                   className="w-full shrink-0 sm:w-[160px]"
                   maxPanelHeightClassName="max-h-[180px]"
                 />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-[var(--ink)]">
+                {translate(
+                  'settings.storage.worktreeSessionsDir',
+                  'Session worktree directory',
+                )}
+              </h4>
+              <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-3">
+                <p className="text-sm leading-snug text-[var(--ink-subtle)]">
+                  {translate(
+                    'settings.storage.worktreeSessionsDirDesc',
+                    'Choose where isolated session worktree folders are created.',
+                  )}
+                </p>
+                <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center">
+                  <input
+                    type="text"
+                    value={worktreeSessionsDirDraft}
+                    onChange={(event) =>
+                      setWorktreeSessionsDirDraft(event.target.value)
+                    }
+                    onBlur={() =>
+                      void persistWorktreeSessionsDir(worktreeSessionsDirDraft)
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.currentTarget.blur();
+                      }
+                    }}
+                    placeholder={worktreeSessionsDirPlaceholder}
+                    className="min-h-9 min-w-0 flex-1 rounded-md border border-[var(--hairline-strong)] bg-[var(--surface-2)] px-3 font-mono text-sm text-[var(--ink)] outline-none transition focus:border-[var(--primary)]"
+                  />
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleSelectWorktreeSessionsDir()}
+                      disabled={
+                        worktreeSessionsDirSaving ||
+                        worktreeSessionsDirSelecting ||
+                        !configAsync.data
+                      }
+                      className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[var(--hairline-strong)] px-3 py-2 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <FolderOpen className="h-3.5 w-3.5" />
+                      {worktreeSessionsDirSaving
+                        ? translate('settings.storage.saving', 'Saving...')
+                        : translate('settings.storage.browse', 'Browse')}
+                    </button>
+                  </div>
+                </div>
+                {worktreeSessionsDirMessage && (
+                  <p className="mt-2 text-xs text-[var(--ink-subtle)]">
+                    {worktreeSessionsDirMessage}
+                  </p>
+                )}
               </div>
             </div>
 

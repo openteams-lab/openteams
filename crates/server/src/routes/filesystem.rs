@@ -38,8 +38,174 @@ pub struct OpenInExplorerResponse {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct SelectDirectoryRequest {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub initial_directory: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SelectDirectoryResponse {
+    pub path: Option<String>,
+    pub cancelled: bool,
+}
+
 fn open_in_explorer_response(ok: bool, error: Option<String>) -> Json<OpenInExplorerResponse> {
     Json(OpenInExplorerResponse { ok, error })
+}
+
+fn clean_optional_string(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn selected_path_from_output(
+    output: std::process::Output,
+    cancelled_status_codes: &[i32],
+) -> Result<Option<String>, String> {
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if output.status.success() {
+        return Ok((!stdout.is_empty()).then_some(stdout));
+    }
+
+    let code = output.status.code();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if stdout.is_empty()
+        && code
+            .map(|code| cancelled_status_codes.contains(&code))
+            .unwrap_or(false)
+    {
+        return Ok(None);
+    }
+    if stderr.to_lowercase().contains("user canceled") {
+        return Ok(None);
+    }
+
+    Err(if !stderr.is_empty() {
+        stderr
+    } else if !stdout.is_empty() {
+        stdout
+    } else {
+        format!("Directory picker exited with status {}", output.status)
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn select_directory_native(
+    title: Option<String>,
+    initial_directory: Option<String>,
+) -> Result<Option<String>, String> {
+    let script = r#"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+$dialog.ShowNewFolderButton = $true
+$title = [Environment]::GetEnvironmentVariable('OPENTEAMS_PICKER_TITLE')
+if (![string]::IsNullOrWhiteSpace($title)) {
+  $dialog.Description = $title
+}
+$initial = [Environment]::GetEnvironmentVariable('OPENTEAMS_PICKER_INITIAL')
+if (![string]::IsNullOrWhiteSpace($initial) -and [System.IO.Directory]::Exists($initial)) {
+  $dialog.SelectedPath = $initial
+}
+$result = $dialog.ShowDialog()
+if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+  [Console]::WriteLine($dialog.SelectedPath)
+}
+"#;
+
+    let mut command = Command::new("powershell.exe");
+    command.args([
+        "-NoProfile",
+        "-STA",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        script,
+    ]);
+    if let Some(title) = title {
+        command.env("OPENTEAMS_PICKER_TITLE", title);
+    }
+    if let Some(initial_directory) = initial_directory {
+        command.env("OPENTEAMS_PICKER_INITIAL", initial_directory);
+    }
+
+    let output = command
+        .output()
+        .map_err(|err| format!("Failed to open directory picker: {err}"))?;
+    selected_path_from_output(output, &[])
+}
+
+#[cfg(target_os = "macos")]
+fn select_directory_native(
+    title: Option<String>,
+    initial_directory: Option<String>,
+) -> Result<Option<String>, String> {
+    let script = r#"
+on run argv
+  set promptText to "Select directory"
+  if (count of argv) >= 1 and item 1 of argv is not "" then
+    set promptText to item 1 of argv
+  end if
+  if (count of argv) >= 2 and item 2 of argv is not "" then
+    set chosenFolder to choose folder with prompt promptText default location (POSIX file (item 2 of argv))
+  else
+    set chosenFolder to choose folder with prompt promptText
+  end if
+  return POSIX path of chosenFolder
+end run
+"#;
+    let mut command = Command::new("osascript");
+    command.args(["-e", script, "--"]);
+    command.arg(title.unwrap_or_else(|| "Select directory".to_string()));
+    if let Some(initial_directory) =
+        initial_directory.filter(|path| Path::new(path.as_str()).is_dir())
+    {
+        command.arg(initial_directory);
+    }
+
+    let output = command
+        .output()
+        .map_err(|err| format!("Failed to open directory picker: {err}"))?;
+    selected_path_from_output(output, &[1])
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn select_directory_native(
+    title: Option<String>,
+    initial_directory: Option<String>,
+) -> Result<Option<String>, String> {
+    let title = title.unwrap_or_else(|| "Select directory".to_string());
+    let initial_directory = initial_directory.filter(|path| Path::new(path.as_str()).is_dir());
+
+    let mut zenity = Command::new("zenity");
+    zenity
+        .args(["--file-selection", "--directory", "--title"])
+        .arg(&title);
+    if let Some(initial_directory) = initial_directory.as_deref() {
+        zenity.arg("--filename").arg(initial_directory);
+    }
+    match zenity.output() {
+        Ok(output) => return selected_path_from_output(output, &[1]),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(format!("Failed to open directory picker: {err}")),
+    }
+
+    let mut kdialog = Command::new("kdialog");
+    kdialog.args(["--title", &title, "--getexistingdirectory"]);
+    if let Some(initial_directory) = initial_directory.as_deref() {
+        kdialog.arg(initial_directory);
+    }
+    match kdialog.output() {
+        Ok(output) => selected_path_from_output(output, &[1]),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            Err("No native directory picker is available (tried zenity and kdialog).".to_string())
+        }
+        Err(err) => Err(format!("Failed to open directory picker: {err}")),
+    }
 }
 
 fn validate_workspace_relative_path(path: &Path) -> Result<(), String> {
@@ -497,11 +663,33 @@ pub async fn list_git_repos(
     }
 }
 
+pub async fn select_directory(
+    Json(payload): Json<SelectDirectoryRequest>,
+) -> Result<ResponseJson<ApiResponse<SelectDirectoryResponse>>, ApiError> {
+    let title = clean_optional_string(payload.title);
+    let initial_directory = clean_optional_string(payload.initial_directory);
+    match tokio::task::spawn_blocking(move || select_directory_native(title, initial_directory))
+        .await
+    {
+        Ok(Ok(path)) => Ok(ResponseJson(ApiResponse::success(
+            SelectDirectoryResponse {
+                cancelled: path.is_none(),
+                path,
+            },
+        ))),
+        Ok(Err(error)) => Ok(ResponseJson(ApiResponse::error(&error))),
+        Err(error) => Ok(ResponseJson(ApiResponse::error(&format!(
+            "Directory picker task failed: {error}"
+        )))),
+    }
+}
+
 pub fn router() -> Router<DeploymentImpl> {
     Router::new()
         .route("/filesystem/roots", get(list_roots))
         .route("/filesystem/directory", get(list_directory))
         .route("/filesystem/git-repos", get(list_git_repos))
+        .route("/filesystem/select-directory", post(select_directory))
         .route("/filesystem/open-in-explorer", post(open_in_explorer))
 }
 

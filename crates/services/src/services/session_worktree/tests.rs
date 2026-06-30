@@ -70,6 +70,37 @@ fn init_git_repo(repo: &Path) {
     git(repo, &["commit", "-m", "initial"]);
 }
 
+struct TestWorktreeCleanup {
+    path: PathBuf,
+}
+
+impl Drop for TestWorktreeCleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+        if let Some(parent) = self.path.parent() {
+            let _ = std::fs::remove_dir(parent);
+        }
+    }
+}
+
+async fn ensure_test_worktree(
+    service: &SessionWorktreeService,
+    session_id: Uuid,
+    base: PathBuf,
+) -> (SessionWorktree, TestWorktreeCleanup) {
+    let worktree = match service
+        .ensure_for_session(EnsureWorktreeInput::new(session_id, base))
+        .await
+        .expect("create session worktree")
+    {
+        EnsureOutcome::Created(row) | EnsureOutcome::Existing(row) => row,
+    };
+    let cleanup = TestWorktreeCleanup {
+        path: PathBuf::from(&worktree.worktree_path),
+    };
+    (worktree, cleanup)
+}
+
 /// In-memory schema matching `20260622120000_create_chat_session_worktrees.sql`.
 /// Kept in sync by hand; tests fail loudly if the model and schema diverge.
 async fn setup_pool() -> SqlitePool {
@@ -908,13 +939,7 @@ async fn ensure_for_session_uses_current_workspace_branch_over_origin_head() {
     git(&base, &["add", "branch.txt"]);
     git(&base, &["commit", "-m", "current branch commit"]);
 
-    let worktree = match service
-        .ensure_for_session(EnsureWorktreeInput::new(session_id, base.clone()))
-        .await
-        .expect("create session worktree")
-    {
-        EnsureOutcome::Created(row) | EnsureOutcome::Existing(row) => row,
-    };
+    let (worktree, _cleanup) = ensure_test_worktree(&service, session_id, base.clone()).await;
 
     assert_eq!(worktree.base_branch, "codex/openteams-dev");
     let expected_head = git(&base, &["rev-parse", "codex/openteams-dev"]);
@@ -939,13 +964,7 @@ async fn perform_merge_preserves_session_branch_commit_in_base_history() {
     let base = tmp.path().join("base");
     init_git_repo(&base);
 
-    let worktree = match service
-        .ensure_for_session(EnsureWorktreeInput::new(session_id, base.clone()))
-        .await
-        .expect("create session worktree")
-    {
-        EnsureOutcome::Created(row) | EnsureOutcome::Existing(row) => row,
-    };
+    let (worktree, _cleanup) = ensure_test_worktree(&service, session_id, base.clone()).await;
 
     let worktree_path = PathBuf::from(&worktree.worktree_path);
     std::fs::write(worktree_path.join("feature.txt"), "from session\n")
@@ -1026,13 +1045,7 @@ async fn perform_merge_allows_untracked_files_in_base_workspace() {
     let base = tmp.path().join("base");
     init_git_repo(&base);
 
-    let worktree = match service
-        .ensure_for_session(EnsureWorktreeInput::new(session_id, base.clone()))
-        .await
-        .expect("create session worktree")
-    {
-        EnsureOutcome::Created(row) | EnsureOutcome::Existing(row) => row,
-    };
+    let (worktree, _cleanup) = ensure_test_worktree(&service, session_id, base.clone()).await;
 
     let worktree_path = PathBuf::from(&worktree.worktree_path);
     std::fs::write(worktree_path.join("feature.txt"), "from session\n")
@@ -1075,13 +1088,7 @@ async fn perform_merge_allows_uncommitted_base_changes_when_git_can_merge() {
     git(&base, &["add", "base-only.txt"]);
     git(&base, &["commit", "-m", "add base-only file"]);
 
-    let worktree = match service
-        .ensure_for_session(EnsureWorktreeInput::new(session_id, base.clone()))
-        .await
-        .expect("create session worktree")
-    {
-        EnsureOutcome::Created(row) | EnsureOutcome::Existing(row) => row,
-    };
+    let (worktree, _cleanup) = ensure_test_worktree(&service, session_id, base.clone()).await;
 
     let worktree_path = PathBuf::from(&worktree.worktree_path);
     std::fs::write(worktree_path.join("feature.txt"), "from session\n")
@@ -1131,13 +1138,7 @@ async fn perform_merge_surfaces_git_failure_for_overlapping_dirty_base_changes()
     let base = tmp.path().join("base");
     init_git_repo(&base);
 
-    let worktree = match service
-        .ensure_for_session(EnsureWorktreeInput::new(session_id, base.clone()))
-        .await
-        .expect("create session worktree")
-    {
-        EnsureOutcome::Created(row) | EnsureOutcome::Existing(row) => row,
-    };
+    let (worktree, _cleanup) = ensure_test_worktree(&service, session_id, base.clone()).await;
 
     let worktree_path = PathBuf::from(&worktree.worktree_path);
     std::fs::write(worktree_path.join("README.md"), "from session\n")
@@ -1192,13 +1193,7 @@ async fn perform_merge_does_not_auto_commit_uncommitted_session_changes() {
     git(&base, &["add", ".gitignore"]);
     git(&base, &["commit", "-m", "ignore runtime files"]);
 
-    let worktree = match service
-        .ensure_for_session(EnsureWorktreeInput::new(session_id, base.clone()))
-        .await
-        .expect("create session worktree")
-    {
-        EnsureOutcome::Created(row) | EnsureOutcome::Existing(row) => row,
-    };
+    let (worktree, _cleanup) = ensure_test_worktree(&service, session_id, base.clone()).await;
 
     let worktree_path = PathBuf::from(&worktree.worktree_path);
     std::fs::write(worktree_path.join("committed.txt"), "committed\n")
