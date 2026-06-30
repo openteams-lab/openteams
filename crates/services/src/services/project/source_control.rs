@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     ffi::OsString,
     fs,
     path::{Component, Path, PathBuf},
@@ -12,6 +12,7 @@ use db::models::{
     chat_run::ChatRun,
     chat_session::{ChatSession, ChatSessionStatus, ChatSessionWorktreeMode},
     chat_session_worktree::{SessionWorktree, SessionWorktreeStatus},
+    chat_work_item::{ChatWorkItem, ChatWorkItemType},
     project::Project,
     project_delivery_record::{ProjectDeliveryEventTypeV2, ProjectDeliveryRecord},
     project_path::{ProjectPath, ProjectPathKind},
@@ -24,7 +25,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use thiserror::Error;
 use ts_rs::TS;
-use utils::diff::{compute_line_change_counts, create_unified_diff};
+use utils::{
+    assets::asset_dir,
+    diff::{compute_line_change_counts, create_unified_diff},
+};
 use uuid::Uuid;
 
 use super::delivery::ProjectDeliveryService;
@@ -37,6 +41,14 @@ static SESSION_PATH_CACHE: Lazy<DashMap<SessionPathCacheKey, SessionPathCacheEnt
     Lazy::new(DashMap::new);
 static STATUS_CACHE: Lazy<DashMap<SourceControlStatusCacheKey, SourceControlStatusCacheEntry>> =
     Lazy::new(DashMap::new);
+static INLINE_CODE_PATH_RE: Lazy<regex::Regex> =
+    Lazy::new(|| regex::Regex::new(r"`([^`\r\n]+)`").expect("inline code path regex"));
+
+const PATH_LIKE_EXTENSIONS: &[&str] = &[
+    "c", "cc", "cpp", "cs", "css", "go", "h", "hpp", "html", "java", "js", "json", "jsx", "md",
+    "mjs", "py", "rb", "rs", "scss", "sh", "sql", "svg", "toml", "ts", "tsx", "txt", "vue", "xml",
+    "yaml", "yml",
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[serde(rename_all = "snake_case")]
@@ -362,6 +374,14 @@ struct RunMetaFile {
 }
 
 #[derive(Debug, Deserialize)]
+struct WorkRecordJsonLine {
+    session_id: Uuid,
+    run_id: Uuid,
+    message_type: String,
+    content: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct CommitDeliveryMetadata {
     #[serde(default)]
     files: Vec<String>,
@@ -376,10 +396,10 @@ struct StatusPathEntry {
     is_untracked: bool,
 }
 
-fn is_source_control_observed_source(source: &str) -> bool {
-    source.split(',').map(str::trim).any(|part| {
-        part.eq_ignore_ascii_case("git_diff") || part.eq_ignore_ascii_case("git_untracked")
-    })
+fn is_artifact_observed_source(source: &str) -> bool {
+    source
+        .split(',')
+        .any(|part| part.trim().eq_ignore_ascii_case("artifact_record"))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1268,7 +1288,12 @@ async fn collect_session_paths(
     let runs =
         ChatRun::list_for_session_workspace(pool, session_id, &context.workspace_path_string)
             .await?;
-    let paths = collect_paths_from_runs(&context.workspace_path, &runs)?;
+    let work_items = ChatWorkItem::find_by_session_id(pool, session_id, None)
+        .await?
+        .into_iter()
+        .filter(|item| item.item_type == ChatWorkItemType::Artifact)
+        .collect::<Vec<_>>();
+    let paths = collect_paths_from_runs(&context.workspace_path, &runs, &work_items)?;
     let paths = filter_committed_session_paths(pool, session_id, context, paths).await?;
     SESSION_PATH_CACHE.insert(
         key,
@@ -1451,14 +1476,36 @@ fn invalidate_source_control_session_caches(session_id: Uuid) {
     }
 }
 
+fn session_work_records_path(session_id: Uuid) -> PathBuf {
+    asset_dir()
+        .join("chat")
+        .join(format!("session_{session_id}"))
+        .join("protocol")
+        .join("work_records.jsonl")
+}
+
+fn load_work_record_lines(session_id: Uuid) -> Vec<WorkRecordJsonLine> {
+    let Ok(content) = fs::read_to_string(session_work_records_path(session_id)) else {
+        return Vec::new();
+    };
+
+    content
+        .lines()
+        .filter_map(|line| serde_json::from_str::<WorkRecordJsonLine>(line).ok())
+        .collect()
+}
+
 fn collect_paths_from_runs(
     workspace_path: &Path,
     runs: &[ChatRun],
+    work_items: &[ChatWorkItem],
 ) -> Result<BTreeMap<String, SessionPathState>> {
     let mut paths = BTreeMap::<String, SessionPathState>::new();
+    let run_ids = runs.iter().map(|run| run.id).collect::<HashSet<_>>();
+
     for run in runs {
         for entry in load_run_meta_observed_paths(run)? {
-            if !is_source_control_observed_source(&entry.source) {
+            if !is_artifact_observed_source(&entry.source) {
                 continue;
             }
             if let Ok(path) = normalize_workspace_relative_path(&entry.path, workspace_path) {
@@ -1466,18 +1513,26 @@ fn collect_paths_from_runs(
             }
         }
 
-        if let Some(patch) = read_first_existing_file(&run_scoped_diff_paths(run)) {
-            for path in parse_diff_patch_paths(&patch, workspace_path) {
+        for record in load_work_record_lines(run.session_id)
+            .into_iter()
+            .filter(|record| {
+                record.session_id == run.session_id
+                    && record.run_id == run.id
+                    && record.message_type.eq_ignore_ascii_case("artifact")
+            })
+        {
+            for path in extract_workspace_paths_from_artifact_text(&record.content, workspace_path)
+            {
                 observe_session_path(&mut paths, path, run.created_at, true);
             }
         }
+    }
 
-        for dir in run_scoped_untracked_dirs(run) {
-            for path in collect_relative_file_paths(&dir) {
-                if let Ok(path) = normalize_workspace_relative_path(&path, workspace_path) {
-                    observe_session_path(&mut paths, path, run.created_at, true);
-                }
-            }
+    for item in work_items.iter().filter(|item| {
+        item.item_type == ChatWorkItemType::Artifact && run_ids.contains(&item.run_id)
+    }) {
+        for path in extract_workspace_paths_from_artifact_text(&item.content, workspace_path) {
+            observe_session_path(&mut paths, path, item.created_at, true);
         }
     }
 
@@ -1516,75 +1571,86 @@ fn load_run_meta_observed_paths(run: &ChatRun) -> Result<Vec<WorkspaceObservedPa
         .unwrap_or_default())
 }
 
-fn run_scoped_diff_paths(run: &ChatRun) -> [PathBuf; 3] {
-    let run_dir = PathBuf::from(&run.run_dir);
-    [
-        run_dir.join(format!(
-            "session_agent_{}_run_{:04}_diff.patch",
-            run.session_agent_id, run.run_index
-        )),
-        run_dir.join(format!("run_{:04}_diff.patch", run.run_index)),
-        run_dir.join("diff.patch"),
-    ]
-}
-
-fn run_scoped_untracked_dirs(run: &ChatRun) -> [PathBuf; 3] {
-    let run_dir = PathBuf::from(&run.run_dir);
-    [
-        run_dir.join(format!(
-            "session_agent_{}_run_{:04}_untracked",
-            run.session_agent_id, run.run_index
-        )),
-        run_dir.join(format!("run_{:04}_untracked", run.run_index)),
-        run_dir.join("untracked"),
-    ]
-}
-
-fn read_first_existing_file(paths: &[PathBuf]) -> Option<String> {
-    paths.iter().find_map(|path| fs::read_to_string(path).ok())
-}
-
-fn parse_diff_patch_paths(patch: &str, workspace_path: &Path) -> Vec<String> {
-    patch
-        .lines()
-        .filter_map(|line| {
-            let rest = line.strip_prefix("diff --git a/")?;
-            let (old_path, new_path) = rest.split_once(" b/")?;
-            let preferred = if new_path == "/dev/null" {
-                old_path
-            } else {
-                new_path
-            };
-            normalize_workspace_relative_path(preferred, workspace_path).ok()
+fn looks_like_workspace_path(candidate: &str) -> bool {
+    if candidate.contains("://") {
+        return false;
+    }
+    if candidate.contains('/') || candidate.contains('\\') {
+        return true;
+    }
+    PathBuf::from(candidate)
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|extension| {
+            PATH_LIKE_EXTENSIONS
+                .iter()
+                .any(|allowed| allowed.eq_ignore_ascii_case(extension))
         })
-        .collect()
+        .unwrap_or(false)
 }
 
-fn collect_relative_file_paths(root: &Path) -> Vec<String> {
-    fn walk(dir: &Path, root: &Path, result: &mut Vec<String>) {
-        let Ok(entries) = fs::read_dir(dir) else {
-            return;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let Ok(file_type) = entry.file_type() else {
-                continue;
-            };
-            if file_type.is_dir() {
-                walk(&path, root, result);
-            } else if file_type.is_file()
-                && let Ok(relative) = path.strip_prefix(root)
-            {
-                result.push(relative.to_string_lossy().replace('\\', "/"));
+fn is_internal_openteams_runtime_path(path: &str) -> bool {
+    let components = PathBuf::from(path)
+        .components()
+        .filter_map(|component| match component {
+            Component::Normal(part) => Some(part.to_string_lossy().to_string()),
+            Component::CurDir => None,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => None,
+        })
+        .collect::<Vec<_>>();
+
+    match components.as_slice() {
+        [openteams, runs, ..] if openteams == ".openteams" && runs == "runs" => true,
+        [openteams, context, _session_id, file]
+            if openteams == ".openteams"
+                && context == "context"
+                && matches!(
+                    file.as_str(),
+                    "messages.jsonl"
+                        | "messages_compacted.background.jsonl"
+                        | "shared_blackboard.jsonl"
+                        | "work_records.jsonl"
+                ) =>
+        {
+            true
+        }
+        [openteams, context, _session_id, internal_dir, ..]
+            if openteams == ".openteams"
+                && context == "context"
+                && matches!(internal_dir.as_str(), "attachments" | "references") =>
+        {
+            true
+        }
+        _ => false,
+    }
+}
+
+fn extract_workspace_paths_from_artifact_text(
+    text: &str,
+    workspace_root: &Path,
+) -> HashSet<String> {
+    let mut candidates = Vec::new();
+
+    if let Ok(paths) = serde_json::from_str::<Vec<String>>(text.trim()) {
+        candidates.extend(paths);
+    } else {
+        for capture in INLINE_CODE_PATH_RE.captures_iter(text) {
+            if let Some(matched) = capture.get(1) {
+                candidates.push(matched.as_str().to_string());
             }
+        }
+
+        if candidates.is_empty() {
+            candidates.extend(text.split_whitespace().map(str::to_string));
         }
     }
 
-    let mut result = Vec::new();
-    if root.exists() {
-        walk(root, root, &mut result);
-    }
-    result
+    candidates
+        .into_iter()
+        .filter(|candidate| looks_like_workspace_path(candidate))
+        .filter_map(|candidate| normalize_workspace_relative_path(&candidate, workspace_root).ok())
+        .filter(|path| !is_internal_openteams_runtime_path(path))
+        .collect()
 }
 
 fn normalize_workspace_relative_path(
