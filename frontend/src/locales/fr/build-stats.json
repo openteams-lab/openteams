@@ -35,6 +35,7 @@
   "buildStats.pricing.saved": "Prix enregistré",
   "buildStats.pricing.saving": "Enregistrement...",
   "buildStats.sessionTokens": "Utilisation des tokens par session",
+  "buildStats.sessionTokens.showMore": "Afficher {count} sessions de plus",
   "buildStats.subtitle": "Utilisation des tokens, activité de livraison, coût par session et dépenses de modèles pour le projet actuel.",
   "buildStats.timeRange.30d": "1 mois",
   "buildStats.timeRange.7d": "1 semaine",

@@ -35,6 +35,7 @@
   "buildStats.pricing.saved": "가격이 저장되었습니다",
   "buildStats.pricing.saving": "저장 중...",
   "buildStats.sessionTokens": "세션별 토큰 사용량",
+  "buildStats.sessionTokens.showMore": "세션 {count}개 더 보기",
   "buildStats.subtitle": "현재 프로젝트의 토큰 사용량, 전달 활동, 세션 비용, 모델 지출입니다.",
   "buildStats.timeRange.30d": "1개월",
   "buildStats.timeRange.7d": "1주",

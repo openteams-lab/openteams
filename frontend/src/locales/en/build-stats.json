@@ -35,6 +35,7 @@
   "buildStats.pricing.saved": "Price saved",
   "buildStats.pricing.saving": "Saving...",
   "buildStats.sessionTokens": "Per-Session Token Usage",
+  "buildStats.sessionTokens.showMore": "Show {count} more",
   "buildStats.subtitle": "Token usage, delivery activity, session cost, and model spend for the current project.",
   "buildStats.timeRange.30d": "1 Month",
   "buildStats.timeRange.7d": "1 Week",

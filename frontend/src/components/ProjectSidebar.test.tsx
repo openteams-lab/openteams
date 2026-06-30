@@ -741,10 +741,11 @@ check(
   componentSource,
 );
 check(
-  "create project modal uses softer Linear-style controls",
-  componentSource.includes("bg-[#141517]") &&
-    componentSource.includes("border-transparent bg-[rgba(255,255,255,0.04)]") &&
-    componentSource.includes("bg-white px-3.5 py-1.5"),
+  "create project modal uses theme tokens for light mode",
+  componentSource.includes("bg-[var(--surface-1)] text-[var(--ink)]") &&
+    componentSource.includes("border-[var(--hairline)] bg-[var(--surface-2)]") &&
+    componentSource.includes("bg-[var(--primary)] px-3.5 py-1.5") &&
+    !componentSource.includes("bg-[#141517]"),
   componentSource,
 );
 check(
