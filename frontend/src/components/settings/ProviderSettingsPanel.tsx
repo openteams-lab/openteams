@@ -28,6 +28,7 @@ import {
   BUILT_IN_PROVIDER_IDS,
   customProvidersListToRecord,
   isBuiltInProvider,
+  normalizeCustomProviderEntry,
   trimToNull,
 } from '@/lib/cliConfigTypes';
 import { BuiltInProviderEditor } from './BuiltInProviderEditor';
@@ -254,6 +255,24 @@ export function ProviderSettingsPanel() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  const syncCustomProvider = (
+    provider: CustomProviderEntry,
+    previousProviderId: string | null,
+  ) => {
+    const normalizedProvider = normalizeCustomProviderEntry(provider);
+    if (!normalizedProvider.id) return;
+    setCustomProviders((current) => {
+      const nextProviders = current.filter(
+        (entry) =>
+          entry.id !== normalizedProvider.id &&
+          (previousProviderId == null || entry.id !== previousProviderId),
+      );
+      return [...nextProviders, normalizedProvider].sort((left, right) =>
+        left.id.localeCompare(right.id),
+      );
+    });
+  };
 
   const updateConfig = (updater: (draft: CliConfig) => void) => {
     setConfig((current) => {
@@ -531,12 +550,14 @@ export function ProviderSettingsPanel() {
                 initialProvider={null}
                 mode="create"
                 onSaved={(providerId) => loadData(providerId)}
+                onProviderSaved={syncCustomProvider}
               />
             ) : selectedCustomProvider ? (
               <CustomProviderEditor
                 initialProvider={selectedCustomProvider}
                 mode="edit"
                 onSaved={(providerId) => loadData(providerId)}
+                onProviderSaved={syncCustomProvider}
               />
             ) : isBuiltInProvider(selectedId) ? (
               <BuiltInProviderEditor

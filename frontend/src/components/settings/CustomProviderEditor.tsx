@@ -28,6 +28,10 @@ type CustomProviderEditorProps = {
   initialProvider: CustomProviderEntry | null;
   mode: 'create' | 'edit';
   onSaved: (providerId: string) => Promise<void> | void;
+  onProviderSaved?: (
+    provider: CustomProviderEntry,
+    previousProviderId: string | null,
+  ) => void;
 };
 
 export type ModelDraft = {
@@ -261,6 +265,7 @@ export function CustomProviderEditor({
   initialProvider,
   mode,
   onSaved,
+  onProviderSaved,
 }: CustomProviderEditorProps) {
   const { t, showToast } = useWorkspace();
   const [formState, setFormState] = useState(() =>
@@ -302,7 +307,7 @@ export function CustomProviderEditor({
     setFocusedModelKey(null);
     setPersistedProviderId(initialProvider?.id ?? null);
     setAutosaveState('idle');
-  }, [initialProvider, mode]);
+  }, [initialProvider?.id, mode]);
 
   const existingModelIds = useMemo(
     () =>
@@ -497,6 +502,7 @@ export function CustomProviderEditor({
         ? await cliConfigApi.updateCustomProvider(existingProviderId, provider)
         : await cliConfigApi.createCustomProvider(provider);
       setPersistedProviderId(saved.id);
+      onProviderSaved?.(saved, existingProviderId);
       if (!options.silent) {
         setStatus({
           message: copy(
