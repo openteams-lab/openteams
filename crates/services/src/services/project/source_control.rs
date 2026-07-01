@@ -1774,10 +1774,23 @@ async fn collect_shared_paths(
             .insert(shared.session_id);
     }
 
-    Ok(by_path
+    let shared_paths = by_path
         .into_iter()
         .map(|(path, sessions)| (path, sessions.into_iter().collect::<Vec<_>>()))
-        .collect())
+        .collect::<HashMap<_, _>>();
+    for (path, sessions) in &shared_paths {
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            shared_path = %path,
+            shared_session_ids = ?sessions,
+            "source-control collect_shared_paths found shared file sessions"
+        );
+    }
+
+    Ok(shared_paths)
 }
 
 async fn resolve_commit_work_item_ids(
