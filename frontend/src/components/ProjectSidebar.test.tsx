@@ -364,6 +364,15 @@ check(
     html.includes("Build stats"),
   html,
 );
+check(
+  "retries build stats usage refresh while sidebar cost is zero",
+  componentSource.includes("ZERO_COST_USAGE_REFRESH_DELAYS_MS") &&
+    componentSource.includes("buildStatsModelCostRef.current <= 0") &&
+    componentSource.includes('reason === "usage"') &&
+    componentSource.includes("buildStatsUsageRetryTimersRef.current") &&
+    componentSource.includes("clearBuildStatsUsageRetryTimers()"),
+  componentSource,
+);
 check("renders weekly cost prop accepted", typeof html === "string", html);
 check("renders session section", html.includes("Sessions"), html);
 check(

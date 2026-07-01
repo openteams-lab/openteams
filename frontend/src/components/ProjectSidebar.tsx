@@ -331,6 +331,8 @@ const ZERO_BUILD_STATS: SidebarBuildStats = {
   ],
 };
 
+const ZERO_COST_USAGE_REFRESH_DELAYS_MS = [1500, 5000] as const;
+
 export function ProjectSidebar({
   shellOptions,
   projects = [],
@@ -434,6 +436,10 @@ export function ProjectSidebar({
     useState<SidebarBuildStats | null>(null);
   const [buildStatsRefreshVersion, setBuildStatsRefreshVersion] = useState(0);
   const buildStatsProjectRef = useRef<string | null>(null);
+  const buildStatsModelCostRef = useRef(0);
+  const buildStatsUsageRetryTimersRef = useRef<
+    ReturnType<typeof setTimeout>[]
+  >([]);
   const portalTarget =
     appScale.portalRoot ??
     (typeof document === "undefined" ? null : document.body);
@@ -547,10 +553,19 @@ export function ProjectSidebar({
     }, 900);
   }, []);
 
+  const clearBuildStatsUsageRetryTimers = useCallback(() => {
+    for (const timer of buildStatsUsageRetryTimersRef.current) {
+      clearTimeout(timer);
+    }
+    buildStatsUsageRetryTimersRef.current = [];
+  }, []);
+
   useEffect(() => {
     if (!selectedProjectId) {
       setRealBuildStats(null);
       buildStatsProjectRef.current = null;
+      buildStatsModelCostRef.current = 0;
+      clearBuildStatsUsageRetryTimers();
       return;
     }
 
@@ -560,6 +575,8 @@ export function ProjectSidebar({
     if (isProjectChanged) {
       setRealBuildStats(null);
       buildStatsProjectRef.current = selectedProjectId;
+      buildStatsModelCostRef.current = 0;
+      clearBuildStatsUsageRetryTimers();
     }
     const loadSidebarBuildStats = async () => {
       try {
@@ -584,6 +601,10 @@ export function ProjectSidebar({
           (sum, model) => sum + Number(model.estimated_cost || 0),
           0,
         );
+        buildStatsModelCostRef.current = modelCost;
+        if (modelCost > 0) {
+          clearBuildStatsUsageRetryTimers();
+        }
 
         setRealBuildStats({
           title: "Build stats",
@@ -628,24 +649,35 @@ export function ProjectSidebar({
     selectedProjectId,
     shellOptions?.buildStats?.defaultExpanded,
     buildStatsRefreshVersion,
+    clearBuildStatsUsageRetryTimers,
   ]);
 
   useEffect(() => {
     if (!selectedProjectId) return undefined;
-    return onBuildStatsUpdated((projectId) => {
-      if (projectId === selectedProjectId) {
-        setBuildStatsRefreshVersion((version) => version + 1);
+    return onBuildStatsUpdated((projectId, reason) => {
+      if (projectId !== selectedProjectId) return;
+
+      setBuildStatsRefreshVersion((version) => version + 1);
+      if (reason === "usage" && buildStatsModelCostRef.current <= 0) {
+        clearBuildStatsUsageRetryTimers();
+        buildStatsUsageRetryTimersRef.current =
+          ZERO_COST_USAGE_REFRESH_DELAYS_MS.map((delayMs) =>
+            setTimeout(() => {
+              setBuildStatsRefreshVersion((version) => version + 1);
+            }, delayMs),
+          );
       }
     });
-  }, [selectedProjectId]);
+  }, [clearBuildStatsUsageRetryTimers, selectedProjectId]);
 
   useEffect(() => {
     return () => {
       if (workspaceBrowserScrollResetRef.current) {
         clearTimeout(workspaceBrowserScrollResetRef.current);
       }
+      clearBuildStatsUsageRetryTimers();
     };
-  }, []);
+  }, [clearBuildStatsUsageRetryTimers]);
 
   const openBuildStatsPage = () => {
     onNavigate({
