@@ -8,9 +8,15 @@ export function WorktreeMergeConflictFrame({
   children: ReactNode;
 }) {
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-[var(--surface-1)] text-[var(--ink)]">
-      {children}
-    </section>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-3">
+      <section
+        role="dialog"
+        aria-modal="true"
+        className="flex h-[min(820px,calc(100vh-24px))] w-[min(1180px,calc(100vw-24px))] min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--ink)] shadow-2xl"
+      >
+        {children}
+      </section>
+    </div>
   );
 }
 
