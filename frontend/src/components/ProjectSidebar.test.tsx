@@ -303,6 +303,19 @@ const completedOrderedHtml = renderToStaticMarkup(
     onProjectAction={() => undefined}
   />,
 );
+const activeOrderedHtml = renderToStaticMarkup(
+  <ProjectSidebar
+    shellOptions={mockShellOptions}
+    sessions={mockWorkspaceBootstrap.sessions}
+    activeSessionId="sess-8"
+    activePage="workspace"
+    weeklyCost={mockWorkspaceBootstrap.defaults.weeklyCost}
+    onNavigate={() => undefined}
+    onSessionSelect={() => undefined}
+    onPrimaryAction={() => undefined}
+    onProjectAction={() => undefined}
+  />,
+);
 const moreAttrStart = html.indexOf('data-sidebar-more="true"');
 const moreStart =
   moreAttrStart >= 0 ? html.lastIndexOf("<button", moreAttrStart) : -1;
@@ -431,6 +444,14 @@ check(
       completedOrderedHtml.indexOf("Fix login flicker") &&
     !completedOrderedHtml.includes("Refactor auth guard"),
   completedOrderedHtml,
+);
+check(
+  "keeps the selected session at the top after attention clears",
+  activeOrderedHtml.indexOf("Billing copy polish") >= 0 &&
+    activeOrderedHtml.indexOf("Billing copy polish") <
+      activeOrderedHtml.indexOf("Fix login flicker") &&
+    !activeOrderedHtml.includes("Refactor auth guard"),
+  activeOrderedHtml,
 );
 check(
   "keeps collapsed session list height content-sized",

@@ -155,13 +155,23 @@ const hasSidebarPrioritySessionActivity = (session: Session): boolean =>
 
 const isPinnedSession = (session: Session): boolean => Boolean(session.pinnedAt);
 
-const prioritizeSessions = (sessions: Session[]): Session[] => {
+const prioritizeSessions = (
+  sessions: Session[],
+  activeSessionId: string,
+): Session[] => {
   const pinned = sessions.filter(isPinnedSession);
   const unpinned = sessions.filter((session) => !isPinnedSession(session));
+  const priority = unpinned.filter(hasSidebarPrioritySessionActivity);
+  const rest = unpinned.filter(
+    (session) => !hasSidebarPrioritySessionActivity(session),
+  );
+  const active = rest.filter((session) => session.id === activeSessionId);
+  const inactive = rest.filter((session) => session.id !== activeSessionId);
   return [
     ...pinned,
-    ...unpinned.filter(hasSidebarPrioritySessionActivity),
-    ...unpinned.filter((session) => !hasSidebarPrioritySessionActivity(session)),
+    ...priority,
+    ...active,
+    ...inactive,
   ];
 };
 
@@ -462,8 +472,8 @@ export function ProjectSidebar({
   );
   const buildStats = realBuildStats ?? ZERO_BUILD_STATS;
   const orderedSessions = useMemo(
-    () => prioritizeSessions(sessions),
-    [sessions],
+    () => prioritizeSessions(sessions, activeSessionId),
+    [activeSessionId, sessions],
   );
   const hasOverflowSessions = orderedSessions.length > visibleSessionLimit;
   const visibleSessions = sessionsExpanded
