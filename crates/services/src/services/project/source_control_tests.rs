@@ -25,8 +25,8 @@ use uuid::Uuid;
 use super::source_control::{
     SessionSourceControlStatus, SourceControlCommitErrorCode, SourceControlCommitRequest,
     SourceControlDiscardRequest, SourceControlError, SourceControlFileStatus,
-    SourceControlOperationFailureCode, SourceControlOperationInProgress, SourceControlService,
-    SourceControlStageRequest,
+    SourceControlObservedPath, SourceControlOperationFailureCode, SourceControlOperationInProgress,
+    SourceControlService, SourceControlStageRequest,
 };
 
 async fn setup_pool() -> SqlitePool {
@@ -177,7 +177,7 @@ async fn seed_session_with_observed_source(
     )
     .expect("write meta");
 
-    ChatRun::create(
+    let run = ChatRun::create(
         pool,
         &CreateChatRun {
             session_id: session.id,
@@ -194,6 +194,24 @@ async fn seed_session_with_observed_source(
     )
     .await
     .expect("create run");
+    let observed_for_index = paths
+        .iter()
+        .map(|path| SourceControlObservedPath {
+            path: (*path).to_string(),
+            source: source.to_string(),
+            existed_after_run: true,
+            observed_at: run.created_at,
+        })
+        .collect::<Vec<_>>();
+    SourceControlService::record_session_run_observed_paths(
+        pool,
+        session.id,
+        workspace_path,
+        run.id,
+        &observed_for_index,
+    )
+    .await
+    .expect("index session paths");
 
     session.id
 }
@@ -230,7 +248,7 @@ async fn append_session_run_with_paths(
     )
     .expect("write meta");
 
-    ChatRun::create(
+    let run = ChatRun::create(
         pool,
         &CreateChatRun {
             session_id,
@@ -247,6 +265,24 @@ async fn append_session_run_with_paths(
     )
     .await
     .expect("create run");
+    let observed_for_index = paths
+        .iter()
+        .map(|path| SourceControlObservedPath {
+            path: (*path).to_string(),
+            source: "git_diff,artifact_record".to_string(),
+            existed_after_run: true,
+            observed_at: run.created_at,
+        })
+        .collect::<Vec<_>>();
+    SourceControlService::record_session_run_observed_paths(
+        pool,
+        session_id,
+        workspace_path,
+        run.id,
+        &observed_for_index,
+    )
+    .await
+    .expect("index appended session paths");
     SourceControlService::invalidate_session_caches(session_id);
 }
 

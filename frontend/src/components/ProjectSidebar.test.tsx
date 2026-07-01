@@ -303,6 +303,19 @@ const completedOrderedHtml = renderToStaticMarkup(
     onProjectAction={() => undefined}
   />,
 );
+const activeOrderedHtml = renderToStaticMarkup(
+  <ProjectSidebar
+    shellOptions={mockShellOptions}
+    sessions={mockWorkspaceBootstrap.sessions}
+    activeSessionId="sess-8"
+    activePage="workspace"
+    weeklyCost={mockWorkspaceBootstrap.defaults.weeklyCost}
+    onNavigate={() => undefined}
+    onSessionSelect={() => undefined}
+    onPrimaryAction={() => undefined}
+    onProjectAction={() => undefined}
+  />,
+);
 const moreAttrStart = html.indexOf('data-sidebar-more="true"');
 const moreStart =
   moreAttrStart >= 0 ? html.lastIndexOf("<button", moreAttrStart) : -1;
@@ -350,6 +363,15 @@ check(
   html.includes('data-section="Build stats"') &&
     html.includes("Build stats"),
   html,
+);
+check(
+  "retries build stats usage refresh while sidebar cost is zero",
+  componentSource.includes("ZERO_COST_USAGE_REFRESH_DELAYS_MS") &&
+    componentSource.includes("buildStatsModelCostRef.current <= 0") &&
+    componentSource.includes('reason === "usage"') &&
+    componentSource.includes("buildStatsUsageRetryTimersRef.current") &&
+    componentSource.includes("clearBuildStatsUsageRetryTimers()"),
+  componentSource,
 );
 check("renders weekly cost prop accepted", typeof html === "string", html);
 check("renders session section", html.includes("Sessions"), html);
@@ -431,6 +453,14 @@ check(
       completedOrderedHtml.indexOf("Fix login flicker") &&
     !completedOrderedHtml.includes("Refactor auth guard"),
   completedOrderedHtml,
+);
+check(
+  "keeps the selected session at the top after attention clears",
+  activeOrderedHtml.indexOf("Billing copy polish") >= 0 &&
+    activeOrderedHtml.indexOf("Billing copy polish") <
+      activeOrderedHtml.indexOf("Fix login flicker") &&
+    !activeOrderedHtml.includes("Refactor auth guard"),
+  activeOrderedHtml,
 );
 check(
   "keeps collapsed session list height content-sized",

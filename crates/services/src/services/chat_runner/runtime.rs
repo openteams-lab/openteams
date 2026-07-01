@@ -3,7 +3,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::services::project::source_control::SourceControlService;
+use crate::services::project::source_control::{SourceControlObservedPath, SourceControlService};
 
 use super::{super::workflow_analytics, startup_timing, *};
 
@@ -1904,6 +1904,32 @@ impl ChatRunner {
                             retention_summary_json,
                         )
                         .await;
+                        let observed_for_source_control = workspace_observed_paths
+                            .iter()
+                            .map(|entry| SourceControlObservedPath {
+                                path: entry.path.clone(),
+                                source: entry.source.clone(),
+                                existed_after_run: entry.existed_after_run,
+                                observed_at: run_started_at,
+                            })
+                            .collect::<Vec<_>>();
+                        if let Err(err) = SourceControlService::record_session_run_observed_paths(
+                            &db.pool,
+                            session_id,
+                            &workspace_path,
+                            run_id,
+                            &observed_for_source_control,
+                        )
+                        .await
+                        {
+                            tracing::warn!(
+                                session_id = %session_id,
+                                run_id = %run_id,
+                                workspace_path = %workspace_path.display(),
+                                error = %err,
+                                "failed to update source-control path index"
+                            );
+                        }
                         startup_timing
                             .mark_and_persist(
                                 startup_timing::StartupMilestoneName::ChatRunCompletionPersisted,
