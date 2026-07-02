@@ -1211,7 +1211,7 @@ export function OnboardingGuide({
                   </span>
                   <h3
                     className={cn(
-                      'col-start-2 min-w-0 truncate text-[13px] font-semibold tracking-[-0.01em] transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                      'col-start-2 min-w-0 truncate text-[14px] font-semibold tracking-[-0.01em] transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
                       selected ? 'text-white' : 'text-white/85 group-hover:text-white',
                     )}
                   >
