@@ -265,6 +265,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
                     "/validate-workspace-path",
                     axum::routing::post(sessions::validate_workspace_path_endpoint),
                 )
+                .route(
+                    "/initialize-workspace-git",
+                    axum::routing::post(sessions::initialize_workspace_git_endpoint),
+                )
                 .route("/runs/{run_id}/log", get(runs::get_run_log))
                 .route("/runs/{run_id}/activity", get(runs::get_run_activity))
                 .route("/runs/{run_id}/diff", get(runs::get_run_diff))

@@ -159,6 +159,8 @@ fn generate_types_content() -> String {
         services::services::session_worktree::MergeResult::decl(),
         server::routes::chat::sessions::ValidateWorkspacePathRequest::decl(),
         server::routes::chat::sessions::ValidateWorkspacePathResponse::decl(),
+        server::routes::chat::sessions::InitializeWorkspaceGitRequest::decl(),
+        server::routes::chat::sessions::InitializeWorkspaceGitResponse::decl(),
         server::routes::build_stats::WorkflowStepTokenEntry::decl(),
         server::routes::build_stats::WorkflowStepTokensResponse::decl(),
         server::routes::build_stats::WorkflowStepTokenUsageResponse::decl(),

@@ -1,16 +1,15 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   Bot,
   Check,
   ChevronUp,
   FileText,
   Folder,
-  FolderOpen,
   Home,
+  Info,
   LoaderCircle,
   RefreshCw,
   Rocket,
-  Search,
   Sparkles,
   Users,
   Zap,
@@ -50,10 +49,12 @@ import {
 
 const welcomeStepKey = 'welcome';
 const onboardingSteps = ['scenario', 'executor', 'project_path', 'appearance'] as const;
+const gitignoreTemplates = ['node', 'go', 'python', 'none'] as const;
 
 type OnboardingStepKey = (typeof onboardingSteps)[number];
 type ActiveStepKey = OnboardingStepKey | typeof welcomeStepKey;
 type OnboardingMode = 'onboarding' | 'upgrade';
+type GitignoreTemplate = (typeof gitignoreTemplates)[number];
 type TranslateFn = (
   key: string,
   replacements?: Record<string, string | number>,
@@ -89,14 +90,24 @@ const onboardingDarkThemeVars = {
   '--hairline': '#23252a',
   '--hairline-strong': '#34343a',
   '--hairline-tertiary': '#3e3e44',
-  '--ink': '#f7f8f8',
-  '--ink-muted': '#d0d6e0',
-  '--ink-subtle': '#8a8f98',
-  '--ink-tertiary': '#62666d',
+  '--ink': '#f4f7fb',
+  '--ink-muted': '#c5ceda',
+  '--ink-subtle': '#8f9aaa',
+  '--ink-tertiary': '#667083',
   '--primary': '#5e6ad2',
   '--primary-hover': '#828fff',
   '--on-primary': '#ffffff',
   '--primary-tint': 'rgba(94, 106, 210, 0.12)',
+} as CSSProperties;
+
+const onboardingMonoFont = {
+  fontFamily:
+    '"JetBrains Mono", "SF Mono", "SFMono-Regular", ui-monospace, "Cascadia Code", monospace',
+} as CSSProperties;
+
+const onboardingNoiseTextureStyle = {
+  backgroundImage:
+    'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27128%27 height=%27128%27 viewBox=%270 0 128 128%27%3E%3Cfilter id=%27noise%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.82%27 numOctaves=%274%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27128%27 height=%27128%27 filter=%27url(%23noise)%27 opacity=%270.68%27/%3E%3C/svg%3E")',
 } as CSSProperties;
 
 type ScenarioDefinition = {
@@ -238,9 +249,6 @@ const onboardingLanguageToLocale = (
   }
 };
 
-const isGitRepoLabel = (value: boolean, t: TranslateFn) =>
-  value ? t('onboarding.project.gitYes') : t('onboarding.project.gitNo');
-
 const directoryEntryTime = (entry: DirectoryEntry): number =>
   typeof entry.last_modified === 'number' ? entry.last_modified : 0;
 
@@ -361,6 +369,9 @@ export function OnboardingGuide({
           }
         : null,
     );
+  const [initializeGit, setInitializeGit] = useState(true);
+  const [gitignoreTemplate, setGitignoreTemplate] =
+    useState<GitignoreTemplate>('node');
   const [selectedLocale, setSelectedLocale] = useState<Locale>(
     onboardingLanguageToLocale(initialState?.language, locale),
   );
@@ -374,9 +385,13 @@ export function OnboardingGuide({
   const [entries, setEntries] = useState<DirectoryEntry[]>([]);
   const [currentPath, setCurrentPath] = useState('');
   const [pathLoading, setPathLoading] = useState(false);
+  const [pathDetecting, setPathDetecting] = useState(false);
   const [pathError, setPathError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedWelcomeCommandId, setSelectedWelcomeCommandId] =
+    useState('workflow_execution');
+  const pathValidationRequestRef = useRef(0);
 
   const { scenarios, currentScenario } = useTranslatedScenario(
     t,
@@ -393,6 +408,39 @@ export function OnboardingGuide({
   const recommendedTeamName = recommendedTeam?.name ?? currentScenario.teamName;
   const recommendedTeamId = recommendedTeam?.id ?? null;
   const teamMembers = teamConfig;
+  const welcomeCommandOptions = useMemo(
+    () => [
+      {
+        id: 'local_workspace',
+        label: '本地多Agent工作区',
+        Icon: Folder,
+        keyHint: 'L',
+      },
+      {
+        id: 'workflow_execution',
+        label: '工作流编排引擎',
+        Icon: Zap,
+        keyHint: 'W',
+      },
+      {
+        id: 'agent_team',
+        label: '智能体团队模板平台',
+        Icon: Bot,
+        keyHint: 'T',
+      },
+      {
+        id: 'personal_project_management',
+        label: '项目进度加速器',
+        Icon: FileText,
+        keyHint: 'P',
+      },
+    ],
+    [],
+  );
+  const selectedWelcomeCommand =
+    welcomeCommandOptions.find(
+      (option) => option.id === selectedWelcomeCommandId,
+    ) ?? welcomeCommandOptions[0];
 
   const runnerOptions = useMemo(() => {
     const availableRunners = runtimes
@@ -404,6 +452,34 @@ export function OnboardingGuide({
       }));
     return availableRunners.length > 0 ? availableRunners : fallbackRunnerOptions;
   }, [runtimes]);
+
+  useEffect(() => {
+    if (!isWelcome) return;
+
+    const handleWelcomeShortcut = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest('input, textarea, select, [contenteditable="true"]')
+      ) {
+        return;
+      }
+
+      const key = event.key.toUpperCase();
+      const command = welcomeCommandOptions.find(
+        (option) => option.keyHint === key,
+      );
+      if (!command) return;
+      event.preventDefault();
+      setSelectedWelcomeCommandId(command.id);
+    };
+
+    window.addEventListener('keydown', handleWelcomeShortcut);
+    return () => {
+      window.removeEventListener('keydown', handleWelcomeShortcut);
+    };
+  }, [isWelcome, welcomeCommandOptions]);
 
   const modelOptionsForRunner = (runnerType?: string): DropdownSelectOption[] => {
     const runtime = runtimes.find((candidate) => candidate.runner_type === runnerType);
@@ -617,7 +693,7 @@ export function OnboardingGuide({
       return null;
     }
 
-    return { name, path };
+    return { name, path, status };
   };
 
   const handleFinish = async () => {
@@ -627,6 +703,15 @@ export function OnboardingGuide({
     setSaving(true);
     setError(null);
     try {
+      if (!projectDraft.status.is_git_repo && initializeGit) {
+        const initialized = await chatSessionsApi.initializeWorkspaceGit({
+          workspace_path: projectDraft.path,
+          gitignore_template:
+            gitignoreTemplate === 'none' ? null : gitignoreTemplate,
+        });
+        setProjectStatus(initialized.status);
+      }
+
       const createdProject = await onCreateProjectFromOnboarding({
         name: projectDraft.name,
         path: projectDraft.path,
@@ -764,6 +849,7 @@ export function OnboardingGuide({
       setEntries(sortedEntries);
       setCurrentPath(response.current_path);
       setProjectPath(response.current_path);
+      setProjectStatus(null);
     } catch (err) {
       setPathError(
         err instanceof Error ? err.message : t('onboarding.project.readFailed'),
@@ -789,31 +875,55 @@ export function OnboardingGuide({
     }
   };
 
-  const validateProjectPath = async (path: string) => {
+  const validateProjectPath = useCallback(async (path: string) => {
     const trimmed = path.trim();
+    const requestId = pathValidationRequestRef.current + 1;
+    pathValidationRequestRef.current = requestId;
     if (!trimmed) {
       setProjectStatus(null);
+      setPathDetecting(false);
       return null;
     }
-    setPathLoading(true);
+    setPathDetecting(true);
     setPathError(null);
     try {
       const status = await chatSessionsApi.validateWorkspacePath(trimmed);
+      if (pathValidationRequestRef.current !== requestId) return status;
       setProjectStatus(status);
       if (!status.valid) {
         setPathError(status.error ?? t('onboarding.project.invalid'));
       }
       return status;
     } catch (err) {
-      setProjectStatus(null);
-      setPathError(
-        err instanceof Error ? err.message : t('onboarding.project.invalid'),
-      );
+      if (pathValidationRequestRef.current === requestId) {
+        setProjectStatus(null);
+        setPathError(
+          err instanceof Error ? err.message : t('onboarding.project.invalid'),
+        );
+      }
       throw err;
     } finally {
-      setPathLoading(false);
+      if (pathValidationRequestRef.current === requestId) {
+        setPathDetecting(false);
+      }
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    if (mode !== 'onboarding' || activeStepKey !== 'project_path') return;
+    const trimmed = projectPath.trim();
+    if (!trimmed) {
+      pathValidationRequestRef.current += 1;
+      setProjectStatus(null);
+      setPathDetecting(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void validateProjectPath(trimmed).catch(() => undefined);
+    }, 100);
+    return () => window.clearTimeout(timeout);
+  }, [activeStepKey, mode, projectPath, validateProjectPath]);
 
   const handleMarkUpgradeRead = async () => {
     setSaving(true);
@@ -914,7 +1024,7 @@ export function OnboardingGuide({
             type="button"
             onClick={() => void handleMarkUpgradeRead()}
             disabled={saving}
-            className="mt-4 inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] bg-[#5e6ad2] px-[14px] py-2 text-[13px] font-semibold text-white transition hover:bg-[#6f7ae6] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-4 inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] bg-[#5e6ad2] px-[14px] py-2 text-[13px] font-semibold text-[#f4f7fb] transition hover:bg-[#6f7ae6] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
             {t('onboarding.upgrade.markRead')}
@@ -925,13 +1035,13 @@ export function OnboardingGuide({
   );
 
   const renderExecutorStep = () => (
-    <div className="space-y-4">
+    <div className="min-h-[420px] border-y border-[#222]">
       {runtimeError && (
-        <p className="rounded-[8px] border border-yellow-500/25 bg-yellow-500/10 px-3 py-2 text-[12px] text-yellow-200">
+        <p className="border-b border-yellow-500/25 px-0 py-3 font-mono text-[12px] text-yellow-200">
           {runtimeError}
         </p>
       )}
-      <div className="overflow-hidden rounded-[10px] border border-white/10 bg-[#161616]/85">
+      <div className="divide-y divide-[#222]">
         {teamMembers.map((member, index) => {
           const runnerValue = member.runner_type || runnerOptions[0]?.id || '';
           const modelOptions = modelOptionsForRunner(runnerValue);
@@ -939,16 +1049,13 @@ export function OnboardingGuide({
           return (
             <div
               key={`${member.member}-${index}`}
-              className={cn(
-                'grid gap-3 px-6 py-4 md:grid-cols-[minmax(150px,1fr)_minmax(160px,220px)_minmax(160px,220px)] md:items-center',
-                index < teamMembers.length - 1 && 'border-b border-white/5',
-              )}
+              className="grid gap-3 py-4 md:grid-cols-[minmax(150px,1fr)_minmax(160px,220px)_minmax(160px,220px)] md:items-center"
             >
               <div className="flex min-w-0 items-center gap-2">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] font-mono text-[11px] font-semibold text-[#d0d6e0]">
+                <span className="grid h-7 w-7 shrink-0 place-items-center border border-[#222] font-mono text-[11px] font-semibold text-[#8f9aaa]">
                   {member.member.slice(0, 2).toUpperCase()}
                 </span>
-                <span className="truncate text-[13px] font-semibold text-[var(--ink)]">
+                <span className="truncate text-[13px] font-semibold text-[#f4f7fb]">
                   {member.member}
                 </span>
               </div>
@@ -980,8 +1087,8 @@ export function OnboardingGuide({
   );
 
   const renderScenarioStep = () => (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2">
+    <div className="flex min-h-[420px] flex-col justify-center border-y border-[#222] py-6">
+      <section className="mx-auto grid max-w-4xl gap-5 md:grid-cols-2">
         {scenarios.map((scenario) => {
           const selected = scenario.key === selectedScenario;
           return (
@@ -990,48 +1097,57 @@ export function OnboardingGuide({
               type="button"
               onClick={() => handleScenarioSelect(scenario.key)}
               className={cn(
-                'min-h-[118px] cursor-pointer rounded-[10px] border bg-[#161616]/75 p-6 text-left transition hover:border-white/20 hover:bg-white/[0.06]',
+                'min-h-[112px] cursor-pointer rounded-[8px] border p-4 text-left transition',
                 selected
-                  ? 'border-white/25 bg-white/[0.08]'
-                  : 'border-white/10',
+                  ? 'border-white/35 bg-[#121216] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] hover:border-white/45'
+                  : 'border-white/[0.08] bg-[#111111] hover:border-white/20',
               )}
             >
               <div className="flex items-center justify-between gap-3">
-                <h3 className="truncate text-[13px] font-semibold text-[var(--ink)]">
+                <h3
+                  className={cn(
+                    'truncate text-[13px] font-semibold tracking-[0.02em]',
+                    selected ? 'text-[#f4f7fb]' : 'text-[#8f9aaa]',
+                  )}
+                >
                   {scenario.title}
                 </h3>
-                {selected && <Check className="h-4 w-4 text-[var(--primary)]" />}
               </div>
-              <p className="mt-2 text-[12px] leading-relaxed text-[#aeb8c8]">
+              <p
+                className={cn(
+                  'mt-2 text-[12px] leading-relaxed',
+                  selected ? 'text-[#a8b3c2]' : 'text-[#768295]',
+                )}
+              >
                 {scenario.desc}
               </p>
             </button>
           );
         })}
-      </div>
-      <div className="rounded-[10px] border border-white/10 bg-[#161616]/70 p-6">
-        <p className="text-[12px] font-semibold text-[#7e8795]">
-          {t('onboarding.scenario.recommendedTeam')}
-        </p>
-        <div className="mt-3 flex items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.04] px-3 py-3">
-          <Users className="h-4 w-4 shrink-0 text-[var(--primary)]" />
+      </section>
+      <aside className="mx-auto mt-5 flex max-w-4xl items-center justify-between gap-4 rounded-[8px] border border-white/[0.08] bg-white/[0.035] px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Users className="h-3 w-3 shrink-0 text-[#8f9aaa]" strokeWidth={1.5} />
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold text-[var(--ink)]">
+            <p className="font-mono text-[12px] font-semibold text-[#f4f7fb]">
               {recommendedTeamName}
-            </p>
-            <p className="mt-0.5 text-[12px] text-[#aeb8c8]">
-              {t('onboarding.scenario.memberDetailsHint')}
             </p>
           </div>
         </div>
-      </div>
+        <p className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-[#667083]">
+          <span>Details in next step</span>
+          <span aria-hidden="true" className="text-[12px] text-[#768295]">
+            ↵
+          </span>
+        </p>
+      </aside>
     </div>
   );
 
   const renderProjectPathStep = () => (
-    <div className="space-y-4">
-      <section className="grid gap-3 rounded-[10px] border border-white/10 bg-[#161616]/75 p-6 md:grid-cols-[minmax(0,1fr)_260px]">
-        <label className="block min-w-0 text-[12px] font-semibold text-[#7e8795]">
+    <div className="grid min-h-[420px] border-y border-[#222] lg:grid-cols-[minmax(0,65%)_minmax(280px,35%)]">
+      <section className="space-y-7 py-6 lg:border-r lg:border-[#222] lg:pr-8">
+        <label className="block min-w-0 text-[12px] font-medium text-[#768295]">
           {t('onboarding.project.nameTitle')}
           <input
             value={projectName}
@@ -1039,29 +1155,20 @@ export function OnboardingGuide({
               setProjectName(sanitizeProjectName(event.target.value));
               setProjectNameTouched(true);
             }}
-            className="mt-2 h-9 w-full rounded-[8px] border border-white/10 bg-white/[0.04] px-3 text-[13px] text-white outline-none transition placeholder:text-[#7e8795] focus:border-white/25"
+            className="mt-2 h-10 w-full border-0 border-b border-[#222] bg-transparent px-0 font-mono text-[18px] font-semibold text-[#f4f7fb] outline-none transition placeholder:text-[#5b6678] focus:border-[#4b5568]"
             placeholder={t('onboarding.project.namePlaceholder')}
           />
         </label>
-        <div className="min-w-0 rounded-[8px] border border-white/10 bg-white/[0.04] px-3 py-2">
-          <p className="font-mono text-[11px] font-semibold text-[#7e8795]">
-            {t('onboarding.scenario.recommendedTemplate')}
-          </p>
-          <p className="mt-1 truncate text-[13px] font-semibold text-[var(--ink)]">
-            {recommendedTeamName}
-          </p>
-        </div>
-      </section>
-      <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
-        <section className="overflow-hidden rounded-[10px] border border-white/10 bg-[#161616]/75">
-          <div className="flex items-center gap-1.5 border-b border-white/5 px-3 py-2">
-            <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[#7e8795]">
+
+        <section>
+          <div className="flex items-center gap-2 border-b border-[#222] pb-2">
+            <span className="min-w-0 flex-1 truncate font-mono text-[12px] tracking-[0.05em] text-[#8f9aaa]">
               {currentPath || t('onboarding.project.localRoots')}
             </span>
             <button
               type="button"
               onClick={() => void loadRoots()}
-              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[#7e8795] transition hover:bg-white/[0.06] hover:text-white"
+              className="flex h-7 w-7 items-center justify-center text-[#768295] transition hover:text-[#f4f7fb]"
               aria-label={t('onboarding.project.roots')}
               title={t('onboarding.project.roots')}
             >
@@ -1074,7 +1181,7 @@ export function OnboardingGuide({
                 const parent = getParentPath(currentPath);
                 if (parent) void loadDirectory(parent);
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[#7e8795] transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-7 w-7 items-center justify-center text-[#768295] transition hover:text-[#f4f7fb] disabled:cursor-not-allowed disabled:opacity-35"
               aria-label={t('onboarding.project.up')}
               title={t('onboarding.project.up')}
             >
@@ -1083,20 +1190,20 @@ export function OnboardingGuide({
             <button
               type="button"
               onClick={() => void loadDirectory(projectPath)}
-              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[#7e8795] transition hover:bg-white/[0.06] hover:text-white"
+              className="flex h-7 w-7 items-center justify-center text-[#768295] transition hover:text-[#f4f7fb]"
               aria-label={t('onboarding.project.refresh')}
               title={t('onboarding.project.refresh')}
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
           </div>
-          <div className="h-[236px] overflow-y-auto p-1.5">
+          <div className="h-[286px] overflow-y-auto py-2">
             {pathLoading ? (
-              <div className="px-2 py-2 text-[12px] text-[#7e8795]">
+              <div className="py-2 font-mono text-[12px] text-[#768295]">
                 {t('onboarding.project.loading')}
               </div>
             ) : entries.length === 0 ? (
-              <div className="px-2 py-2 text-[12px] text-[#7e8795]">
+              <div className="py-2 font-mono text-[12px] text-[#768295]">
                 {t('onboarding.project.empty')}
               </div>
             ) : (
@@ -1107,8 +1214,8 @@ export function OnboardingGuide({
                   <div
                     key={`${entry.path}-${directoryEntryTime(entry)}`}
                     className={cn(
-                      'group/path-entry flex items-center rounded-[6px]',
-                      selected && 'bg-white/[0.06]',
+                      'group/path-entry flex items-center border-b border-transparent',
+                      selected && 'border-[#222]',
                     )}
                   >
                     <button
@@ -1117,22 +1224,13 @@ export function OnboardingGuide({
                       onClick={() => {
                         if (entry.is_directory) void loadDirectory(entry.path);
                       }}
-                      className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[12px] text-[#aeb8c8] transition hover:bg-white/[0.06] hover:text-white disabled:cursor-default disabled:opacity-55"
+                      className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left font-mono text-[12px] tracking-[0.05em] text-[#8f9aaa] transition hover:text-[#f4f7fb] disabled:cursor-default disabled:opacity-55"
                     >
-                      <Icon
-                        className={cn(
-                          'h-4 w-4 shrink-0',
-                          entry.is_git_repo
-                            ? 'text-[var(--primary)]'
-                            : 'text-[#7e8795]',
-                        )}
-                      />
-                      <span className="min-w-0 flex-1 truncate font-mono">
-                        {entry.name}
-                      </span>
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-[#768295]" />
+                      <span className="min-w-0 flex-1 truncate">{entry.name}</span>
                       {entry.is_git_repo && (
-                        <span className="rounded-[4px] bg-[var(--primary-tint)] px-1.5 py-px font-mono text-[10px] font-semibold text-[var(--primary-hover)]">
-                          GIT
+                        <span className="font-mono text-[10px] text-emerald-400/80">
+                          git
                         </span>
                       )}
                     </button>
@@ -1144,7 +1242,7 @@ export function OnboardingGuide({
                           void validateProjectPath(entry.path);
                         }}
                         className={cn(
-                          'mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[5px] text-[#7e8795] opacity-0 transition hover:bg-white/[0.06] hover:text-white group-hover/path-entry:opacity-100',
+                          'flex h-7 w-7 shrink-0 items-center justify-center text-[#768295] opacity-0 transition hover:text-[#f4f7fb] group-hover/path-entry:opacity-100',
                           selected && '!opacity-100',
                         )}
                         aria-label={t('onboarding.project.select')}
@@ -1159,55 +1257,107 @@ export function OnboardingGuide({
             )}
           </div>
         </section>
+      </section>
 
-        <aside className="space-y-3 rounded-[10px] border border-white/10 bg-[#161616]/75 p-4">
-          <label className="block text-[12px] font-semibold text-[#7e8795]">
+      <aside className="py-6 lg:pl-8">
+        <div className="space-y-5">
+          <label className="block text-[12px] font-medium text-[#768295]">
             {t('onboarding.project.selectedPath')}
             <input
               value={projectPath}
-              onChange={(event) => setProjectPath(event.target.value)}
-              className="mt-2 h-9 w-full rounded-[8px] border border-white/10 bg-white/[0.04] px-3 font-mono text-[12px] text-white outline-none transition placeholder:text-[#7e8795] focus:border-white/25"
+              onChange={(event) => {
+                setProjectPath(event.target.value);
+                setProjectStatus(null);
+              }}
+              className="mt-2 h-8 w-full truncate border-0 border-b border-[#222] bg-transparent px-0 font-mono text-[12px] tracking-[0.05em] text-[#8f9aaa] outline-none transition placeholder:text-[#5b6678] focus:border-[#4b5568]"
               placeholder={t('onboarding.project.pathPlaceholder')}
             />
           </label>
+
           <button
             type="button"
             onClick={() => void validateProjectPath(projectPath)}
-            disabled={!projectPath.trim() || pathLoading}
-            className="inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.06] px-[14px] py-2 text-[12px] font-semibold text-[#d0d6e0] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!projectPath.trim() || pathLoading || pathDetecting}
+            className="font-mono text-[11px] tracking-[0.05em] text-[#768295] transition hover:text-[#f4f7fb] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <FolderOpen className="h-3.5 w-3.5" />
             {t('onboarding.project.validate')}
           </button>
-          <div className="divide-y divide-white/5 rounded-[8px] border border-white/10 bg-white/[0.04] text-[12px]">
-            <div className="flex items-center justify-between gap-2 px-3 py-2">
-              <span className="text-[var(--ink-subtle)]">
-                {t('onboarding.project.status')}
-              </span>
-              <span className="font-semibold text-[var(--ink)]">
-                {projectStatus?.valid
-                  ? t('onboarding.project.valid')
-                  : t('onboarding.project.pending')}
-              </span>
+
+          {!projectPath.trim() && (
+            <p className="font-mono text-[12px] leading-relaxed tracking-[0.05em] text-[#768295]">
+              {t('onboarding.project.pathPrompt')}
+            </p>
+          )}
+
+          {projectPath.trim() && pathDetecting && (
+            <p className="font-mono text-[12px] tracking-[0.05em] text-[#768295]">
+              {t('onboarding.project.detecting')}
+            </p>
+          )}
+
+          {projectPath.trim() &&
+            !pathDetecting &&
+            projectStatus?.valid &&
+            projectStatus.is_git_repo && (
+            <p className="flex items-center gap-2 font-mono text-[12px] tracking-[0.05em] text-emerald-400/80">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              {t('onboarding.project.gitDetected')}
+            </p>
+          )}
+
+          {projectPath.trim() &&
+            !pathDetecting &&
+            projectStatus?.valid &&
+            !projectStatus.is_git_repo && (
+            <div className="grid grid-rows-[1fr] border-t border-[#222] pt-4 transition-[grid-template-rows] duration-200">
+              <div className="space-y-4 overflow-hidden">
+                <p className="flex items-start gap-2 font-mono text-[12px] leading-relaxed tracking-[0.05em] text-[#8f9aaa]">
+                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#768295]" />
+                  <span>{t('onboarding.project.gitMissing')}</span>
+                </p>
+                <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px] tracking-[0.05em] text-[#c9d2df]">
+                  <input
+                    type="checkbox"
+                    checked={initializeGit}
+                    onChange={(event) => setInitializeGit(event.target.checked)}
+                    className="h-3.5 w-3.5 accent-white"
+                  />
+                  {t('onboarding.project.initializeGit')}
+                </label>
+                <div
+                  className={cn(
+                    'grid transition-[grid-template-rows] duration-200',
+                    initializeGit ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                  )}
+                >
+                  <label className="block overflow-hidden font-mono text-[12px] tracking-[0.05em] text-[#768295]">
+                    {t('onboarding.project.gitignoreTemplate')}
+                    <select
+                      value={gitignoreTemplate}
+                      onChange={(event) =>
+                        setGitignoreTemplate(event.target.value as GitignoreTemplate)
+                      }
+                      className="mt-2 h-8 w-full rounded-[4px] border border-[#333] bg-black px-2 font-mono text-[12px] text-[#c9d2df] outline-none focus:border-[#555]"
+                    >
+                      {gitignoreTemplates.map((template) => (
+                        <option key={template} value={template}>
+                          {t(`onboarding.project.gitignore.${template}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center justify-between gap-2 px-3 py-2">
-              <span className="text-[var(--ink-subtle)]">
-                {t('onboarding.project.gitStatus')}
-              </span>
-              <span className="font-semibold text-[var(--ink)]">
-                {projectStatus
-                  ? isGitRepoLabel(projectStatus.is_git_repo, t)
-                  : '-'}
-              </span>
-            </div>
-          </div>
+          )}
+
           {(pathError || error) && (
-            <p className="text-[12px] leading-relaxed text-red-400">
+            <p className="font-mono text-[12px] leading-relaxed tracking-[0.05em] text-red-400">
               {pathError || error}
             </p>
           )}
-        </aside>
-      </div>
+        </div>
+      </aside>
     </div>
   );
 
@@ -1236,20 +1386,20 @@ export function OnboardingGuide({
     ];
 
     return (
-      <div className="space-y-5">
-        <section className="space-y-2">
-          <h3 className="text-[13px] font-semibold text-[var(--ink)]">
+      <div className="grid min-h-[420px] border-y border-[#222] lg:grid-cols-2">
+        <section className="space-y-4 py-6 lg:border-r lg:border-[#222] lg:pr-8">
+          <h3 className="font-mono text-[12px] font-medium tracking-[0.05em] text-[#768295]">
             {t('onboarding.appearance.languageTitle')}
           </h3>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2">
             {languageOptions.map((option) => (
               <label
                 key={option.id}
                 className={cn(
-                  'flex cursor-pointer items-center gap-2 rounded-[8px] border px-3 py-2 text-[13px] transition',
+                  'flex cursor-pointer items-center gap-2 border px-3 py-2 text-[13px] transition',
                   selectedLocale === option.id
-                    ? 'border-white/25 bg-white/[0.08] text-white'
-                    : 'border-white/10 bg-[#161616]/75 text-[#aeb8c8] hover:border-white/20 hover:text-white',
+                    ? 'border-white/35 bg-white/[0.05] text-[#f4f7fb]'
+                    : 'border-[#222] bg-transparent text-[#8f9aaa] hover:border-[#4b5568] hover:text-[#f4f7fb]',
                 )}
               >
                 <input
@@ -1258,35 +1408,35 @@ export function OnboardingGuide({
                   value={option.id}
                   checked={selectedLocale === option.id}
                   onChange={() => handleLocaleSelect(option)}
-                  className="h-3.5 w-3.5 accent-[var(--primary)]"
+                  className="h-3.5 w-3.5 accent-white"
                 />
                 <span className="truncate">{option.label}</span>
               </label>
             ))}
           </div>
         </section>
-        <section className="space-y-2">
-          <h3 className="text-[13px] font-semibold text-[var(--ink)]">
+        <section className="space-y-4 py-6 lg:pl-8">
+          <h3 className="font-mono text-[12px] font-medium tracking-[0.05em] text-[#768295]">
             {t('onboarding.appearance.themeTitle')}
           </h3>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
             {appearanceOptions.map((option) => (
               <button
                 key={option.id}
                 type="button"
                 onClick={() => handleAppearanceSelect(option)}
                 className={cn(
-                  'cursor-pointer rounded-[8px] border p-6 text-left transition',
+                  'cursor-pointer border p-4 text-left transition',
                   selectedAppearance === option.id
-                    ? 'border-white/25 bg-white/[0.08]'
-                    : 'border-white/10 bg-[#161616]/75 hover:border-white/20 hover:bg-white/[0.06]',
+                    ? 'border-white/35 bg-white/[0.05]'
+                    : 'border-[#222] bg-transparent hover:border-[#4b5568] hover:bg-white/[0.03]',
                 )}
               >
-                <div className="h-12 rounded-[6px] border border-white/10 bg-white/[0.04] p-2">
-                  <div className="h-2 rounded bg-white/10" />
-                  <div className="mt-3 h-2 w-1/2 rounded bg-[var(--primary)]" />
+                <div className="h-10 border border-[#222] bg-black p-2">
+                  <div className="h-1.5 bg-white/20" />
+                  <div className="mt-2 h-1.5 w-1/2 bg-white" />
                 </div>
-                <p className="mt-2 text-[13px] font-semibold text-[var(--ink)]">
+                <p className="mt-3 text-[13px] font-semibold text-[#f4f7fb]">
                   {option.label}
                 </p>
               </button>
@@ -1334,40 +1484,32 @@ export function OnboardingGuide({
 
     return (
       <div className="relative isolate flex min-h-0 flex-1 flex-col items-center overflow-hidden px-6 text-center">
-        <div className="pointer-events-none absolute inset-0 bg-[#030303]" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(94,106,210,0.22)_0%,rgba(3,3,3,0)_58%)]" />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.08]"
-          style={{
-            backgroundImage:
-              'linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-        />
+        <div className="pointer-events-none absolute inset-0 bg-black" />
+        <div className="pointer-events-none absolute left-1/2 top-[48%] h-[520px] w-[760px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.05] blur-[120px]" />
 
-        <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto pb-10 pt-10">
+        <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col items-center justify-center overflow-y-auto py-10">
           <div className="flex gap-3">
             {onboardingSteps.map((step, index) => (
               <div
                 key={step}
                 className={cn(
                   'h-0.5 w-10 rounded-full',
-                  index <= activeStepIndex ? 'bg-white' : 'bg-white/10',
+                  index <= activeStepIndex ? 'bg-white' : 'bg-white/15',
                 )}
               />
             ))}
           </div>
 
-          <div className="mt-12 max-w-4xl">
-            <h1 className="font-sans text-[44px] font-semibold leading-[1.08] tracking-[-1.2px] text-white">
+          <div className="mt-10 max-w-4xl">
+            <h1 className="font-sans text-[24px] font-semibold leading-tight tracking-[0.02em] text-[#f4f7fb]">
               {stepTitle}
             </h1>
-            <p className="mx-auto mt-5 max-w-3xl text-[17px] leading-relaxed text-[#aeb8c8]">
+            <p className="mx-auto mt-2 max-w-3xl text-[13px] leading-relaxed tracking-[0.02em] text-[#8f9aaa]">
               {stepDescription}
             </p>
           </div>
 
-          <div className="relative mt-12 w-full max-w-5xl rounded-[14px] border border-white/10 bg-white/[0.03] p-6 text-left shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-8">
+          <div className="relative mt-8 w-full max-w-5xl p-0 text-left">
             {renderActiveConfigurationContent(stepKey)}
           </div>
 
@@ -1377,13 +1519,13 @@ export function OnboardingGuide({
             </p>
           )}
 
-          <div className="mt-8 flex flex-col items-center gap-4">
-            <div className="flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-16 grid w-full max-w-5xl grid-cols-1 items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
               <button
                 type="button"
                 onClick={() => void handleSkip()}
                 disabled={saving}
-                className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/[0.06] px-5 py-2 text-[13px] font-medium text-[#d0d6e0] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex min-h-10 cursor-pointer items-center justify-center px-0 py-2 text-[13px] font-medium text-[#768295] transition hover:text-[#f4f7fb] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t('onboarding.action.skip')}
               </button>
@@ -1391,25 +1533,30 @@ export function OnboardingGuide({
                 type="button"
                 onClick={handleStepBack}
                 disabled={saving || activeStepIndex === 0}
-                className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/[0.06] px-5 py-2 text-[13px] font-medium text-[#d0d6e0] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-45"
+                className="inline-flex min-h-10 cursor-pointer items-center justify-center px-3 py-2 text-[13px] font-medium text-[#768295] transition hover:text-[#f4f7fb] disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {t('onboarding.action.back')}
               </button>
+            </div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#7d8aa3]">
+              Step {activeStepIndex + 1} of {onboardingSteps.length}: {stepLabel}
+            </p>
+            <div className="flex justify-center sm:justify-end">
               <button
                 type="button"
                 onClick={() => void handleStepNext()}
                 disabled={saving}
-                className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-8 py-3 text-[15px] font-semibold text-black transition hover:bg-[#e7e9ee] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2.5 rounded-[4px] border border-[#4f59b8] border-t-white/30 bg-[linear-gradient(180deg,#6f7ae6_0%,#5e6ad2_100%)] px-6 py-2 text-[13px] font-semibold text-[#f4f7fb] shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
                 {stepKey === 'appearance'
                   ? t('onboarding.action.startNow')
                   : t('onboarding.action.next')}
+                <span aria-hidden="true" className="font-mono text-[12px] text-[#c5ceda]">
+                  ↵
+                </span>
               </button>
             </div>
-            <p className="font-mono text-[12px] uppercase tracking-[0.2em] text-[#5f6d82]">
-              Step {activeStepIndex + 1} of {onboardingSteps.length}: {stepLabel}
-            </p>
           </div>
         </div>
       </div>
@@ -1420,109 +1567,99 @@ export function OnboardingGuide({
     if (isWelcome) {
       return (
         <div className="relative isolate flex min-h-0 flex-1 flex-col items-center overflow-hidden px-6 text-center">
-          <div className="pointer-events-none absolute inset-0 bg-[#030303]" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(94,106,210,0.22)_0%,rgba(3,3,3,0)_58%)]" />
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.08]"
-            style={{
-              backgroundImage:
-                'linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)',
-              backgroundSize: '40px 40px',
-            }}
-          />
+          <div className="pointer-events-none absolute inset-0 bg-black" />
 
           <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto pb-10 pt-10">
-            <div className="flex gap-3">
-              <div className="h-0.5 w-10 rounded-full bg-white" />
-              <div className="h-0.5 w-10 rounded-full bg-white/10" />
-              <div className="h-0.5 w-10 rounded-full bg-white/10" />
-              <div className="h-0.5 w-10 rounded-full bg-white/10" />
-            </div>
-
             <div className="mt-16 max-w-4xl">
-              <h1 className="font-sans text-[48px] font-semibold leading-[1.06] tracking-[-1.3px] text-white">
+              <h1 className="font-sans text-[48px] font-semibold leading-[1.06] tracking-[0] text-[#f4f7fb]">
                 {t('onboarding.welcome.title')}
               </h1>
-              <p className="mx-auto mt-5 max-w-3xl text-[18px] leading-relaxed text-[#aeb8c8]">
+              <p className="mx-auto mt-5 max-w-3xl text-[18px] leading-relaxed text-[#a8b3c2]">
                 {t('onboarding.welcome.desc')}
               </p>
             </div>
 
-            <div className="relative mt-14 w-full max-w-5xl rounded-[14px] border border-white/10 bg-white/[0.03] p-2 shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-              <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
-                <div className="h-2 w-2 rounded-full bg-white/10" />
-                <div className="h-2 w-2 rounded-full bg-white/10" />
-                <div className="h-2 w-2 rounded-full bg-white/10" />
-                <div className="ml-4 h-3 w-32 rounded bg-white/5" />
+            <div className="relative mt-14 flex min-h-[440px] w-full max-w-5xl flex-col overflow-hidden rounded-[8px] border border-white/[0.12] bg-[#0a0a0a] p-px shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+              <div
+                className="pointer-events-none absolute inset-0 opacity-[0.025]"
+                style={onboardingNoiseTextureStyle}
+              />
+              <div className="relative z-10 flex items-center gap-2 border-b border-white/[0.08] bg-[#0c0c0c] px-4 py-3">
+                <div className="h-2 w-2 rounded-full border border-white/[0.18] bg-transparent" />
+                <div className="h-2 w-2 rounded-full border border-white/[0.18] bg-transparent" />
+                <div className="h-2 w-2 rounded-full border border-white/[0.18] bg-transparent" />
+                <div className="ml-4 h-3 w-32 rounded-[3px] border border-white/[0.08] bg-white/[0.03]" />
               </div>
 
-              <div className="flex justify-center px-4 py-12 sm:px-20">
-                <div className="w-full max-w-md overflow-hidden rounded-[10px] border border-white/10 bg-[#161616]/95 text-left shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-                  <div className="flex items-center border-b border-white/5 p-4">
-                    <span className="mr-3 font-mono text-[15px] text-[#8a8f98]">/</span>
-                    <span className="min-w-0 flex-1 truncate text-[14px] text-white/80">
-                      {t('onboarding.welcome.pointWorkflow')}
+              <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-4 py-10 sm:px-20">
+                <div className="w-full max-w-md -translate-y-4 overflow-hidden rounded-[6px] border border-white/[0.12] bg-[#0a0a0a] text-left">
+                  <div className="flex items-center border-b border-white/[0.08] p-4">
+                    <span className="mr-3 font-mono text-[15px] text-[#a8b3c2]">/</span>
+                    <span className="min-w-0 flex-1 truncate text-[14px] text-[#f4f7fb]">
+                      {selectedWelcomeCommand.label}
                     </span>
                   </div>
                   <div className="p-2">
-                    {[
-                      {
-                        label: t('onboarding.welcome.pointTeams'),
-                        Icon: Users,
-                        keyHint: 'T',
-                        active: true,
-                      },
-                      {
-                        label: t('onboarding.welcome.pointLocal'),
-                        Icon: Search,
-                        keyHint: 'L',
-                        active: false,
-                      },
-                      {
-                        label: t('onboarding.welcome.pointWorkflow'),
-                        Icon: Zap,
-                        keyHint: 'W',
-                        active: false,
-                      },
-                    ].map(({ label, Icon, keyHint, active }) => (
-                      <div
-                        key={label}
-                        className={cn(
-                          'flex items-center justify-between rounded-[8px] px-3 py-2 text-[14px]',
-                          active
-                            ? 'bg-white/[0.06] text-white'
-                            : 'text-[#7e8795]',
-                        )}
-                      >
-                        <div className="flex min-w-0 items-center gap-3">
-                          <Icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{label}</span>
-                        </div>
-                        <span className="ml-3 rounded-[4px] border border-white/10 bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-[#8a8f98]">
-                          {keyHint}
-                        </span>
-                      </div>
-                    ))}
+                    {welcomeCommandOptions.map(({ id, label, Icon, keyHint }) => {
+                      const active = selectedWelcomeCommand.id === id;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setSelectedWelcomeCommandId(id)}
+                          onFocus={() => setSelectedWelcomeCommandId(id)}
+                          onMouseEnter={() => setSelectedWelcomeCommandId(id)}
+                          aria-pressed={active}
+                          className={cn(
+                            'relative flex w-full cursor-pointer items-center justify-between rounded-[5px] border px-3 py-2 text-left text-[14px] transition',
+                            active
+                              ? 'border-white/[0.1] bg-white/[0.065] text-white'
+                              : 'border-transparent text-[#8792a3] hover:border-white/[0.08] hover:bg-white/[0.035] hover:text-[#f4f7fb]',
+                          )}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              'absolute bottom-2 left-0 top-2 w-px',
+                              active ? 'bg-white' : 'bg-transparent',
+                            )}
+                          />
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Icon className="h-4 w-4 shrink-0 text-current opacity-55" />
+                            <span className="truncate">{label}</span>
+                          </div>
+                          <span
+                            className={cn(
+                              'ml-3 min-w-6 rounded-[3px] border border-white/[0.18] bg-[#0c0c0c] px-1.5 py-0.5 text-center font-mono text-[10px] font-semibold',
+                              active ? 'text-white' : 'text-[#8792a3]',
+                            )}
+                            style={onboardingMonoFont}
+                          >
+                            {keyHint}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
-
-              <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-3/4 w-3/4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#5e6ad2]/10 blur-[100px]" />
             </div>
 
-            <div className="mt-16 flex flex-col items-center gap-4">
+            <div className="mt-12 flex flex-col items-center gap-4">
               <button
                 type="button"
                 onClick={() => void handleWelcomeNext()}
                 disabled={saving}
-                className="inline-flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-10 py-3 text-[16px] font-semibold text-black transition hover:bg-[#e7e9ee] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-3 rounded-[6px] border border-white bg-white px-9 py-3 text-[14px] font-semibold text-black transition hover:bg-[#e8e8e8] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
                 {t('onboarding.welcome.next')}
-                <span className="font-mono text-[12px] font-normal text-black/45">Enter</span>
               </button>
-              <p className="font-mono text-[12px] uppercase tracking-[0.2em] text-[#5f6d82]">
-                Step 1 of {onboardingSteps.length}: Command center
+              <p
+                className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8f9aaa]"
+                style={onboardingMonoFont}
+              >
+                ALL 4 STEPS TO FINISH CONFIGURATION
               </p>
             </div>
           </div>

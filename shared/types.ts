@@ -352,6 +352,10 @@ export type ValidateWorkspacePathRequest = { workspace_path: string, };
 
 export type ValidateWorkspacePathResponse = { valid: boolean, is_git_repo: boolean, error: string | null, };
 
+export type InitializeWorkspaceGitRequest = { workspace_path: string, gitignore_template: string | null, };
+
+export type InitializeWorkspaceGitResponse = { initialized: boolean, gitignore_template: string | null, status: ValidateWorkspacePathResponse, };
+
 export type WorkflowStepTokenEntry = { session_id: string, session_title: string, workflow_execution_id: string, workflow_step_id: string, workflow_step_key: string, workflow_step_title: string, agent_name: string | null, latest_run_id: string | null, run_count: bigint, input_tokens: bigint, output_tokens: bigint, cache_read_tokens: bigint, reasoning_output_tokens: bigint, total_tokens: bigint, estimated_cost: number, model_id: string | null, model_name: string | null, };
 
 export type WorkflowStepTokensResponse = { steps: Array<WorkflowStepTokenEntry>, };

@@ -2198,6 +2198,73 @@ pub struct ValidateWorkspacePathResponse {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Deserialize, TS)]
+pub struct InitializeWorkspaceGitRequest {
+    pub workspace_path: String,
+    #[serde(default)]
+    pub gitignore_template: Option<String>,
+}
+
+#[derive(Debug, Serialize, TS)]
+pub struct InitializeWorkspaceGitResponse {
+    pub initialized: bool,
+    pub gitignore_template: Option<String>,
+    pub status: ValidateWorkspacePathResponse,
+}
+
+fn normalized_gitignore_template(value: Option<&str>) -> Option<&'static str> {
+    match value.unwrap_or("none").trim().to_ascii_lowercase().as_str() {
+        "node" => Some("node"),
+        "go" => Some("go"),
+        "python" => Some("python"),
+        "none" | "" => None,
+        _ => None,
+    }
+}
+
+fn gitignore_template_body(template: &str) -> &'static str {
+    match template {
+        "node" => {
+            "node_modules/\ndist/\nbuild/\n.env\n.env.*\nnpm-debug.log*\nyarn-debug.log*\npnpm-debug.log*\n"
+        }
+        "go" => "bin/\n*.test\ncoverage.out\nvendor/\n",
+        "python" => {
+            "__pycache__/\n*.py[cod]\n.venv/\nvenv/\n.pytest_cache/\n.mypy_cache/\ndist/\nbuild/\n*.egg-info/\n"
+        }
+        _ => "",
+    }
+}
+
+async fn write_gitignore_template(
+    workspace_path: &PathBuf,
+    template: &str,
+) -> Result<(), ApiError> {
+    let body = gitignore_template_body(template);
+    if body.is_empty() {
+        return Ok(());
+    }
+
+    let gitignore_path = workspace_path.join(".gitignore");
+    match tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&gitignore_path)
+        .await
+    {
+        Ok(mut file) => {
+            use tokio::io::AsyncWriteExt;
+            file.write_all(body.as_bytes()).await.map_err(|err| {
+                ApiError::BadRequest(format!("Failed to write .gitignore: {err}"))
+            })?;
+            Ok(())
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(err) => Err(ApiError::BadRequest(format!(
+            "Failed to create .gitignore: {err}"
+        ))),
+    }
+}
+
 pub(crate) async fn validate_workspace_path_status(
     workspace_path: &str,
 ) -> ValidateWorkspacePathResponse {
@@ -2258,6 +2325,46 @@ pub async fn validate_workspace_path_endpoint(
     )))
 }
 
+pub async fn initialize_workspace_git_endpoint(
+    Json(payload): Json<InitializeWorkspaceGitRequest>,
+) -> Result<ResponseJson<ApiResponse<InitializeWorkspaceGitResponse>>, ApiError> {
+    let trimmed = payload.workspace_path.trim();
+    let parsed_path = validate_workspace_path_legality(trimmed)?;
+    let metadata = tokio::fs::metadata(&parsed_path)
+        .await
+        .map_err(|err| match err.kind() {
+            std::io::ErrorKind::NotFound => {
+                ApiError::BadRequest("Workspace path does not exist.".to_string())
+            }
+            _ => ApiError::BadRequest(format!("Workspace path is not accessible: {err}")),
+        })?;
+    if !metadata.is_dir() {
+        return Err(ApiError::BadRequest(
+            "Workspace path must be an existing directory.".to_string(),
+        ));
+    }
+
+    let mut initialized = false;
+    if git2::Repository::open(&parsed_path).is_err() {
+        git2::Repository::init(&parsed_path)
+            .map_err(|err| ApiError::BadRequest(format!("Failed to initialize Git: {err}")))?;
+        initialized = true;
+    }
+
+    let template = normalized_gitignore_template(payload.gitignore_template.as_deref());
+    if let Some(template) = template {
+        write_gitignore_template(&parsed_path, template).await?;
+    }
+
+    Ok(ResponseJson(ApiResponse::success(
+        InitializeWorkspaceGitResponse {
+            initialized,
+            gitignore_template: template.map(str::to_string),
+            status: validate_workspace_path_status(trimmed).await,
+        },
+    )))
+}
+
 #[cfg(test)]
 mod tests {
     use std::{fs, path::Path};
@@ -2300,6 +2407,29 @@ mod tests {
         assert!(data.valid);
         assert!(!data.is_git_repo);
         assert!(data.error.is_none());
+    }
+
+    #[tokio::test]
+    async fn initialize_workspace_git_creates_repo_and_gitignore_template() {
+        let plain_dir = tempfile::tempdir().expect("create plain dir");
+        let ResponseJson(response) =
+            initialize_workspace_git_endpoint(Json(InitializeWorkspaceGitRequest {
+                workspace_path: plain_dir.path().to_string_lossy().to_string(),
+                gitignore_template: Some("Node".to_string()),
+            }))
+            .await
+            .expect("initialize git workspace");
+        let data = response.into_data().expect("git init response data");
+
+        assert!(data.initialized);
+        assert_eq!(data.gitignore_template.as_deref(), Some("node"));
+        assert!(data.status.valid);
+        assert!(data.status.is_git_repo);
+        assert!(git2::Repository::open(plain_dir.path()).is_ok());
+
+        let gitignore = fs::read_to_string(plain_dir.path().join(".gitignore"))
+            .expect("read generated .gitignore");
+        assert!(gitignore.contains("node_modules/"));
     }
 
     async fn setup_workspace_history_pool() -> (SqlitePool, Uuid, Uuid) {
