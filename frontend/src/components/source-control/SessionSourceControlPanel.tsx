@@ -416,6 +416,20 @@ export const SessionSourceControlPanel: React.FC<
   const handleWorktreeAction = async (action: SessionWorktreeAction) => {
     if (worktreeBusy) return;
     const actionScopeKey = scopeKeyRef.current;
+    if (action === "discard") {
+      const confirmed = await requestConfirm({
+        title: tr("worktree.confirm.deleteTitle", "Delete worktree?"),
+        description: tr(
+          "worktree.confirm.deleteDescription",
+          "Delete this session worktree? Unmerged changes in the isolated workspace will be removed. This cannot be undone.",
+        ),
+        confirmLabel: tr("worktree.action.discard", "Delete"),
+        tone: "danger",
+      });
+      if (!isCurrentScope(actionScopeKey)) return;
+      if (!confirmed) return;
+    }
+
     setWorktreeBusyScopeKey(actionScopeKey);
     setWorktreeActionErrorForScope(actionScopeKey, null);
     try {

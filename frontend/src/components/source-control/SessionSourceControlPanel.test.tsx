@@ -116,6 +116,23 @@ check(
   source,
 );
 
+{
+  const confirmIndex = source.indexOf(
+    'title: tr("worktree.confirm.deleteTitle", "Delete worktree?")',
+  );
+  const discardIndex = source.indexOf("await discardWorktree();");
+  check(
+    "confirms worktree delete before calling discard",
+    confirmIndex >= 0 &&
+      discardIndex > confirmIndex &&
+      source.includes(
+        '"worktree.confirm.deleteDescription"',
+      ) &&
+      source.includes('confirmLabel: tr("worktree.action.discard", "Delete")'),
+    { confirmIndex, discardIndex },
+  );
+}
+
 check(
   "displays worktree action errors alongside source-control errors",
   source.includes("worktreeActionError") &&

@@ -312,7 +312,7 @@ export const SessionWorktreeBadge: React.FC<SessionWorktreeBadgeProps> = ({
           )}
           {can('discard') && (
             <WorktreeActionButton
-              label={tr('worktree.action.discard', 'Discard')}
+              label={tr('worktree.action.discard', 'Delete')}
               tone="danger"
               busy={busy}
               disabled={false}
