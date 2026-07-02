@@ -135,7 +135,8 @@ const scenarioDefinitions: ScenarioDefinition[] = [
     titleKey: 'onboarding.scenario.software.title',
     titleFallback: 'Software product',
     descKey: 'onboarding.scenario.software.desc',
-    descFallback: 'Plan, build, review, and ship product code.',
+    descFallback:
+      'Plan requirements, split engineering tasks, implement frontend and backend changes, and move code through review and testing.',
     teamKey: 'onboarding.scenario.software.team',
     teamFallback: 'Software delivery team',
     Icon: Layers3,
@@ -151,7 +152,8 @@ const scenarioDefinitions: ScenarioDefinition[] = [
     titleKey: 'onboarding.scenario.design.title',
     titleFallback: 'Design implementation',
     descKey: 'onboarding.scenario.design.desc',
-    descFallback: 'Turn product screens into polished frontend work.',
+    descFallback:
+      'Translate product screens, interaction states, and visual details into implementation tasks while keeping fidelity and quality aligned.',
     teamKey: 'onboarding.scenario.design.team',
     teamFallback: 'Design implementation team',
     Icon: Sparkles,
@@ -166,7 +168,8 @@ const scenarioDefinitions: ScenarioDefinition[] = [
     titleKey: 'onboarding.scenario.research.title',
     titleFallback: 'Research and analysis',
     descKey: 'onboarding.scenario.research.desc',
-    descFallback: 'Collect context, compare options, and write decisions.',
+    descFallback:
+      'Collect source context, compare options, capture conclusions, and turn the result into an actionable decision record.',
     teamKey: 'onboarding.scenario.research.team',
     teamFallback: 'Research analysis team',
     Icon: Search,
@@ -181,7 +184,8 @@ const scenarioDefinitions: ScenarioDefinition[] = [
     titleKey: 'onboarding.scenario.other.title',
     titleFallback: 'General collaboration',
     descKey: 'onboarding.scenario.other.desc',
-    descFallback: 'Start with a flexible team and adapt later.',
+    descFallback:
+      'Start with a flexible collaboration team for exploration, execution, and review, then tune the members as the project takes shape.',
     teamKey: 'onboarding.scenario.other.team',
     teamFallback: 'General collaboration team',
     Icon: Bot,
@@ -1156,10 +1160,10 @@ export function OnboardingGuide({
                     : 'bg-[#0a0a0a] group-hover:bg-[#121212]',
                 )}
               >
-                <div className="flex items-start gap-3">
+                <div className="grid grid-cols-[20px_minmax(0,1fr)] items-start gap-x-3">
                   <span
                     className={cn(
-                      'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center transition-colors',
+                      'col-start-1 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center transition-colors',
                       selected
                         ? 'text-white'
                         : 'text-[#7d8490] group-hover:text-[#d9dde6]',
@@ -1167,21 +1171,17 @@ export function OnboardingGuide({
                   >
                     <Icon className="h-4 w-4" strokeWidth={1} />
                   </span>
-                  <div className="min-w-0">
-                    <h3
-                      className={cn(
-                        'truncate text-[13px] font-semibold tracking-[-0.01em]',
-                        selected ? 'text-white' : 'text-[#f7f7f7]',
-                      )}
-                    >
-                      {scenario.title}
-                    </h3>
-                    <p
-                      className="mt-1.5 text-[12px] leading-relaxed tracking-[0] text-[rgba(255,255,255,0.40)]"
-                    >
-                      {scenario.desc}
-                    </p>
-                  </div>
+                  <h3
+                    className={cn(
+                      'col-start-2 min-w-0 truncate text-[13px] font-semibold tracking-[-0.01em]',
+                      selected ? 'text-white' : 'text-[#f7f7f7]',
+                    )}
+                  >
+                    {scenario.title}
+                  </h3>
+                  <p className="col-start-2 mt-1.5 text-[12px] leading-relaxed tracking-[0] text-[rgba(255,255,255,0.40)]">
+                    {scenario.desc}
+                  </p>
                 </div>
               </div>
             </button>
@@ -1562,18 +1562,13 @@ export function OnboardingGuide({
         <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col items-center justify-center overflow-y-auto py-8">
           <div className="relative flex gap-2">
             {onboardingSteps.map((step, index) => {
-              const current = index === activeStepIndex;
-              const complete = index < activeStepIndex;
+              const active = index <= activeStepIndex;
               return (
                 <div
                   key={step}
                   className={cn(
-                    'h-0 w-12 border-t border-dashed transition-colors duration-150',
-                    current
-                      ? 'border-white'
-                      : complete
-                        ? 'border-white/60'
-                        : 'border-[#262626]',
+                    'h-[2px] w-12 rounded-none transition-colors duration-150',
+                    active ? 'bg-white' : 'bg-[#262626]',
                   )}
                 />
               );
@@ -1581,7 +1576,7 @@ export function OnboardingGuide({
           </div>
 
           <div className="mt-9 max-w-4xl">
-            <h1 className="text-[25px] font-semibold leading-tight tracking-[-0.02em] text-white">
+            <h1 className="text-[25px] font-[600] leading-tight tracking-[-0.02em] text-white">
               {stepTitle}
             </h1>
             <p className="mx-auto mt-2 max-w-3xl text-[12px] leading-relaxed tracking-[0] text-[rgba(255,255,255,0.48)]">
@@ -1640,7 +1635,7 @@ export function OnboardingGuide({
                 {stepKey === 'appearance'
                   ? t('onboarding.action.startNow')
                   : t('onboarding.action.next')}
-                <kbd className="rounded-[3px] border border-black/[0.14] bg-black/[0.035] px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-black/55">
+                <kbd className="rounded-[3px] bg-[rgba(0,0,0,0.06)] px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-black/55">
                   Enter <span aria-hidden="true">&#8617;</span>
                 </kbd>
               </button>
