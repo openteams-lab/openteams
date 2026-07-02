@@ -215,6 +215,34 @@ impl WorkflowStep {
         .await
     }
 
+    pub async fn recover_orphaned_running(
+        pool: &SqlitePool,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(
+            r#"
+            UPDATE chat_workflow_steps
+            SET status = 'ready',
+                latest_run_id = NULL,
+                summary_text = NULL,
+                content = NULL,
+                started_at = NULL,
+                completed_at = NULL,
+                updated_at = datetime('now', 'subsec')
+            WHERE id = ?1 AND status = 'running'
+            RETURNING id, execution_id, round_id, compiled_revision_id, step_key,
+                      step_type, title, instructions, assigned_workflow_agent_session_id,
+                      status, retry_count, max_retry, round_index, display_order,
+                      latest_run_id, summary_text, content, loop_id,
+                      lead_review_required, user_review_required, revision_context,
+                      created_at, updated_at, started_at, completed_at
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    }
+
     pub async fn record_execution_result(
         pool: &SqlitePool,
         id: Uuid,
