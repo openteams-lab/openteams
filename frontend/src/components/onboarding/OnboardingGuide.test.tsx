@@ -87,6 +87,10 @@ check(
     guideSource.includes('text-[#a8b3c2]') &&
     guideSource.includes('rounded-[6px] border border-white bg-white') &&
     guideSource.includes('px-9 py-3 text-[14px]') &&
+    guideSource.includes('transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]') &&
+    guideSource.includes('will-change-transform hover:-translate-y-[2px] hover:scale-[1.012]') &&
+    guideSource.includes('hover:shadow-[inset_0_-1px_0_rgba(0,0,0,0.18),0_0_0_1px_rgba(255,255,255,0.55),0_14px_34px_rgba(255,255,255,0.11)]') &&
+    guideSource.includes('active:translate-y-[1px] active:scale-[0.988] active:bg-[#e7e7e7]') &&
     guideSource.includes('const onboardingNoiseTextureStyle') &&
     guideSource.includes('feTurbulence type=%27fractalNoise%27') &&
     guideSource.includes('opacity-[0.025]') &&

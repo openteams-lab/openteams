@@ -1650,7 +1650,7 @@ export function OnboardingGuide({
                 type="button"
                 onClick={() => void handleWelcomeNext()}
                 disabled={saving}
-                className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-3 rounded-[6px] border border-white bg-white px-9 py-3 text-[14px] font-semibold text-black transition hover:bg-[#e8e8e8] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-12 origin-center cursor-pointer items-center justify-center gap-3 rounded-[6px] border border-white bg-white px-9 py-3 text-[14px] font-semibold text-black shadow-[inset_0_-1px_0_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.35)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform hover:-translate-y-[2px] hover:scale-[1.012] hover:bg-[#f7f7f7] hover:shadow-[inset_0_-1px_0_rgba(0,0,0,0.18),0_0_0_1px_rgba(255,255,255,0.55),0_14px_34px_rgba(255,255,255,0.11)] active:translate-y-[1px] active:scale-[0.988] active:bg-[#e7e7e7] active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.22),0_1px_2px_rgba(0,0,0,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
                 {t('onboarding.welcome.next')}
