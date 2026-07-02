@@ -413,34 +413,6 @@ export const SessionSourceControlPanel: React.FC<
     return <>{fallbackRelatedFiles}</>;
   }
 
-  // When the user opens the conflict resolver, it takes over the entire panel
-  // until the merge continues or aborts.
-  if (
-    showConflictResolution &&
-    worktree?.status === "needs_conflict_resolution"
-  ) {
-    return (
-      <WorktreeMergeConflictsSection
-        sessionId={sessionId}
-        tr={tr}
-        onCompleted={() => {
-          closeConflictResolutionForScope(scopeKey);
-          void refreshAfterWorktreeResolution(
-            refreshSourceControl,
-            refreshWorktree,
-          );
-        }}
-        onAbort={() => {
-          closeConflictResolutionForScope(scopeKey);
-          void refreshAfterWorktreeResolution(
-            refreshSourceControl,
-            refreshWorktree,
-          );
-        }}
-      />
-    );
-  }
-
   const handleWorktreeAction = async (action: SessionWorktreeAction) => {
     if (worktreeBusy) return;
     const actionScopeKey = scopeKeyRef.current;
@@ -917,6 +889,28 @@ export const SessionSourceControlPanel: React.FC<
           onConfirm={() => closeConfirmDialog(true)}
         />
       )}
+      {showConflictResolution &&
+        worktree?.status === "needs_conflict_resolution" && (
+          <WorktreeMergeConflictsSection
+            sessionId={sessionId}
+            tr={tr}
+            onClose={() => closeConflictResolutionForScope(scopeKey)}
+            onCompleted={() => {
+              closeConflictResolutionForScope(scopeKey);
+              void refreshAfterWorktreeResolution(
+                refreshSourceControl,
+                refreshWorktree,
+              );
+            }}
+            onAbort={() => {
+              closeConflictResolutionForScope(scopeKey);
+              void refreshAfterWorktreeResolution(
+                refreshSourceControl,
+                refreshWorktree,
+              );
+            }}
+          />
+        )}
     </>
   );
 };

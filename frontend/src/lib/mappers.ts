@@ -197,6 +197,22 @@ const clientMessageIdFromMeta = (
   return typeof clientMessageId === 'string' ? clientMessageId : undefined;
 };
 
+const nonEmptyString = (value: JsonValue | undefined): string | undefined =>
+  typeof value === 'string' && value.trim() ? value : undefined;
+
+const messageModelFromMeta = (meta: JsonValue | undefined): string | undefined => {
+  const obj = jsonObject(meta);
+  const tokenUsage = jsonObject(obj?.token_usage);
+  return (
+    nonEmptyString(obj?.model) ??
+    nonEmptyString(obj?.model_name) ??
+    nonEmptyString(obj?.run_model) ??
+    nonEmptyString(tokenUsage?.runtime_model_id) ??
+    nonEmptyString(tokenUsage?.model_id) ??
+    nonEmptyString(tokenUsage?.model)
+  );
+};
+
 const i18nFromMeta = (
   meta: JsonValue | undefined,
 ): { key: string; params?: Record<string, string | number> } | undefined => {
@@ -301,7 +317,7 @@ export const mapMessage = (
     sender = agentName.startsWith('@') ? agentName : `@${agentName}`;
     avatar = monogramFromName(agentName);
     const m = backend.sender_id && opts.agentModelsById?.[backend.sender_id];
-    model = m ?? undefined;
+    model = messageModelFromMeta(backend.meta) ?? m ?? undefined;
   }
 
   const workflowCardType = workflowCardTypeFromMeta(backend.meta);

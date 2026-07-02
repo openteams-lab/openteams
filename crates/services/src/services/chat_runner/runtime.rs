@@ -3,7 +3,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::services::project::source_control::SourceControlService;
+use crate::services::project::source_control::{SourceControlObservedPath, SourceControlService};
 
 use super::{super::workflow_analytics, startup_timing, *};
 
@@ -1297,6 +1297,7 @@ impl ChatRunner {
         runner: ChatRunner,
         source_message_id: Uuid,
         client_message_id: Option<String>,
+        run_model: Option<String>,
         source_message_created_at: chrono::DateTime<Utc>,
         source_message_content: String,
         agent_name: String,
@@ -1797,6 +1798,7 @@ impl ChatRunner {
                             "session_id": session_id,
                             "session_agent_id": session_agent_id,
                             "agent_id": agent_id,
+                            "model": run_model.as_deref(),
                             "source_message_id": source_message_id,
                             "client_message_id": client_message_id,
                             "agent_session_id": agent_session_id,
@@ -1948,6 +1950,32 @@ impl ChatRunner {
                             retention_summary_json,
                         )
                         .await;
+                        let observed_for_source_control = workspace_observed_paths
+                            .iter()
+                            .map(|entry| SourceControlObservedPath {
+                                path: entry.path.clone(),
+                                source: entry.source.clone(),
+                                existed_after_run: entry.existed_after_run,
+                                observed_at: run_started_at,
+                            })
+                            .collect::<Vec<_>>();
+                        if let Err(err) = SourceControlService::record_session_run_observed_paths(
+                            &db.pool,
+                            session_id,
+                            &workspace_path,
+                            run_id,
+                            &observed_for_source_control,
+                        )
+                        .await
+                        {
+                            tracing::warn!(
+                                session_id = %session_id,
+                                run_id = %run_id,
+                                workspace_path = %workspace_path.display(),
+                                error = %err,
+                                "failed to update source-control path index"
+                            );
+                        }
                         startup_timing
                             .mark_and_persist(
                                 startup_timing::StartupMilestoneName::ChatRunCompletionPersisted,
@@ -1979,6 +2007,7 @@ impl ChatRunner {
                                 error_type.as_ref(),
                                 matches!(completion_status, RunCompletionStatus::Stopped),
                                 Some(&token_usage),
+                                run_model.as_deref(),
                                 protocol_retry_attempt,
                             )
                             .await;
@@ -2106,6 +2135,7 @@ impl ChatRunner {
                                             visible_error_content
                                                 .map(|content| (content, error_type.as_ref())),
                                             Some(&token_usage),
+                                            run_model.as_deref(),
                                             None,
                                         )
                                         .await
@@ -2208,6 +2238,7 @@ impl ChatRunner {
                                     client_message_id.as_deref(),
                                     visible_error_content,
                                     error_type.as_ref(),
+                                    run_model.as_deref(),
                                 )
                                 .await
                             {

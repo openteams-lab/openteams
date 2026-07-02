@@ -7,7 +7,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
-import { ProjectSidebar } from "./ProjectSidebar";
+import { prioritizeSessions, ProjectSidebar } from "./ProjectSidebar";
 import { mockShellOptions, mockWorkspaceBootstrap } from "@/mockApiData";
 import type { Project } from "../../../shared/types";
 
@@ -303,6 +303,37 @@ const completedOrderedHtml = renderToStaticMarkup(
     onProjectAction={() => undefined}
   />,
 );
+const activeOrderedHtml = renderToStaticMarkup(
+  <ProjectSidebar
+    shellOptions={mockShellOptions}
+    sessions={mockWorkspaceBootstrap.sessions}
+    activeSessionId="sess-8"
+    activePage="workspace"
+    weeklyCost={mockWorkspaceBootstrap.defaults.weeklyCost}
+    onNavigate={() => undefined}
+    onSessionSelect={() => undefined}
+    onPrimaryAction={() => undefined}
+    onProjectAction={() => undefined}
+  />,
+);
+const prioritySessions = mockWorkspaceBootstrap.sessions.map((session) => ({
+  ...session,
+  hasUnreadAgentCompletion: session.id === "sess-8",
+}));
+const priorityOrderIds = prioritizeSessions(prioritySessions).map(
+  (session) => session.id,
+);
+const readOrderIds = prioritizeSessions(
+  mockWorkspaceBootstrap.sessions,
+  priorityOrderIds,
+).map((session) => session.id);
+const nextPriorityOrderIds = prioritizeSessions(
+  mockWorkspaceBootstrap.sessions.map((session) => ({
+    ...session,
+    hasPendingWorkflowInput: session.id === "sess-7",
+  })),
+  readOrderIds,
+).map((session) => session.id);
 const moreAttrStart = html.indexOf('data-sidebar-more="true"');
 const moreStart =
   moreAttrStart >= 0 ? html.lastIndexOf("<button", moreAttrStart) : -1;
@@ -350,6 +381,15 @@ check(
   html.includes('data-section="Build stats"') &&
     html.includes("Build stats"),
   html,
+);
+check(
+  "retries build stats usage refresh while sidebar cost is zero",
+  componentSource.includes("ZERO_COST_USAGE_REFRESH_DELAYS_MS") &&
+    componentSource.includes("buildStatsModelCostRef.current <= 0") &&
+    componentSource.includes('reason === "usage"') &&
+    componentSource.includes("buildStatsUsageRetryTimersRef.current") &&
+    componentSource.includes("clearBuildStatsUsageRetryTimers()"),
+  componentSource,
 );
 check("renders weekly cost prop accepted", typeof html === "string", html);
 check("renders session section", html.includes("Sessions"), html);
@@ -431,6 +471,27 @@ check(
       completedOrderedHtml.indexOf("Fix login flicker") &&
     !completedOrderedHtml.includes("Refactor auth guard"),
   completedOrderedHtml,
+);
+check(
+  "does not move the selected session to the top on click",
+  activeOrderedHtml.indexOf("Fix login flicker") >= 0 &&
+    activeOrderedHtml.includes("Refactor auth guard") &&
+    !activeOrderedHtml.includes("Billing copy polish"),
+  activeOrderedHtml,
+);
+check(
+  "keeps a read priority session in its displayed position",
+  priorityOrderIds[0] === "sess-8" &&
+    readOrderIds[0] === "sess-8" &&
+    priorityOrderIds.join("|") === readOrderIds.join("|"),
+  { priorityOrderIds, readOrderIds },
+);
+check(
+  "lets read sessions fall behind newly prioritized sessions",
+  nextPriorityOrderIds[0] === "sess-7" &&
+    nextPriorityOrderIds.indexOf("sess-8") >
+      nextPriorityOrderIds.indexOf("sess-7"),
+  nextPriorityOrderIds,
 );
 check(
   "keeps collapsed session list height content-sized",
@@ -656,9 +717,10 @@ check(
   componentSource,
 );
 check(
-  "create project modal sanitizes project names before submit",
+  "create project modal preserves typed project names until submit",
   componentSource.includes("sanitizeProjectName(projectName)") &&
-    componentSource.includes("sanitizeProjectName(event.target.value)"),
+    componentSource.includes("setProjectName(event.target.value)") &&
+    !componentSource.includes("sanitizeProjectName(event.target.value)"),
   componentSource,
 );
 check(
@@ -741,10 +803,11 @@ check(
   componentSource,
 );
 check(
-  "create project modal uses softer Linear-style controls",
-  componentSource.includes("bg-[#141517]") &&
-    componentSource.includes("border-transparent bg-[rgba(255,255,255,0.04)]") &&
-    componentSource.includes("bg-white px-3.5 py-1.5"),
+  "create project modal uses theme tokens for light mode",
+  componentSource.includes("bg-[var(--surface-1)] text-[var(--ink)]") &&
+    componentSource.includes("border-[var(--hairline)] bg-[var(--surface-2)]") &&
+    componentSource.includes("bg-[var(--primary)] px-3.5 py-1.5") &&
+    !componentSource.includes("bg-[#141517]"),
   componentSource,
 );
 check(

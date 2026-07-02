@@ -27,9 +27,14 @@ import {
 
 export interface WorktreeMergeConflictsViewProps {
   sessionId: string;
-  tr: (key: string, fallback: string, replacements?: Record<string, string | number>) => string;
+  tr: (
+    key: string,
+    fallback: string,
+    replacements?: Record<string, string | number>,
+  ) => string;
   onCompleted: () => void;
   onAbort: () => void;
+  onClose?: () => void;
 }
 
 export type FileResolution =
@@ -79,9 +84,173 @@ export const canContinueMerge = (
   listLoading: boolean,
 ): boolean => listLoaded && !listLoading && files.length === 0;
 
+export type ConflictHunkChoice = 'current' | 'session' | 'both';
+
+export interface ConflictHunk {
+  id: string;
+  index: number;
+  startLine: number;
+  endLine: number;
+  currentLabel: string;
+  sessionLabel: string;
+  baseLabel: string | null;
+  current: string;
+  session: string;
+  base: string | null;
+  original: string;
+}
+
+type ParsedConflictSegment =
+  | { kind: 'text'; content: string }
+  | { kind: 'conflict'; hunk: ConflictHunk };
+
+export interface ParsedConflictText {
+  segments: ParsedConflictSegment[];
+  hunks: ConflictHunk[];
+}
+
+const splitLinesPreservingEndings = (content: string): string[] =>
+  content.match(/[^\n]*\n|[^\n]+/g) ?? [];
+
+const trimMarkerLine = (line: string, marker: string): string =>
+  line
+    .replace(/\r?\n$/, '')
+    .slice(marker.length)
+    .trim();
+
+export const containsConflictMarkers = (content: string): boolean =>
+  splitLinesPreservingEndings(content).some(
+    (line) =>
+      line.startsWith('<<<<<<<') || line.startsWith('>>>>>>>'),
+  );
+
+export const parseConflictText = (content: string): ParsedConflictText => {
+  const lines = splitLinesPreservingEndings(content);
+  const segments: ParsedConflictSegment[] = [];
+  const hunks: ConflictHunk[] = [];
+  let textBuffer: string[] = [];
+  let index = 0;
+
+  const flushText = () => {
+    if (textBuffer.length === 0) return;
+    segments.push({ kind: 'text', content: textBuffer.join('') });
+    textBuffer = [];
+  };
+
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.startsWith('<<<<<<<')) {
+      textBuffer.push(line);
+      index += 1;
+      continue;
+    }
+
+    const startIndex = index;
+    const startLine = startIndex + 1;
+    const currentLabel = trimMarkerLine(line, '<<<<<<<') || 'current';
+    index += 1;
+
+    const currentLines: string[] = [];
+    while (
+      index < lines.length &&
+      !lines[index].startsWith('|||||||') &&
+      !lines[index].startsWith('=======') &&
+      !lines[index].startsWith('>>>>>>>')
+    ) {
+      currentLines.push(lines[index]);
+      index += 1;
+    }
+
+    let baseLabel: string | null = null;
+    let baseLines: string[] | null = null;
+    if (index < lines.length && lines[index].startsWith('|||||||')) {
+      baseLabel = trimMarkerLine(lines[index], '|||||||') || 'base';
+      baseLines = [];
+      index += 1;
+      while (
+        index < lines.length &&
+        !lines[index].startsWith('=======') &&
+        !lines[index].startsWith('>>>>>>>')
+      ) {
+        baseLines.push(lines[index]);
+        index += 1;
+      }
+    }
+
+    if (index >= lines.length || !lines[index].startsWith('=======')) {
+      textBuffer.push(...lines.slice(startIndex, index));
+      continue;
+    }
+    index += 1;
+
+    const sessionLines: string[] = [];
+    while (index < lines.length && !lines[index].startsWith('>>>>>>>')) {
+      sessionLines.push(lines[index]);
+      index += 1;
+    }
+
+    if (index >= lines.length || !lines[index].startsWith('>>>>>>>')) {
+      textBuffer.push(...lines.slice(startIndex, index));
+      continue;
+    }
+
+    const sessionLabel = trimMarkerLine(lines[index], '>>>>>>>') || 'source';
+    index += 1;
+    const original = lines.slice(startIndex, index).join('');
+    const hunk: ConflictHunk = {
+      id: `hunk-${hunks.length + 1}`,
+      index: hunks.length,
+      startLine,
+      endLine: startLine + index - startIndex - 1,
+      currentLabel,
+      sessionLabel,
+      baseLabel,
+      current: currentLines.join(''),
+      session: sessionLines.join(''),
+      base: baseLines ? baseLines.join('') : null,
+      original,
+    };
+    flushText();
+    hunks.push(hunk);
+    segments.push({ kind: 'conflict', hunk });
+  }
+
+  flushText();
+  return { segments, hunks };
+};
+
+const joinAcceptedBoth = (current: string, session: string): string => {
+  if (!current) return session;
+  if (!session) return current;
+  return `${current}${current.endsWith('\n') ? '' : '\n'}${session}`;
+};
+
+const contentForHunkChoice = (
+  hunk: ConflictHunk,
+  choice: ConflictHunkChoice,
+): string => {
+  if (choice === 'current') return hunk.current;
+  if (choice === 'session') return hunk.session;
+  return joinAcceptedBoth(hunk.current, hunk.session);
+};
+
+export const buildConflictResolutionContent = (
+  parsed: ParsedConflictText,
+  choices: Record<string, ConflictHunkChoice>,
+): string =>
+  parsed.segments
+    .map((segment) => {
+      if (segment.kind === 'text') return segment.content;
+      const choice = choices[segment.hunk.id];
+      return choice
+        ? contentForHunkChoice(segment.hunk, choice)
+        : segment.hunk.original;
+    })
+    .join('');
+
 export const WorktreeMergeConflictsView: React.FC<
   WorktreeMergeConflictsViewProps
-> = ({ sessionId, tr, onCompleted, onAbort }) => {
+> = ({ sessionId, tr, onCompleted, onAbort, onClose }) => {
   const [files, setFiles] = useState<ConflictFileInfo[]>([]);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [detail, setDetail] = useState<ConflictFileContent | null>(null);
@@ -295,6 +464,9 @@ export const WorktreeMergeConflictsView: React.FC<
   const currentResolution = selectedPath
     ? resolved.get(selectedPath)
     : undefined;
+  const currentTextHasMarkers =
+    currentResolution?.kind === 'text' &&
+    containsConflictMarkers(currentResolution.content);
 
   return (
     <WorktreeMergeConflictFrame>
@@ -305,21 +477,36 @@ export const WorktreeMergeConflictsView: React.FC<
             {tr('worktree.merge.title', 'Merge Conflicts')}
           </h2>
           <span className="rounded-full bg-[var(--surface-3)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--ink-tertiary)]">
-            {files.length}/{files.length}
+            {tr('worktree.merge.fileCount', '{count} files', {
+              count: files.length,
+            })}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => void refreshList()}
-          disabled={listLoading || Boolean(pendingAction)}
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:opacity-40"
-          title={tr('sourceControl.refresh', 'Refresh')}
-        >
-          <RefreshCw
-            aria-hidden
-            className={`h-3.5 w-3.5 ${listLoading ? 'animate-spin' : ''}`}
-          />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => void refreshList()}
+            disabled={listLoading || Boolean(pendingAction)}
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:opacity-40"
+            title={tr('sourceControl.refresh', 'Refresh')}
+          >
+            <RefreshCw
+              aria-hidden
+              className={`h-3.5 w-3.5 ${listLoading ? 'animate-spin' : ''}`}
+            />
+          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={Boolean(pendingAction)}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:opacity-40"
+              title={tr('worktree.merge.closeWindow', 'Close resolver')}
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          )}
+        </div>
       </div>
 
       {actionError && (
@@ -341,7 +528,11 @@ export const WorktreeMergeConflictsView: React.FC<
             ) : (
               <ul className="py-1">
                 {files.map((file) => {
-                  const isResolved = resolved.has(file.path);
+                  const fileResolution = resolved.get(file.path);
+                  const isResolved =
+                    fileResolution?.kind === 'binary' ||
+                    (fileResolution?.kind === 'text' &&
+                      !containsConflictMarkers(fileResolution.content));
                   const isSelected = file.path === selectedPath;
                   return (
                     <li key={file.path}>
@@ -392,7 +583,7 @@ export const WorktreeMergeConflictsView: React.FC<
           ) : detailLoading ? (
             <div className="flex flex-1 items-center justify-center gap-2 text-[12px] text-[var(--ink-tertiary)]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              {tr('worktree.merge.loading', 'Loading conflict…')}
+              {tr('worktree.merge.loading', 'Loading conflict...')}
             </div>
           ) : !detail ? (
             <div className="flex flex-1 items-center justify-center px-4 text-[12px] text-rose-600">
@@ -446,12 +637,20 @@ export const WorktreeMergeConflictsView: React.FC<
               disabled={
                 !selectedPath ||
                 !currentResolution ||
+                currentTextHasMarkers ||
                 Boolean(pendingAction)
               }
-              title={tr(
-                'worktree.merge.markResolvedHint',
-                'Save this file and mark it resolved',
-              )}
+              title={
+                currentTextHasMarkers
+                  ? tr(
+                      'worktree.merge.unresolvedMarkersHint',
+                      'Choose a resolution for every conflict point first',
+                    )
+                  : tr(
+                      'worktree.merge.markResolvedHint',
+                      'Save this file and mark it resolved',
+                    )
+              }
               icon={
                 pendingAction === `resolve:${selectedPath}` ? (
                   <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
@@ -525,55 +724,198 @@ const TextConflictEditor: React.FC<TextConflictEditorProps> = ({
   onAcceptBoth,
   onChange,
 }) => {
+  const parsed = useMemo(
+    () => parseConflictText(detail.working_tree),
+    [detail.working_tree],
+  );
+  const [selectedHunkId, setSelectedHunkId] = useState<string | null>(
+    () => parsed.hunks[0]?.id ?? null,
+  );
+  const [choices, setChoices] = useState<Record<string, ConflictHunkChoice>>(
+    {},
+  );
   const resultContent =
     resolution?.kind === 'text' ? resolution.content : detail.working_tree;
+  const selectedHunk =
+    parsed.hunks.find((hunk) => hunk.id === selectedHunkId) ??
+    parsed.hunks[0] ??
+    null;
+  const unresolvedCount = parsed.hunks.filter(
+    (hunk) => !choices[hunk.id],
+  ).length;
+
+  useEffect(() => {
+    setSelectedHunkId(parsed.hunks[0]?.id ?? null);
+    setChoices({});
+  }, [path, parsed]);
+
+  const applyChoices = (nextChoices: Record<string, ConflictHunkChoice>) => {
+    setChoices(nextChoices);
+    onChange(buildConflictResolutionContent(parsed, nextChoices));
+  };
+
+  const chooseHunk = (hunkId: string, choice: ConflictHunkChoice) => {
+    applyChoices({ ...choices, [hunkId]: choice });
+  };
+
+  const chooseAll = (choice: ConflictHunkChoice) => {
+    if (parsed.hunks.length === 0) return;
+    applyChoices(
+      Object.fromEntries(
+        parsed.hunks.map((hunk) => [hunk.id, choice]),
+      ) as Record<string, ConflictHunkChoice>,
+    );
+  };
+
+  if (parsed.hunks.length === 0) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-[var(--hairline)] px-3 py-1.5">
+          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--ink-tertiary)]">
+            {path}
+          </span>
+          <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1">
+            <QuickAction
+              label={tr('worktree.merge.useCurrent', 'Use current')}
+              onClick={onUseCurrent}
+            />
+            <QuickAction
+              label={tr('worktree.merge.useSession', 'Use source')}
+              onClick={onUseSession}
+            />
+            <QuickAction
+              label={tr('worktree.merge.acceptBoth', 'Accept both')}
+              onClick={onAcceptBoth}
+            />
+          </div>
+        </div>
+        <div className="grid min-h-0 flex-1 grid-cols-1 divide-y divide-[var(--hairline)] overflow-auto xl:grid-cols-3 xl:divide-x xl:divide-y-0">
+          <ConflictPane
+            title={tr('worktree.merge.pane.current', 'Current')}
+            content={detail.current ?? ''}
+            emptyHint={tr(
+              'worktree.merge.emptyCurrent',
+              'No current-side content',
+            )}
+          />
+          <ConflictPane
+            title={tr('worktree.merge.pane.session', 'Source Worktree')}
+            content={detail.session ?? ''}
+            emptyHint={tr(
+              'worktree.merge.emptySession',
+              'No source-side content',
+            )}
+          />
+          <ResultPane
+            title={tr('worktree.merge.pane.result', 'Result')}
+            content={resultContent}
+            onChange={onChange}
+            markerWarning={containsConflictMarkers(resultContent)}
+            tr={tr}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-[var(--hairline)] px-3 py-1.5">
         <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--ink-tertiary)]">
           {path}
         </span>
+        <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+          {tr('worktree.merge.hunkCount', '{count} conflict points', {
+            count: parsed.hunks.length,
+          })}
+        </span>
+        {unresolvedCount > 0 && (
+          <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-medium text-rose-600">
+            {tr('worktree.merge.unresolvedCount', '{count} unresolved', {
+              count: unresolvedCount,
+            })}
+          </span>
+        )}
         <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1">
           <QuickAction
-            label={tr('worktree.merge.useCurrent', 'Use current')}
-            onClick={onUseCurrent}
+            label={tr('worktree.merge.acceptAllCurrent', 'All current')}
+            onClick={() => chooseAll('current')}
           />
           <QuickAction
-            label={tr('worktree.merge.useSession', 'Use session')}
-            onClick={onUseSession}
+            label={tr('worktree.merge.acceptAllSource', 'All source')}
+            onClick={() => chooseAll('session')}
           />
           <QuickAction
-            label={tr('worktree.merge.acceptBoth', 'Accept both')}
-            onClick={onAcceptBoth}
+            label={tr('worktree.merge.acceptAllBoth', 'All both')}
+            onClick={() => chooseAll('both')}
           />
         </div>
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 divide-y divide-[var(--hairline)] overflow-auto">
-        <ConflictPane
-          title={tr('worktree.merge.pane.current', 'Current')}
-          content={detail.current ?? ''}
-          emptyHint={tr(
-            'worktree.merge.emptyCurrent',
-            'No current-side content',
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="min-h-0 border-b border-[var(--hairline)] lg:border-b-0 lg:border-r">
+          <ScrollArea className="h-full">
+            <ul className="p-2">
+              {parsed.hunks.map((hunk) => {
+                const selected = hunk.id === selectedHunk?.id;
+                const choice = choices[hunk.id];
+                return (
+                  <li key={hunk.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedHunkId(hunk.id)}
+                      className={`mb-1 flex w-full min-w-0 flex-col items-start rounded-md border px-2 py-1.5 text-left transition ${
+                        selected
+                          ? 'border-[var(--primary)] bg-[var(--primary-tint)]'
+                          : 'border-transparent hover:bg-[var(--surface-3)]'
+                      }`}
+                    >
+                      <span className="flex w-full min-w-0 items-center gap-1">
+                        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[var(--ink)]">
+                          {tr('worktree.merge.hunkTitle', 'Conflict {index}', {
+                            index: hunk.index + 1,
+                          })}
+                        </span>
+                        <span className="font-mono text-[10px] text-[var(--ink-tertiary)]">
+                          {hunk.startLine}
+                        </span>
+                      </span>
+                      <span
+                        className={`mt-1 rounded px-1 py-0.5 text-[10px] ${
+                          choice
+                            ? 'bg-emerald-500/10 text-emerald-700'
+                            : 'bg-amber-500/10 text-amber-700'
+                        }`}
+                      >
+                        {choice
+                          ? choiceLabel(choice, tr)
+                          : tr('worktree.merge.pendingChoice', 'Unresolved')}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </ScrollArea>
+        </div>
+        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_minmax(120px,0.7fr)] overflow-hidden">
+          {selectedHunk ? (
+            <HunkDiffView
+              hunk={selectedHunk}
+              choice={choices[selectedHunk.id]}
+              tr={tr}
+              onChoose={(choice) => chooseHunk(selectedHunk.id, choice)}
+            />
+          ) : (
+            <div className="flex min-h-0 items-center justify-center text-[12px] text-[var(--ink-tertiary)]">
+              {tr('worktree.merge.selectHunk', 'Select a conflict point')}
+            </div>
           )}
-        />
-        <ConflictPane
-          title={tr('worktree.merge.pane.session', 'Session Worktree')}
-          content={detail.session ?? ''}
-          emptyHint={tr(
-            'worktree.merge.emptySession',
-            'No session-side content',
-          )}
-        />
-        <div className="flex min-h-0 flex-col">
-          <div className="shrink-0 border-b border-[var(--hairline)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-tertiary)]">
-            {tr('worktree.merge.pane.result', 'Result')}
-          </div>
-          <textarea
-            value={resultContent}
-            onChange={(e) => onChange(e.target.value)}
-            spellCheck={false}
-            className="min-h-0 flex-1 resize-none border-0 bg-transparent p-2 font-mono text-[11px] leading-snug text-[var(--ink)] outline-none"
+          <ResultPane
+            title={tr('worktree.merge.pane.result', 'Merged Result')}
+            content={resultContent}
+            onChange={onChange}
+            markerWarning={containsConflictMarkers(resultContent)}
+            tr={tr}
           />
         </div>
       </div>
@@ -581,14 +923,122 @@ const TextConflictEditor: React.FC<TextConflictEditorProps> = ({
   );
 };
 
+const choiceLabel = (
+  choice: ConflictHunkChoice,
+  tr: WorktreeMergeConflictsViewProps['tr'],
+) => {
+  if (choice === 'current') {
+    return tr('worktree.merge.choice.current', 'Current');
+  }
+  if (choice === 'session') {
+    return tr('worktree.merge.choice.source', 'Source');
+  }
+  return tr('worktree.merge.choice.both', 'Both');
+};
+
+const HunkDiffView: React.FC<{
+  hunk: ConflictHunk;
+  choice: ConflictHunkChoice | undefined;
+  tr: WorktreeMergeConflictsViewProps['tr'];
+  onChoose: (choice: ConflictHunkChoice) => void;
+}> = ({ hunk, choice, tr, onChoose }) => (
+  <div className="flex min-h-0 flex-col overflow-hidden">
+    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--hairline)] px-3 py-2">
+      <span className="font-mono text-[11px] text-[var(--ink-tertiary)]">
+        {tr('worktree.merge.lines', 'Lines {start}-{end}', {
+          start: hunk.startLine,
+          end: hunk.endLine,
+        })}
+      </span>
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+        <ConflictChoiceButton
+          selected={choice === 'current'}
+          label={tr('worktree.merge.acceptCurrent', 'Accept current')}
+          onClick={() => onChoose('current')}
+        />
+        <ConflictChoiceButton
+          selected={choice === 'session'}
+          label={tr('worktree.merge.acceptSource', 'Accept source')}
+          onClick={() => onChoose('session')}
+        />
+        <ConflictChoiceButton
+          selected={choice === 'both'}
+          label={tr('worktree.merge.acceptBoth', 'Accept both')}
+          onClick={() => onChoose('both')}
+        />
+      </div>
+    </div>
+    <div className="grid min-h-0 flex-1 grid-cols-1 divide-y divide-[var(--hairline)] overflow-hidden xl:grid-cols-2 xl:divide-x xl:divide-y-0">
+      <ConflictPane
+        title={tr('worktree.merge.pane.current', 'Current')}
+        subtitle={hunk.currentLabel}
+        content={hunk.current}
+        emptyHint={tr('worktree.merge.emptyCurrent', 'No current-side content')}
+        tone="current"
+      />
+      <ConflictPane
+        title={tr('worktree.merge.pane.source', 'Source')}
+        subtitle={hunk.sessionLabel}
+        content={hunk.session}
+        emptyHint={tr('worktree.merge.emptySession', 'No source-side content')}
+        tone="source"
+      />
+    </div>
+    {hunk.base !== null && (
+      <div className="max-h-24 shrink-0 border-t border-[var(--hairline)]">
+        <ConflictPane
+          title={tr('worktree.merge.pane.base', 'Base')}
+          subtitle={hunk.baseLabel ?? undefined}
+          content={hunk.base}
+          emptyHint={tr('worktree.merge.emptyBase', 'No base content')}
+        />
+      </div>
+    )}
+  </div>
+);
+
+const ConflictChoiceButton: React.FC<{
+  selected: boolean;
+  label: string;
+  onClick: () => void;
+}> = ({ selected, label, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`h-6 max-w-full rounded-md px-2 text-[11px] font-semibold transition ${
+      selected
+        ? 'bg-[var(--primary)] text-[var(--on-primary)]'
+        : 'border border-[var(--hairline)] text-[var(--ink-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--ink)]'
+    }`}
+    title={label}
+  >
+    <span className="block truncate">{label}</span>
+  </button>
+);
+
 const ConflictPane: React.FC<{
   title: string;
+  subtitle?: string;
   content: string;
   emptyHint: string;
-}> = ({ title, content, emptyHint }) => (
+  tone?: 'current' | 'source';
+}> = ({ title, subtitle, content, emptyHint, tone }) => (
   <div className="flex min-h-0 flex-col">
-    <div className="shrink-0 border-b border-[var(--hairline)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-tertiary)]">
-      {title}
+    <div
+      className={`shrink-0 border-b border-[var(--hairline)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+        tone === 'current'
+          ? 'text-sky-700'
+          : tone === 'source'
+            ? 'text-emerald-700'
+            : 'text-[var(--ink-tertiary)]'
+      }`}
+    >
+      <span>{title}</span>
+      {subtitle && (
+        <span className="ml-2 normal-case tracking-normal text-[var(--ink-tertiary)]">
+          {subtitle}
+        </span>
+      )}
     </div>
     {content.length === 0 ? (
       <div className="flex flex-1 items-center justify-center px-2 text-center text-[10px] text-[var(--ink-tertiary)]">
@@ -599,6 +1049,35 @@ const ConflictPane: React.FC<{
         {content}
       </pre>
     )}
+  </div>
+);
+
+const ResultPane: React.FC<{
+  title: string;
+  content: string;
+  markerWarning: boolean;
+  tr: WorktreeMergeConflictsViewProps['tr'];
+  onChange: (content: string) => void;
+}> = ({ title, content, markerWarning, tr, onChange }) => (
+  <div className="flex min-h-0 flex-col border-t border-[var(--hairline)]">
+    <div className="flex shrink-0 items-center gap-2 border-b border-[var(--hairline)] px-2 py-1">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-tertiary)]">
+        {title}
+      </span>
+      {markerWarning && (
+        <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-medium text-rose-600">
+          {tr('worktree.merge.markersRemain', 'Conflict markers remain')}
+        </span>
+      )}
+    </div>
+    <textarea
+      value={content}
+      onChange={(e) => onChange(e.target.value)}
+      spellCheck={false}
+      className={`min-h-0 flex-1 resize-none border-0 bg-transparent p-2 font-mono text-[11px] leading-snug text-[var(--ink)] outline-none ${
+        markerWarning ? 'shadow-[inset_3px_0_0_#e11d48]' : ''
+      }`}
+    />
   </div>
 );
 

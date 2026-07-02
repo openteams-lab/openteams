@@ -143,6 +143,7 @@ check(
   "onboarding creates a real project before opening the existing composer",
   source.includes("handleCreateOnboardingProject") &&
     source.includes("onCreateProjectFromOnboarding={handleCreateOnboardingProject}") &&
+    source.includes("default_workspace_path: path") &&
     source.includes("return { project }") &&
     source.includes("return { projectId: project.id, sessionId: null }") &&
     source.includes("setIsCreateSessionModalOpen(true)"),
@@ -402,6 +403,13 @@ check(
   source.includes("openSourceControlDiffTab") &&
     source.includes("onOpenSourceControlDiffTab={openSourceControlDiffTab}") &&
     source.includes('activeTab?.kind === "sc-diff"'),
+  source,
+);
+check(
+  "opens diffs by reusing the most recent diff tab",
+  source.includes("const openReusableDiffTab") &&
+    source.includes("findLastDiffTabIndex(currentTabs)") &&
+    source.includes("openReusableDiffTab(nextTab)"),
   source,
 );
 check(

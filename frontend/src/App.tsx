@@ -179,6 +179,18 @@ const createPageTab = (
   label: label ?? pageTabConfig[page].label,
 });
 
+const isDiffWorkspaceTab = (
+  tab: WorkspaceTab,
+): tab is Extract<WorkspaceTab, { kind: "diff" | "sc-diff" }> =>
+  tab.kind === "diff" || tab.kind === "sc-diff";
+
+const findLastDiffTabIndex = (tabs: WorkspaceTab[]) => {
+  for (let index = tabs.length - 1; index >= 0; index -= 1) {
+    if (isDiffWorkspaceTab(tabs[index])) return index;
+  }
+  return -1;
+};
+
 const defaultSidebarWidth = 224;
 const minSidebarWidth = 180;
 const maxSidebarWidth = 360;
@@ -972,6 +984,39 @@ function WorkspaceLayout() {
     replaceActiveTab(createPageTab(page, label));
   };
 
+  const openReusableDiffTab = (
+    nextTab: Extract<WorkspaceTab, { kind: "diff" | "sc-diff" }>,
+  ) => {
+    setOpenTabs((currentTabs) => {
+      if (currentTabs.some((tab) => tab.id === nextTab.id)) {
+        return currentTabs.map((tab) =>
+          tab.id === nextTab.id ? nextTab : tab,
+        );
+      }
+      if (currentTabs.length === 0) return [nextTab];
+
+      const activeDiffIndex = currentTabs.findIndex(
+        (tab) => tab.id === activeTabId && isDiffWorkspaceTab(tab),
+      );
+      const replaceIndex =
+        activeDiffIndex >= 0
+          ? activeDiffIndex
+          : findLastDiffTabIndex(currentTabs);
+
+      if (replaceIndex < 0) return [...currentTabs, nextTab];
+
+      return currentTabs.reduce<WorkspaceTab[]>((nextTabs, tab, index) => {
+        if (index === replaceIndex) {
+          nextTabs.push(nextTab);
+          return nextTabs;
+        }
+        if (tab.id !== nextTab.id) nextTabs.push(tab);
+        return nextTabs;
+      }, []);
+    });
+    setActiveTabId(nextTab.id);
+  };
+
   useEffect(() => {
     const handleNavigateSession = (event: Event) => {
       const sessionId = (event as CustomEvent<string>).detail;
@@ -1056,11 +1101,7 @@ function WorkspaceLayout() {
       status,
       unified_diff,
     };
-    setOpenTabs((currentTabs) => {
-      if (currentTabs.some((tab) => tab.id === nextTab.id)) return currentTabs;
-      return [...currentTabs, nextTab];
-    });
-    setActiveTabId(nextTab.id);
+    openReusableDiffTab(nextTab);
   };
 
   const openSourceControlDiffTab = (
@@ -1077,11 +1118,7 @@ function WorkspaceLayout() {
       filePath,
       area,
     };
-    setOpenTabs((currentTabs) => {
-      if (currentTabs.some((tab) => tab.id === nextTab.id)) return currentTabs;
-      return [...currentTabs, nextTab];
-    });
-    setActiveTabId(nextTab.id);
+    openReusableDiffTab(nextTab);
   };
 
   const handleSidebarNavigate = (item: SidebarNavigationItem) => {

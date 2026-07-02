@@ -2021,6 +2021,7 @@ impl ChatRunner {
         intent: Option<&str>,
         intent_meaning: Option<&str>,
         token_usage: Option<&TokenUsageInfo>,
+        run_model: Option<&str>,
     ) -> serde_json::Value {
         let mut protocol_meta = serde_json::json!({
             "type": "send",
@@ -2038,6 +2039,7 @@ impl ChatRunner {
             "app_language": app_language,
             "run_id": run_id,
             "session_agent_id": session_agent_id,
+            "model": run_model,
             "source_message_id": source_message_id,
             "client_message_id": client_message_id,
             "chain_depth": chain_depth + 1,

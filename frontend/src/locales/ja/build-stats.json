@@ -35,6 +35,7 @@
   "buildStats.pricing.saved": "価格を保存しました",
   "buildStats.pricing.saving": "保存中...",
   "buildStats.sessionTokens": "セッション別トークン使用量",
+  "buildStats.sessionTokens.showMore": "さらに{count}件のセッションを表示",
   "buildStats.subtitle": "現在のプロジェクトのトークン使用量、開発アクティビティ、セッションコスト、モデル支出。",
   "buildStats.timeRange.30d": "1か月",
   "buildStats.timeRange.7d": "1週間",

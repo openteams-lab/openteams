@@ -4,9 +4,12 @@
 //     pnpm exec tsx src/components/source-control/WorktreeMergeConflictsView.test.ts
 
 import {
+  buildConflictResolutionContent,
   buildResolveConflictRequest,
   canContinueMerge,
+  containsConflictMarkers,
   isNonTextConflict,
+  parseConflictText,
   type FileResolution,
 } from './WorktreeMergeConflictsView';
 import type { ConflictFileContent, ConflictFileInfo } from '@/types';
@@ -124,6 +127,46 @@ check(
 check(
   'continue stays disabled while the conflict list is refreshing',
   !canContinueMerge([], true, true),
+);
+
+const conflictText = [
+  'before\n',
+  '<<<<<<< HEAD\n',
+  'current line\n',
+  '=======\n',
+  'source line\n',
+  '>>>>>>> openteams/session/demo\n',
+  'after\n',
+].join('');
+const parsed = parseConflictText(conflictText);
+
+check(
+  'parses conflict markers into a selectable conflict point',
+  parsed.hunks.length === 1 &&
+    parsed.hunks[0].current === 'current line\n' &&
+    parsed.hunks[0].session === 'source line\n' &&
+    parsed.hunks[0].startLine === 2,
+  parsed,
+);
+
+check(
+  'accept current for one conflict point preserves surrounding content',
+  buildConflictResolutionContent(parsed, { 'hunk-1': 'current' }) ===
+    'before\ncurrent line\nafter\n',
+  buildConflictResolutionContent(parsed, { 'hunk-1': 'current' }),
+);
+
+check(
+  'accept both for one conflict point joins current then source',
+  buildConflictResolutionContent(parsed, { 'hunk-1': 'both' }) ===
+    'before\ncurrent line\nsource line\nafter\n',
+  buildConflictResolutionContent(parsed, { 'hunk-1': 'both' }),
+);
+
+check(
+  'unresolved conflict point keeps conflict markers in the draft result',
+  containsConflictMarkers(buildConflictResolutionContent(parsed, {})),
+  buildConflictResolutionContent(parsed, {}),
 );
 
 if (failures > 0) {

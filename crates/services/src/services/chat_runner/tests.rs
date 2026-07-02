@@ -1410,6 +1410,7 @@ async fn process_agent_protocol_output_requests_retry_for_first_json_shape_failu
             None,
             false,
             None,
+            None,
             0,
         )
         .await
@@ -1456,6 +1457,7 @@ async fn process_agent_protocol_output_uses_raw_output_after_retry_exhaustion() 
             None,
             false,
             None,
+            None,
             MAX_PROTOCOL_PARSE_RETRIES,
         )
         .await
@@ -1500,6 +1502,7 @@ async fn process_agent_protocol_output_uses_conclusion_when_no_send() {
             None,
             false,
             None,
+            None,
             0,
         )
         .await
@@ -1517,6 +1520,48 @@ async fn process_agent_protocol_output_uses_conclusion_when_no_send() {
         messages[0].meta["protocol"]["mode"],
         json!("display_fallback")
     );
+}
+
+#[tokio::test]
+async fn process_agent_protocol_output_persists_run_model_on_send_message() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let result = runner
+        .process_agent_protocol_output(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "coder",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            None,
+            0,
+            ResolvedPromptLanguage {
+                setting: "english",
+                code: "en",
+                instruction: "You MUST respond in English.",
+            },
+            r#"[{"type":"send","to":"you","content":"done"}]"#,
+            None,
+            None,
+            false,
+            None,
+            Some("gpt-5.5"),
+            0,
+        )
+        .await
+        .expect("process protocol output");
+
+    assert!(matches!(result, super::ProtocolProcessResult::Success(1)));
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list messages");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].sender_type, ChatSenderType::Agent);
+    assert_eq!(messages[0].meta["model"], json!("gpt-5.5"));
 }
 
 #[tokio::test]
@@ -1545,6 +1590,7 @@ async fn process_agent_protocol_output_uses_record_when_no_send_or_conclusion() 
             None,
             None,
             false,
+            None,
             None,
             0,
         )
@@ -1588,6 +1634,7 @@ async fn process_agent_protocol_output_persists_error_when_output_empty() {
             None,
             false,
             None,
+            None,
             0,
         )
         .await
@@ -1629,6 +1676,7 @@ async fn process_agent_protocol_output_persists_failure_hint_when_output_empty()
             None,
             None,
             false,
+            None,
             None,
             0,
         )
@@ -1672,6 +1720,7 @@ async fn process_agent_protocol_output_persists_stopped_hint_when_stopped_empty(
             None,
             None,
             true,
+            None,
             None,
             0,
         )
@@ -1847,6 +1896,7 @@ fn build_protocol_send_message_meta_includes_token_usage() {
         Some("reply"),
         Some("The receiver should reply."),
         Some(&token_usage),
+        Some("gpt-5.5"),
     );
 
     assert_eq!(meta["app_language"], json!("zh-Hans"));
@@ -1854,6 +1904,7 @@ fn build_protocol_send_message_meta_includes_token_usage() {
     assert_eq!(meta["protocol"]["to"], json!("you"));
     assert_eq!(meta["protocol"]["intent"], json!("reply"));
     assert_eq!(meta["client_message_id"], json!("client-message-1"));
+    assert_eq!(meta["model"], json!("gpt-5.5"));
     assert_eq!(
         meta["token_usage"]["total_tokens"],
         json!(token_usage.total_tokens)

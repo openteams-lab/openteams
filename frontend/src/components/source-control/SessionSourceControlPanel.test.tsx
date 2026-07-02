@@ -82,7 +82,16 @@ check(
   source.includes("@/pages/worktree/WorktreeMergeConflictsSection") &&
     source.includes("<WorktreeMergeConflictsSection") &&
     source.includes("showConflictResolution") &&
-    source.includes('worktree?.status === "needs_conflict_resolution"'),
+    source.includes('worktree?.status === "needs_conflict_resolution"') &&
+    source.includes("onClose={() => closeConflictResolutionForScope(scopeKey)}"),
+  source,
+);
+
+check(
+  "renders conflict resolution as an overlay instead of replacing the panel",
+  !source.includes("When the user opens the conflict resolver, it takes over") &&
+    source.includes("</div>") &&
+    source.includes("{showConflictResolution &&"),
   source,
 );
 

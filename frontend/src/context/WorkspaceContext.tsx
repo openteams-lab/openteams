@@ -2356,6 +2356,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       const [
         backendMsgs,
         backendAgents,
+        sessionAgents,
         projectMembers,
         runtimeSnapshot,
       ] =
@@ -2364,6 +2365,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           chatAgentsApi
             .list(projectId ? { projectId } : undefined)
             .catch(() => []),
+          sessionAgentsApi.list(sid).catch(() => []),
           projectId ? projectApi.listMembers(projectId).catch(() => []) : [],
           chatRuntimeApi.getSnapshot(sid).catch(() => ({
             session_id: sid,
@@ -2381,11 +2383,20 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
             member.member_name as string,
           ]),
       );
+      const sessionAgentByAgentId = new Map(
+        sessionAgents.map((sessionAgent) => [
+          sessionAgent.agent_id,
+          sessionAgent,
+        ]),
+      );
       const agentNamesById: Record<string, string> = {};
       const agentModelsById: Record<string, string | null> = {};
       for (const a of backendAgents) {
         agentNamesById[a.id] = projectMemberNameByAgentId.get(a.id) ?? a.name;
-        agentModelsById[a.id] = a.model_name ?? null;
+        agentModelsById[a.id] = effectiveSessionAgentModelName(
+          a,
+          sessionAgentByAgentId.get(a.id),
+        );
       }
       agentNamesByIdRef.current = agentNamesById;
       agentModelsByIdRef.current = agentModelsById;
@@ -2915,20 +2926,23 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     (sid: string, runId: string, message: Message) => {
       setAllMessages((prev) => {
         const current = filterMessagesForSession(sid, prev[sid] ?? []);
-        const clientMessageId = userMessageClientId(message);
-        const withoutExistingUserMessage = current.filter(
-          (candidate) =>
-            !matchesUserMessageIdentity(
-              candidate,
-              message.id,
-              clientMessageId,
-            ),
+        const sourceClientMessageId = message.isUser
+          ? userMessageClientId(message)
+          : undefined;
+        const withoutExistingSourceMessage = current.filter((candidate) =>
+          message.isUser
+            ? !matchesUserMessageIdentity(
+                candidate,
+                message.id,
+                sourceClientMessageId,
+              )
+            : candidate.id !== message.id,
         );
 
-        const runIndex = withoutExistingUserMessage.findIndex(
+        const runIndex = withoutExistingSourceMessage.findIndex(
           (candidate) => candidate.isAgentRunning && candidate.runId === runId,
         );
-        const next = [...withoutExistingUserMessage];
+        const next = [...withoutExistingSourceMessage];
         next.splice(runIndex >= 0 ? runIndex : next.length, 0, message);
         return { ...prev, [sid]: resolveQuotedMessageReferences(next) };
       });

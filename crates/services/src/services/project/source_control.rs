@@ -4,6 +4,7 @@ use std::{
     fs,
     io::Read,
     path::{Component, Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
     time::{Duration, Instant},
 };
 
@@ -11,8 +12,9 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use db::models::{
     chat_run::ChatRun,
-    chat_session::{ChatSession, ChatSessionStatus, ChatSessionWorktreeMode},
-    chat_session_worktree::{SessionWorktree, SessionWorktreeStatus},
+    chat_session::{ChatSession, ChatSessionWorktreeMode},
+    chat_session_path_index::{ChatSessionPathIndex, UpsertChatSessionPathIndex},
+    chat_session_worktree::SessionWorktree,
     chat_work_item::{ChatWorkItem, ChatWorkItemType},
     project::Project,
     project_delivery_record::{ProjectDeliveryEventTypeV2, ProjectDeliveryRecord},
@@ -38,13 +40,13 @@ use crate::services::session_worktree::{SessionWorktreeError, SessionWorktreeSer
 const MAX_INLINE_DIFF_BYTES: u64 = 2 * 1024 * 1024;
 const BINARY_SNIFF_BYTES: usize = 8 * 1024;
 const SOURCE_CONTROL_DIFF_STAT_PATH_CHUNK: usize = 200;
-const SOURCE_CONTROL_STATUS_SHARED_PATH_LIMIT: usize = 200;
 const SOURCE_CONTROL_CACHE_TTL: Duration = Duration::from_secs(2);
 
 static SESSION_PATH_CACHE: Lazy<DashMap<SessionPathCacheKey, SessionPathCacheEntry>> =
     Lazy::new(DashMap::new);
 static STATUS_CACHE: Lazy<DashMap<SourceControlStatusCacheKey, SourceControlStatusCacheEntry>> =
     Lazy::new(DashMap::new);
+static SOURCE_CONTROL_CACHE_EPOCH: AtomicU64 = AtomicU64::new(0);
 static INLINE_CODE_PATH_RE: Lazy<regex::Regex> =
     Lazy::new(|| regex::Regex::new(r"`([^`\r\n]+)`").expect("inline code path regex"));
 
@@ -373,6 +375,14 @@ struct WorkspaceObservedPathRecord {
     existed_after_run: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct SourceControlObservedPath {
+    pub path: String,
+    pub source: String,
+    pub existed_after_run: bool,
+    pub observed_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Deserialize)]
 struct RunMetaFile {
     #[serde(default)]
@@ -427,6 +437,46 @@ impl SourceControlService {
         invalidate_source_control_session_caches(session_id);
     }
 
+    pub async fn record_session_run_observed_paths(
+        pool: &SqlitePool,
+        session_id: Uuid,
+        workspace_path: &Path,
+        run_id: Uuid,
+        observed_paths: &[SourceControlObservedPath],
+    ) -> Result<()> {
+        let Some(session) = ChatSession::find_by_id(pool, session_id).await? else {
+            return Err(SourceControlError::SessionNotFound);
+        };
+        let Some(project_id) = session.project_id else {
+            return Ok(());
+        };
+
+        let rows = observed_paths
+            .iter()
+            .filter(|entry| is_artifact_observed_source(&entry.source))
+            .filter_map(|entry| {
+                let path = normalize_workspace_relative_path(&entry.path, workspace_path).ok()?;
+                (!is_internal_openteams_runtime_path(&path)).then_some(UpsertChatSessionPathIndex {
+                    path,
+                    last_run_id: Some(run_id),
+                    last_observed_at: entry.observed_at,
+                    existed_after_run: entry.existed_after_run,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let workspace_path_string = workspace_path.to_string_lossy().to_string();
+        ChatSessionPathIndex::upsert_many(
+            pool,
+            project_id,
+            &workspace_path_string,
+            session_id,
+            &rows,
+        )
+        .await?;
+        Ok(())
+    }
+
     pub async fn session_status(
         &self,
         pool: &SqlitePool,
@@ -434,8 +484,31 @@ impl SourceControlService {
         session_id: Uuid,
         workspace_id: Option<Uuid>,
     ) -> Result<SessionSourceControlStatus> {
+        let request_started = Instant::now();
+        let resolve_started = Instant::now();
         let context = resolve_workspace_context(pool, project_id, session_id, workspace_id).await?;
-        self.cached_status_for_context(pool, &context).await
+        tracing::debug!(
+            project_id = %project_id,
+            session_id = %session_id,
+            workspace_id = ?workspace_id,
+            workspace_path = %context.workspace_path_string,
+            elapsed_ms = elapsed_ms(resolve_started.elapsed()),
+            "source-control session-status phase completed: resolve_workspace_context"
+        );
+
+        let status_started = Instant::now();
+        let status = self.cached_status_for_context(pool, &context).await;
+        tracing::debug!(
+            project_id = %project_id,
+            session_id = %session_id,
+            workspace_id = ?workspace_id,
+            workspace_path = %context.workspace_path_string,
+            elapsed_ms = elapsed_ms(status_started.elapsed()),
+            total_elapsed_ms = elapsed_ms(request_started.elapsed()),
+            success = status.is_ok(),
+            "source-control session-status completed"
+        );
+        status
     }
 
     pub async fn diff(
@@ -812,6 +885,14 @@ impl SourceControlService {
                 force_shared,
             )
             .await?;
+        ChatSessionPathIndex::delete_paths(
+            pool,
+            context.project_id,
+            &context.workspace_path_string,
+            context.session_id,
+            &committed_paths,
+        )
+        .await?;
         invalidate_source_control_caches(&context.workspace_path_string);
 
         Ok(SourceControlCommitResponse {
@@ -831,29 +912,114 @@ impl SourceControlService {
         pool: &SqlitePool,
         context: &WorkspaceContext,
     ) -> Result<SessionSourceControlStatus> {
+        let total_started = Instant::now();
+        let phase_started = Instant::now();
         ensure_workspace_accessible(&context.workspace_path)?;
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            elapsed_ms = elapsed_ms(phase_started.elapsed()),
+            "source-control session-status phase completed: ensure_workspace_accessible"
+        );
+
+        let phase_started = Instant::now();
         let session_paths = collect_session_paths(pool, context.session_id, context).await?;
         let session_path_set = session_paths.keys().cloned().collect::<BTreeSet<_>>();
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            elapsed_ms = elapsed_ms(phase_started.elapsed()),
+            session_path_count = session_paths.len(),
+            "source-control session-status phase completed: collect_session_paths"
+        );
 
+        let phase_started = Instant::now();
         if !is_git_repo(&context.workspace_path) {
+            let build_started = Instant::now();
+            let files = build_plain_files(&context.workspace_path, session_paths);
+            tracing::debug!(
+                project_id = %context.project_id,
+                session_id = %context.session_id,
+                workspace_id = ?context.workspace_id,
+                workspace_path = %context.workspace_path_string,
+                elapsed_ms = elapsed_ms(build_started.elapsed()),
+                file_count = files.len(),
+                "source-control session-status phase completed: build_plain_files"
+            );
+            tracing::debug!(
+                project_id = %context.project_id,
+                session_id = %context.session_id,
+                workspace_id = ?context.workspace_id,
+                workspace_path = %context.workspace_path_string,
+                elapsed_ms = elapsed_ms(phase_started.elapsed()),
+                total_elapsed_ms = elapsed_ms(total_started.elapsed()),
+                mode = "plain",
+                "source-control session-status context completed"
+            );
             return Ok(SessionSourceControlStatus::Plain {
                 workspace_id: context.workspace_id,
                 workspace_path: context.workspace_path_string.clone(),
-                files: build_plain_files(&context.workspace_path, session_paths),
+                files,
                 reason: SourceControlPlainReason::NotGitRepo,
             });
         }
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            elapsed_ms = elapsed_ms(phase_started.elapsed()),
+            "source-control session-status phase completed: detect_git_repo"
+        );
 
         let git = GitCli::new();
+        let phase_started = Instant::now();
         let worktree_status = git.get_worktree_status(&context.workspace_path)?;
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            elapsed_ms = elapsed_ms(phase_started.elapsed()),
+            raw_entry_count = worktree_status.entries.len(),
+            "source-control session-status phase completed: git_worktree_status"
+        );
+
+        let phase_started = Instant::now();
         let entries = normalize_status_entries(worktree_status.entries);
         let changed_session_paths = session_changed_paths(&entries, &session_path_set);
-        let shared_paths = if changed_session_paths.len() <= SOURCE_CONTROL_STATUS_SHARED_PATH_LIMIT
-        {
-            collect_shared_paths(pool, context, &changed_session_paths).await?
-        } else {
-            HashMap::new()
-        };
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            elapsed_ms = elapsed_ms(phase_started.elapsed()),
+            entry_count = entries.len(),
+            changed_session_path_count = changed_session_paths.len(),
+            "source-control session-status phase completed: normalize_and_filter_status_entries"
+        );
+
+        let phase_started = Instant::now();
+        let shared_paths = collect_shared_paths(pool, context, &changed_session_paths).await?;
+        let shared_path_count = shared_paths.len();
+        let shared_session_ref_count = shared_paths.values().map(Vec::len).sum::<usize>();
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            elapsed_ms = elapsed_ms(phase_started.elapsed()),
+            target_path_count = changed_session_paths.len(),
+            shared_path_count,
+            shared_session_ref_count,
+            "source-control session-status phase completed: collect_shared_paths"
+        );
+
+        let phase_started = Instant::now();
         let mut changes = Vec::new();
         let mut staged_changes = Vec::new();
         let mut external_staged_paths = Vec::new();
@@ -888,7 +1054,19 @@ impl SourceControlService {
         staged_changes.sort_by(|a, b| a.path.cmp(&b.path));
         external_staged_paths.sort();
         external_staged_paths.dedup();
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            elapsed_ms = elapsed_ms(phase_started.elapsed()),
+            change_count = changes.len(),
+            staged_change_count = staged_changes.len(),
+            external_staged_path_count = external_staged_paths.len(),
+            "source-control session-status phase completed: build_status_files"
+        );
 
+        let phase_started = Instant::now();
         let head_sha = current_head_sha(&context.workspace_path);
         let branch = current_branch(&context.workspace_path).unwrap_or_else(|| "HEAD".to_string());
         let operation_in_progress =
@@ -907,6 +1085,30 @@ impl SourceControlService {
             (None, true) => Some("HEAD is detached.".to_string()),
             _ => None,
         };
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            elapsed_ms = elapsed_ms(phase_started.elapsed()),
+            branch = %branch,
+            has_head_sha = head_sha.is_some(),
+            operation_in_progress = ?operation_in_progress,
+            detached_head,
+            "source-control session-status phase completed: git_metadata"
+        );
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            total_elapsed_ms = elapsed_ms(total_started.elapsed()),
+            mode = "git",
+            change_count = changes.len(),
+            staged_change_count = staged_changes.len(),
+            external_staged_path_count = external_staged_paths.len(),
+            "source-control session-status context completed"
+        );
 
         Ok(SessionSourceControlStatus::Git {
             workspace_id: context.workspace_id,
@@ -927,6 +1129,7 @@ impl SourceControlService {
         pool: &SqlitePool,
         context: &WorkspaceContext,
     ) -> Result<SessionSourceControlStatus> {
+        let total_started = Instant::now();
         let key = SourceControlStatusCacheKey {
             project_id: context.project_id,
             session_id: context.session_id,
@@ -937,17 +1140,68 @@ impl SourceControlService {
         if let Some(entry) = STATUS_CACHE.get(&key)
             && now.duration_since(entry.captured_at) <= SOURCE_CONTROL_CACHE_TTL
         {
+            tracing::debug!(
+                project_id = %context.project_id,
+                session_id = %context.session_id,
+                workspace_id = ?context.workspace_id,
+                workspace_path = %context.workspace_path_string,
+                cache_hit = true,
+                cache_age_ms = elapsed_ms(now.duration_since(entry.captured_at)),
+                elapsed_ms = elapsed_ms(total_started.elapsed()),
+                "source-control session-status cache lookup completed"
+            );
             return Ok(entry.status.clone());
         }
 
-        let status = self.status_for_context(pool, context).await?;
-        STATUS_CACHE.insert(
-            key,
-            SourceControlStatusCacheEntry {
-                captured_at: Instant::now(),
-                status: status.clone(),
-            },
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            cache_hit = false,
+            elapsed_ms = elapsed_ms(total_started.elapsed()),
+            "source-control session-status cache lookup completed"
         );
+
+        let cache_epoch = source_control_cache_epoch();
+        let phase_started = Instant::now();
+        let status = self.status_for_context(pool, context).await?;
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            elapsed_ms = elapsed_ms(phase_started.elapsed()),
+            "source-control session-status phase completed: status_for_context"
+        );
+        if source_control_cache_epoch() == cache_epoch {
+            STATUS_CACHE.insert(
+                key,
+                SourceControlStatusCacheEntry {
+                    captured_at: Instant::now(),
+                    status: status.clone(),
+                },
+            );
+            tracing::debug!(
+                project_id = %context.project_id,
+                session_id = %context.session_id,
+                workspace_id = ?context.workspace_id,
+                workspace_path = %context.workspace_path_string,
+                elapsed_ms = elapsed_ms(total_started.elapsed()),
+                cache_inserted = true,
+                "source-control session-status cache store completed"
+            );
+        } else {
+            tracing::debug!(
+                project_id = %context.project_id,
+                session_id = %context.session_id,
+                workspace_id = ?context.workspace_id,
+                workspace_path = %context.workspace_path_string,
+                elapsed_ms = elapsed_ms(total_started.elapsed()),
+                cache_inserted = false,
+                "source-control session-status cache store skipped after epoch change"
+            );
+        }
         Ok(status)
     }
 
@@ -1151,9 +1405,10 @@ async fn resolve_workspace_context(
                 other => SourceControlError::WorkspaceNotAccessible(other.to_string()),
             })?;
         if let Some(wt) = latest {
-            // Source-control stays in the isolated worktree while it can still
-            // hold unmerged session edits. After merge, show the base workspace.
-            if worktree_status_uses_isolated_source_control(wt.status) {
+            // Source-control follows the same workspace routing as runners:
+            // merged worktrees stay selected so follow-up commits can be made
+            // and merged again from the same session workspace.
+            if wt.status.is_active_for_workspace() {
                 let workspace_path = PathBuf::from(&wt.worktree_path);
                 ensure_workspace_accessible(&workspace_path)?;
                 return Ok(WorkspaceContext {
@@ -1164,9 +1419,8 @@ async fn resolve_workspace_context(
                     workspace_path,
                 });
             }
-            // Terminal/audit states (merged/archived/cleanup_failed)
-            // → switch back to the worktree row's base_workspace_path,
-            // not the (possibly changed) project default.
+            // Terminal/audit states switch back to the worktree row's
+            // base_workspace_path, not the (possibly changed) project default.
             let workspace_path = PathBuf::from(&wt.base_workspace_path);
             ensure_workspace_accessible(&workspace_path)?;
             return Ok(WorkspaceContext {
@@ -1195,17 +1449,6 @@ async fn resolve_workspace_context(
         workspace_path,
         workspace_path_string,
     })
-}
-
-fn worktree_status_uses_isolated_source_control(status: SessionWorktreeStatus) -> bool {
-    matches!(
-        status,
-        SessionWorktreeStatus::Creating
-            | SessionWorktreeStatus::Active
-            | SessionWorktreeStatus::Dirty
-            | SessionWorktreeStatus::Merging
-            | SessionWorktreeStatus::NeedsConflictResolution
-    )
 }
 
 async fn resolve_project_workspace(
@@ -1268,27 +1511,153 @@ async fn collect_session_paths(
     if let Some(entry) = SESSION_PATH_CACHE.get(&key)
         && now.duration_since(entry.captured_at) <= SOURCE_CONTROL_CACHE_TTL
     {
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            cache_hit = true,
+            cache_age_ms = elapsed_ms(now.duration_since(entry.captured_at)),
+            path_count = entry.paths.len(),
+            "source-control session-status phase completed: session_path_cache_lookup"
+        );
         return Ok(entry.paths.clone());
     }
 
+    tracing::debug!(
+        project_id = %context.project_id,
+        session_id = %session_id,
+        workspace_id = ?context.workspace_id,
+        workspace_path = %context.workspace_path_string,
+        cache_hit = false,
+        "source-control session-status phase completed: session_path_cache_lookup"
+    );
+
+    let cache_epoch = source_control_cache_epoch();
+    let phase_started = Instant::now();
     let runs =
         ChatRun::list_for_session_workspace(pool, session_id, &context.workspace_path_string)
             .await?;
+    tracing::debug!(
+        project_id = %context.project_id,
+        session_id = %session_id,
+        workspace_id = ?context.workspace_id,
+        workspace_path = %context.workspace_path_string,
+        elapsed_ms = elapsed_ms(phase_started.elapsed()),
+        run_count = runs.len(),
+        "source-control session-status phase completed: list_session_runs"
+    );
+
+    let phase_started = Instant::now();
     let work_items = ChatWorkItem::find_by_session_id(pool, session_id, None)
         .await?
         .into_iter()
         .filter(|item| item.item_type == ChatWorkItemType::Artifact)
         .collect::<Vec<_>>();
-    let paths = collect_paths_from_runs(&context.workspace_path, &runs, &work_items)?;
-    let paths = filter_committed_session_paths(pool, session_id, context, paths).await?;
-    SESSION_PATH_CACHE.insert(
-        key,
-        SessionPathCacheEntry {
-            captured_at: Instant::now(),
-            paths: paths.clone(),
-        },
+    tracing::debug!(
+        project_id = %context.project_id,
+        session_id = %session_id,
+        workspace_id = ?context.workspace_id,
+        workspace_path = %context.workspace_path_string,
+        elapsed_ms = elapsed_ms(phase_started.elapsed()),
+        artifact_work_item_count = work_items.len(),
+        "source-control session-status phase completed: list_artifact_work_items"
     );
+
+    let phase_started = Instant::now();
+    let paths = collect_paths_from_runs(&context.workspace_path, &runs, &work_items)?;
+    tracing::debug!(
+        project_id = %context.project_id,
+        session_id = %session_id,
+        workspace_id = ?context.workspace_id,
+        workspace_path = %context.workspace_path_string,
+        elapsed_ms = elapsed_ms(phase_started.elapsed()),
+        path_count = paths.len(),
+        "source-control session-status phase completed: collect_paths_from_runs"
+    );
+
+    let phase_started = Instant::now();
+    let paths = filter_committed_session_paths(pool, session_id, context, paths).await?;
+    tracing::debug!(
+        project_id = %context.project_id,
+        session_id = %session_id,
+        workspace_id = ?context.workspace_id,
+        workspace_path = %context.workspace_path_string,
+        elapsed_ms = elapsed_ms(phase_started.elapsed()),
+        retained_path_count = paths.len(),
+        "source-control session-status phase completed: filter_committed_session_paths"
+    );
+
+    let phase_started = Instant::now();
+    persist_session_path_index(pool, context, session_id, None, &paths).await?;
+    tracing::debug!(
+        project_id = %context.project_id,
+        session_id = %session_id,
+        workspace_id = ?context.workspace_id,
+        workspace_path = %context.workspace_path_string,
+        elapsed_ms = elapsed_ms(phase_started.elapsed()),
+        indexed_path_count = paths.len(),
+        "source-control session-status phase completed: persist_session_path_index"
+    );
+    if source_control_cache_epoch() == cache_epoch {
+        SESSION_PATH_CACHE.insert(
+            key,
+            SessionPathCacheEntry {
+                captured_at: Instant::now(),
+                paths: paths.clone(),
+            },
+        );
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            cache_inserted = true,
+            path_count = paths.len(),
+            "source-control session-status phase completed: session_path_cache_store"
+        );
+    } else {
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            cache_inserted = false,
+            path_count = paths.len(),
+            "source-control session-status phase skipped: session_path_cache_store"
+        );
+    }
     Ok(paths)
+}
+
+async fn persist_session_path_index(
+    pool: &SqlitePool,
+    context: &WorkspaceContext,
+    session_id: Uuid,
+    run_id: Option<Uuid>,
+    paths: &BTreeMap<String, SessionPathState>,
+) -> Result<()> {
+    let rows = paths
+        .iter()
+        .filter_map(|(path, state)| {
+            Some(UpsertChatSessionPathIndex {
+                path: path.clone(),
+                last_run_id: run_id,
+                last_observed_at: state.last_observed_at?,
+                existed_after_run: state.existed_after_run,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    ChatSessionPathIndex::upsert_many(
+        pool,
+        context.project_id,
+        &context.workspace_path_string,
+        session_id,
+        &rows,
+    )
+    .await?;
+    Ok(())
 }
 
 async fn filter_committed_session_paths(
@@ -1308,18 +1677,35 @@ async fn filter_committed_session_paths(
         return Ok(paths);
     }
 
-    Ok(paths
-        .into_iter()
-        .filter(|(path, state)| {
-            let Some(last_observed_at) = state.last_observed_at else {
-                return true;
-            };
-            committed_paths
-                .get(path)
-                .map(|committed_at| *committed_at < last_observed_at)
-                .unwrap_or(true)
-        })
-        .collect())
+    let mut retained_paths = BTreeMap::new();
+    let mut pruned_paths = Vec::new();
+    for (path, state) in paths {
+        let keep = state
+            .last_observed_at
+            .as_ref()
+            .and_then(|last_observed_at| {
+                committed_paths
+                    .get(&path)
+                    .map(|committed_at| committed_at < last_observed_at)
+            })
+            .unwrap_or(true);
+        if keep {
+            retained_paths.insert(path, state);
+        } else {
+            pruned_paths.push(path);
+        }
+    }
+
+    ChatSessionPathIndex::delete_paths(
+        pool,
+        context.project_id,
+        &context.workspace_path_string,
+        session_id,
+        &pruned_paths,
+    )
+    .await?;
+
+    Ok(retained_paths)
 }
 
 async fn collect_committed_path_times(
@@ -1406,21 +1792,40 @@ async fn collect_shared_paths(
         return Ok(HashMap::new());
     }
 
-    let sessions = ChatSession::find_by_project(pool, context.project_id).await?;
     let mut by_path = HashMap::<String, BTreeSet<Uuid>>::new();
-    for session in sessions.into_iter().filter(|session| {
-        session.status == ChatSessionStatus::Active && session.id != context.session_id
-    }) {
-        let paths = collect_session_paths(pool, session.id, context).await?;
-        for path in paths.keys().filter(|path| target_paths.contains(*path)) {
-            by_path.entry(path.clone()).or_default().insert(session.id);
-        }
+    let target_paths = target_paths.iter().cloned().collect::<Vec<_>>();
+    for shared in ChatSessionPathIndex::find_shared_sessions_for_paths(
+        pool,
+        context.project_id,
+        &context.workspace_path_string,
+        context.session_id,
+        &target_paths,
+    )
+    .await?
+    {
+        by_path
+            .entry(shared.path)
+            .or_default()
+            .insert(shared.session_id);
     }
 
-    Ok(by_path
+    let shared_paths = by_path
         .into_iter()
         .map(|(path, sessions)| (path, sessions.into_iter().collect::<Vec<_>>()))
-        .collect())
+        .collect::<HashMap<_, _>>();
+    for (path, sessions) in &shared_paths {
+        tracing::debug!(
+            project_id = %context.project_id,
+            session_id = %context.session_id,
+            workspace_id = ?context.workspace_id,
+            workspace_path = %context.workspace_path_string,
+            shared_path = %path,
+            shared_session_ids = ?sessions,
+            "source-control collect_shared_paths found shared file sessions"
+        );
+    }
+
+    Ok(shared_paths)
 }
 
 async fn resolve_commit_work_item_ids(
@@ -1458,6 +1863,8 @@ async fn resolve_commit_work_item_ids(
 }
 
 fn invalidate_source_control_caches(workspace_path: &str) {
+    bump_source_control_cache_epoch();
+
     let path_keys = SESSION_PATH_CACHE
         .iter()
         .filter(|entry| entry.key().workspace_path.as_str() == workspace_path)
@@ -1478,6 +1885,8 @@ fn invalidate_source_control_caches(workspace_path: &str) {
 }
 
 fn invalidate_source_control_session_caches(session_id: Uuid) {
+    bump_source_control_cache_epoch();
+
     let path_keys = SESSION_PATH_CACHE
         .iter()
         .filter(|entry| entry.key().session_id == session_id)
@@ -1494,6 +1903,32 @@ fn invalidate_source_control_session_caches(session_id: Uuid) {
         .collect::<Vec<_>>();
     for key in status_keys {
         STATUS_CACHE.remove(&key);
+    }
+}
+
+fn elapsed_ms(duration: Duration) -> u64 {
+    duration.as_millis().min(u128::from(u64::MAX)) as u64
+}
+
+fn source_control_cache_epoch() -> u64 {
+    SOURCE_CONTROL_CACHE_EPOCH.load(Ordering::Acquire)
+}
+
+fn bump_source_control_cache_epoch() {
+    SOURCE_CONTROL_CACHE_EPOCH.fetch_add(1, Ordering::AcqRel);
+}
+
+#[cfg(test)]
+mod cache_tests {
+    use super::*;
+
+    #[test]
+    fn cache_epoch_advances_on_workspace_invalidation() {
+        let before = source_control_cache_epoch();
+
+        invalidate_source_control_caches("__source_control_epoch_test__");
+
+        assert!(source_control_cache_epoch() > before);
     }
 }
 

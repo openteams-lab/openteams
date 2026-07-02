@@ -8,6 +8,7 @@ pub mod chat_permission;
 pub mod chat_run;
 pub mod chat_session;
 pub mod chat_session_agent;
+pub mod chat_session_path_index;
 pub mod chat_session_worktree;
 pub mod chat_skill;
 pub mod chat_work_item;

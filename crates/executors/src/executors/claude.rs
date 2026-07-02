@@ -749,6 +749,7 @@ impl ClaudeLogProcessor {
                 // TODO: Add proper ToolResult support to NormalizedEntry when the type system supports it
                 None
             }
+            ClaudeContentItem::Unknown => None,
         }
     }
 
@@ -1053,6 +1054,7 @@ impl ClaudeLogProcessor {
                             }
                         }
                         ClaudeContentItem::ToolResult { .. } => {}
+                        ClaudeContentItem::Unknown => {}
                     }
                 }
             }
@@ -1323,6 +1325,7 @@ impl ClaudeLogProcessor {
             ClaudeJson::StreamEvent {
                 event,
                 parent_tool_use_id,
+                uuid,
                 ..
             } => match event {
                 ClaudeStreamEvent::MessageStart { message } => {
@@ -1332,7 +1335,7 @@ impl ClaudeLogProcessor {
                             patches.push(patch);
                         }
 
-                        if let Some(message_id) = message.id.clone() {
+                        if let Some(message_id) = message.id.clone().or_else(|| uuid.clone()) {
                             self.streaming_messages.insert(
                                 message_id.clone(),
                                 StreamingMessageState::new(message.role.clone()),
@@ -1934,6 +1937,7 @@ pub struct ClaudeMessage {
     pub message_type: Option<String>,
     pub role: String,
     pub model: Option<String>,
+    #[serde(default)]
     pub content: ClaudeMessageContent,
     pub stop_reason: Option<String>,
 }
@@ -1943,6 +1947,12 @@ pub struct ClaudeMessage {
 pub enum ClaudeMessageContent {
     Array(Vec<ClaudeContentItem>),
     Text(String),
+}
+
+impl Default for ClaudeMessageContent {
+    fn default() -> Self {
+        Self::Array(Vec::new())
+    }
 }
 
 impl ClaudeMessageContent {
@@ -1980,6 +1990,8 @@ pub enum ClaudeContentItem {
         content: serde_json::Value,
         is_error: Option<bool>,
     },
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
@@ -2380,6 +2392,27 @@ mod tests {
             NormalizedEntryType::Thinking
         ));
         assert_eq!(entries[0].content, "Let me think about this...");
+    }
+
+    #[test]
+    fn test_streaming_thinking_delta_uses_uuid_when_start_has_no_content_or_id() {
+        let mut processor = ClaudeLogProcessor::new();
+        let provider = EntryIndexProvider::test_new();
+
+        let start_json = r#"{"type":"stream_event","uuid":"assistant-uuid-1","event":{"type":"message_start","message":{"role":"assistant","model":"claude-sonnet-4-20250514"}}}"#;
+        let start: ClaudeJson = serde_json::from_str(start_json).unwrap();
+        let _ = processor.normalize_entries(&start, "", &provider);
+
+        let delta_json = r#"{"type":"stream_event","uuid":"assistant-uuid-1","event":{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"I should inspect the executor."}}}"#;
+        let delta: ClaudeJson = serde_json::from_str(delta_json).unwrap();
+        let entries = patches_to_entries(&processor.normalize_entries(&delta, "", &provider));
+
+        assert_eq!(entries.len(), 1);
+        assert!(matches!(
+            entries[0].entry_type,
+            NormalizedEntryType::Thinking
+        ));
+        assert_eq!(entries[0].content, "I should inspect the executor.");
     }
 
     #[test]

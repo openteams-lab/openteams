@@ -60,7 +60,8 @@ check(
   'welcome page is independent from numbered steps',
   guideSource.includes("const welcomeStepKey = 'welcome'") &&
     guideSource.includes('activeStepKey === welcomeStepKey') &&
-    guideSource.includes('!isWelcome &&') &&
+    guideSource.includes('if (isWelcome)') &&
+    guideSource.includes('return renderConfigurationStep()') &&
     guideSource.includes('onboarding.welcome.next') &&
     !guideSource.includes('welcomeStepKey, ...onboardingSteps'),
   guideSource,
@@ -121,6 +122,7 @@ check(
   guideSource.indexOf('await onCreateProjectFromOnboarding') <
     guideSource.indexOf('await onboardingApi.complete') &&
   guideSource.includes('await onboardingApi.complete') &&
+    guideSource.includes('path: projectDraft.path') &&
     guideSource.includes('created_project_id: createdProject.projectId') &&
     guideSource.includes('onOpenCreateSession(state)') &&
     appSource.includes('onCreateProjectFromOnboarding={handleCreateOnboardingProject}') &&

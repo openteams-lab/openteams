@@ -33,6 +33,8 @@ import {
 
 type TimeRange = '7d' | '30d' | '90d';
 
+const SESSION_TOKEN_PREVIEW_LIMIT = 7;
+
 const asArray = <T,>(value: T[] | null | undefined): T[] =>
   Array.isArray(value) ? value : [];
 
@@ -516,6 +518,7 @@ export function BuildStatsPage() {
               sessions={sessions}
               loading={sessionsLoading}
               mode="bar"
+              visibleLimit={SESSION_TOKEN_PREVIEW_LIMIT}
               selectedSessionId={null}
               onSessionSelect={setSelectedSession}
               t={t}

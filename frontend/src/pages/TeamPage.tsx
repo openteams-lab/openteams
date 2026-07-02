@@ -283,7 +283,22 @@ const sameStringSet = (left: string[], right: string[]) => {
   return leftSorted.every((value, index) => value === rightSorted[index]);
 };
 
+const sameMemberFormState = (
+  left: MemberFormState,
+  right: MemberFormState,
+) =>
+  left.workspacePath === right.workspacePath &&
+  left.memberName === right.memberName &&
+  left.isLeader === right.isLeader &&
+  left.runnerType === right.runnerType &&
+  left.modelName === right.modelName &&
+  left.thinkingEffort === right.thinkingEffort &&
+  left.modelVariant === right.modelVariant &&
+  left.roleDefinition === right.roleDefinition &&
+  sameStringSet(left.allowedSkillIds, right.allowedSkillIds);
+
 const noticeAutoDismissMs = 4200;
+const autoSaveDelayMs = 700;
 
 const createUniqueAgentName = (
   runnerType: BaseCodingAgent,
@@ -387,6 +402,16 @@ export function TeamPage() {
   const [addMemberMenuRequestId, setAddMemberMenuRequestId] = useState(0);
   const addMemberActionRef = useRef<HTMLDivElement | null>(null);
   const loadRequestIdRef = useRef(0);
+  const memberAutoSaveTimerRef = useRef<number | null>(null);
+  const mcpAutoSaveTimerRef = useRef<number | null>(null);
+  const teamProtocolAutoSaveTimerRef = useRef<number | null>(null);
+  const latestMemberDraftRef = useRef<MemberFormState | null>(null);
+  const latestMcpServersJsonRef = useRef(mcpServersJson);
+  const latestTeamProtocolContentRef = useRef(teamProtocolContent);
+  const memberFormSyncRef = useRef<{
+    memberId: string;
+    state: MemberFormState;
+  } | null>(null);
 
   const currentProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -461,6 +486,19 @@ export function TeamPage() {
   const selectedReasoningValue =
     (capability?.kind === "variant" ? modelVariant : thinkingEffort) ||
     defaultOptionId;
+  latestMemberDraftRef.current = {
+    allowedSkillIds,
+    isLeader,
+    memberName: memberNameValue,
+    modelName,
+    modelVariant,
+    roleDefinition,
+    runnerType,
+    thinkingEffort,
+    workspacePath,
+  };
+  latestMcpServersJsonRef.current = mcpServersJson;
+  latestTeamProtocolContentRef.current = teamProtocolContent;
   const mcpDirty = mcpServersJson !== originalMcpServersJson;
   const teamProtocolDirty =
     teamProtocolContent !== originalTeamProtocolContent;
@@ -679,18 +717,37 @@ export function TeamPage() {
   }, [activeSessionId, t]);
 
   useEffect(() => {
-    if (!memberFormState) return;
-    setWorkspacePath(memberFormState.workspacePath);
-    setMemberNameValue(memberFormState.memberName);
-    setIsLeader(memberFormState.isLeader);
-    setAllowedSkillIds(memberFormState.allowedSkillIds);
-    setRunnerType(memberFormState.runnerType);
-    setModelName(memberFormState.modelName);
-    setThinkingEffort(memberFormState.thinkingEffort);
-    setModelVariant(memberFormState.modelVariant);
-    setRoleDefinition(memberFormState.roleDefinition);
+    if (!memberFormState || !selectedMember) {
+      memberFormSyncRef.current = null;
+      return;
+    }
+
+    const previousSync = memberFormSyncRef.current;
+    const sameMember = previousSync?.memberId === selectedMember.id;
+    const localDraft = latestMemberDraftRef.current;
+    const localDirty =
+      sameMember &&
+      !!localDraft &&
+      !sameMemberFormState(localDraft, previousSync.state);
+
+    memberFormSyncRef.current = {
+      memberId: selectedMember.id,
+      state: memberFormState,
+    };
+
+    if (!sameMember || !localDirty) {
+      setWorkspacePath(memberFormState.workspacePath);
+      setMemberNameValue(memberFormState.memberName);
+      setIsLeader(memberFormState.isLeader);
+      setAllowedSkillIds(memberFormState.allowedSkillIds);
+      setRunnerType(memberFormState.runnerType);
+      setModelName(memberFormState.modelName);
+      setThinkingEffort(memberFormState.thinkingEffort);
+      setModelVariant(memberFormState.modelVariant);
+      setRoleDefinition(memberFormState.roleDefinition);
+    }
     setNotice(null);
-  }, [memberFormState]);
+  }, [memberFormState, selectedMember]);
 
   useEffect(() => {
     if (!selectedMember) {
@@ -764,10 +821,11 @@ export function TeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [runnerType, selectedMember]);
+  }, [runnerType, selectedMember?.id]);
 
   const saveMember = async () => {
-    if (!selectedProjectId || !selectedMember) return;
+    const draft = latestMemberDraftRef.current;
+    if (!selectedProjectId || !selectedMember || !draft) return;
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -775,39 +833,43 @@ export function TeamPage() {
     try {
       const explicitMemberName = selectedMember.member_name?.trim() ?? "";
       const fallbackAgentName = selectedAgent?.name?.trim() ?? "";
-      const nextMemberName = memberNameValue.trim();
+      const nextMemberName = draft.memberName.trim();
       const memberNamePayload =
         !explicitMemberName &&
         fallbackAgentName &&
         nextMemberName === fallbackAgentName
           ? null
-          : trimOrNull(memberNameValue);
+          : trimOrNull(draft.memberName);
       const memberUpdate = projectApi.updateMember(
         selectedProjectId,
         selectedMember.id,
         {
-          role: isLeader ? "lead" : nonLeadRole,
+          role: draft.isLeader ? "lead" : nonLeadRole,
           member_name: memberNamePayload,
           display_order: null,
-          default_workspace_path: trimOrNull(workspacePath),
+          default_workspace_path: trimOrNull(draft.workspacePath),
           is_default: null,
-          allowed_skill_ids: allowedSkillIds,
+          allowed_skill_ids: draft.allowedSkillIds,
           execution_config: {
-            runner_type: runnerType,
-            model_name: trimOrNull(modelName),
+            runner_type: draft.runnerType,
+            model_name: trimOrNull(draft.modelName),
             thinking_effort:
-              capability?.kind === "effort" ? trimOrNull(thinkingEffort) : null,
+              capability?.kind === "effort"
+                ? trimOrNull(draft.thinkingEffort)
+                : null,
             model_variant:
-              capability?.kind === "variant" ? trimOrNull(modelVariant) : null,
+              capability?.kind === "variant"
+                ? trimOrNull(draft.modelVariant)
+                : null,
           },
         } as never,
       );
       const agentUpdate =
-        selectedAgent && selectedAgent.system_prompt !== roleDefinition
+        selectedAgent && selectedAgent.system_prompt !== draft.roleDefinition
           ? chatAgentsApi.update(selectedAgent.id, {
               name: null,
               runner_type: null,
-              system_prompt: roleDefinition,
+              system_prompt: draft.roleDefinition,
               tools_enabled: null,
               model_name: null,
             })
@@ -842,6 +904,29 @@ export function TeamPage() {
           ),
         );
       }
+      const draftStillCurrent = latestMemberDraftRef.current
+        ? sameMemberFormState(latestMemberDraftRef.current, draft)
+        : true;
+      if (draftStillCurrent) {
+        const savedFormState = resolveMemberFormState(
+          updatedMember as ProjectMemberWithExecution,
+          updatedAgent,
+          currentProject?.default_workspace_path,
+        );
+        memberFormSyncRef.current = {
+          memberId: updatedMember.id,
+          state: savedFormState,
+        };
+        setWorkspacePath(savedFormState.workspacePath);
+        setMemberNameValue(savedFormState.memberName);
+        setIsLeader(savedFormState.isLeader);
+        setAllowedSkillIds(savedFormState.allowedSkillIds);
+        setRunnerType(savedFormState.runnerType);
+        setModelName(savedFormState.modelName);
+        setThinkingEffort(savedFormState.thinkingEffort);
+        setModelVariant(savedFormState.modelVariant);
+        setRoleDefinition(savedFormState.roleDefinition);
+      }
       await Promise.all([
         activeSessionId
           ? sessionAgentsApi
@@ -854,7 +939,7 @@ export function TeamPage() {
         refreshMembers().catch(() => undefined),
         refreshMessages().catch(() => undefined),
       ]);
-      setMemberSuccess(true);
+      setMemberSuccess(draftStillCurrent);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : t("teamPage.error.saveMember"),
@@ -921,15 +1006,16 @@ export function TeamPage() {
     setMcpError(null);
     setMcpSuccess(false);
     try {
-      const fullConfig = JSON.parse(mcpServersJson) as JsonValue;
+      const draftJson = mcpServersJson;
+      const fullConfig = JSON.parse(draftJson) as JsonValue;
       McpConfigStrategyGeneral.validateFullConfig(mcpConfig, fullConfig);
       const servers = McpConfigStrategyGeneral.extractServersForApi(
         mcpConfig,
         fullConfig,
       );
       await mcpServersApi.save(runnerType, { servers });
-      setOriginalMcpServersJson(mcpServersJson);
-      setMcpSuccess(true);
+      setOriginalMcpServersJson(draftJson);
+      setMcpSuccess(latestMcpServersJsonRef.current === draftJson);
     } catch (err) {
       setMcpError(
         err instanceof SyntaxError
@@ -955,20 +1041,8 @@ export function TeamPage() {
     setModelVariant("");
   };
 
-  const discardMcpChanges = () => {
-    setMcpServersJson(originalMcpServersJson);
-    setMcpError(null);
-    setMcpSuccess(false);
-  };
-
   const handleTeamProtocolChange = (value: string) => {
     setTeamProtocolContent(value);
-    setTeamProtocolError(null);
-    setTeamProtocolSuccess(false);
-  };
-
-  const discardTeamProtocolChanges = () => {
-    setTeamProtocolContent(originalTeamProtocolContent);
     setTeamProtocolError(null);
     setTeamProtocolSuccess(false);
   };
@@ -984,10 +1058,12 @@ export function TeamPage() {
         content,
         enabled: teamProtocolEnabled || content.trim().length > 0,
       });
-      setTeamProtocolContent(saved.content);
       setOriginalTeamProtocolContent(saved.content);
       setTeamProtocolEnabled(saved.enabled);
-      setTeamProtocolSuccess(true);
+      setTeamProtocolContent((current) =>
+        current === content ? saved.content : current,
+      );
+      setTeamProtocolSuccess(latestTeamProtocolContentRef.current === content);
       await refreshMessages().catch(() => undefined);
     } catch (err) {
       setTeamProtocolError(
@@ -1000,20 +1076,115 @@ export function TeamPage() {
     }
   };
 
-  const discardMemberChanges = () => {
-    if (!memberFormState) return;
-    setMemberSuccess(false);
-    setWorkspacePath(memberFormState.workspacePath);
-    setMemberNameValue(memberFormState.memberName);
-    setIsLeader(memberFormState.isLeader);
-    setAllowedSkillIds(memberFormState.allowedSkillIds);
-    setRunnerType(memberFormState.runnerType);
-    setModelName(memberFormState.modelName);
-    setThinkingEffort(memberFormState.thinkingEffort);
-    setModelVariant(memberFormState.modelVariant);
-    setRoleDefinition(memberFormState.roleDefinition);
-    setNotice(null);
-  };
+  useEffect(() => {
+    if (memberAutoSaveTimerRef.current !== null) {
+      window.clearTimeout(memberAutoSaveTimerRef.current);
+      memberAutoSaveTimerRef.current = null;
+    }
+
+    if (!memberDirty || saving || !selectedProjectId || !selectedMember) {
+      return;
+    }
+
+    memberAutoSaveTimerRef.current = window.setTimeout(() => {
+      memberAutoSaveTimerRef.current = null;
+      void saveMember();
+    }, autoSaveDelayMs);
+
+    return () => {
+      if (memberAutoSaveTimerRef.current !== null) {
+        window.clearTimeout(memberAutoSaveTimerRef.current);
+        memberAutoSaveTimerRef.current = null;
+      }
+    };
+  }, [
+    allowedSkillIds,
+    isLeader,
+    memberDirty,
+    memberNameValue,
+    modelName,
+    modelVariant,
+    roleDefinition,
+    runnerType,
+    saving,
+    selectedMember,
+    selectedProjectId,
+    thinkingEffort,
+    workspacePath,
+  ]);
+
+  useEffect(() => {
+    if (mcpAutoSaveTimerRef.current !== null) {
+      window.clearTimeout(mcpAutoSaveTimerRef.current);
+      mcpAutoSaveTimerRef.current = null;
+    }
+
+    if (
+      !mcpDirty ||
+      mcpApplying ||
+      mcpLoading ||
+      !!mcpError ||
+      !mcpConfig
+    ) {
+      return;
+    }
+
+    mcpAutoSaveTimerRef.current = window.setTimeout(() => {
+      mcpAutoSaveTimerRef.current = null;
+      void applyMcpServers();
+    }, autoSaveDelayMs);
+
+    return () => {
+      if (mcpAutoSaveTimerRef.current !== null) {
+        window.clearTimeout(mcpAutoSaveTimerRef.current);
+        mcpAutoSaveTimerRef.current = null;
+      }
+    };
+  }, [
+    mcpApplying,
+    mcpConfig,
+    mcpDirty,
+    mcpError,
+    mcpLoading,
+    mcpServersJson,
+    runnerType,
+  ]);
+
+  useEffect(() => {
+    if (teamProtocolAutoSaveTimerRef.current !== null) {
+      window.clearTimeout(teamProtocolAutoSaveTimerRef.current);
+      teamProtocolAutoSaveTimerRef.current = null;
+    }
+
+    if (
+      !activeSessionId ||
+      !teamProtocolDirty ||
+      teamProtocolLoading ||
+      teamProtocolSaving ||
+      !!teamProtocolError
+    ) {
+      return;
+    }
+
+    teamProtocolAutoSaveTimerRef.current = window.setTimeout(() => {
+      teamProtocolAutoSaveTimerRef.current = null;
+      void saveTeamProtocol();
+    }, autoSaveDelayMs);
+
+    return () => {
+      if (teamProtocolAutoSaveTimerRef.current !== null) {
+        window.clearTimeout(teamProtocolAutoSaveTimerRef.current);
+        teamProtocolAutoSaveTimerRef.current = null;
+      }
+    };
+  }, [
+    activeSessionId,
+    teamProtocolContent,
+    teamProtocolDirty,
+    teamProtocolError,
+    teamProtocolLoading,
+    teamProtocolSaving,
+  ]);
 
   const addProjectMemberForAgent = async (
     agent: BackendChatAgent,
@@ -1294,13 +1465,7 @@ export function TeamPage() {
               teamProtocolSessionAvailable={!!activeSessionId}
               teamProtocolSuccess={teamProtocolSuccess}
               workspacePath={workspacePath}
-              onDiscardMemberChanges={discardMemberChanges}
-              onApplyMcpServers={applyMcpServers}
-              onDiscardMcpChanges={discardMcpChanges}
-              onDiscardTeamProtocolChanges={discardTeamProtocolChanges}
               onMcpServersChange={handleMcpServersChange}
-              onSaveMember={saveMember}
-              onSaveTeamProtocol={saveTeamProtocol}
               onTeamProtocolChange={handleTeamProtocolChange}
               onToggleMcpServer={toggleMcpServer}
               setAllowedSkillIds={setAllowedSkillIds}

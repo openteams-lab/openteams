@@ -126,7 +126,7 @@ check(
     source.includes("event.stream_type !== 'thinking'") &&
     source.includes('liveDeltaActivityLineId') &&
     source.includes('event.delta && existingLine') &&
-    source.includes('activityLines: nextLines') &&
+    source.includes('activity_lines: activityLines') &&
     source.includes('liveDeltaActivityLineId(line.run_id, line.stream_type)'),
   source,
 );
@@ -536,6 +536,16 @@ check(
     !source.includes('deferredQueuedUserMessagesRef') &&
     !source.includes('rememberDeferredQueuedUserMessage') &&
     !source.includes('releaseDeferredQueuedUserMessage'),
+  source,
+);
+check(
+  'run source hydration does not evict user messages from non-user source client ids',
+  /const sourceClientMessageId = message\.isUser\s*\?\s*userMessageClientId\(message\)\s*:\s*undefined;/.test(
+    source,
+  ) &&
+    /message\.isUser\s*\?\s*!matchesUserMessageIdentity\([\s\S]*sourceClientMessageId[\s\S]*\)\s*:\s*candidate\.id !== message\.id/.test(
+      source,
+    ),
   source,
 );
 

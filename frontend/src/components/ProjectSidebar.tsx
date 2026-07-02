@@ -155,13 +155,59 @@ const hasSidebarPrioritySessionActivity = (session: Session): boolean =>
 
 const isPinnedSession = (session: Session): boolean => Boolean(session.pinnedAt);
 
-const prioritizeSessions = (sessions: Session[]): Session[] => {
+const emptySessionOrderIds: string[] = [];
+
+type StableSessionOrder = {
+  rosterKey: string;
+  orderIds: string[];
+};
+
+const sameStringArray = (left: string[], right: string[]): boolean =>
+  left.length === right.length &&
+  left.every((value, index) => value === right[index]);
+
+const sessionOrderKey = (sessions: Session[]): string =>
+  sessions.map((session) => session.id).join("\u001f");
+
+const orderSessionsWithinGroup = (
+  group: Session[],
+  inputOrderById: Map<string, number>,
+  previousOrderById: Map<string, number>,
+): Session[] =>
+  [...group].sort((left, right) => {
+    const leftPrevious = previousOrderById.get(left.id);
+    const rightPrevious = previousOrderById.get(right.id);
+    if (leftPrevious !== undefined || rightPrevious !== undefined) {
+      if (leftPrevious === undefined) return 1;
+      if (rightPrevious === undefined) return -1;
+      return leftPrevious - rightPrevious;
+    }
+    return (
+      (inputOrderById.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+      (inputOrderById.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+    );
+  });
+
+export const prioritizeSessions = (
+  sessions: Session[],
+  previousOrderIds: readonly string[] = emptySessionOrderIds,
+): Session[] => {
+  const inputOrderById = new Map(
+    sessions.map((session, index) => [session.id, index]),
+  );
+  const previousOrderById = new Map(
+    previousOrderIds.map((sessionId, index) => [sessionId, index]),
+  );
   const pinned = sessions.filter(isPinnedSession);
   const unpinned = sessions.filter((session) => !isPinnedSession(session));
+  const priority = unpinned.filter(hasSidebarPrioritySessionActivity);
+  const rest = unpinned.filter(
+    (session) => !hasSidebarPrioritySessionActivity(session),
+  );
   return [
-    ...pinned,
-    ...unpinned.filter(hasSidebarPrioritySessionActivity),
-    ...unpinned.filter((session) => !hasSidebarPrioritySessionActivity(session)),
+    ...orderSessionsWithinGroup(pinned, inputOrderById, previousOrderById),
+    ...orderSessionsWithinGroup(priority, inputOrderById, previousOrderById),
+    ...orderSessionsWithinGroup(rest, inputOrderById, previousOrderById),
   ];
 };
 
@@ -178,7 +224,7 @@ const createProjectLabelClass =
   "mb-1.5 block text-[12px] font-semibold tracking-[0.04em] text-[var(--ink-tertiary)]";
 
 const createProjectFieldBaseClass =
-  "w-full rounded-md border border-transparent bg-[rgba(255,255,255,0.04)] px-3 py-2 text-[var(--ink)] outline-none transition placeholder:text-[rgba(138,143,152,0.58)] hover:bg-[rgba(255,255,255,0.055)] focus:border-[rgba(130,143,255,0.58)] focus:bg-[rgba(255,255,255,0.06)]";
+  "w-full rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] px-3 py-2 text-[var(--ink)] outline-none transition placeholder:text-[var(--ink-tertiary)] hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)] focus:border-[var(--primary)] focus:bg-[var(--surface-1)]";
 
 const getNavigationIcon = (icon: string): LucideIcon =>
   navigationIcons[icon] ?? CircleDot;
@@ -321,6 +367,8 @@ const ZERO_BUILD_STATS: SidebarBuildStats = {
   ],
 };
 
+const ZERO_COST_USAGE_REFRESH_DELAYS_MS = [1500, 5000] as const;
+
 export function ProjectSidebar({
   shellOptions,
   projects = [],
@@ -423,7 +471,16 @@ export function ProjectSidebar({
   const [realBuildStats, setRealBuildStats] =
     useState<SidebarBuildStats | null>(null);
   const [buildStatsRefreshVersion, setBuildStatsRefreshVersion] = useState(0);
+  const [stableSessionOrder, setStableSessionOrder] =
+    useState<StableSessionOrder>({
+      rosterKey: "",
+      orderIds: [],
+    });
   const buildStatsProjectRef = useRef<string | null>(null);
+  const buildStatsModelCostRef = useRef(0);
+  const buildStatsUsageRetryTimersRef = useRef<
+    ReturnType<typeof setTimeout>[]
+  >([]);
   const portalTarget =
     appScale.portalRoot ??
     (typeof document === "undefined" ? null : document.body);
@@ -461,10 +518,33 @@ export function ProjectSidebar({
     [displayedProjects, projectActionMenu],
   );
   const buildStats = realBuildStats ?? ZERO_BUILD_STATS;
-  const orderedSessions = useMemo(
-    () => prioritizeSessions(sessions),
+  const currentSessionOrderKey = useMemo(
+    () => sessionOrderKey(sessions),
     [sessions],
   );
+  const previousSessionOrderIds =
+    stableSessionOrder.rosterKey === currentSessionOrderKey
+      ? stableSessionOrder.orderIds
+      : emptySessionOrderIds;
+  const orderedSessions = useMemo(
+    () => prioritizeSessions(sessions, previousSessionOrderIds),
+    [previousSessionOrderIds, sessions],
+  );
+  useEffect(() => {
+    const nextOrderIds = orderedSessions.map((session) => session.id);
+    setStableSessionOrder((current) => {
+      if (
+        current.rosterKey === currentSessionOrderKey &&
+        sameStringArray(current.orderIds, nextOrderIds)
+      ) {
+        return current;
+      }
+      return {
+        rosterKey: currentSessionOrderKey,
+        orderIds: nextOrderIds,
+      };
+    });
+  }, [currentSessionOrderKey, orderedSessions]);
   const hasOverflowSessions = orderedSessions.length > visibleSessionLimit;
   const visibleSessions = sessionsExpanded
     ? orderedSessions
@@ -537,10 +617,19 @@ export function ProjectSidebar({
     }, 900);
   }, []);
 
+  const clearBuildStatsUsageRetryTimers = useCallback(() => {
+    for (const timer of buildStatsUsageRetryTimersRef.current) {
+      clearTimeout(timer);
+    }
+    buildStatsUsageRetryTimersRef.current = [];
+  }, []);
+
   useEffect(() => {
     if (!selectedProjectId) {
       setRealBuildStats(null);
       buildStatsProjectRef.current = null;
+      buildStatsModelCostRef.current = 0;
+      clearBuildStatsUsageRetryTimers();
       return;
     }
 
@@ -550,6 +639,8 @@ export function ProjectSidebar({
     if (isProjectChanged) {
       setRealBuildStats(null);
       buildStatsProjectRef.current = selectedProjectId;
+      buildStatsModelCostRef.current = 0;
+      clearBuildStatsUsageRetryTimers();
     }
     const loadSidebarBuildStats = async () => {
       try {
@@ -574,6 +665,10 @@ export function ProjectSidebar({
           (sum, model) => sum + Number(model.estimated_cost || 0),
           0,
         );
+        buildStatsModelCostRef.current = modelCost;
+        if (modelCost > 0) {
+          clearBuildStatsUsageRetryTimers();
+        }
 
         setRealBuildStats({
           title: "Build stats",
@@ -618,24 +713,35 @@ export function ProjectSidebar({
     selectedProjectId,
     shellOptions?.buildStats?.defaultExpanded,
     buildStatsRefreshVersion,
+    clearBuildStatsUsageRetryTimers,
   ]);
 
   useEffect(() => {
     if (!selectedProjectId) return undefined;
-    return onBuildStatsUpdated((projectId) => {
-      if (projectId === selectedProjectId) {
-        setBuildStatsRefreshVersion((version) => version + 1);
+    return onBuildStatsUpdated((projectId, reason) => {
+      if (projectId !== selectedProjectId) return;
+
+      setBuildStatsRefreshVersion((version) => version + 1);
+      if (reason === "usage" && buildStatsModelCostRef.current <= 0) {
+        clearBuildStatsUsageRetryTimers();
+        buildStatsUsageRetryTimersRef.current =
+          ZERO_COST_USAGE_REFRESH_DELAYS_MS.map((delayMs) =>
+            setTimeout(() => {
+              setBuildStatsRefreshVersion((version) => version + 1);
+            }, delayMs),
+          );
       }
     });
-  }, [selectedProjectId]);
+  }, [clearBuildStatsUsageRetryTimers, selectedProjectId]);
 
   useEffect(() => {
     return () => {
       if (workspaceBrowserScrollResetRef.current) {
         clearTimeout(workspaceBrowserScrollResetRef.current);
       }
+      clearBuildStatsUsageRetryTimers();
     };
-  }, []);
+  }, [clearBuildStatsUsageRetryTimers]);
 
   const openBuildStatsPage = () => {
     onNavigate({
@@ -1484,7 +1590,7 @@ export function ProjectSidebar({
             role="presentation"
           >
             <div
-              className="absolute inset-0 bg-black/70"
+              className="absolute inset-0 bg-[color-mix(in_srgb,var(--canvas)_72%,rgba(0,0,0,0.46))]"
               onClick={closeProjectForm}
             />
             <button
@@ -1498,9 +1604,9 @@ export function ProjectSidebar({
               role="dialog"
               aria-modal="true"
               aria-labelledby="create-project-modal-title"
-              className="relative w-full max-w-[480px] overflow-hidden rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#141517]"
+              className="relative w-full max-w-[480px] overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--ink)] shadow-[0_24px_64px_rgba(0,0,0,0.22)]"
             >
-              <header className="flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] px-6 py-4">
+              <header className="flex items-center justify-between border-b border-[var(--hairline)] bg-[var(--surface-1)] px-6 py-4">
                 <h2
                   id="create-project-modal-title"
                   className="text-[14px] font-semibold text-[var(--ink)]"
@@ -1511,7 +1617,7 @@ export function ProjectSidebar({
                 </h2>
                 <button
                   type="button"
-                  className="rounded-md p-1 text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink)]"
+                  className="rounded-md p-1 text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
                   onClick={closeProjectForm}
                 >
                   <X className="h-4 w-4" />
@@ -1525,13 +1631,7 @@ export function ProjectSidebar({
                   <input
                     className={`${createProjectFieldBaseClass} text-[14px]`}
                     value={projectName}
-                    onChange={(event) =>
-                      setProjectName(
-                        editingProject
-                          ? event.target.value
-                          : sanitizeProjectName(event.target.value),
-                      )
-                    }
+                    onChange={(event) => setProjectName(event.target.value)}
                     placeholder={translate(
                       "sidebar.projectName",
                       "Project name",
@@ -1565,7 +1665,7 @@ export function ProjectSidebar({
                     triggerIcon={
                       <Users className="h-3 w-3 text-[var(--ink-tertiary)]" />
                     }
-                    triggerClassName="border-transparent bg-[rgba(255,255,255,0.04)] hover:border-transparent hover:bg-[rgba(255,255,255,0.055)]"
+                    triggerClassName="border-[var(--hairline)] bg-[var(--surface-2)] hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)]"
                     panelClassName="z-[1010] max-w-none"
                     maxPanelHeightClassName="max-h-[240px]"
                   />
@@ -1592,7 +1692,7 @@ export function ProjectSidebar({
                     />
                     <button
                       type="button"
-                      className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-transparent bg-[rgba(255,255,255,0.04)] px-3 py-2 text-[13px] font-medium text-[var(--ink-subtle)] transition hover:bg-[rgba(255,255,255,0.065)] hover:text-[var(--ink)]"
+                      className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] px-3 py-2 text-[13px] font-medium text-[var(--ink-subtle)] transition hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
                       onClick={() => {
                         setWorkspaceBrowserOpen((open) => !open);
                       }}
@@ -1604,14 +1704,14 @@ export function ProjectSidebar({
 
                   {workspaceBrowserOpen && (
                     <div className="overflow-hidden rounded-lg bg-transparent">
-                      <div className="flex items-center gap-1.5 border-b border-[rgba(255,255,255,0.08)] px-1 py-1.5">
+                      <div className="flex items-center gap-1.5 border-b border-[var(--hairline)] px-1 py-1.5">
                         <span className="min-w-0 flex-1 truncate px-1 font-mono text-[12px] text-[var(--ink-tertiary)]">
                           {workspaceCurrentPath ||
                             translate("sidebar.workspaceRoots", "Local roots")}
                         </span>
                         <button
                           type="button"
-                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink-muted)]"
+                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink-muted)]"
                           onClick={() => void loadWorkspaceRoots()}
                           aria-label={translate("sidebar.roots", "Roots")}
                           title={translate("sidebar.roots", "Roots")}
@@ -1621,7 +1721,7 @@ export function ProjectSidebar({
                         <button
                           type="button"
                           disabled={!workspaceCurrentPath}
-                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink-muted)] disabled:cursor-not-allowed disabled:opacity-35"
+                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink-muted)] disabled:cursor-not-allowed disabled:opacity-35"
                           onClick={() => {
                             const parent = getParentPath(workspaceCurrentPath);
                             if (parent) void loadWorkspaceDirectory(parent);
@@ -1638,7 +1738,7 @@ export function ProjectSidebar({
                             workspaceBrowserLoading ||
                             workspaceDirectoryMutating
                           }
-                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-35"
+                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-35"
                           onClick={() => void createWorkspaceDirectory()}
                           aria-label={translate(
                             "sidebar.newFolder",
@@ -1650,7 +1750,7 @@ export function ProjectSidebar({
                         </button>
                         <button
                           type="button"
-                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink)]"
+                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
                           onClick={() =>
                             void loadWorkspaceDirectory(projectWorkspacePath)
                           }
@@ -1707,16 +1807,16 @@ export function ProjectSidebar({
                                 key={`${entry.path}-${directoryEntryTime(entry)}`}
                                 className={`group/workspace-entry relative flex items-center rounded-md ${
                                   selected
-                                    ? "bg-[rgba(255,255,255,0.08)] before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-[2px] before:rounded-full before:bg-[var(--primary)]"
+                                    ? "bg-[var(--primary-tint)] before:absolute before:bottom-1.5 before:left-0 before:top-1.5 before:w-[2px] before:rounded-full before:bg-[var(--primary)]"
                                     : ""
                                   }`}
                               >
                                 {isRenaming ? (
                                   <>
                                     <div className="flex min-h-7 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1">
-                                      <Folder className="h-4 w-4 shrink-0 text-[#8A94FA]" />
+                                      <Folder className="h-4 w-4 shrink-0 text-[var(--primary-hover)]" />
                                       <input
-                                        className="h-6 min-w-0 flex-1 rounded-[4px] border border-[rgba(130,143,255,0.58)] bg-[rgba(255,255,255,0.06)] px-2 font-mono text-[12px] text-white outline-none"
+                                        className="h-6 min-w-0 flex-1 rounded-[4px] border border-[color-mix(in_srgb,var(--primary)_58%,transparent)] bg-[var(--surface-1)] px-2 font-mono text-[12px] text-[var(--ink)] outline-none"
                                         value={renameWorkspaceName}
                                         onChange={(event) =>
                                           setRenameWorkspaceName(
@@ -1737,7 +1837,7 @@ export function ProjectSidebar({
                                     </div>
                                     <button
                                       type="button"
-                                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-45"
+                                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-45"
                                       onClick={() =>
                                         void commitWorkspaceDirectoryRename()
                                       }
@@ -1755,7 +1855,7 @@ export function ProjectSidebar({
                                     </button>
                                     <button
                                       type="button"
-                                      className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-45"
+                                      className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-45"
                                       onClick={resetWorkspaceDirectoryRename}
                                       disabled={workspaceDirectoryMutating}
                                       aria-label={translate(
@@ -1775,10 +1875,10 @@ export function ProjectSidebar({
                                     <button
                                       type="button"
                                       disabled={!entry.is_directory}
-                                      className={`flex min-h-7 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors hover:bg-[rgba(255,255,255,0.04)] disabled:cursor-default disabled:opacity-55 ${
+                                      className={`flex min-h-7 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors hover:bg-[var(--surface-3)] disabled:cursor-default disabled:opacity-55 ${
                                         selected
-                                          ? "text-white"
-                                          : "text-[#8A8F98] hover:text-[#D1D5DB]"
+                                          ? "text-[var(--ink)]"
+                                          : "text-[var(--ink-subtle)] hover:text-[var(--ink)]"
                                       }`}
                                       onClick={() => {
                                         if (entry.is_directory) {
@@ -1791,17 +1891,17 @@ export function ProjectSidebar({
                                       <Icon
                                         className={`h-4 w-4 shrink-0 ${
                                           selected
-                                            ? "text-white"
+                                            ? "text-[var(--ink)]"
                                             : entry.is_git_repo
-                                              ? "text-[#8A94FA]"
-                                              : "text-[#8A8F98]"
+                                              ? "text-[var(--primary-hover)]"
+                                              : "text-[var(--ink-subtle)]"
                                         }`}
                                       />
                                       <span className="min-w-0 flex-1 truncate font-mono text-[12px]">
                                         {entry.name}
                                       </span>
                                       {entry.is_git_repo && (
-                                        <span className="rounded-[4px] bg-[rgba(94,106,210,0.15)] px-1.5 py-px font-mono text-[10px] font-semibold text-[#8A94FA]">
+                                        <span className="rounded-[4px] bg-[var(--primary-tint)] px-1.5 py-px font-mono text-[10px] font-semibold text-[var(--primary-hover)]">
                                           GIT
                                         </span>
                                       )}
@@ -1810,7 +1910,7 @@ export function ProjectSidebar({
                                       <>
                                         <button
                                           type="button"
-                                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] opacity-0 transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink)] group-hover/workspace-entry:opacity-100 ${
+                                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] opacity-0 transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] group-hover/workspace-entry:opacity-100 ${
                                             selected ? "!opacity-100" : ""
                                           }`}
                                           onClick={() =>
@@ -1829,7 +1929,7 @@ export function ProjectSidebar({
                                         </button>
                                         <button
                                           type="button"
-                                          className={`mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] opacity-0 transition hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--ink)] group-hover/workspace-entry:opacity-100 ${
+                                          className={`mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] opacity-0 transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] group-hover/workspace-entry:opacity-100 ${
                                             selected ? "!opacity-100" : ""
                                           }`}
                                           onClick={() =>
@@ -1861,9 +1961,9 @@ export function ProjectSidebar({
                 {createError && (
                   <div className="text-[13px] text-red-400">{createError}</div>
                 )}
-                <div className="-mx-6 -mb-6 mt-2 flex items-center justify-between border-t border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.025)] px-6 py-3">
+                <div className="-mx-6 -mb-6 mt-2 flex items-center justify-between border-t border-[var(--hairline)] bg-[var(--surface-2)] px-6 py-3">
                   <span className="flex items-center gap-1.5 text-[11px] text-[var(--ink-tertiary)]">
-                    <kbd className="rounded-[4px] border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--ink-subtle)] shadow-[inset_0_-1px_0_rgba(0,0,0,0.35)]">
+                    <kbd className="rounded-[4px] border border-[var(--hairline-strong)] bg-[var(--surface-1)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--ink-subtle)] shadow-[inset_0_-1px_0_color-mix(in_srgb,var(--ink)_10%,transparent)]">
                       Esc
                     </kbd>
                     {translate("sidebar.cancel", "Cancel")}
@@ -1871,7 +1971,7 @@ export function ProjectSidebar({
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      className="cursor-pointer rounded-md px-2.5 py-1.5 text-[13px] font-medium text-[var(--ink-tertiary)] transition hover:bg-[rgba(255,255,255,0.055)] hover:text-[var(--ink)]"
+                      className="cursor-pointer rounded-md px-2.5 py-1.5 text-[13px] font-medium text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
                       onClick={closeProjectForm}
                     >
                       {translate("sidebar.cancel", "Cancel")}
@@ -1879,7 +1979,7 @@ export function ProjectSidebar({
                     <button
                       type="submit"
                       disabled={creatingProject || !projectName.trim()}
-                      className="cursor-pointer rounded-md bg-white px-3.5 py-1.5 text-[13px] font-semibold text-[#0b0b0c] transition hover:bg-[rgba(255,255,255,0.9)] disabled:cursor-not-allowed disabled:bg-[rgba(255,255,255,0.22)] disabled:text-[rgba(255,255,255,0.46)]"
+                      className="cursor-pointer rounded-md bg-[var(--primary)] px-3.5 py-1.5 text-[13px] font-semibold text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-4)] disabled:text-[var(--ink-tertiary)]"
                     >
                       {creatingProject
                         ? translate("sidebar.creatingProject", "Creating...")

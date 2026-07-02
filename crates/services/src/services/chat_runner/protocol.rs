@@ -153,6 +153,7 @@ impl ChatRunner {
         raw_output: &str,
         error_info: Option<(&str, Option<&NormalizedEntryError>)>,
         token_usage: Option<&TokenUsageInfo>,
+        run_model: Option<&str>,
         empty_output_fallback: Option<AgentEmptyOutputFallback>,
     ) -> Result<(), ChatRunnerError> {
         let output_is_empty = raw_output.trim().is_empty();
@@ -173,6 +174,7 @@ impl ChatRunner {
             "run_id": run_id,
             "session_id": session_id,
             "session_agent_id": session_agent_id,
+            "model": run_model,
             "source_message_id": source_message_id,
             "client_message_id": client_message_id,
             "chain_depth": chain_depth + 1,
@@ -279,6 +281,7 @@ impl ChatRunner {
         client_message_id: Option<&str>,
         error_content: &str,
         error_type: Option<&NormalizedEntryError>,
+        run_model: Option<&str>,
     ) -> Result<(), ChatRunnerError> {
         let summary: String = error_content.chars().take(200).collect();
         let mut error_meta = serde_json::json!({
@@ -293,6 +296,7 @@ impl ChatRunner {
             "run_id": run_id,
             "session_agent_id": session_agent_id,
             "agent_id": agent_id,
+            "model": run_model,
             "source_message_id": source_message_id,
             "client_message_id": client_message_id,
             "error": error_meta,
@@ -338,6 +342,7 @@ impl ChatRunner {
         error_content: Option<&str>,
         error_type: Option<&NormalizedEntryError>,
         token_usage: Option<&TokenUsageInfo>,
+        run_model: Option<&str>,
     ) -> Result<(), ChatRunnerError> {
         let mut meta = Self::build_protocol_send_message_meta(
             prompt_language.code,
@@ -351,6 +356,7 @@ impl ChatRunner {
             None,
             None,
             token_usage,
+            run_model,
         );
         meta["protocol"] = serde_json::json!({
             "type": fallback_type,
@@ -590,6 +596,7 @@ impl ChatRunner {
         error_type: Option<&NormalizedEntryError>,
         completion_was_stopped: bool,
         token_usage: Option<&TokenUsageInfo>,
+        run_model: Option<&str>,
         protocol_retry_attempt: u32,
     ) -> Result<ProtocolProcessResult, ChatRunnerError> {
         let output_is_empty = latest_assistant.trim().is_empty();
@@ -639,6 +646,7 @@ impl ChatRunner {
                         latest_assistant,
                         error_info,
                         token_usage,
+                        run_model,
                         Some(empty_output_fallback),
                     )
                     .await?;
@@ -701,6 +709,7 @@ impl ChatRunner {
                         latest_assistant,
                         error_info,
                         token_usage,
+                        run_model,
                         Some(empty_output_fallback),
                     )
                     .await?;
@@ -838,6 +847,7 @@ impl ChatRunner {
                 intent,
                 intent_meaning,
                 token_usage,
+                run_model,
             );
 
             // Sync error info from the run to the message meta so frontend can display it
@@ -903,6 +913,7 @@ impl ChatRunner {
                 error_content,
                 error_type,
                 token_usage,
+                run_model,
             )
             .await?;
             send_count = 1;

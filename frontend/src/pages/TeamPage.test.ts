@@ -24,6 +24,10 @@ const sidebarSource = readFileSync(
   new URL("./team/TeamMemberSidebar.tsx", import.meta.url),
   "utf8",
 );
+const configTabsSource = readFileSync(
+  new URL("./team/TeamConfigTabs.tsx", import.meta.url),
+  "utf8",
+);
 const appSource = readFileSync(new URL("../App.tsx", import.meta.url), "utf8");
 const teamNavigationSource = readFileSync(
   new URL("../lib/teamNavigation.ts", import.meta.url),
@@ -84,6 +88,36 @@ check(
     teamNavigationSource.includes("window.sessionStorage.setItem") &&
     teamNavigationSource.includes("openteams:navigate-team-member-invite"),
   { appSource, source, sidebarSource, teamNavigationSource },
+);
+
+check(
+  "team member configuration changes are auto-saved without a manual action footer",
+  source.includes("const autoSaveDelayMs = 700") &&
+    source.includes("memberAutoSaveTimerRef.current = window.setTimeout") &&
+    source.includes("void saveMember()") &&
+    source.includes("mcpAutoSaveTimerRef.current = window.setTimeout") &&
+    source.includes("void applyMcpServers()") &&
+    source.includes(
+      "teamProtocolAutoSaveTimerRef.current = window.setTimeout",
+    ) &&
+    source.includes("void saveTeamProtocol()") &&
+    !configTabsSource.includes("MemberSaveActions") &&
+    !configTabsSource.includes("McpSaveActions") &&
+    !configTabsSource.includes("TeamProtocolSaveActions") &&
+    !configTabsSource.includes("shouldShowActionFooter") &&
+    !configTabsSource.includes(
+      'border-t border-[var(--hairline)] bg-[var(--surface-1)]',
+    ),
+  { source, configTabsSource },
+);
+
+check(
+  "skill selection does not reload the installed skills list after save",
+  source.includes(".listNative(runnerType)") &&
+    source.includes("mcpServersApi\n      .load(runnerType)") &&
+    source.includes("}, [runnerType, selectedMember?.id]);") &&
+    !source.includes("}, [runnerType, selectedMember]);"),
+  { source },
 );
 
 if (failures > 0) {

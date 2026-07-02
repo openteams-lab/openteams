@@ -147,6 +147,18 @@ body {
   font-size: calc(28px * var(--ot-compact-font-scale, 1));
 }
 
+.ot-app-scale-frame :where(.text-\[40px\]) {
+  font-size: calc(40px * var(--ot-compact-font-scale, 1));
+}
+
+.ot-app-scale-frame :where(.text-\[44px\]) {
+  font-size: calc(44px * var(--ot-compact-font-scale, 1));
+}
+
+.ot-app-scale-frame :where(.text-\[48px\]) {
+  font-size: calc(48px * var(--ot-compact-font-scale, 1));
+}
+
 .ot-app-scale-frame :where(.text-xs) {
   font-size: calc(0.75rem * var(--ot-compact-font-scale, 1));
 }

@@ -231,9 +231,8 @@ export function useSessionWorktree({
     return () => window.clearInterval(interval);
   }, [enabled, refresh, sessionId, worktree]);
 
-  // After a successful merge, the source-control panel must switch back to the
-  // base workspace. Broadcasting the refresh event lets the existing
-  // `useSessionSourceControl` subscriber re-read its status.
+  // After a successful merge, the source-control panel must refresh while
+  // staying scoped to the session worktree, matching runner workspace routing.
   useEffect(() => {
     if (!enabled || !sessionId) return;
     if (worktree?.status === 'merged') {

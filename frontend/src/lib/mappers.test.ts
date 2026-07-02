@@ -157,6 +157,26 @@ const a = mapMessage(agentMsg, {
 eq('agent sender prefixed', a.sender, '@frontend');
 eq('agent avatar derived', a.avatar, 'FR');
 eq('agent model carried through', a.model, 'Claude 3.5 Sonnet');
+eq(
+  'agent message model prefers run meta',
+  mapMessage(
+    {
+      ...agentMsg,
+      meta: {
+        run_id: 'run-1',
+        session_agent_id: 'sa-1',
+        source_message_id: 'm1',
+        model: 'gpt-5.5',
+      },
+    },
+    {
+      agentNamesById: { 'agent-1': 'frontend' },
+      agentModelsById: { 'agent-1': 'codex-auto-review' },
+      now,
+    },
+  ).model,
+  'gpt-5.5',
+);
 eq('agent not isUser', a.isUser, undefined);
 eq('agent run id mapped from meta', a.runId, 'run-1');
 eq('agent session agent id mapped from meta', a.sessionAgentId, 'sa-1');

@@ -12,8 +12,6 @@ import {
   FolderGit2,
   PackagePlus,
   RefreshCw,
-  RotateCcw,
-  Save,
   Server,
   Settings,
   UserRoundCog,
@@ -84,13 +82,7 @@ type TeamConfigTabsProps = {
   teamProtocolSuccess: boolean;
   t: TranslateFn;
   workspacePath: string;
-  onApplyMcpServers: () => void;
-  onDiscardMemberChanges: () => void;
-  onDiscardMcpChanges: () => void;
-  onDiscardTeamProtocolChanges: () => void;
   onMcpServersChange: (value: string) => void;
-  onSaveMember: () => void;
-  onSaveTeamProtocol: () => void;
   onTeamProtocolChange: (value: string) => void;
   onToggleMcpServer: (serverKey: string) => void;
   setAllowedSkillIds: (ids: string[]) => void;
@@ -454,189 +446,6 @@ function SkillMarkdownPanel({
   );
 }
 
-function MemberSaveActions({
-  dirty,
-  onDiscardChanges,
-  onSaveChanges,
-  saving,
-  success,
-  t,
-}: {
-  dirty: boolean;
-  onDiscardChanges: () => void;
-  onSaveChanges: () => void;
-  saving: boolean;
-  success: boolean;
-  t: TranslateFn;
-}) {
-  if (!dirty && !success && !saving) return null;
-
-  return (
-    <div className="flex justify-end gap-2">
-      {dirty && !success && (
-        <button
-          type="button"
-          onClick={onDiscardChanges}
-          disabled={saving}
-          className="inline-flex h-8 items-center gap-1.5 rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-2)] px-2.5 text-[12px] font-medium text-[var(--ink-subtle)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          {t("teamPage.action.discard")}
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={() => void onSaveChanges()}
-        disabled={saving || success}
-        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-[6px] bg-[var(--primary)] px-2.5 text-[12px] font-semibold text-[var(--on-primary)] transition-colors hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {success ? (
-          <Check className="h-3.5 w-3.5" />
-        ) : saving ? (
-          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Save className="h-3.5 w-3.5" />
-        )}
-        {success
-          ? t("teamPage.action.saved")
-          : saving
-            ? t("teamPage.action.saving")
-            : t("teamPage.action.saveChanges")}
-      </button>
-    </div>
-  );
-}
-
-function McpSaveActions({
-  mcpApplying,
-  mcpDirty,
-  mcpError,
-  mcpLoading,
-  mcpSuccess,
-  onApplyMcpServers,
-  onDiscardMcpChanges,
-  t,
-}: Pick<
-  TeamConfigTabsProps,
-  | "mcpApplying"
-  | "mcpDirty"
-  | "mcpError"
-  | "mcpLoading"
-  | "mcpSuccess"
-  | "onApplyMcpServers"
-  | "onDiscardMcpChanges"
-  | "t"
->) {
-  const unsupported = mcpError?.includes("support MCP") ?? false;
-
-  if (unsupported || (!mcpDirty && !mcpSuccess && !mcpApplying)) return null;
-
-  return (
-    <div className="flex justify-end gap-2">
-      {mcpDirty && !mcpSuccess && (
-        <button
-          type="button"
-          onClick={onDiscardMcpChanges}
-          disabled={mcpApplying}
-          className="inline-flex h-8 items-center gap-1.5 rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-2)] px-2.5 text-[12px] font-medium text-[var(--ink-subtle)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          {t("teamPage.action.discard")}
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={() => void onApplyMcpServers()}
-        disabled={mcpApplying || mcpLoading || !!mcpError || mcpSuccess}
-        className="inline-flex h-8 items-center gap-1.5 rounded-[6px] bg-[var(--primary)] px-2.5 text-[12px] font-semibold text-[var(--on-primary)] transition-colors hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {mcpSuccess ? (
-          <Check className="h-3.5 w-3.5" />
-        ) : mcpApplying ? (
-          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Save className="h-3.5 w-3.5" />
-        )}
-        {mcpSuccess
-          ? t("teamPage.action.saved")
-          : mcpApplying
-            ? t("teamPage.action.saving")
-            : t("teamPage.action.saveMcpConfig")}
-      </button>
-    </div>
-  );
-}
-
-function TeamProtocolSaveActions({
-  onDiscardTeamProtocolChanges,
-  onSaveTeamProtocol,
-  t,
-  teamProtocolDirty,
-  teamProtocolError,
-  teamProtocolLoading,
-  teamProtocolSaving,
-  teamProtocolSessionAvailable,
-  teamProtocolSuccess,
-}: Pick<
-  TeamConfigTabsProps,
-  | "onDiscardTeamProtocolChanges"
-  | "onSaveTeamProtocol"
-  | "t"
-  | "teamProtocolDirty"
-  | "teamProtocolError"
-  | "teamProtocolLoading"
-  | "teamProtocolSaving"
-  | "teamProtocolSessionAvailable"
-  | "teamProtocolSuccess"
->) {
-  if (
-    !teamProtocolSessionAvailable ||
-    (!teamProtocolDirty && !teamProtocolSuccess && !teamProtocolSaving)
-  ) {
-    return null;
-  }
-
-  return (
-    <div className="flex justify-end gap-2">
-      {teamProtocolDirty && !teamProtocolSuccess && (
-        <button
-          type="button"
-          onClick={onDiscardTeamProtocolChanges}
-          disabled={teamProtocolSaving}
-          className="inline-flex h-8 items-center gap-1.5 rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-2)] px-2.5 text-[12px] font-medium text-[var(--ink-subtle)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          {t("teamPage.action.discard")}
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={() => void onSaveTeamProtocol()}
-        disabled={
-          teamProtocolSaving ||
-          teamProtocolLoading ||
-          !!teamProtocolError ||
-          teamProtocolSuccess
-        }
-        className="inline-flex h-8 items-center gap-1.5 rounded-[6px] bg-[var(--primary)] px-2.5 text-[12px] font-semibold text-[var(--on-primary)] transition-colors hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {teamProtocolSuccess ? (
-          <Check className="h-3.5 w-3.5" />
-        ) : teamProtocolSaving ? (
-          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Save className="h-3.5 w-3.5" />
-        )}
-        {teamProtocolSuccess
-          ? t("teamPage.action.saved")
-          : teamProtocolSaving
-            ? t("teamPage.action.saving")
-            : t("teamPage.action.saveTeamProtocol")}
-      </button>
-    </div>
-  );
-}
-
 function ConfigTab({
   capability,
   isLeader,
@@ -670,8 +479,6 @@ function ConfigTab({
   | "mcpLoading"
   | "mcpServersJson"
   | "mcpSuccess"
-  | "onApplyMcpServers"
-  | "onDiscardMcpChanges"
   | "onMcpServersChange"
   | "onToggleMcpServer"
   | "teamProtocolContent"
@@ -681,13 +488,9 @@ function ConfigTab({
   | "teamProtocolSaving"
   | "teamProtocolSessionAvailable"
   | "teamProtocolSuccess"
-  | "onDiscardTeamProtocolChanges"
-  | "onSaveTeamProtocol"
   | "onTeamProtocolChange"
   | "memberDirty"
   | "memberSuccess"
-  | "onDiscardMemberChanges"
-  | "onSaveMember"
   | "saving"
   | "selectedMember"
   | "allowedSkillIds"
@@ -1115,8 +918,18 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
           : props.mcpSuccess
             ? t("teamPage.notice.savedMcp")
             : null;
-  const statusNotice = dirtyNotice ?? savedNotice;
-  const statusKind = dirtyNotice ? "dirty" : savedNotice ? "saved" : null;
+  const savingNotice =
+    props.saving || props.mcpApplying || props.teamProtocolSaving
+      ? t("teamPage.action.saving")
+      : null;
+  const statusNotice = savingNotice ?? dirtyNotice ?? savedNotice;
+  const statusKind = savingNotice
+    ? "saving"
+    : dirtyNotice
+      ? "dirty"
+      : savedNotice
+        ? "saved"
+        : null;
   const tabItems = useMemo(
     () => [
       {
@@ -1138,23 +951,6 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
     ],
     [t],
   );
-  const isMcpUnsupported = props.mcpError?.includes("support MCP") ?? false;
-  const shouldShowMemberActions =
-    props.memberDirty || props.memberSuccess || props.saving;
-  const shouldShowMcpActions =
-    !isMcpUnsupported &&
-    (props.mcpDirty || props.mcpSuccess || props.mcpApplying);
-  const shouldShowTeamProtocolActions =
-    props.teamProtocolSessionAvailable &&
-    (props.teamProtocolDirty ||
-      props.teamProtocolSuccess ||
-      props.teamProtocolSaving);
-  const shouldShowActionFooter =
-    activeTab === "mcp"
-      ? shouldShowMcpActions
-      : activeTab === "teamProtocol"
-        ? shouldShowTeamProtocolActions
-        : shouldShowMemberActions;
 
   if (!selectedMember) return <EmptyMemberState t={t} />;
 
@@ -1201,6 +997,8 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
             >
               {statusKind === "saved" ? (
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              ) : statusKind === "saving" ? (
+                <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" />
               ) : (
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
               )}
@@ -1248,45 +1046,6 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
           />
         )}
       </div>
-      {shouldShowActionFooter && (
-        <div className="shrink-0 border-t border-[var(--hairline)] bg-[var(--surface-1)] px-5 py-2">
-          {activeTab === "mcp" ? (
-            <McpSaveActions
-              mcpApplying={props.mcpApplying}
-              mcpDirty={props.mcpDirty}
-              mcpError={props.mcpError}
-              mcpLoading={props.mcpLoading}
-              mcpSuccess={props.mcpSuccess}
-              onApplyMcpServers={props.onApplyMcpServers}
-              onDiscardMcpChanges={props.onDiscardMcpChanges}
-              t={t}
-            />
-          ) : activeTab === "teamProtocol" ? (
-            <TeamProtocolSaveActions
-              teamProtocolDirty={props.teamProtocolDirty}
-              teamProtocolError={props.teamProtocolError}
-              teamProtocolLoading={props.teamProtocolLoading}
-              teamProtocolSaving={props.teamProtocolSaving}
-              teamProtocolSessionAvailable={props.teamProtocolSessionAvailable}
-              teamProtocolSuccess={props.teamProtocolSuccess}
-              onDiscardTeamProtocolChanges={
-                props.onDiscardTeamProtocolChanges
-              }
-              onSaveTeamProtocol={props.onSaveTeamProtocol}
-              t={t}
-            />
-          ) : (
-            <MemberSaveActions
-              dirty={props.memberDirty}
-              saving={props.saving}
-              success={props.memberSuccess}
-              onDiscardChanges={props.onDiscardMemberChanges}
-              onSaveChanges={props.onSaveMember}
-              t={t}
-            />
-          )}
-        </div>
-      )}
     </div>
   );
 }
