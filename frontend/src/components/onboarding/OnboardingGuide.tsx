@@ -1146,40 +1146,47 @@ export function OnboardingGuide({
               type="button"
               onClick={() => handleScenarioSelect(scenario.key)}
               className={cn(
-                'group relative min-h-[118px] cursor-pointer overflow-hidden rounded-[4px] border p-px text-left transition-colors duration-75 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-white/60',
+                'group relative min-h-[118px] cursor-pointer overflow-hidden rounded-[4px] border bg-black p-px text-left transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black',
                 selected
-                  ? 'border-white bg-[#111111] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)]'
-                  : 'border-[#262626] bg-[#0a0a0a] hover:border-[#404040] hover:bg-[#121212]',
+                  ? 'border-white bg-white/[0.04] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)] duration-[50ms] ease-linear'
+                  : 'border-[#1F1F23] hover:border-[#3F3F46] hover:bg-white/[0.02]',
               )}
             >
               <div
                 className={cn(
-                  'relative z-10 flex min-h-[116px] flex-col rounded-[3px] px-4 py-4',
+                  'relative z-10 flex min-h-[116px] flex-col rounded-[3px] px-4 py-4 transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
                   selected
-                    ? 'bg-[#111111]'
-                    : 'bg-[#0a0a0a] group-hover:bg-[#121212]',
+                    ? 'bg-white/[0.04] duration-[50ms] ease-linear'
+                    : 'bg-black group-hover:bg-white/[0.02]',
                 )}
               >
                 <div className="grid grid-cols-[20px_minmax(0,1fr)] items-start gap-x-3">
                   <span
                     className={cn(
-                      'col-start-1 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center transition-colors',
+                      'col-start-1 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
                       selected
                         ? 'text-white'
-                        : 'text-[#7d8490] group-hover:text-[#d9dde6]',
+                        : 'text-white/45 group-hover:text-white/70',
                     )}
                   >
                     <Icon className="h-4 w-4" strokeWidth={1} />
                   </span>
                   <h3
                     className={cn(
-                      'col-start-2 min-w-0 truncate text-[13px] font-semibold tracking-[-0.01em]',
-                      selected ? 'text-white' : 'text-[#f7f7f7]',
+                      'col-start-2 min-w-0 truncate text-[13px] font-semibold tracking-[-0.01em] transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                      selected ? 'text-white' : 'text-white/85 group-hover:text-white',
                     )}
                   >
                     {scenario.title}
                   </h3>
-                  <p className="col-start-2 mt-1.5 text-[12px] leading-relaxed tracking-[0] text-[rgba(255,255,255,0.40)]">
+                  <p
+                    className={cn(
+                      'col-start-2 mt-1.5 text-[12px] leading-relaxed tracking-[0] transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                      selected
+                        ? 'text-white'
+                        : 'text-white/40 group-hover:text-white/65',
+                    )}
+                  >
                     {scenario.desc}
                   </p>
                 </div>
