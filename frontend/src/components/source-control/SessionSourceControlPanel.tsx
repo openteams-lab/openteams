@@ -25,7 +25,6 @@ import {
   SessionWorktreeBadge,
   type SessionWorktreeAction,
 } from "./SessionWorktreeBadge";
-import { WorktreeMergeConflictsSection } from "@/pages/worktree/WorktreeMergeConflictsSection";
 import {
   buildSourceControlViewModel,
   sourceControlHasSharedFiles,
@@ -50,6 +49,7 @@ interface SessionSourceControlPanelProps {
     filePath: string,
     area: SourceControlDiffArea,
   ) => void;
+  onOpenConflictResolver: (projectId: string, sessionId: string) => void;
 }
 
 interface SourceControlConfirmDialogState {
@@ -84,13 +84,6 @@ interface SessionCommitSummary {
   sha: string;
   message: string;
 }
-
-export const refreshAfterWorktreeResolution = async (
-  refreshSourceControl: () => Promise<unknown>,
-  refreshWorktree: () => Promise<unknown>,
-) => {
-  await Promise.allSettled([refreshSourceControl(), refreshWorktree()]);
-};
 
 const actionErrorMessage = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
@@ -255,6 +248,7 @@ export const SessionSourceControlPanel: React.FC<
   fallbackRelatedFiles,
   linkedWorkItemIds = [],
   onOpenDiff,
+  onOpenConflictResolver,
 }) => {
   const { t, showToast } = useWorkspace();
   const {
@@ -278,7 +272,6 @@ export const SessionSourceControlPanel: React.FC<
     cleanup,
     retryCleanup,
     forceRemove,
-    refresh: refreshWorktree,
   } = useSessionWorktree({
     sessionId,
     enabled: worktreeEnabled && enabled,
@@ -296,9 +289,6 @@ export const SessionSourceControlPanel: React.FC<
   const [commitListExpanded, setCommitListExpanded] = useState(true);
   const [confirmDialog, setConfirmDialog] =
     useState<SourceControlConfirmDialogState | null>(null);
-  const [conflictResolutionScopeKey, setConflictResolutionScopeKey] = useState<
-    string | null
-  >(null);
   const [worktreeHistoryScopeKey, setWorktreeHistoryScopeKey] = useState<
     string | null
   >(null);
@@ -318,7 +308,6 @@ export const SessionSourceControlPanel: React.FC<
     pendingActionState?.scopeKey === scopeKey ? pendingActionState.key : null;
   const actionError = scopedError(actionErrorsByScope, scopeKey);
   const worktreeActionError = scopedError(worktreeActionErrorsByScope, scopeKey);
-  const showConflictResolution = conflictResolutionScopeKey === scopeKey;
   const showWorktreeHistory = worktreeHistoryScopeKey === scopeKey;
   const worktreeBusy = worktreeBusyScopeKey === scopeKey;
   const setActionErrorForScope = (key: string, message: string | null) => {
@@ -332,11 +321,6 @@ export const SessionSourceControlPanel: React.FC<
   ) => {
     setWorktreeActionErrorsByScope((current) =>
       updateScopedError(current, key, message),
-    );
-  };
-  const closeConflictResolutionForScope = (key: string) => {
-    setConflictResolutionScopeKey((current) =>
-      current === key ? null : current,
     );
   };
   const closeWorktreeHistoryForScope = (key: string) => {
@@ -391,18 +375,6 @@ export const SessionSourceControlPanel: React.FC<
     };
   }, [enabled, projectId, sessionId]);
 
-  // Exit the conflict-resolution overlay automatically if the worktree
-  // transitions away from needs_conflict_resolution (e.g. another tab aborted
-  // or the backend cleaned up).
-  useEffect(() => {
-    if (
-      showConflictResolution &&
-      worktree?.status !== "needs_conflict_resolution"
-    ) {
-      closeConflictResolutionForScope(scopeKey);
-    }
-  }, [showConflictResolution, scopeKey, worktree?.status]);
-
   useEffect(() => {
     if (worktree?.status !== "merged") {
       closeWorktreeHistoryForScope(scopeKey);
@@ -453,7 +425,7 @@ export const SessionSourceControlPanel: React.FC<
           await forceRemove();
           break;
         case "resolve-conflicts":
-          setConflictResolutionScopeKey(actionScopeKey);
+          onOpenConflictResolver(projectId, sessionId);
           break;
         case "view-history":
           setWorktreeHistoryScopeKey(actionScopeKey);
@@ -903,28 +875,6 @@ export const SessionSourceControlPanel: React.FC<
           onConfirm={() => closeConfirmDialog(true)}
         />
       )}
-      {showConflictResolution &&
-        worktree?.status === "needs_conflict_resolution" && (
-          <WorktreeMergeConflictsSection
-            sessionId={sessionId}
-            tr={tr}
-            onClose={() => closeConflictResolutionForScope(scopeKey)}
-            onCompleted={() => {
-              closeConflictResolutionForScope(scopeKey);
-              void refreshAfterWorktreeResolution(
-                refreshSourceControl,
-                refreshWorktree,
-              );
-            }}
-            onAbort={() => {
-              closeConflictResolutionForScope(scopeKey);
-              void refreshAfterWorktreeResolution(
-                refreshSourceControl,
-                refreshWorktree,
-              );
-            }}
-          />
-        )}
     </>
   );
 };

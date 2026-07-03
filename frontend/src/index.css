@@ -476,6 +476,17 @@ body[data-mode="light"] .animate-shimmer::after {
   display: none;
 }
 
+.main-right-nav-panel-scrollbars-hidden {
+  scrollbar-color: transparent transparent;
+  scrollbar-width: none;
+}
+
+.main-right-nav-panel-scrollbars-hidden::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .team-template-page {
   --team-template-canvas: #070708;
   --team-template-border: rgba(255, 255, 255, 0.08);
