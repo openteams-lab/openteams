@@ -156,6 +156,8 @@ check(
   'project path step uses existing filesystem and workspace validation APIs',
   guideSource.includes('filesystemApi.listRoots') &&
     guideSource.includes('filesystemApi.listDirectory') &&
+    guideSource.includes('filesystemApi.createDirectory') &&
+    guideSource.includes('filesystemApi.renameDirectory') &&
     guideSource.includes('chatSessionsApi.validateWorkspacePath') &&
     guideSource.includes('chatSessionsApi.initializeWorkspaceGit') &&
     !guideSource.includes('webkitdirectory'),
@@ -174,6 +176,18 @@ check(
     guideSource.includes('rounded-[6px] border border-white/[0.08] bg-[#151617]') &&
     guideSource.includes('focus:bg-[#171819]') &&
     !guideSource.includes('bg-[#111214]') &&
+    guideSource.includes('<Plus className="h-3.5 w-3.5"') &&
+    guideSource.includes('const commitDirectoryRename = async () =>') &&
+    guideSource.includes('autoFocus') &&
+    guideSource.includes('options={gitignoreOptions}') &&
+    guideSource.includes('className={onboardingProjectSelectClassName}') &&
+    guideSource.includes('[&>button]:h-7') &&
+    guideSource.includes('[&>button]:px-1.5') &&
+    guideSource.includes('panelClassName="[&_*]:!text-[12px] [&_[role=listbox]]:!py-0.5 [&_[role=option]]:!px-2 [&_[role=option]]:!py-1"') &&
+    guideSource.includes('maxPanelHeightClassName="max-h-[144px]"') &&
+    !guideSource.includes('<RefreshCw') &&
+    !guideSource.includes('<select') &&
+    !guideSource.includes("t('onboarding.project.validate')") &&
     guideSource.includes('border-l-white/[0.28] bg-white/[0.05]') &&
     guideSource.includes('border border-emerald-300/[0.14] bg-emerald-400/[0.06]') &&
     !guideSource.includes("0_4px_20px_rgba(95,99,242,0.25)") &&
@@ -328,6 +342,7 @@ check(
 check(
   'project names are sanitized before onboarding project creation',
   guideSource.includes("import { sanitizeProjectName }") &&
+    guideSource.includes("sanitizeProjectName('MyProject')") &&
     guideSource.includes('const name = sanitizeProjectName(projectName)') &&
     guideSource.includes('setProjectName(sanitizeProjectName(event.target.value))'),
   guideSource,

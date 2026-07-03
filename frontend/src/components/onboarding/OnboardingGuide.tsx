@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import {
   Bot,
   Check,
@@ -12,12 +20,13 @@ import {
   LoaderCircle,
   Monitor,
   Moon,
-  RefreshCw,
+  Plus,
   Rocket,
   Search,
   Sparkles,
   Sun,
   Users,
+  X,
   Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -132,6 +141,9 @@ const executorSelectClassName =
 
 const onboardingProjectInputClassName =
   'mt-2 w-full rounded-[5px] border border-white/[0.08] bg-[#151617] px-3 font-mono shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] outline-none transition-[background-color,border-color,box-shadow] placeholder:text-[#5F6672] focus:border-white/[0.24] focus:bg-[#171819] focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.04)]';
+
+const onboardingProjectSelectClassName =
+  'mt-2 w-full [&>button]:h-7 [&>button]:rounded-[5px] [&>button]:border-white/[0.08] [&>button]:bg-[#151617] [&>button]:px-1.5 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[12px] [&>button]:text-[#c9d2df] [&>button]:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] [&>button]:outline-none [&>button:hover]:border-white/[0.16] [&>button:hover]:bg-white/[0.045] [&>button:focus-visible]:border-white/[0.24] [&>button:focus-visible]:bg-[#171819] [&>button:focus-visible]:outline-none [&>button[aria-expanded=true]]:border-white/[0.24] [&>button[aria-expanded=true]]:bg-[#171819] [&>button>svg:last-child]:h-3 [&>button>svg:last-child]:w-3 [&>button>svg:last-child]:text-[#768295]';
 
 const onboardingNoiseTextureStyle = {
   backgroundImage:
@@ -437,6 +449,14 @@ export function OnboardingGuide({
   const [pathLoading, setPathLoading] = useState(false);
   const [pathDetecting, setPathDetecting] = useState(false);
   const [pathError, setPathError] = useState<string | null>(null);
+  const [directoryMutating, setDirectoryMutating] = useState(false);
+  const [renamingDirectoryPath, setRenamingDirectoryPath] = useState<string | null>(
+    null,
+  );
+  const [renamingDirectoryName, setRenamingDirectoryName] = useState('');
+  const [renameDirectoryError, setRenameDirectoryError] = useState<string | null>(
+    null,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedWelcomeCommandId, setSelectedWelcomeCommandId] =
@@ -536,6 +556,15 @@ export function OnboardingGuide({
     return availableRunners.length > 0 ? availableRunners : fallbackRunnerOptions;
   }, [runtimes]);
 
+  const gitignoreOptions = useMemo<DropdownSelectOption[]>(
+    () =>
+      gitignoreTemplates.map((template) => ({
+        id: template,
+        label: t(`onboarding.project.gitignore.${template}`),
+      })),
+    [t],
+  );
+
   useEffect(() => {
     if (!isWelcome) return;
 
@@ -592,13 +621,8 @@ export function OnboardingGuide({
   };
 
   const projectNameForScenario = useCallback(
-    (scenarioKey: OnboardingScenario) => {
-      const scenario =
-        scenarios.find((candidate) => candidate.key === scenarioKey) ??
-        currentScenario;
-      return sanitizeProjectName(`${scenario.title} workspace`);
-    },
-    [currentScenario, scenarios],
+    (_scenarioKey: OnboardingScenario) => sanitizeProjectName('MyProject'),
+    [],
   );
 
   const buildTeamConfigForScenario = useCallback(
@@ -1025,6 +1049,9 @@ export function OnboardingGuide({
       setCurrentPath(response.current_path);
       setProjectPath(response.current_path);
       setProjectStatus(null);
+      setRenamingDirectoryPath(null);
+      setRenamingDirectoryName('');
+      setRenameDirectoryError(null);
     } catch (err) {
       setPathError(
         err instanceof Error ? err.message : t('onboarding.project.readFailed'),
@@ -1041,12 +1068,99 @@ export function OnboardingGuide({
       const roots = await filesystemApi.listRoots();
       setEntries(roots);
       setCurrentPath('');
+      setRenamingDirectoryPath(null);
+      setRenamingDirectoryName('');
+      setRenameDirectoryError(null);
     } catch (err) {
       setPathError(
         err instanceof Error ? err.message : t('onboarding.project.rootsFailed'),
       );
     } finally {
       setPathLoading(false);
+    }
+  };
+
+  const resetDirectoryRename = () => {
+    setRenamingDirectoryPath(null);
+    setRenamingDirectoryName('');
+    setRenameDirectoryError(null);
+  };
+
+  const createProjectDirectory = async () => {
+    const parentPath = currentPath.trim();
+    if (!parentPath || pathLoading || directoryMutating) return;
+
+    setDirectoryMutating(true);
+    setPathError(null);
+    setRenameDirectoryError(null);
+    try {
+      const created = await filesystemApi.createDirectory({
+        parent_path: parentPath,
+        name: t('sidebar.newFolderName'),
+      });
+      await loadDirectory(parentPath);
+      setProjectPath(created.path);
+      setProjectStatus(null);
+      setRenamingDirectoryPath(created.path);
+      setRenamingDirectoryName(created.name);
+    } catch (err) {
+      setPathError(
+        err instanceof Error ? err.message : t('sidebar.createFolderFailed'),
+      );
+    } finally {
+      setDirectoryMutating(false);
+    }
+  };
+
+  const commitDirectoryRename = async () => {
+    const targetPath = renamingDirectoryPath;
+    const nextName = renamingDirectoryName.trim();
+    if (!targetPath || directoryMutating) return;
+    if (!nextName) {
+      setRenameDirectoryError(t('sidebar.folderNameRequired'));
+      return;
+    }
+
+    const originalEntry = entries.find((entry) => entry.path === targetPath);
+    if (originalEntry?.name === nextName) {
+      resetDirectoryRename();
+      return;
+    }
+
+    setDirectoryMutating(true);
+    setRenameDirectoryError(null);
+    try {
+      const renamed = await filesystemApi.renameDirectory({
+        path: targetPath,
+        name: nextName,
+      });
+      const parentPath = getParentPath(renamed.path) || currentPath;
+      await loadDirectory(parentPath);
+      setProjectPath(renamed.path);
+      setProjectStatus(null);
+      resetDirectoryRename();
+    } catch (err) {
+      setRenameDirectoryError(
+        err instanceof Error ? err.message : t('sidebar.renameFolderFailed'),
+      );
+    } finally {
+      setDirectoryMutating(false);
+    }
+  };
+
+  const handleDirectoryRenameKeyDown = (
+    event: ReactKeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      void commitDirectoryRename();
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      resetDirectoryRename();
     }
   };
 
@@ -1397,12 +1511,13 @@ export function OnboardingGuide({
                 </button>
                 <button
                   type="button"
-                  onClick={() => void loadDirectory(projectPath)}
-                  className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"
-                  aria-label={t('onboarding.project.refresh')}
-                  title={t('onboarding.project.refresh')}
+                  disabled={!currentPath || pathLoading || directoryMutating}
+                  onClick={() => void createProjectDirectory()}
+                  className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-35"
+                  aria-label={t('sidebar.newFolder')}
+                  title={t('sidebar.newFolder')}
                 >
-                  <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
                 </button>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
@@ -1418,6 +1533,7 @@ export function OnboardingGuide({
                   entries.map((entry) => {
                     const Icon = entry.is_directory ? Folder : FileText;
                     const selected = entry.path === projectPath.trim();
+                    const isRenaming = renamingDirectoryPath === entry.path;
                     return (
                       <div
                         key={`${entry.path}-${directoryEntryTime(entry)}`}
@@ -1427,47 +1543,100 @@ export function OnboardingGuide({
                             'border-white/[0.08] border-l-white/[0.28] bg-white/[0.05]',
                         )}
                       >
-                        <button
-                          type="button"
-                          disabled={!entry.is_directory}
-                          onClick={() => {
-                            if (entry.is_directory) void loadDirectory(entry.path);
-                          }}
-                          className="flex min-h-6 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left font-mono text-[11px] leading-none tracking-[0.02em] text-[#8A8F98] transition hover:text-[#f5f5f5] disabled:cursor-default disabled:opacity-55"
-                        >
-                          <Icon
-                            className="h-3 w-3 shrink-0 text-[#768295]"
-                            strokeWidth={1.5}
-                          />
-                          <span className="min-w-0 flex-1 truncate">
-                            {entry.name}
-                          </span>
-                          {entry.is_git_repo && (
-                            <span className="inline-flex h-4 items-center rounded-[3px] border border-emerald-300/[0.14] bg-emerald-400/[0.06] px-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-emerald-200/55">
-                              git
-                            </span>
-                          )}
-                        </button>
-                        {entry.is_directory && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setProjectPath(entry.path);
-                              void validateProjectPath(entry.path);
-                            }}
-                            className={cn(
-                              'flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[#768295] opacity-0 transition hover:bg-white/[0.05] hover:text-[#f5f5f5] group-hover/path-entry:opacity-100',
-                              selected && '!opacity-100',
+                        {isRenaming ? (
+                          <>
+                            <div className="flex min-h-6 min-w-0 flex-1 items-center gap-2 py-0.5">
+                              <Folder
+                                className="h-3 w-3 shrink-0 text-[#768295]"
+                                strokeWidth={1.5}
+                              />
+                              <input
+                                className="h-6 min-w-0 flex-1 rounded-[4px] border border-white/[0.18] bg-[#171819] px-2 font-mono text-[11px] tracking-[0.02em] text-[#f5f5f5] outline-none focus:border-white/[0.32]"
+                                value={renamingDirectoryName}
+                                onChange={(event) =>
+                                  setRenamingDirectoryName(event.target.value)
+                                }
+                                onKeyDown={handleDirectoryRenameKeyDown}
+                                onClick={(event) => event.stopPropagation()}
+                                disabled={directoryMutating}
+                                aria-label={t('sidebar.folderName')}
+                                autoFocus
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void commitDirectoryRename()}
+                              disabled={directoryMutating}
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-45"
+                              aria-label={t('sidebar.saveFolderName')}
+                              title={t('sidebar.saveFolderName')}
+                            >
+                              <Check className="h-3.5 w-3.5" strokeWidth={1.5} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={resetDirectoryRename}
+                              disabled={directoryMutating}
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-45"
+                              aria-label={t('sidebar.cancelFolderRename')}
+                              title={t('sidebar.cancelFolderRename')}
+                            >
+                              <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              disabled={!entry.is_directory}
+                              onClick={() => {
+                                if (entry.is_directory) void loadDirectory(entry.path);
+                              }}
+                              className="flex min-h-6 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left font-mono text-[11px] leading-none tracking-[0.02em] text-[#8A8F98] transition hover:text-[#f5f5f5] disabled:cursor-default disabled:opacity-55"
+                            >
+                              <Icon
+                                className="h-3 w-3 shrink-0 text-[#768295]"
+                                strokeWidth={1.5}
+                              />
+                              <span className="min-w-0 flex-1 truncate">
+                                {entry.name}
+                              </span>
+                              {entry.is_git_repo && (
+                                <span className="inline-flex h-4 items-center rounded-[3px] border border-emerald-300/[0.14] bg-emerald-400/[0.06] px-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-emerald-200/55">
+                                  git
+                                </span>
+                              )}
+                            </button>
+                            {entry.is_directory && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProjectPath(entry.path);
+                                  void validateProjectPath(entry.path);
+                                }}
+                                className={cn(
+                                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[#768295] opacity-0 transition hover:bg-white/[0.05] hover:text-[#f5f5f5] group-hover/path-entry:opacity-100',
+                                  selected && '!opacity-100',
+                                )}
+                                aria-label={t('onboarding.project.select')}
+                                title={t('onboarding.project.select')}
+                              >
+                                <Check
+                                  className="h-3.5 w-3.5"
+                                  strokeWidth={1.5}
+                                />
+                              </button>
                             )}
-                            aria-label={t('onboarding.project.select')}
-                            title={t('onboarding.project.select')}
-                          >
-                            <Check className="h-3.5 w-3.5" strokeWidth={1.5} />
-                          </button>
+                          </>
                         )}
                       </div>
                     );
                   })
+                )}
+                {renameDirectoryError && (
+                  <div className="px-1 py-2 font-mono text-[12px] text-red-400">
+                    {renameDirectoryError}
+                  </div>
                 )}
               </div>
             </section>
@@ -1490,15 +1659,6 @@ export function OnboardingGuide({
                   placeholder={t('onboarding.project.pathPlaceholder')}
                 />
               </label>
-
-              <button
-                type="button"
-                onClick={() => void validateProjectPath(projectPath)}
-                disabled={!projectPath.trim() || pathLoading || pathDetecting}
-                className="inline-flex h-8 cursor-pointer items-center justify-center rounded-[5px] border border-white/[0.08] bg-[#151617] px-3 font-mono text-[11px] tracking-[0.03em] text-[#c9d2df] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition hover:border-white/[0.16] hover:bg-white/[0.045] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {t('onboarding.project.validate')}
-              </button>
 
               {!projectPath.trim() && (
                 <p className="font-mono text-[12px] leading-relaxed tracking-[0.03em] text-[#768295]">
@@ -1571,21 +1731,17 @@ export function OnboardingGuide({
                       >
                         <label className="block overflow-hidden font-mono text-[12px] tracking-[0.03em] text-[#a1a1aa]">
                           {t('onboarding.project.gitignoreTemplate')}
-                          <select
+                          <DropdownSelect
                             value={gitignoreTemplate}
-                            onChange={(event) =>
-                              setGitignoreTemplate(
-                                event.target.value as GitignoreTemplate,
-                              )
+                            options={gitignoreOptions}
+                            showSearch={false}
+                            className={onboardingProjectSelectClassName}
+                            panelClassName="[&_*]:!text-[12px] [&_[role=listbox]]:!py-0.5 [&_[role=option]]:!px-2 [&_[role=option]]:!py-1"
+                            maxPanelHeightClassName="max-h-[144px]"
+                            onChange={(value) =>
+                              setGitignoreTemplate(value as GitignoreTemplate)
                             }
-                            className="mt-2 h-8 w-full rounded-[5px] border border-white/[0.08] bg-[#151617] px-2 font-mono text-[12px] text-[#c9d2df] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] outline-none transition-[background-color,border-color,box-shadow] focus:border-white/[0.24] focus:bg-[#171819]"
-                          >
-                            {gitignoreTemplates.map((template) => (
-                              <option key={template} value={template}>
-                                {t(`onboarding.project.gitignore.${template}`)}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </label>
                       </div>
                     </div>
