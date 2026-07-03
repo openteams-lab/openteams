@@ -154,13 +154,15 @@ check(
 );
 
 check(
-  'project path step uses the flat grid layout with micro Git controls',
-  guideSource.includes('lg:grid-cols-[minmax(0,65%)_minmax(280px,35%)]') &&
+  'project path step uses the shared onboarding panel with micro Git controls',
+  guideSource.includes('h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#121212]/90') &&
+    guideSource.includes('lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.74fr)]') &&
+    guideSource.includes('overflow-y-auto lg:grid-cols') &&
     guideSource.includes("gitignoreTemplates = ['node', 'go', 'python', 'none'] as const") &&
     guideSource.includes("grid-rows-[1fr]") &&
     guideSource.includes('chatSessionsApi.initializeWorkspaceGit') &&
-    guideSource.includes('className="flex h-7 w-7 items-center justify-center text-[#768295] transition hover:text-[#f5f5f5]"') &&
-    guideSource.includes('rounded-[4px] border border-[#333] bg-black') &&
+    guideSource.includes('className="flex h-7 w-7 items-center justify-center rounded-[6px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"') &&
+    guideSource.includes('rounded-[6px] border border-white/[0.08] bg-[#0a0a0a]') &&
     !guideSource.includes("0_4px_20px_rgba(95,99,242,0.25)") &&
     guideSource.includes("onboarding.project.gitMissing"),
   guideSource,
@@ -185,13 +187,17 @@ check(
 );
 
 check(
-  'scenario executor and appearance steps keep the flat onboarding treatment',
+  'configuration form steps keep the flat onboarding treatment',
     guideSource.includes('renderScenarioStep') &&
     guideSource.includes('renderExecutorStep') &&
+    guideSource.includes('renderProjectPathStep') &&
     guideSource.includes('renderAppearanceStep') &&
     guideSource.includes('flex h-[340px] items-center justify-center') &&
     guideSource.includes('h-full w-full max-w-[820px] rounded-[8px] border border-white/[0.08] bg-[#121212]/90') &&
+    guideSource.includes('h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#121212]/90') &&
     guideSource.includes('px-5 py-5 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-5') &&
+    guideSource.includes('md:grid-cols-[minmax(160px,1fr)_190px_230px]') &&
+    guideSource.includes('!rounded-[6px] !border-white/[0.08] !bg-white/[0.025]') &&
     guideSource.includes('lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.84fr)] lg:gap-10') &&
     guideSource.includes('mx-auto grid w-full max-w-[760px] gap-3 sm:grid-cols-2') &&
     guideSource.includes('group min-h-[104px] cursor-pointer rounded-[8px] border p-3') &&

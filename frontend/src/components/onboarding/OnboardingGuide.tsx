@@ -119,10 +119,10 @@ const onboardingSansFont = {
 } as CSSProperties;
 
 const executorSelectTriggerClassName =
-  '!h-8 !rounded-[4px] !border-[#1f1f23] !bg-transparent !px-2.5 !py-1.5 !font-mono !text-[12px] !text-[#d4d4d8] !shadow-none hover:!border-[#3f3f46] hover:!bg-transparent focus-visible:!border-[#52525b] focus-visible:!outline-none focus-visible:!shadow-[0_0_0_1px_rgba(255,255,255,0.06)] [&[aria-expanded=true]]:!border-[#52525b] [&[aria-expanded=true]]:!shadow-[0_0_0_1px_rgba(255,255,255,0.06)]';
+  '!h-8 !rounded-[6px] !border-white/[0.08] !bg-white/[0.025] !px-2.5 !py-1.5 !font-mono !text-[12px] !text-[#d4d4d8] !shadow-none hover:!border-white/[0.16] hover:!bg-white/[0.045] focus-visible:!border-white/[0.22] focus-visible:!outline-none focus-visible:!shadow-[0_0_0_1px_rgba(255,255,255,0.06)] [&[aria-expanded=true]]:!border-white/[0.22] [&[aria-expanded=true]]:!bg-white/[0.045] [&[aria-expanded=true]]:!shadow-[0_0_0_1px_rgba(255,255,255,0.06)]';
 
 const executorSelectPanelClassName =
-  '!rounded-[6px] !border-[#2a2a30] !bg-[#09090b] !shadow-[0_14px_32px_rgba(0,0,0,0.28)]';
+  '!rounded-[8px] !border-white/[0.1] !bg-[#0a0a0a] !shadow-[0_14px_32px_rgba(0,0,0,0.28)]';
 
 const onboardingNoiseTextureStyle = {
   backgroundImage:
@@ -1197,68 +1197,70 @@ export function OnboardingGuide({
   );
 
   const renderExecutorStep = () => (
-    <div className="mx-auto flex min-h-[380px] w-full max-w-5xl flex-col justify-center">
-      <div className="overflow-hidden rounded-[6px] border border-[#1f1f23] bg-transparent shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
-        {runtimeError && (
-          <p className="border-b border-yellow-500/25 px-4 py-2.5 font-mono text-[12px] text-yellow-200">
-            {runtimeError}
-          </p>
-        )}
-        <div className="hidden border-b border-[#1f1f23] px-4 py-2 font-mono text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-[#6f6f76] md:grid md:grid-cols-[minmax(180px,1fr)_220px_260px] md:gap-3">
-          <span>Role</span>
-          <span>Executor</span>
-          <span>Model</span>
-        </div>
-        <div>
-          {teamMembers.map((member, index) => {
-            const runnerValue = member.runner_type || runnerOptions[0]?.id || '';
-            const modelOptions = modelOptionsForRunner(runnerValue);
-            const modelValue = member.model_name || modelOptions[0]?.id || '';
-            return (
-              <div
-                key={`${member.member}-${index}`}
-                className={cn(
-                  'grid min-h-[54px] gap-2.5 px-3 py-2.5 md:grid-cols-[minmax(180px,1fr)_220px_260px] md:items-center md:gap-3 md:px-4',
-                  index < teamMembers.length - 1 && 'border-b border-[#1f1f23]',
-                )}
-              >
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="inline-flex h-5 min-w-8 shrink-0 items-center justify-center rounded-[3px] border border-[#2a2a30] bg-transparent px-1.5 font-mono text-[11px] font-semibold uppercase leading-none tracking-[0] text-[#9ca3af]">
-                    {roleBadgeLabel(member.member)}
-                  </span>
-                  <span className="truncate text-[13px] font-semibold tracking-tight text-[#f5f5f5]">
-                    {member.member}
-                  </span>
+    <div className="flex h-[340px] items-center justify-center">
+      <div className="h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#121212]/90 px-5 py-5 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-5">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#0a0a0a]/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+          {runtimeError && (
+            <p className="shrink-0 border-b border-yellow-500/25 px-4 py-2.5 font-mono text-[12px] text-yellow-200">
+              {runtimeError}
+            </p>
+          )}
+          <div className="hidden shrink-0 border-b border-white/[0.08] px-4 py-2 font-mono text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-[#777777] md:grid md:grid-cols-[minmax(160px,1fr)_190px_230px] md:gap-3">
+            <span>Role</span>
+            <span>Executor</span>
+            <span>Model</span>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {teamMembers.map((member, index) => {
+              const runnerValue = member.runner_type || runnerOptions[0]?.id || '';
+              const modelOptions = modelOptionsForRunner(runnerValue);
+              const modelValue = member.model_name || modelOptions[0]?.id || '';
+              return (
+                <div
+                  key={`${member.member}-${index}`}
+                  className={cn(
+                    'grid min-h-[54px] gap-2.5 px-3 py-2.5 md:grid-cols-[minmax(160px,1fr)_190px_230px] md:items-center md:gap-3 md:px-4',
+                    index < teamMembers.length - 1 && 'border-b border-white/[0.08]',
+                  )}
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="inline-flex h-5 min-w-8 shrink-0 items-center justify-center rounded-[4px] border border-white/[0.12] bg-white/[0.03] px-1.5 font-mono text-[11px] font-semibold uppercase leading-none tracking-[0] text-[#a1a1aa]">
+                      {roleBadgeLabel(member.member)}
+                    </span>
+                    <span className="truncate text-[13px] font-semibold tracking-tight text-[#f5f5f5]">
+                      {member.member}
+                    </span>
+                  </div>
+                  <DropdownSelect
+                    value={runnerValue}
+                    options={runnerOptions}
+                    showSearch={false}
+                    placeholder={t('onboarding.executor.runnerPlaceholder')}
+                    className="w-full"
+                    triggerClassName={executorSelectTriggerClassName}
+                    panelClassName={executorSelectPanelClassName}
+                    onChange={(value) =>
+                      updateTeamMember(index, {
+                        runner_type: value,
+                        model_name: modelOptionsForRunner(value)[0]?.id,
+                      })
+                    }
+                    maxPanelHeightClassName="max-h-[190px]"
+                  />
+                  <DropdownSelect
+                    value={modelValue}
+                    options={modelOptions}
+                    placeholder={t('onboarding.executor.modelPlaceholder')}
+                    className="w-full"
+                    triggerClassName={executorSelectTriggerClassName}
+                    panelClassName={executorSelectPanelClassName}
+                    onChange={(value) => updateTeamMember(index, { model_name: value })}
+                    maxPanelHeightClassName="max-h-[190px]"
+                  />
                 </div>
-                <DropdownSelect
-                  value={runnerValue}
-                  options={runnerOptions}
-                  showSearch={false}
-                  placeholder={t('onboarding.executor.runnerPlaceholder')}
-                  className="w-full"
-                  triggerClassName={executorSelectTriggerClassName}
-                  panelClassName={executorSelectPanelClassName}
-                  onChange={(value) =>
-                    updateTeamMember(index, {
-                      runner_type: value,
-                      model_name: modelOptionsForRunner(value)[0]?.id,
-                    })
-                  }
-                  maxPanelHeightClassName="max-h-[190px]"
-                />
-                <DropdownSelect
-                  value={modelValue}
-                  options={modelOptions}
-                  placeholder={t('onboarding.executor.modelPlaceholder')}
-                  className="w-full"
-                  triggerClassName={executorSelectTriggerClassName}
-                  panelClassName={executorSelectPanelClassName}
-                  onChange={(value) => updateTeamMember(index, { model_name: value })}
-                  maxPanelHeightClassName="max-h-[190px]"
-                />
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -1340,219 +1342,229 @@ export function OnboardingGuide({
   );
 
   const renderProjectPathStep = () => (
-    <div className="grid min-h-[420px] border-y border-[#222] lg:grid-cols-[minmax(0,65%)_minmax(280px,35%)]">
-      <section className="space-y-7 py-6 lg:border-r lg:border-[#222] lg:pr-8">
-        <label className="block min-w-0 text-[12px] font-medium text-[#768295]">
-          {t('onboarding.project.nameTitle')}
-          <input
-            value={projectName}
-            onChange={(event) => {
-              setProjectName(sanitizeProjectName(event.target.value));
-              setProjectNameTouched(true);
-            }}
-            className="mt-2 h-10 w-full border-0 border-b border-[#222] bg-transparent px-0 font-mono text-[18px] font-semibold text-[#f5f5f5] outline-none transition placeholder:text-[#5b6678] focus:border-[#4b5568]"
-            placeholder={t('onboarding.project.namePlaceholder')}
-          />
-        </label>
+    <div className="flex h-[340px] items-center justify-center">
+      <div className="h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#121212]/90 px-5 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-5">
+        <div className="grid h-full min-h-0 gap-5 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.74fr)] lg:gap-6 lg:overflow-hidden">
+          <section className="flex min-h-0 flex-col lg:border-r lg:border-white/[0.08] lg:pr-6">
+            <label className="block min-w-0 text-[12px] font-medium text-[#a1a1aa]">
+              {t('onboarding.project.nameTitle')}
+              <input
+                value={projectName}
+                onChange={(event) => {
+                  setProjectName(sanitizeProjectName(event.target.value));
+                  setProjectNameTouched(true);
+                }}
+                className="mt-2 h-9 w-full rounded-[6px] border border-white/[0.08] bg-white/[0.025] px-3 font-mono text-[13px] font-semibold text-[#f5f5f5] outline-none transition placeholder:text-[#5b6678] focus:border-white/[0.22] focus:bg-white/[0.045]"
+                placeholder={t('onboarding.project.namePlaceholder')}
+              />
+            </label>
 
-        <section>
-          <div className="flex items-center gap-2 border-b border-[#222] pb-2">
-            <span className="min-w-0 flex-1 truncate font-mono text-[12px] tracking-[0.05em] text-[#8f9aaa]">
-              {currentPath || t('onboarding.project.localRoots')}
-            </span>
-            <button
-              type="button"
-              onClick={() => void loadRoots()}
-              className="flex h-7 w-7 items-center justify-center text-[#768295] transition hover:text-[#f5f5f5]"
-              aria-label={t('onboarding.project.roots')}
-              title={t('onboarding.project.roots')}
-            >
-              <Home className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              disabled={!currentPath}
-              onClick={() => {
-                const parent = getParentPath(currentPath);
-                if (parent) void loadDirectory(parent);
-              }}
-              className="flex h-7 w-7 items-center justify-center text-[#768295] transition hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-35"
-              aria-label={t('onboarding.project.up')}
-              title={t('onboarding.project.up')}
-            >
-              <ChevronUp className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => void loadDirectory(projectPath)}
-              className="flex h-7 w-7 items-center justify-center text-[#768295] transition hover:text-[#f5f5f5]"
-              aria-label={t('onboarding.project.refresh')}
-              title={t('onboarding.project.refresh')}
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="h-[286px] overflow-y-auto py-2">
-            {pathLoading ? (
-              <div className="py-2 font-mono text-[12px] text-[#768295]">
-                {t('onboarding.project.loading')}
-              </div>
-            ) : entries.length === 0 ? (
-              <div className="py-2 font-mono text-[12px] text-[#768295]">
-                {t('onboarding.project.empty')}
-              </div>
-            ) : (
-              entries.map((entry) => {
-                const Icon = entry.is_directory ? Folder : FileText;
-                const selected = entry.path === projectPath.trim();
-                return (
-                  <div
-                    key={`${entry.path}-${directoryEntryTime(entry)}`}
-                    className={cn(
-                      'group/path-entry flex items-center border-b border-transparent',
-                      selected && 'border-[#222]',
-                    )}
-                  >
-                    <button
-                      type="button"
-                      disabled={!entry.is_directory}
-                      onClick={() => {
-                        if (entry.is_directory) void loadDirectory(entry.path);
-                      }}
-                      className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left font-mono text-[12px] tracking-[0.05em] text-[#8f9aaa] transition hover:text-[#f5f5f5] disabled:cursor-default disabled:opacity-55"
-                    >
-                      <Icon className="h-3.5 w-3.5 shrink-0 text-[#768295]" />
-                      <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-                      {entry.is_git_repo && (
-                        <span className="font-mono text-[10px] text-emerald-400/80">
-                          git
-                        </span>
-                      )}
-                    </button>
-                    {entry.is_directory && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProjectPath(entry.path);
-                          void validateProjectPath(entry.path);
-                        }}
-                        className={cn(
-                          'flex h-7 w-7 shrink-0 items-center justify-center text-[#768295] opacity-0 transition hover:text-[#f5f5f5] group-hover/path-entry:opacity-100',
-                          selected && '!opacity-100',
-                        )}
-                        aria-label={t('onboarding.project.select')}
-                        title={t('onboarding.project.select')}
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </section>
-      </section>
-
-      <aside className="py-6 lg:pl-8">
-        <div className="space-y-5">
-          <label className="block text-[12px] font-medium text-[#768295]">
-            {t('onboarding.project.selectedPath')}
-            <input
-              value={projectPath}
-              onChange={(event) => {
-                setProjectPath(event.target.value);
-                setProjectStatus(null);
-              }}
-              className="mt-2 h-8 w-full truncate border-0 border-b border-[#222] bg-transparent px-0 font-mono text-[12px] tracking-[0.05em] text-[#8f9aaa] outline-none transition placeholder:text-[#5b6678] focus:border-[#4b5568]"
-              placeholder={t('onboarding.project.pathPlaceholder')}
-            />
-          </label>
-
-          <button
-            type="button"
-            onClick={() => void validateProjectPath(projectPath)}
-            disabled={!projectPath.trim() || pathLoading || pathDetecting}
-            className="font-mono text-[11px] tracking-[0.05em] text-[#768295] transition hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {t('onboarding.project.validate')}
-          </button>
-
-          {!projectPath.trim() && (
-            <p className="font-mono text-[12px] leading-relaxed tracking-[0.05em] text-[#768295]">
-              {t('onboarding.project.pathPrompt')}
-            </p>
-          )}
-
-          {projectPath.trim() && pathDetecting && (
-            <p className="font-mono text-[12px] tracking-[0.05em] text-[#768295]">
-              {t('onboarding.project.detecting')}
-            </p>
-          )}
-
-          {projectPath.trim() &&
-            !pathDetecting &&
-            projectStatus?.valid &&
-            projectStatus.is_git_repo && (
-            <p className="flex items-center gap-2 font-mono text-[12px] tracking-[0.05em] text-emerald-400/80">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              {t('onboarding.project.gitDetected')}
-            </p>
-          )}
-
-          {projectPath.trim() &&
-            !pathDetecting &&
-            projectStatus?.valid &&
-            !projectStatus.is_git_repo && (
-            <div className="grid grid-rows-[1fr] border-t border-[#222] pt-4 transition-[grid-template-rows] duration-200">
-              <div className="space-y-4 overflow-hidden">
-                <p className="flex items-start gap-2 font-mono text-[12px] leading-relaxed tracking-[0.05em] text-[#8f9aaa]">
-                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#768295]" />
-                  <span>{t('onboarding.project.gitMissing')}</span>
-                </p>
-                <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px] tracking-[0.05em] text-[#c9d2df]">
-                  <input
-                    type="checkbox"
-                    checked={initializeGit}
-                    onChange={(event) => setInitializeGit(event.target.checked)}
-                    className="h-3.5 w-3.5 accent-white"
-                  />
-                  {t('onboarding.project.initializeGit')}
-                </label>
-                <div
-                  className={cn(
-                    'grid transition-[grid-template-rows] duration-200',
-                    initializeGit ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
-                  )}
+            <section className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#0a0a0a]/35">
+              <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.08] px-3 py-2">
+                <span className="min-w-0 flex-1 truncate font-mono text-[12px] tracking-[0.03em] text-[#8f9aaa]">
+                  {currentPath || t('onboarding.project.localRoots')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void loadRoots()}
+                  className="flex h-7 w-7 items-center justify-center rounded-[6px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"
+                  aria-label={t('onboarding.project.roots')}
+                  title={t('onboarding.project.roots')}
                 >
-                  <label className="block overflow-hidden font-mono text-[12px] tracking-[0.05em] text-[#768295]">
-                    {t('onboarding.project.gitignoreTemplate')}
-                    <select
-                      value={gitignoreTemplate}
-                      onChange={(event) =>
-                        setGitignoreTemplate(event.target.value as GitignoreTemplate)
-                      }
-                      className="mt-2 h-8 w-full rounded-[4px] border border-[#333] bg-black px-2 font-mono text-[12px] text-[#c9d2df] outline-none focus:border-[#555]"
-                    >
-                      {gitignoreTemplates.map((template) => (
-                        <option key={template} value={template}>
-                          {t(`onboarding.project.gitignore.${template}`)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+                  <Home className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={!currentPath}
+                  onClick={() => {
+                    const parent = getParentPath(currentPath);
+                    if (parent) void loadDirectory(parent);
+                  }}
+                  className="flex h-7 w-7 items-center justify-center rounded-[6px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-35"
+                  aria-label={t('onboarding.project.up')}
+                  title={t('onboarding.project.up')}
+                >
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void loadDirectory(projectPath)}
+                  className="flex h-7 w-7 items-center justify-center rounded-[6px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"
+                  aria-label={t('onboarding.project.refresh')}
+                  title={t('onboarding.project.refresh')}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
               </div>
-            </div>
-          )}
+              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1.5">
+                {pathLoading ? (
+                  <div className="px-1 py-2 font-mono text-[12px] text-[#768295]">
+                    {t('onboarding.project.loading')}
+                  </div>
+                ) : entries.length === 0 ? (
+                  <div className="px-1 py-2 font-mono text-[12px] text-[#768295]">
+                    {t('onboarding.project.empty')}
+                  </div>
+                ) : (
+                  entries.map((entry) => {
+                    const Icon = entry.is_directory ? Folder : FileText;
+                    const selected = entry.path === projectPath.trim();
+                    return (
+                      <div
+                        key={`${entry.path}-${directoryEntryTime(entry)}`}
+                        className={cn(
+                          'group/path-entry flex items-center rounded-[6px] border border-transparent px-1',
+                          selected && 'border-white/[0.1] bg-white/[0.045]',
+                        )}
+                      >
+                        <button
+                          type="button"
+                          disabled={!entry.is_directory}
+                          onClick={() => {
+                            if (entry.is_directory) void loadDirectory(entry.path);
+                          }}
+                          className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left font-mono text-[12px] tracking-[0.03em] text-[#8f9aaa] transition hover:text-[#f5f5f5] disabled:cursor-default disabled:opacity-55"
+                        >
+                          <Icon className="h-3.5 w-3.5 shrink-0 text-[#768295]" />
+                          <span className="min-w-0 flex-1 truncate">
+                            {entry.name}
+                          </span>
+                          {entry.is_git_repo && (
+                            <span className="font-mono text-[10px] text-emerald-400/80">
+                              git
+                            </span>
+                          )}
+                        </button>
+                        {entry.is_directory && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProjectPath(entry.path);
+                              void validateProjectPath(entry.path);
+                            }}
+                            className={cn(
+                              'flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] text-[#768295] opacity-0 transition hover:bg-white/[0.05] hover:text-[#f5f5f5] group-hover/path-entry:opacity-100',
+                              selected && '!opacity-100',
+                            )}
+                            aria-label={t('onboarding.project.select')}
+                            title={t('onboarding.project.select')}
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          </section>
 
-          {(pathError || error) && (
-            <p className="font-mono text-[12px] leading-relaxed tracking-[0.05em] text-red-400">
-              {pathError || error}
-            </p>
-          )}
+          <aside className="min-h-0 overflow-y-auto">
+            <div className="space-y-4">
+              <label className="block text-[12px] font-medium text-[#a1a1aa]">
+                {t('onboarding.project.selectedPath')}
+                <input
+                  value={projectPath}
+                  onChange={(event) => {
+                    setProjectPath(event.target.value);
+                    setProjectStatus(null);
+                  }}
+                  className="mt-2 h-8 w-full truncate rounded-[6px] border border-white/[0.08] bg-white/[0.025] px-3 font-mono text-[12px] tracking-[0.03em] text-[#d4d4d8] outline-none transition placeholder:text-[#5b6678] focus:border-white/[0.22] focus:bg-white/[0.045]"
+                  placeholder={t('onboarding.project.pathPlaceholder')}
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={() => void validateProjectPath(projectPath)}
+                disabled={!projectPath.trim() || pathLoading || pathDetecting}
+                className="inline-flex h-8 cursor-pointer items-center justify-center rounded-[6px] border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[11px] tracking-[0.03em] text-[#c9d2df] transition hover:border-white/[0.14] hover:bg-white/[0.055] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {t('onboarding.project.validate')}
+              </button>
+
+              {!projectPath.trim() && (
+                <p className="font-mono text-[12px] leading-relaxed tracking-[0.03em] text-[#768295]">
+                  {t('onboarding.project.pathPrompt')}
+                </p>
+              )}
+
+              {projectPath.trim() && pathDetecting && (
+                <p className="font-mono text-[12px] tracking-[0.03em] text-[#768295]">
+                  {t('onboarding.project.detecting')}
+                </p>
+              )}
+
+              {projectPath.trim() &&
+                !pathDetecting &&
+                projectStatus?.valid &&
+                projectStatus.is_git_repo && (
+                  <p className="flex items-center gap-2 font-mono text-[12px] tracking-[0.03em] text-emerald-400/80">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    {t('onboarding.project.gitDetected')}
+                  </p>
+                )}
+
+              {projectPath.trim() &&
+                !pathDetecting &&
+                projectStatus?.valid &&
+                !projectStatus.is_git_repo && (
+                  <div className="grid grid-rows-[1fr] border-t border-white/[0.08] pt-4 transition-[grid-template-rows] duration-200">
+                    <div className="space-y-4 overflow-hidden">
+                      <p className="flex items-start gap-2 font-mono text-[12px] leading-relaxed tracking-[0.03em] text-[#8f9aaa]">
+                        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#768295]" />
+                        <span>{t('onboarding.project.gitMissing')}</span>
+                      </p>
+                      <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px] tracking-[0.03em] text-[#c9d2df]">
+                        <input
+                          type="checkbox"
+                          checked={initializeGit}
+                          onChange={(event) =>
+                            setInitializeGit(event.target.checked)
+                          }
+                          className="h-3.5 w-3.5 accent-white"
+                        />
+                        {t('onboarding.project.initializeGit')}
+                      </label>
+                      <div
+                        className={cn(
+                          'grid transition-[grid-template-rows] duration-200',
+                          initializeGit ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                        )}
+                      >
+                        <label className="block overflow-hidden font-mono text-[12px] tracking-[0.03em] text-[#a1a1aa]">
+                          {t('onboarding.project.gitignoreTemplate')}
+                          <select
+                            value={gitignoreTemplate}
+                            onChange={(event) =>
+                              setGitignoreTemplate(
+                                event.target.value as GitignoreTemplate,
+                              )
+                            }
+                            className="mt-2 h-8 w-full rounded-[6px] border border-white/[0.08] bg-[#0a0a0a] px-2 font-mono text-[12px] text-[#c9d2df] outline-none focus:border-white/[0.22]"
+                          >
+                            {gitignoreTemplates.map((template) => (
+                              <option key={template} value={template}>
+                                {t(`onboarding.project.gitignore.${template}`)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              {(pathError || error) && (
+                <p className="font-mono text-[12px] leading-relaxed tracking-[0.03em] text-red-400">
+                  {pathError || error}
+                </p>
+              )}
+            </div>
+          </aside>
         </div>
-      </aside>
+      </div>
     </div>
   );
 
