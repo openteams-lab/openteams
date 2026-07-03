@@ -40,6 +40,17 @@ const requiredLocaleKeys = [
   'onboarding.project.gitDetected',
   'onboarding.project.gitMissing',
   'onboarding.project.gitignoreTemplate',
+  'onboarding.project.gitignoreSearchPlaceholder',
+  'onboarding.project.gitignoreTemplatesLoadFailed',
+  'onboarding.project.gitError.generic',
+  'onboarding.project.gitError.workspace_path_required',
+  'onboarding.project.gitError.workspace_path_invalid',
+  'onboarding.project.gitError.workspace_path_not_found',
+  'onboarding.project.gitError.workspace_path_not_directory',
+  'onboarding.project.gitError.workspace_path_not_accessible',
+  'onboarding.project.gitError.invalid_gitignore_template',
+  'onboarding.project.gitError.git_init_failed',
+  'onboarding.project.gitError.gitignore_write_failed',
   'onboarding.project.initializeGit',
   'onboarding.project.initializeAction',
   'onboarding.project.initializeFailed',
@@ -161,6 +172,7 @@ check(
     guideSource.includes('filesystemApi.createDirectory') &&
     guideSource.includes('filesystemApi.renameDirectory') &&
     guideSource.includes('chatSessionsApi.validateWorkspacePath') &&
+    guideSource.includes('chatSessionsApi.listGitignoreTemplates') &&
     guideSource.includes('chatSessionsApi.initializeWorkspaceGit') &&
     !guideSource.includes('webkitdirectory'),
   guideSource,
@@ -171,9 +183,15 @@ check(
   guideSource.includes('h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#1A1A1A]/90') &&
     guideSource.includes('lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.74fr)]') &&
     guideSource.includes('overflow-y-auto lg:grid-cols') &&
-    guideSource.includes("gitignoreTemplates = ['node', 'go', 'python', 'none'] as const") &&
+    guideSource.includes('chatSessionsApi.listGitignoreTemplates') &&
+    guideSource.includes('fallbackGitignoreTemplates') &&
+    guideSource.includes('gitignoreTemplatesLoadFailed') &&
+    !guideSource.includes("gitignoreTemplates = ['node', 'go', 'python', 'none'] as const") &&
     guideSource.includes("grid-rows-[1fr]") &&
     guideSource.includes('chatSessionsApi.initializeWorkspaceGit') &&
+    guideSource.includes('workspaceGitApiErrorI18nKey') &&
+    guideSource.includes('workspaceGitValidationErrorI18nKey') &&
+    guideSource.includes('normalizeGitignoreTemplateSelection') &&
     guideSource.includes('className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"') &&
     guideSource.includes('rounded-[6px] border border-white/[0.08] bg-[#151617]') &&
     guideSource.includes('focus:bg-[#171819]') &&
@@ -185,8 +203,13 @@ check(
     guideSource.includes('className={onboardingProjectSelectClassName}') &&
     guideSource.includes('[&>button]:h-7') &&
     guideSource.includes('[&>button]:px-1.5') &&
-    guideSource.includes('panelClassName="[&_*]:!text-[12px] [&_[role=listbox]]:!py-0.5 [&_[role=option]]:!px-2 [&_[role=option]]:!py-1"') &&
-    guideSource.includes('maxPanelHeightClassName="max-h-[144px]"') &&
+    guideSource.includes('showSearch={true}') &&
+    guideSource.includes("searchPlaceholder={t('onboarding.project.gitignoreSearchPlaceholder')}") &&
+    guideSource.includes('group: template.group') &&
+    guideSource.includes('description: template.description') &&
+    guideSource.includes("hint: template.aliases.join(', ')") &&
+    guideSource.includes('panelClassName="[&_*]:!text-[12px] [&_[role=listbox]]:!py-0.5 [&_[role=option]]:!px-2 [&_[role=option]]:!py-1 [&_kbd]:max-w-[132px] [&_kbd]:truncate"') &&
+    guideSource.includes('maxPanelHeightClassName="max-h-[240px]"') &&
     !guideSource.includes('<RefreshCw') &&
     !guideSource.includes('<select') &&
     !guideSource.includes("t('onboarding.project.validate')") &&
@@ -216,7 +239,7 @@ check(
     guideSource.includes('onClick={() => void handleInitializeProjectGit()}') &&
     guideSource.includes("t('onboarding.project.initializeAction')") &&
     guideSource.includes('h-7 shrink-0') &&
-    guideSource.includes("t('onboarding.project.initializeFailed')"),
+    guideSource.includes('t(workspaceGitApiErrorI18nKey(err))'),
   guideSource,
 );
 

@@ -17,14 +17,19 @@ export type {
   ContinueQueuedMessageResponse,
   CreateChatMessageResponse,
   DeleteQueuedMessageResponse,
+  GitignoreTemplateSummary,
+  GitignoreTemplatesResponse,
   MemberQueueSnapshot,
   MemberQueueStatus,
   QueuedMessage,
   QueuedMessageListItem,
   QueuedMessageStatus,
+  WorkspaceGitErrorData,
   ValidateWorkspacePathRequest,
   ValidateWorkspacePathResponse,
 } from '../../shared/types';
+
+export { WorkspaceGitErrorCode } from '../../shared/types';
 
 export type MemberQueuesBySessionAgentId = Record<string, MemberQueueSnapshot>;
 

@@ -266,6 +266,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
                     axum::routing::post(sessions::validate_workspace_path_endpoint),
                 )
                 .route(
+                    "/gitignore-templates",
+                    get(sessions::list_gitignore_templates_endpoint),
+                )
+                .route(
                     "/initialize-workspace-git",
                     axum::routing::post(sessions::initialize_workspace_git_endpoint),
                 )

@@ -38,6 +38,11 @@ import {
   filesystemApi,
   onboardingApi,
 } from '@/lib/api';
+import {
+  normalizeGitignoreTemplateSelection,
+  workspaceGitApiErrorI18nKey,
+  workspaceGitValidationErrorI18nKey,
+} from '@/lib/onboardingGitErrors';
 import { recommendOnboardingTeamTemplate } from '@/lib/onboardingTemplateRecommendations';
 import { sanitizeProjectName } from '@/lib/projectName';
 import { buildTemplateMemberSpecs } from '@/lib/teamTemplateRuntime';
@@ -48,6 +53,7 @@ import {
 import type {
   AgentRuntimeStatus,
   DirectoryEntry,
+  GitignoreTemplateSummary,
   Locale,
   Theme,
   ValidateWorkspacePathResponse,
@@ -65,12 +71,10 @@ import {
 
 const welcomeStepKey = 'welcome';
 const onboardingSteps = ['appearance', 'scenario', 'executor', 'project_path'] as const;
-const gitignoreTemplates = ['node', 'go', 'python', 'none'] as const;
 
 type OnboardingStepKey = (typeof onboardingSteps)[number];
 type ActiveStepKey = OnboardingStepKey | typeof welcomeStepKey;
 type OnboardingMode = 'onboarding' | 'upgrade';
-type GitignoreTemplate = (typeof gitignoreTemplates)[number];
 const firstOnboardingStep: OnboardingStepKey = 'appearance';
 const finalOnboardingStep: OnboardingStepKey = 'project_path';
 type TranslateFn = (
@@ -236,6 +240,30 @@ const fallbackRunnerOptions: DropdownSelectOption[] = [
   { id: 'openteams_cli', label: 'OpenTeams CLI' },
   { id: 'qwen_code', label: 'Qwen Code' },
   { id: 'opencode', label: 'OpenCode' },
+];
+
+const fallbackGitignoreTemplates: GitignoreTemplateSummary[] = [
+  {
+    id: 'node',
+    label: 'Node',
+    group: 'Languages and frameworks',
+    description: 'Ignore patterns for Node projects.',
+    aliases: ['nodejs', 'javascript', 'npm', 'yarn', 'pnpm'],
+  },
+  {
+    id: 'python',
+    label: 'Python',
+    group: 'Languages and frameworks',
+    description: 'Ignore patterns for Python projects.',
+    aliases: ['py', 'pip', 'venv', 'virtualenv'],
+  },
+  {
+    id: 'go',
+    label: 'Go',
+    group: 'Languages and frameworks',
+    description: 'Ignore patterns for Go projects.',
+    aliases: ['golang', 'go modules'],
+  },
 ];
 
 const stepToBackend: Record<OnboardingStepKey, OnboardingStep> = {
@@ -428,12 +456,19 @@ export function OnboardingGuide({
             valid: true,
             is_git_repo: initialState.project_path_is_git,
             error: null,
+            error_code: null,
           }
         : null,
     );
   const [initializeGit, setInitializeGit] = useState(true);
-  const [gitignoreTemplate, setGitignoreTemplate] =
-    useState<GitignoreTemplate>('node');
+  const [gitignoreTemplate, setGitignoreTemplate] = useState('node');
+  const [gitignoreTemplates, setGitignoreTemplates] = useState<
+    GitignoreTemplateSummary[]
+  >([]);
+  const [gitignoreTemplatesLoading, setGitignoreTemplatesLoading] =
+    useState(false);
+  const [gitignoreTemplatesLoadFailed, setGitignoreTemplatesLoadFailed] =
+    useState(false);
   const [selectedLocale, setSelectedLocale] = useState<Locale>(
     onboardingLanguageToLocale(initialState?.language, locale),
   );
@@ -556,14 +591,32 @@ export function OnboardingGuide({
     return availableRunners.length > 0 ? availableRunners : fallbackRunnerOptions;
   }, [runtimes]);
 
-  const gitignoreOptions = useMemo<DropdownSelectOption[]>(
-    () =>
-      gitignoreTemplates.map((template) => ({
-        id: template,
-        label: t(`onboarding.project.gitignore.${template}`),
-      })),
-    [t],
-  );
+  const gitignoreOptions = useMemo<DropdownSelectOption[]>(() => {
+    const templates =
+      gitignoreTemplatesLoadFailed || gitignoreTemplates.length === 0
+        ? fallbackGitignoreTemplates
+        : gitignoreTemplates;
+    const seenIds = new Set(['none']);
+    return [
+      {
+        id: 'none',
+        label: t('onboarding.project.gitignore.none'),
+      },
+      ...templates
+        .filter((template) => {
+          if (seenIds.has(template.id)) return false;
+          seenIds.add(template.id);
+          return true;
+        })
+        .map((template) => ({
+          id: template.id,
+          label: template.label,
+          group: template.group,
+          description: template.description,
+          hint: template.aliases.join(', '),
+        })),
+    ];
+  }, [gitignoreTemplates, gitignoreTemplatesLoadFailed, t]);
 
   useEffect(() => {
     if (!isWelcome) return;
@@ -678,6 +731,7 @@ export function OnboardingGuide({
             valid: true,
             is_git_repo: nextInitialState.project_path_is_git,
             error: null,
+            error_code: null,
           }
         : null,
     );
@@ -730,6 +784,25 @@ export function OnboardingGuide({
       cancelled = true;
     };
   }, [initialState?.team_config?.length, mode, selectedScenario, teamPresets]);
+
+  const loadGitignoreTemplates = useCallback(async () => {
+    setGitignoreTemplatesLoading(true);
+    setGitignoreTemplatesLoadFailed(false);
+    try {
+      const response = await chatSessionsApi.listGitignoreTemplates();
+      setGitignoreTemplates(response.templates);
+    } catch {
+      setGitignoreTemplates([]);
+      setGitignoreTemplatesLoadFailed(true);
+    } finally {
+      setGitignoreTemplatesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mode !== 'onboarding' || activeStepKey !== 'project_path') return;
+    void loadGitignoreTemplates();
+  }, [activeStepKey, loadGitignoreTemplates, mode]);
 
   useEffect(() => {
     if (mode !== 'onboarding' || activeStepKey !== 'project_path') return;
@@ -796,7 +869,7 @@ export function OnboardingGuide({
 
     const status = await validateProjectPath(path);
     if (!status?.valid) {
-      setError(status?.error ?? t('onboarding.project.invalid'));
+      setError(t(workspaceGitValidationErrorI18nKey(status)));
       return null;
     }
 
@@ -806,7 +879,7 @@ export function OnboardingGuide({
   const initializeProjectWorkspaceGit = async (path: string) => {
     const initialized = await chatSessionsApi.initializeWorkspaceGit({
       workspace_path: path,
-      gitignore_template: gitignoreTemplate === 'none' ? null : gitignoreTemplate,
+      gitignore_template: normalizeGitignoreTemplateSelection(gitignoreTemplate),
     });
     setProjectStatus(initialized.status);
     return initialized.status;
@@ -821,9 +894,7 @@ export function OnboardingGuide({
       await initializeProjectWorkspaceGit(projectDraft.path);
       setPathError(null);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t('onboarding.project.initializeFailed'),
-      );
+      setError(t(workspaceGitApiErrorI18nKey(err)));
     } finally {
       setSaving(false);
     }
@@ -835,9 +906,12 @@ export function OnboardingGuide({
 
     setSaving(true);
     setError(null);
+    let initializingGit = false;
     try {
       if (!projectDraft.status.is_git_repo && initializeGit) {
+        initializingGit = true;
         await initializeProjectWorkspaceGit(projectDraft.path);
+        initializingGit = false;
       }
 
       const createdProject = await onCreateProjectFromOnboarding({
@@ -857,8 +931,12 @@ export function OnboardingGuide({
         projectId: createdProject.projectId,
         workspacePath: projectDraft.path,
       });
-    } catch {
-      setError(t('onboarding.project.createFailed'));
+    } catch (err) {
+      setError(
+        initializingGit
+          ? t(workspaceGitApiErrorI18nKey(err))
+          : t('onboarding.project.createFailed'),
+      );
     } finally {
       setSaving(false);
     }
@@ -1201,15 +1279,13 @@ export function OnboardingGuide({
       if (pathValidationRequestRef.current !== requestId) return status;
       setProjectStatus(status);
       if (!status.valid) {
-        setPathError(status.error ?? t('onboarding.project.invalid'));
+        setPathError(t(workspaceGitValidationErrorI18nKey(status)));
       }
       return status;
     } catch (err) {
       if (pathValidationRequestRef.current === requestId) {
         setProjectStatus(null);
-        setPathError(
-          err instanceof Error ? err.message : t('onboarding.project.invalid'),
-        );
+        setPathError(t(workspaceGitApiErrorI18nKey(err)));
       }
       throw err;
     } finally {
@@ -1765,14 +1841,25 @@ export function OnboardingGuide({
                           <DropdownSelect
                             value={gitignoreTemplate}
                             options={gitignoreOptions}
-                            showSearch={false}
+                            showSearch={true}
+                            searchPlaceholder={t('onboarding.project.gitignoreSearchPlaceholder')}
                             className={onboardingProjectSelectClassName}
-                            panelClassName="[&_*]:!text-[12px] [&_[role=listbox]]:!py-0.5 [&_[role=option]]:!px-2 [&_[role=option]]:!py-1"
-                            maxPanelHeightClassName="max-h-[144px]"
-                            onChange={(value) =>
-                              setGitignoreTemplate(value as GitignoreTemplate)
-                            }
+                            panelClassName="[&_*]:!text-[12px] [&_[role=listbox]]:!py-0.5 [&_[role=option]]:!px-2 [&_[role=option]]:!py-1 [&_kbd]:max-w-[132px] [&_kbd]:truncate"
+                            maxPanelHeightClassName="max-h-[240px]"
+                            onChange={(value) => setGitignoreTemplate(value)}
                           />
+                          {gitignoreTemplatesLoadFailed && (
+                            <span className="mt-2 block font-mono text-[11px] leading-relaxed tracking-[0.02em] text-[#d6a85f]">
+                              {t(
+                                'onboarding.project.gitignoreTemplatesLoadFailed',
+                              )}
+                            </span>
+                          )}
+                          {gitignoreTemplatesLoading && !gitignoreTemplatesLoadFailed && (
+                            <span className="mt-2 block font-mono text-[11px] leading-relaxed tracking-[0.02em] text-[#768295]">
+                              {t('onboarding.project.loading')}
+                            </span>
+                          )}
                         </label>
                       </div>
                     </div>

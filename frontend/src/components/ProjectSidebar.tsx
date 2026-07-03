@@ -1408,6 +1408,7 @@ export function ProjectSidebar({
               err instanceof Error
                 ? err.message
                 : "Workspace Git status could not be checked",
+            error_code: null,
           });
           setWorkspaceGitStatusPath(workspacePath);
         })

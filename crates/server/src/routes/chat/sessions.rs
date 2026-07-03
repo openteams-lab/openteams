@@ -10,6 +10,7 @@ use axum::{
         Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
+    http::StatusCode,
     response::{IntoResponse, Json as ResponseJson},
 };
 use chrono::{DateTime, Utc};
@@ -29,6 +30,7 @@ use db::models::{
 use deployment::Deployment;
 use git::{Commit, DiffTarget, GitCli, GitService};
 use regex::Regex;
+use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use services::services::{
     analytics_events::{AnalyticsProjector, DomainEvent},
@@ -1309,6 +1311,11 @@ fn is_windows_reserved_name(name: &str) -> bool {
 }
 
 fn validate_workspace_path_legality(trimmed: &str) -> Result<PathBuf, ApiError> {
+    validate_workspace_path_legality_data(trimmed)
+        .map_err(|error| ApiError::BadRequest(error.message))
+}
+
+fn validate_workspace_path_legality_data(trimmed: &str) -> Result<PathBuf, WorkspaceGitErrorData> {
     let is_absolute = {
         #[cfg(windows)]
         {
@@ -1327,15 +1334,21 @@ fn validate_workspace_path_legality(trimmed: &str) -> Result<PathBuf, ApiError> 
         }
     };
 
+    if trimmed.is_empty() {
+        return Err(workspace_git_error(
+            WorkspaceGitErrorCode::WorkspacePathRequired,
+        ));
+    }
+
     if !is_absolute {
-        return Err(ApiError::BadRequest(
-            "Workspace path must be an absolute path.".to_string(),
+        return Err(workspace_git_error(
+            WorkspaceGitErrorCode::WorkspacePathInvalid,
         ));
     }
 
     if trimmed.chars().any(|ch| ch == '\0' || ch.is_control()) {
-        return Err(ApiError::BadRequest(
-            "Workspace path contains invalid characters.".to_string(),
+        return Err(workspace_git_error(
+            WorkspaceGitErrorCode::WorkspacePathInvalid,
         ));
     }
 
@@ -1344,8 +1357,8 @@ fn validate_workspace_path_legality(trimmed: &str) -> Result<PathBuf, ApiError> 
         .components()
         .any(|component| matches!(component, Component::ParentDir))
     {
-        return Err(ApiError::BadRequest(
-            "Workspace path cannot contain '..'.".to_string(),
+        return Err(workspace_git_error(
+            WorkspaceGitErrorCode::WorkspacePathInvalid,
         ));
     }
 
@@ -1358,21 +1371,30 @@ fn validate_workspace_path_legality(trimmed: &str) -> Result<PathBuf, ApiError> 
                     .chars()
                     .any(|ch| matches!(ch, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
                 {
-                    return Err(ApiError::BadRequest(
-                        "Workspace path contains invalid Windows filename characters.".to_string(),
+                    return Err(workspace_git_error(
+                        WorkspaceGitErrorCode::WorkspacePathInvalid,
                     ));
                 }
 
                 if is_windows_reserved_name(&segment) {
-                    return Err(ApiError::BadRequest(format!(
-                        "Workspace path contains reserved Windows name: {segment}"
-                    )));
+                    return Err(workspace_git_error(
+                        WorkspaceGitErrorCode::WorkspacePathInvalid,
+                    ));
                 }
             }
         }
     }
 
     Ok(parsed_path)
+}
+
+fn workspace_path_metadata_error(err: std::io::Error) -> WorkspaceGitErrorData {
+    match err.kind() {
+        std::io::ErrorKind::NotFound => {
+            workspace_git_error(WorkspaceGitErrorCode::WorkspacePathNotFound)
+        }
+        _ => workspace_git_error(WorkspaceGitErrorCode::WorkspacePathNotAccessible),
+    }
 }
 
 async fn normalize_workspace_path(
@@ -2196,6 +2218,7 @@ pub struct ValidateWorkspacePathResponse {
     pub valid: bool,
     pub is_git_repo: bool,
     pub error: Option<String>,
+    pub error_code: Option<WorkspaceGitErrorCode>,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -2212,56 +2235,368 @@ pub struct InitializeWorkspaceGitResponse {
     pub status: ValidateWorkspacePathResponse,
 }
 
-fn normalized_gitignore_template(value: Option<&str>) -> Option<&'static str> {
-    match value.unwrap_or("none").trim().to_ascii_lowercase().as_str() {
-        "node" => Some("node"),
-        "go" => Some("go"),
-        "python" => Some("python"),
-        "none" | "" => None,
-        _ => None,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(use_ts_enum)]
+pub enum WorkspaceGitErrorCode {
+    WorkspacePathRequired,
+    WorkspacePathInvalid,
+    WorkspacePathNotFound,
+    WorkspacePathNotDirectory,
+    WorkspacePathNotAccessible,
+    InvalidGitignoreTemplate,
+    GitInitFailed,
+    GitignoreWriteFailed,
+}
+
+impl WorkspaceGitErrorCode {
+    fn message(self) -> &'static str {
+        match self {
+            Self::WorkspacePathRequired => "Workspace path is required.",
+            Self::WorkspacePathInvalid => "Workspace path is invalid.",
+            Self::WorkspacePathNotFound => "Workspace path does not exist.",
+            Self::WorkspacePathNotDirectory => "Workspace path must be an existing directory.",
+            Self::WorkspacePathNotAccessible => "Workspace path is not accessible.",
+            Self::InvalidGitignoreTemplate => "Selected .gitignore template is not available.",
+            Self::GitInitFailed => "Failed to initialize Git repository for this workspace.",
+            Self::GitignoreWriteFailed => "Failed to write .gitignore for this workspace.",
+        }
     }
 }
 
-fn gitignore_template_body(template: &str) -> &'static str {
-    match template {
-        "node" => {
-            "node_modules/\ndist/\nbuild/\n.env\n.env.*\nnpm-debug.log*\nyarn-debug.log*\npnpm-debug.log*\n"
-        }
-        "go" => "bin/\n*.test\ncoverage.out\nvendor/\n",
-        "python" => {
-            "__pycache__/\n*.py[cod]\n.venv/\nvenv/\n.pytest_cache/\n.mypy_cache/\ndist/\nbuild/\n*.egg-info/\n"
-        }
-        _ => "",
+impl std::fmt::Display for WorkspaceGitErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Self::WorkspacePathRequired => "workspace_path_required",
+            Self::WorkspacePathInvalid => "workspace_path_invalid",
+            Self::WorkspacePathNotFound => "workspace_path_not_found",
+            Self::WorkspacePathNotDirectory => "workspace_path_not_directory",
+            Self::WorkspacePathNotAccessible => "workspace_path_not_accessible",
+            Self::InvalidGitignoreTemplate => "invalid_gitignore_template",
+            Self::GitInitFailed => "git_init_failed",
+            Self::GitignoreWriteFailed => "gitignore_write_failed",
+        };
+        f.write_str(value)
     }
 }
 
-async fn write_gitignore_template(
-    workspace_path: &PathBuf,
-    template: &str,
-) -> Result<(), ApiError> {
-    let body = gitignore_template_body(template);
-    if body.is_empty() {
-        return Ok(());
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct WorkspaceGitErrorData {
+    pub code: WorkspaceGitErrorCode,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct GitignoreTemplateSummary {
+    pub id: String,
+    pub label: String,
+    pub group: String,
+    pub description: String,
+    pub aliases: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct GitignoreTemplatesResponse {
+    pub templates: Vec<GitignoreTemplateSummary>,
+}
+
+type InitializeWorkspaceGitApiResponse =
+    ApiResponse<InitializeWorkspaceGitResponse, WorkspaceGitErrorData>;
+
+fn workspace_git_error(code: WorkspaceGitErrorCode) -> WorkspaceGitErrorData {
+    WorkspaceGitErrorData {
+        code,
+        message: code.message().to_string(),
+    }
+}
+
+fn workspace_git_bad_request(
+    error: WorkspaceGitErrorData,
+) -> (StatusCode, ResponseJson<InitializeWorkspaceGitApiResponse>) {
+    (
+        StatusCode::BAD_REQUEST,
+        ResponseJson(ApiResponse::error_with_data(error)),
+    )
+}
+
+fn workspace_git_success(
+    data: InitializeWorkspaceGitResponse,
+) -> (StatusCode, ResponseJson<InitializeWorkspaceGitApiResponse>) {
+    (StatusCode::OK, ResponseJson(ApiResponse::success(data)))
+}
+
+mod gitignore_templates {
+    use std::{collections::BTreeSet, path::Path, sync::LazyLock};
+
+    use super::{
+        GitignoreTemplateSummary, RustEmbed, WorkspaceGitErrorCode, WorkspaceGitErrorData,
+        workspace_git_error,
+    };
+
+    #[derive(RustEmbed)]
+    #[folder = "../../assets/gitignore-templates"]
+    struct GitignoreTemplateAssets;
+
+    const TEMPLATE_PREFIX: &str = "templates/";
+    const TEMPLATE_SUFFIX: &str = ".gitignore";
+
+    #[derive(Debug, Clone)]
+    struct GitignoreTemplateRecord {
+        summary: GitignoreTemplateSummary,
+        asset_path: String,
     }
 
-    let gitignore_path = workspace_path.join(".gitignore");
-    match tokio::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&gitignore_path)
-        .await
-    {
-        Ok(mut file) => {
-            use tokio::io::AsyncWriteExt;
-            file.write_all(body.as_bytes()).await.map_err(|err| {
-                ApiError::BadRequest(format!("Failed to write .gitignore: {err}"))
-            })?;
-            Ok(())
+    static TEMPLATES: LazyLock<Vec<GitignoreTemplateRecord>> = LazyLock::new(load_templates);
+
+    pub fn list_templates() -> Vec<GitignoreTemplateSummary> {
+        TEMPLATES
+            .iter()
+            .map(|record| record.summary.clone())
+            .collect()
+    }
+
+    pub fn read_template(id: &str) -> Option<String> {
+        let record = find_record(id)?;
+        let file = GitignoreTemplateAssets::get(&record.asset_path)?;
+        Some(String::from_utf8_lossy(file.data.as_ref()).into_owned())
+    }
+
+    pub fn normalize_template_selection(
+        value: Option<&str>,
+    ) -> Result<Option<String>, WorkspaceGitErrorData> {
+        let trimmed = value.unwrap_or("none").trim();
+        if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("none") {
+            return Ok(None);
         }
-        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
-        Err(err) => Err(ApiError::BadRequest(format!(
-            "Failed to create .gitignore: {err}"
-        ))),
+
+        find_record(trimmed)
+            .map(|record| Some(record.summary.id.clone()))
+            .ok_or_else(|| workspace_git_error(WorkspaceGitErrorCode::InvalidGitignoreTemplate))
+    }
+
+    pub async fn write_template(
+        workspace_path: &Path,
+        id: &str,
+    ) -> Result<(), WorkspaceGitErrorData> {
+        let body = read_template(id)
+            .ok_or_else(|| workspace_git_error(WorkspaceGitErrorCode::InvalidGitignoreTemplate))?;
+        if body.is_empty() {
+            return Ok(());
+        }
+
+        let gitignore_path = workspace_path.join(".gitignore");
+        match tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&gitignore_path)
+            .await
+        {
+            Ok(mut file) => {
+                use tokio::io::AsyncWriteExt;
+                file.write_all(body.as_bytes())
+                    .await
+                    .map_err(|_| workspace_git_error(WorkspaceGitErrorCode::GitignoreWriteFailed))
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+            Err(_) => Err(workspace_git_error(
+                WorkspaceGitErrorCode::GitignoreWriteFailed,
+            )),
+        }
+    }
+
+    fn find_record(id: &str) -> Option<&'static GitignoreTemplateRecord> {
+        let normalized = normalize_id(id);
+        TEMPLATES
+            .iter()
+            .find(|record| record.summary.id == normalized)
+    }
+
+    fn load_templates() -> Vec<GitignoreTemplateRecord> {
+        let mut records = GitignoreTemplateAssets::iter()
+            .filter_map(|path| {
+                let asset_path = path.replace('\\', "/");
+                let relative = asset_path
+                    .strip_prefix(TEMPLATE_PREFIX)?
+                    .strip_suffix(TEMPLATE_SUFFIX)?;
+                let parts = relative.split('/').collect::<Vec<_>>();
+                let file_stem = parts.last().copied()?;
+                let id = template_id(&parts);
+                if id.is_empty() {
+                    return None;
+                }
+
+                let label = display_label(file_stem);
+                let group = template_group(&parts);
+                let aliases = template_aliases(&id, &label, &parts);
+                let description = template_description(&label, &group);
+
+                Some(GitignoreTemplateRecord {
+                    summary: GitignoreTemplateSummary {
+                        id,
+                        label,
+                        group,
+                        description,
+                        aliases,
+                    },
+                    asset_path,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        records.sort_by(|left, right| {
+            group_rank(&left.summary.group)
+                .cmp(&group_rank(&right.summary.group))
+                .then_with(|| left.summary.group.cmp(&right.summary.group))
+                .then_with(|| {
+                    left.summary
+                        .label
+                        .to_lowercase()
+                        .cmp(&right.summary.label.to_lowercase())
+                })
+                .then_with(|| left.summary.id.cmp(&right.summary.id))
+        });
+        records
+    }
+
+    fn template_id(parts: &[&str]) -> String {
+        if parts.len() == 1 {
+            normalize_id(parts[0])
+        } else {
+            parts
+                .iter()
+                .map(|part| normalize_id(part))
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<_>>()
+                .join("-")
+        }
+    }
+
+    fn template_group(parts: &[&str]) -> String {
+        match parts {
+            [_file] => "Languages and frameworks".to_string(),
+            ["Global", ..] => "Global".to_string(),
+            ["community", category, ..] => format!("Community: {}", display_label(category)),
+            _ => "Community".to_string(),
+        }
+    }
+
+    fn template_description(label: &str, group: &str) -> String {
+        if group == "Global" {
+            format!("Global ignore patterns for {label} local tooling and generated files.")
+        } else if group.starts_with("Community:") {
+            format!("Community-maintained ignore patterns for {label} projects.")
+        } else {
+            format!("Ignore patterns for {label} projects.")
+        }
+    }
+
+    fn template_aliases(id: &str, label: &str, parts: &[&str]) -> Vec<String> {
+        let mut aliases = BTreeSet::new();
+        aliases.insert(id.to_string());
+        aliases.insert(label.to_lowercase());
+        for part in parts {
+            aliases.insert(part.to_lowercase());
+            aliases.insert(normalize_id(part));
+        }
+
+        match id {
+            "node" => {
+                aliases.extend(["nodejs", "javascript", "npm", "yarn", "pnpm"].map(String::from));
+            }
+            "python" => {
+                aliases.extend(["py", "pip", "venv", "virtualenv"].map(String::from));
+            }
+            "go" => {
+                aliases.extend(["golang", "go modules"].map(String::from));
+            }
+            "visualstudio" => {
+                aliases.extend(["visual studio", "csharp", "dotnet"].map(String::from));
+            }
+            "rust" => {
+                aliases.extend(["cargo", "rustlang"].map(String::from));
+            }
+            _ => {}
+        }
+
+        aliases
+            .into_iter()
+            .filter(|alias| !alias.is_empty())
+            .collect()
+    }
+
+    fn display_label(value: &str) -> String {
+        let mut label = String::new();
+        let mut previous: Option<char> = None;
+
+        for ch in value.chars() {
+            if matches!(ch, '_' | '-' | '.') {
+                push_space(&mut label);
+                previous = Some(' ');
+                continue;
+            }
+
+            if ch.is_uppercase()
+                && previous
+                    .map(|prev| prev.is_lowercase() || prev.is_ascii_digit())
+                    .unwrap_or(false)
+            {
+                push_space(&mut label);
+            }
+
+            label.push(ch);
+            previous = Some(ch);
+        }
+
+        if label.is_empty() {
+            value.to_string()
+        } else {
+            label
+        }
+    }
+
+    fn normalize_id(value: &str) -> String {
+        let mut normalized = String::new();
+        let mut last_was_separator = false;
+
+        for ch in value.chars() {
+            if ch.is_ascii_alphanumeric() {
+                normalized.push(ch.to_ascii_lowercase());
+                last_was_separator = false;
+            } else {
+                let token = match ch {
+                    '+' => Some("plus"),
+                    '#' => Some("sharp"),
+                    _ => None,
+                };
+
+                if let Some(token) = token {
+                    if !normalized.is_empty() && !last_was_separator {
+                        normalized.push('-');
+                    }
+                    normalized.push_str(token);
+                    last_was_separator = false;
+                } else if !normalized.is_empty() && !last_was_separator {
+                    normalized.push('-');
+                    last_was_separator = true;
+                }
+            }
+        }
+
+        normalized.trim_matches('-').to_string()
+    }
+
+    fn push_space(value: &mut String) {
+        if !value.ends_with(' ') && !value.is_empty() {
+            value.push(' ');
+        }
+    }
+
+    fn group_rank(group: &str) -> u8 {
+        match group {
+            "Languages and frameworks" => 0,
+            "Global" => 1,
+            _ => 2,
+        }
     }
 }
 
@@ -2271,18 +2606,21 @@ pub(crate) async fn validate_workspace_path_status(
     let trimmed = workspace_path.trim();
 
     if trimmed.is_empty() {
+        let error = workspace_git_error(WorkspaceGitErrorCode::WorkspacePathRequired);
         return ValidateWorkspacePathResponse {
             valid: false,
             is_git_repo: false,
-            error: Some("Workspace path is required.".to_string()),
+            error: Some(error.message),
+            error_code: Some(error.code),
         };
     }
 
-    if let Err(e) = validate_workspace_path_legality(trimmed) {
+    if let Err(error) = validate_workspace_path_legality_data(trimmed) {
         return ValidateWorkspacePathResponse {
             valid: false,
             is_git_repo: false,
-            error: Some(e.to_string()),
+            error: Some(error.message),
+            error_code: Some(error.code),
         };
     }
 
@@ -2294,24 +2632,25 @@ pub(crate) async fn validate_workspace_path_status(
                     valid: true,
                     is_git_repo: git2::Repository::open(&parsed_path).is_ok(),
                     error: None,
+                    error_code: None,
                 }
             } else {
+                let error = workspace_git_error(WorkspaceGitErrorCode::WorkspacePathNotDirectory);
                 ValidateWorkspacePathResponse {
                     valid: false,
                     is_git_repo: false,
-                    error: Some("Workspace path must be an existing directory.".to_string()),
+                    error: Some(error.message),
+                    error_code: Some(error.code),
                 }
             }
         }
         Err(err) => {
-            let error_msg = match err.kind() {
-                std::io::ErrorKind::NotFound => "Workspace path does not exist.".to_string(),
-                _ => format!("Workspace path is not accessible: {err}"),
-            };
+            let error = workspace_path_metadata_error(err);
             ValidateWorkspacePathResponse {
                 valid: false,
                 is_git_repo: false,
-                error: Some(error_msg),
+                error: Some(error.message),
+                error_code: Some(error.code),
             }
         }
     }
@@ -2325,44 +2664,65 @@ pub async fn validate_workspace_path_endpoint(
     )))
 }
 
+pub async fn list_gitignore_templates_endpoint()
+-> Result<ResponseJson<ApiResponse<GitignoreTemplatesResponse>>, ApiError> {
+    Ok(ResponseJson(ApiResponse::success(
+        GitignoreTemplatesResponse {
+            templates: gitignore_templates::list_templates(),
+        },
+    )))
+}
+
 pub async fn initialize_workspace_git_endpoint(
     Json(payload): Json<InitializeWorkspaceGitRequest>,
-) -> Result<ResponseJson<ApiResponse<InitializeWorkspaceGitResponse>>, ApiError> {
+) -> Result<(StatusCode, ResponseJson<InitializeWorkspaceGitApiResponse>), ApiError> {
     let trimmed = payload.workspace_path.trim();
-    let parsed_path = validate_workspace_path_legality(trimmed)?;
-    let metadata = tokio::fs::metadata(&parsed_path)
-        .await
-        .map_err(|err| match err.kind() {
-            std::io::ErrorKind::NotFound => {
-                ApiError::BadRequest("Workspace path does not exist.".to_string())
-            }
-            _ => ApiError::BadRequest(format!("Workspace path is not accessible: {err}")),
-        })?;
+    let parsed_path = match validate_workspace_path_legality_data(trimmed) {
+        Ok(path) => path,
+        Err(error) => return Ok(workspace_git_bad_request(error)),
+    };
+    let metadata = match tokio::fs::metadata(&parsed_path).await {
+        Ok(metadata) => metadata,
+        Err(err) => {
+            return Ok(workspace_git_bad_request(workspace_path_metadata_error(
+                err,
+            )));
+        }
+    };
     if !metadata.is_dir() {
-        return Err(ApiError::BadRequest(
-            "Workspace path must be an existing directory.".to_string(),
-        ));
+        return Ok(workspace_git_bad_request(workspace_git_error(
+            WorkspaceGitErrorCode::WorkspacePathNotDirectory,
+        )));
     }
+
+    let template = match gitignore_templates::normalize_template_selection(
+        payload.gitignore_template.as_deref(),
+    ) {
+        Ok(template) => template,
+        Err(error) => return Ok(workspace_git_bad_request(error)),
+    };
 
     let mut initialized = false;
     if git2::Repository::open(&parsed_path).is_err() {
-        git2::Repository::init(&parsed_path)
-            .map_err(|err| ApiError::BadRequest(format!("Failed to initialize Git: {err}")))?;
+        if git2::Repository::init(&parsed_path).is_err() {
+            return Ok(workspace_git_bad_request(workspace_git_error(
+                WorkspaceGitErrorCode::GitInitFailed,
+            )));
+        }
         initialized = true;
     }
 
-    let template = normalized_gitignore_template(payload.gitignore_template.as_deref());
-    if let Some(template) = template {
-        write_gitignore_template(&parsed_path, template).await?;
+    if let Some(template) = template.as_deref() {
+        if let Err(error) = gitignore_templates::write_template(&parsed_path, template).await {
+            return Ok(workspace_git_bad_request(error));
+        }
     }
 
-    Ok(ResponseJson(ApiResponse::success(
-        InitializeWorkspaceGitResponse {
-            initialized,
-            gitignore_template: template.map(str::to_string),
-            status: validate_workspace_path_status(trimmed).await,
-        },
-    )))
+    Ok(workspace_git_success(InitializeWorkspaceGitResponse {
+        initialized,
+        gitignore_template: template,
+        status: validate_workspace_path_status(trimmed).await,
+    }))
 }
 
 #[cfg(test)]
@@ -2395,6 +2755,7 @@ mod tests {
         assert!(data.valid);
         assert!(data.is_git_repo);
         assert!(data.error.is_none());
+        assert!(data.error_code.is_none());
 
         let plain_dir = tempfile::tempdir().expect("create plain dir");
         let ResponseJson(response) =
@@ -2407,18 +2768,96 @@ mod tests {
         assert!(data.valid);
         assert!(!data.is_git_repo);
         assert!(data.error.is_none());
+        assert!(data.error_code.is_none());
+    }
+
+    #[tokio::test]
+    async fn validate_workspace_path_reports_stable_error_codes() {
+        let required = validate_workspace_path_status("  ").await;
+        assert_eq!(
+            required.error_code,
+            Some(WorkspaceGitErrorCode::WorkspacePathRequired)
+        );
+
+        let invalid = validate_workspace_path_status("relative/path").await;
+        assert_eq!(
+            invalid.error_code,
+            Some(WorkspaceGitErrorCode::WorkspacePathInvalid)
+        );
+
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let missing =
+            validate_workspace_path_status(&tempdir.path().join("missing").to_string_lossy()).await;
+        assert_eq!(
+            missing.error_code,
+            Some(WorkspaceGitErrorCode::WorkspacePathNotFound)
+        );
+
+        let file_path = tempdir.path().join("file.txt");
+        fs::write(&file_path, "content").expect("write file");
+        let file = validate_workspace_path_status(&file_path.to_string_lossy()).await;
+        assert_eq!(
+            file.error_code,
+            Some(WorkspaceGitErrorCode::WorkspacePathNotDirectory)
+        );
+
+        let inaccessible = workspace_path_metadata_error(std::io::Error::from(
+            std::io::ErrorKind::PermissionDenied,
+        ));
+        assert_eq!(
+            inaccessible.code,
+            WorkspaceGitErrorCode::WorkspacePathNotAccessible
+        );
+    }
+
+    #[tokio::test]
+    async fn gitignore_template_catalog_lists_expected_templates() {
+        let ResponseJson(response) = list_gitignore_templates_endpoint()
+            .await
+            .expect("list gitignore templates");
+        let data = response.into_data().expect("template response data");
+        let ids = data
+            .templates
+            .iter()
+            .map(|template| template.id.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(data.templates.len() > 100);
+        assert!(ids.contains(&"node"));
+        assert!(ids.contains(&"python"));
+        assert!(ids.contains(&"go"));
+        assert!(
+            data.templates
+                .iter()
+                .all(|template| !template.label.is_empty()
+                    && !template.group.is_empty()
+                    && !template.description.is_empty())
+        );
+    }
+
+    #[test]
+    fn gitignore_template_catalog_reads_common_templates() {
+        let node = gitignore_templates::read_template("node").expect("read node template");
+        assert!(node.contains("node_modules/"));
+
+        let python = gitignore_templates::read_template("python").expect("read python template");
+        assert!(python.contains("__pycache__/"));
+
+        let go = gitignore_templates::read_template("go").expect("read go template");
+        assert!(go.contains("*.test"));
     }
 
     #[tokio::test]
     async fn initialize_workspace_git_creates_repo_and_gitignore_template() {
         let plain_dir = tempfile::tempdir().expect("create plain dir");
-        let ResponseJson(response) =
+        let (status, ResponseJson(response)) =
             initialize_workspace_git_endpoint(Json(InitializeWorkspaceGitRequest {
                 workspace_path: plain_dir.path().to_string_lossy().to_string(),
                 gitignore_template: Some("Node".to_string()),
             }))
             .await
             .expect("initialize git workspace");
+        assert_eq!(status, StatusCode::OK);
         let data = response.into_data().expect("git init response data");
 
         assert!(data.initialized);
@@ -2430,6 +2869,103 @@ mod tests {
         let gitignore = fs::read_to_string(plain_dir.path().join(".gitignore"))
             .expect("read generated .gitignore");
         assert!(gitignore.contains("node_modules/"));
+    }
+
+    #[tokio::test]
+    async fn initialize_workspace_git_rejects_unknown_gitignore_template() {
+        let plain_dir = tempfile::tempdir().expect("create plain dir");
+        let (status, ResponseJson(response)) =
+            initialize_workspace_git_endpoint(Json(InitializeWorkspaceGitRequest {
+                workspace_path: plain_dir.path().to_string_lossy().to_string(),
+                gitignore_template: Some("missing-template".to_string()),
+            }))
+            .await
+            .expect("initialize git workspace");
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_error_code(response, WorkspaceGitErrorCode::InvalidGitignoreTemplate);
+        assert!(!plain_dir.path().join(".git").exists());
+    }
+
+    #[tokio::test]
+    async fn initialize_workspace_git_skips_template_for_none_null_or_empty() {
+        for template in [None, Some(String::new()), Some("none".to_string())] {
+            let plain_dir = tempfile::tempdir().expect("create plain dir");
+            let (status, ResponseJson(response)) =
+                initialize_workspace_git_endpoint(Json(InitializeWorkspaceGitRequest {
+                    workspace_path: plain_dir.path().to_string_lossy().to_string(),
+                    gitignore_template: template,
+                }))
+                .await
+                .expect("initialize git workspace");
+            let data = response.into_data().expect("git init response data");
+
+            assert_eq!(status, StatusCode::OK);
+            assert!(data.initialized);
+            assert!(data.gitignore_template.is_none());
+            assert!(git2::Repository::open(plain_dir.path()).is_ok());
+            assert!(!plain_dir.path().join(".gitignore").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn initialize_workspace_git_preserves_existing_gitignore() {
+        let plain_dir = tempfile::tempdir().expect("create plain dir");
+        let gitignore_path = plain_dir.path().join(".gitignore");
+        fs::write(&gitignore_path, "custom\n").expect("write existing gitignore");
+
+        let (status, ResponseJson(response)) =
+            initialize_workspace_git_endpoint(Json(InitializeWorkspaceGitRequest {
+                workspace_path: plain_dir.path().to_string_lossy().to_string(),
+                gitignore_template: Some("python".to_string()),
+            }))
+            .await
+            .expect("initialize git workspace");
+        let data = response.into_data().expect("git init response data");
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(data.initialized);
+        assert_eq!(data.gitignore_template.as_deref(), Some("python"));
+        assert_eq!(
+            fs::read_to_string(&gitignore_path).expect("read existing gitignore"),
+            "custom\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn initialize_workspace_git_does_not_reinitialize_existing_repo() {
+        let git_dir = tempfile::tempdir().expect("create git dir");
+        git2::Repository::init(git_dir.path()).expect("init existing repo");
+
+        let (status, ResponseJson(response)) =
+            initialize_workspace_git_endpoint(Json(InitializeWorkspaceGitRequest {
+                workspace_path: git_dir.path().to_string_lossy().to_string(),
+                gitignore_template: Some("go".to_string()),
+            }))
+            .await
+            .expect("initialize git workspace");
+        let data = response.into_data().expect("git init response data");
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(!data.initialized);
+        assert_eq!(data.gitignore_template.as_deref(), Some("go"));
+        assert!(data.status.is_git_repo);
+
+        let gitignore = fs::read_to_string(git_dir.path().join(".gitignore"))
+            .expect("read generated .gitignore");
+        assert!(gitignore.contains("*.test"));
+    }
+
+    fn assert_error_code(
+        response: InitializeWorkspaceGitApiResponse,
+        expected: WorkspaceGitErrorCode,
+    ) {
+        assert!(!response.is_success());
+        let value = serde_json::to_value(response).expect("serialize API response");
+        let actual: WorkspaceGitErrorCode =
+            serde_json::from_value(value["error_data"]["code"].clone())
+                .expect("deserialize error code");
+        assert_eq!(actual, expected);
     }
 
     async fn setup_workspace_history_pool() -> (SqlitePool, Uuid, Uuid) {
