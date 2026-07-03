@@ -130,6 +130,9 @@ const onboardingSansFont = {
 const executorSelectClassName =
   'w-full [&>button]:h-7 [&>button]:rounded-[3px] [&>button]:border-transparent [&>button]:bg-transparent [&>button]:px-1.5 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[13px] [&>button]:text-[#d4d4d8] [&>button]:shadow-none [&>button]:transition-colors [&>button]:duration-100 [&>button:hover]:border-transparent [&>button:hover]:bg-white/[0.035] [&>button:focus-visible]:border-white/[0.14] [&>button:focus-visible]:bg-white/[0.045] [&>button:focus-visible]:outline-none [&>button[aria-expanded=true]]:border-white/[0.14] [&>button[aria-expanded=true]]:bg-white/[0.045] [&>button[data-placeholder=true]>span]:text-[#6f6f76] [&>button>svg:last-child]:h-3 [&>button>svg:last-child]:w-3 [&>button>svg:last-child]:text-[var(--ink-tertiary)] [&>button:hover>svg:last-child]:text-[#a1a1aa]';
 
+const onboardingProjectInputClassName =
+  'mt-2 w-full rounded-[6px] border border-white/[0.12] bg-[#030303] px-3 font-mono outline-none transition-[background-color,border-color,box-shadow] placeholder:text-[#505766] focus:border-white/[0.46] focus:bg-[#020202] focus:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_0_4px_rgba(94,106,210,0.12)]';
+
 const onboardingNoiseTextureStyle = {
   backgroundImage:
     'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27128%27 height=%27128%27 viewBox=%270 0 128 128%27%3E%3Cfilter id=%27noise%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.82%27 numOctaves=%274%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27128%27 height=%27128%27 filter=%27url(%23noise)%27 opacity=%270.68%27/%3E%3C/svg%3E")',
@@ -1346,9 +1349,9 @@ export function OnboardingGuide({
 
   const renderProjectPathStep = () => (
     <div className="flex h-[340px] items-center justify-center">
-      <div className="h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#121212]/90 px-5 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-5">
-        <div className="grid h-full min-h-0 gap-5 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.74fr)] lg:gap-6 lg:overflow-hidden">
-          <section className="flex min-h-0 flex-col lg:border-r lg:border-white/[0.08] lg:pr-6">
+      <div className="h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.11] bg-[#111111]/85 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),inset_0_0_0_1px_rgba(255,255,255,0.015),0_18px_60px_rgba(0,0,0,0.34)] backdrop-blur-sm sm:px-7 sm:py-5">
+        <div className="grid h-full min-h-0 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.74fr)] lg:gap-0 lg:divide-x lg:divide-white/[0.1] lg:overflow-hidden">
+          <section className="flex min-h-0 flex-col lg:pr-6">
             <label className="block min-w-0 text-[12px] font-medium text-[#a1a1aa]">
               {t('onboarding.project.nameTitle')}
               <input
@@ -1357,13 +1360,16 @@ export function OnboardingGuide({
                   setProjectName(sanitizeProjectName(event.target.value));
                   setProjectNameTouched(true);
                 }}
-                className="mt-2 h-9 w-full rounded-[6px] border border-white/[0.08] bg-white/[0.025] px-3 font-mono text-[13px] font-semibold text-[#f5f5f5] outline-none transition placeholder:text-[#5b6678] focus:border-white/[0.22] focus:bg-white/[0.045]"
+                className={cn(
+                  onboardingProjectInputClassName,
+                  'h-9 text-[13px] font-semibold text-[#f5f5f5]',
+                )}
                 placeholder={t('onboarding.project.namePlaceholder')}
               />
             </label>
 
-            <section className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#0a0a0a]/35">
-              <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.08] px-3 py-2">
+            <section className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[8px] border border-white/[0.1] bg-[#050505] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+              <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.1] px-3 py-2">
                 <span className="min-w-0 flex-1 truncate font-mono text-[12px] tracking-[0.03em] text-[#8f9aaa]">
                   {currentPath || t('onboarding.project.localRoots')}
                 </span>
@@ -1374,7 +1380,7 @@ export function OnboardingGuide({
                   aria-label={t('onboarding.project.roots')}
                   title={t('onboarding.project.roots')}
                 >
-                  <Home className="h-3.5 w-3.5" />
+                  <Home className="h-3.5 w-3.5" strokeWidth={1.5} />
                 </button>
                 <button
                   type="button"
@@ -1387,7 +1393,7 @@ export function OnboardingGuide({
                   aria-label={t('onboarding.project.up')}
                   title={t('onboarding.project.up')}
                 >
-                  <ChevronUp className="h-3.5 w-3.5" />
+                  <ChevronUp className="h-3.5 w-3.5" strokeWidth={1.5} />
                 </button>
                 <button
                   type="button"
@@ -1396,10 +1402,10 @@ export function OnboardingGuide({
                   aria-label={t('onboarding.project.refresh')}
                   title={t('onboarding.project.refresh')}
                 >
-                  <RefreshCw className="h-3.5 w-3.5" />
+                  <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
                 </button>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1.5">
+              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
                 {pathLoading ? (
                   <div className="px-1 py-2 font-mono text-[12px] text-[#768295]">
                     {t('onboarding.project.loading')}
@@ -1416,8 +1422,8 @@ export function OnboardingGuide({
                       <div
                         key={`${entry.path}-${directoryEntryTime(entry)}`}
                         className={cn(
-                          'group/path-entry flex items-center rounded-[6px] border border-transparent px-1',
-                          selected && 'border-white/[0.1] bg-white/[0.045]',
+                          'group/path-entry flex items-center rounded-[6px] border border-transparent px-2',
+                          selected && 'border-white/[0.12] bg-white/[0.045]',
                         )}
                       >
                         <button
@@ -1426,9 +1432,12 @@ export function OnboardingGuide({
                           onClick={() => {
                             if (entry.is_directory) void loadDirectory(entry.path);
                           }}
-                          className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left font-mono text-[12px] tracking-[0.03em] text-[#8f9aaa] transition hover:text-[#f5f5f5] disabled:cursor-default disabled:opacity-55"
+                          className="flex min-h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left font-mono text-[12px] leading-none tracking-[0.03em] text-[#8f9aaa] transition hover:text-[#f5f5f5] disabled:cursor-default disabled:opacity-55"
                         >
-                          <Icon className="h-3.5 w-3.5 shrink-0 text-[#768295]" />
+                          <Icon
+                            className="h-3.5 w-3.5 shrink-0 text-[#768295]"
+                            strokeWidth={1.5}
+                          />
                           <span className="min-w-0 flex-1 truncate">
                             {entry.name}
                           </span>
@@ -1446,13 +1455,13 @@ export function OnboardingGuide({
                               void validateProjectPath(entry.path);
                             }}
                             className={cn(
-                              'flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] text-[#768295] opacity-0 transition hover:bg-white/[0.05] hover:text-[#f5f5f5] group-hover/path-entry:opacity-100',
+                              'flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] text-[#768295] opacity-0 transition hover:bg-white/[0.05] hover:text-[#f5f5f5] group-hover/path-entry:opacity-100',
                               selected && '!opacity-100',
                             )}
                             aria-label={t('onboarding.project.select')}
                             title={t('onboarding.project.select')}
                           >
-                            <Check className="h-3.5 w-3.5" />
+                            <Check className="h-3.5 w-3.5" strokeWidth={1.5} />
                           </button>
                         )}
                       </div>
@@ -1463,7 +1472,7 @@ export function OnboardingGuide({
             </section>
           </section>
 
-          <aside className="min-h-0 overflow-y-auto">
+          <aside className="min-h-0 overflow-y-auto lg:pl-6">
             <div className="space-y-4">
               <label className="block text-[12px] font-medium text-[#a1a1aa]">
                 {t('onboarding.project.selectedPath')}
@@ -1473,7 +1482,10 @@ export function OnboardingGuide({
                     setProjectPath(event.target.value);
                     setProjectStatus(null);
                   }}
-                  className="mt-2 h-8 w-full truncate rounded-[6px] border border-white/[0.08] bg-white/[0.025] px-3 font-mono text-[12px] tracking-[0.03em] text-[#d4d4d8] outline-none transition placeholder:text-[#5b6678] focus:border-white/[0.22] focus:bg-white/[0.045]"
+                  className={cn(
+                    onboardingProjectInputClassName,
+                    'h-8 truncate text-[12px] tracking-[0.03em] text-[#d4d4d8]',
+                  )}
                   placeholder={t('onboarding.project.pathPlaceholder')}
                 />
               </label>
@@ -1482,7 +1494,7 @@ export function OnboardingGuide({
                 type="button"
                 onClick={() => void validateProjectPath(projectPath)}
                 disabled={!projectPath.trim() || pathLoading || pathDetecting}
-                className="inline-flex h-8 cursor-pointer items-center justify-center rounded-[6px] border border-white/[0.08] bg-white/[0.03] px-3 font-mono text-[11px] tracking-[0.03em] text-[#c9d2df] transition hover:border-white/[0.14] hover:bg-white/[0.055] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-8 cursor-pointer items-center justify-center rounded-[6px] border border-white/[0.1] bg-[#050505] px-3 font-mono text-[11px] tracking-[0.03em] text-[#c9d2df] transition hover:border-white/[0.18] hover:bg-white/[0.045] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {t('onboarding.project.validate')}
               </button>
@@ -1513,21 +1525,41 @@ export function OnboardingGuide({
                 !pathDetecting &&
                 projectStatus?.valid &&
                 !projectStatus.is_git_repo && (
-                  <div className="grid grid-rows-[1fr] border-t border-white/[0.08] pt-4 transition-[grid-template-rows] duration-200">
+                  <div className="grid grid-rows-[1fr] border-t border-white/[0.1] pt-4 transition-[grid-template-rows] duration-200">
                     <div className="space-y-4 overflow-hidden">
                       <p className="flex items-start gap-2 font-mono text-[12px] leading-relaxed tracking-[0.03em] text-[#8f9aaa]">
-                        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#768295]" />
+                        <Info
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#768295]"
+                          strokeWidth={1.5}
+                        />
                         <span>{t('onboarding.project.gitMissing')}</span>
                       </p>
-                      <label className="flex cursor-pointer items-center gap-2 font-mono text-[12px] tracking-[0.03em] text-[#c9d2df]">
+                      <label className="group flex cursor-pointer items-center gap-2 font-mono text-[12px] tracking-[0.03em] text-[#c9d2df]">
                         <input
                           type="checkbox"
                           checked={initializeGit}
                           onChange={(event) =>
                             setInitializeGit(event.target.checked)
                           }
-                          className="h-3.5 w-3.5 accent-white"
+                          className="peer sr-only"
                         />
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            'flex h-3.5 w-3.5 shrink-0 items-center justify-center border bg-[#030303] transition-[background-color,border-color,box-shadow,color] peer-focus-visible:shadow-[0_0_0_1px_rgba(255,255,255,0.16),0_0_0_4px_rgba(94,106,210,0.12)]',
+                            initializeGit
+                              ? 'border-white bg-white text-[#050505]'
+                              : 'border-white/[0.22] text-transparent group-hover:border-white/[0.36]',
+                          )}
+                        >
+                          <Check
+                            className={cn(
+                              'h-3 w-3 transition-opacity',
+                              initializeGit ? 'opacity-100' : 'opacity-0',
+                            )}
+                            strokeWidth={2.3}
+                          />
+                        </span>
                         {t('onboarding.project.initializeGit')}
                       </label>
                       <div
@@ -1545,7 +1577,7 @@ export function OnboardingGuide({
                                 event.target.value as GitignoreTemplate,
                               )
                             }
-                            className="mt-2 h-8 w-full rounded-[6px] border border-white/[0.08] bg-[#0a0a0a] px-2 font-mono text-[12px] text-[#c9d2df] outline-none focus:border-white/[0.22]"
+                            className="mt-2 h-8 w-full rounded-[6px] border border-white/[0.12] bg-[#030303] px-2 font-mono text-[12px] text-[#c9d2df] outline-none transition-[background-color,border-color,box-shadow] focus:border-white/[0.46] focus:bg-[#020202] focus:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_0_4px_rgba(94,106,210,0.12)]"
                           >
                             {gitignoreTemplates.map((template) => (
                               <option key={template} value={template}>
