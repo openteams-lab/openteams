@@ -69,6 +69,12 @@ type TranslateFn = (
   replacements?: Record<string, string | number>,
 ) => string;
 
+type OnboardingCompleteOptions = {
+  createDefaultSession?: boolean;
+  projectId?: string | null;
+  workspacePath?: string | null;
+};
+
 interface OnboardingGuideProps {
   mode: 'onboarding' | 'upgrade';
   initialState: OnboardingState | null;
@@ -85,7 +91,10 @@ interface OnboardingGuideProps {
   onPreviewLocaleChange: (locale: Locale) => void;
   onPreviewAppearanceChange: (appearance: OnboardingAppearance) => void;
   onClose: () => void;
-  onOpenCreateSession: (state: OnboardingState) => void;
+  onComplete: (
+    state: OnboardingState,
+    options?: OnboardingCompleteOptions,
+  ) => void;
   onStateChange?: (state: OnboardingState) => void;
   onUpgradeRead: (state: OnboardingState) => void;
 }
@@ -118,11 +127,8 @@ const onboardingSansFont = {
   fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
 } as CSSProperties;
 
-const executorSelectTriggerClassName =
-  '!h-8 !rounded-[6px] !border-white/[0.08] !bg-white/[0.025] !px-2.5 !py-1.5 !font-mono !text-[12px] !text-[#d4d4d8] !shadow-none hover:!border-white/[0.16] hover:!bg-white/[0.045] focus-visible:!border-white/[0.22] focus-visible:!outline-none focus-visible:!shadow-[0_0_0_1px_rgba(255,255,255,0.06)] [&[aria-expanded=true]]:!border-white/[0.22] [&[aria-expanded=true]]:!bg-white/[0.045] [&[aria-expanded=true]]:!shadow-[0_0_0_1px_rgba(255,255,255,0.06)]';
-
-const executorSelectPanelClassName =
-  '!rounded-[8px] !border-white/[0.1] !bg-[#0a0a0a] !shadow-[0_14px_32px_rgba(0,0,0,0.28)]';
+const executorSelectClassName =
+  'w-full [&>button]:h-7 [&>button]:rounded-[3px] [&>button]:border-transparent [&>button]:bg-transparent [&>button]:px-1.5 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[13px] [&>button]:text-[#d4d4d8] [&>button]:shadow-none [&>button]:transition-colors [&>button]:duration-100 [&>button:hover]:border-transparent [&>button:hover]:bg-white/[0.035] [&>button:focus-visible]:border-white/[0.14] [&>button:focus-visible]:bg-white/[0.045] [&>button:focus-visible]:outline-none [&>button[aria-expanded=true]]:border-white/[0.14] [&>button[aria-expanded=true]]:bg-white/[0.045] [&>button[data-placeholder=true]>span]:text-[#6f6f76] [&>button>svg:last-child]:h-3 [&>button>svg:last-child]:w-3 [&>button>svg:last-child]:text-[var(--ink-tertiary)] [&>button:hover>svg:last-child]:text-[#a1a1aa]';
 
 const onboardingNoiseTextureStyle = {
   backgroundImage:
@@ -372,7 +378,7 @@ export function OnboardingGuide({
   onPreviewLocaleChange,
   onPreviewAppearanceChange,
   onClose,
-  onOpenCreateSession,
+  onComplete,
   onStateChange,
   onUpgradeRead,
 }: OnboardingGuideProps) {
@@ -798,7 +804,11 @@ export function OnboardingGuide({
         created_project_id: createdProject.projectId,
       });
       applyState(state);
-      onOpenCreateSession(state);
+      onComplete(state, {
+        createDefaultSession: true,
+        projectId: createdProject.projectId,
+        workspacePath: projectDraft.path,
+      });
     } catch {
       setError(t('onboarding.project.createFailed'));
     } finally {
@@ -937,7 +947,7 @@ export function OnboardingGuide({
     try {
       const state = await onboardingApi.complete(currentPayload(finalOnboardingStep));
       applyState(state);
-      onOpenCreateSession(state);
+      onComplete(state);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : t('onboarding.error.completeFailed'),
@@ -1199,16 +1209,16 @@ export function OnboardingGuide({
   const renderExecutorStep = () => (
     <div className="flex h-[340px] items-center justify-center">
       <div className="h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#121212]/90 px-5 py-5 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-5">
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#0a0a0a]/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[6px] bg-[#0a0a0a]/30">
           {runtimeError && (
             <p className="shrink-0 border-b border-yellow-500/25 px-4 py-2.5 font-mono text-[12px] text-yellow-200">
               {runtimeError}
             </p>
           )}
-          <div className="hidden shrink-0 border-b border-white/[0.08] px-4 py-2 font-mono text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-[#777777] md:grid md:grid-cols-[minmax(160px,1fr)_190px_230px] md:gap-3">
-            <span>Role</span>
-            <span>Executor</span>
-            <span>Model</span>
+          <div className="hidden shrink-0 px-5 pb-1.5 pt-2.5 font-mono text-[9px] font-semibold uppercase leading-none tracking-[0.05em] text-white/45 md:grid md:grid-cols-[minmax(160px,1fr)_190px_230px] md:gap-3">
+            <span>{t('onboarding.executor.table.role')}</span>
+            <span>{t('onboarding.executor.table.executor')}</span>
+            <span>{t('onboarding.executor.table.model')}</span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {teamMembers.map((member, index) => {
@@ -1218,13 +1228,10 @@ export function OnboardingGuide({
               return (
                 <div
                   key={`${member.member}-${index}`}
-                  className={cn(
-                    'grid min-h-[54px] gap-2.5 px-3 py-2.5 md:grid-cols-[minmax(160px,1fr)_190px_230px] md:items-center md:gap-3 md:px-4',
-                    index < teamMembers.length - 1 && 'border-b border-white/[0.08]',
-                  )}
+                  className="mx-1 grid min-h-[54px] gap-2.5 rounded-[6px] px-3 py-2.5 transition-colors duration-100 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-white/[0.05] md:mx-2 md:grid-cols-[minmax(160px,1fr)_190px_230px] md:items-center md:gap-3"
                 >
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="inline-flex h-5 min-w-8 shrink-0 items-center justify-center rounded-[4px] border border-white/[0.12] bg-white/[0.03] px-1.5 font-mono text-[11px] font-semibold uppercase leading-none tracking-[0] text-[#a1a1aa]">
+                    <span className="inline-flex h-5 min-w-8 shrink-0 items-center justify-center rounded-[4px] border border-white/[0.12] bg-white/[0.03] px-1.5 text-center font-mono text-[11px] font-semibold uppercase leading-[20px] tracking-[0] text-[#a1a1aa]">
                       {roleBadgeLabel(member.member)}
                     </span>
                     <span className="truncate text-[13px] font-semibold tracking-tight text-[#f5f5f5]">
@@ -1236,9 +1243,7 @@ export function OnboardingGuide({
                     options={runnerOptions}
                     showSearch={false}
                     placeholder={t('onboarding.executor.runnerPlaceholder')}
-                    className="w-full"
-                    triggerClassName={executorSelectTriggerClassName}
-                    panelClassName={executorSelectPanelClassName}
+                    className={executorSelectClassName}
                     onChange={(value) =>
                       updateTeamMember(index, {
                         runner_type: value,
@@ -1251,9 +1256,7 @@ export function OnboardingGuide({
                     value={modelValue}
                     options={modelOptions}
                     placeholder={t('onboarding.executor.modelPlaceholder')}
-                    className="w-full"
-                    triggerClassName={executorSelectTriggerClassName}
-                    panelClassName={executorSelectPanelClassName}
+                    className={executorSelectClassName}
                     onChange={(value) => updateTeamMember(index, { model_name: value })}
                     maxPanelHeightClassName="max-h-[190px]"
                   />

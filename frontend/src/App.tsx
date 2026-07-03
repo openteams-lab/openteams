@@ -54,6 +54,7 @@ import {
   ONBOARDING_GUIDE_RESET_EVENT,
   ONBOARDING_UPGRADE_REPLAY_EVENT,
 } from "@/lib/onboardingEvents";
+import { notifyChatInputPrefill } from "@/lib/chatInputPrefill";
 import {
   ISSUE_NAVIGATION_EVENT,
   ISSUE_NAVIGATION_TARGET_CHANGED_EVENT,
@@ -1191,6 +1192,56 @@ function WorkspaceLayout() {
     }
   };
 
+  const handleCreateDefaultSession = async (options?: {
+    projectId?: string | null;
+    workspacePath?: string | null;
+  }) => {
+    const projectId = options?.projectId?.trim() || selectedProjectId;
+    if (!projectId) {
+      showToast(
+        translate(
+          'createSession.noProject',
+          'Please select a project first',
+        ),
+      );
+      return;
+    }
+
+    try {
+      const backendSession = await projectApi.createSession(projectId, {
+        title: null,
+        workspace_path: options?.workspacePath ?? activeProjectWorkspacePath ?? null,
+      });
+      const mappedSession = mapSession(backendSession, {
+        activeSessionId: backendSession.id,
+      });
+
+      setSessions((prev) => [
+        mappedSession,
+        ...prev
+          .filter((session) => session.id !== backendSession.id)
+          .map((session) => ({ ...session, active: false })),
+      ]);
+      replaceActiveTab(createSessionTab(backendSession.id));
+      setActiveSessionId(backendSession.id);
+      setSessionChatInputMode(backendSession.id, 'free');
+      setIsCreateSessionModalOpen(false);
+      closeMobileSidebar();
+      notifyChatInputPrefill({
+        sessionId: backendSession.id,
+        text: '',
+        mode: 'free',
+      });
+      void refreshSessions();
+    } catch (err) {
+      showToast(
+        err instanceof Error
+          ? err.message
+          : String(err ?? 'Failed to create session'),
+      );
+    }
+  };
+
   const handlePrimarySidebarAction = (action: SidebarPrimaryAction) => {
     if (action.id === "new-session") {
       setIsCreateSessionModalOpen(true);
@@ -1614,11 +1665,30 @@ function WorkspaceLayout() {
     );
   };
 
-  const handleOnboardingCompleted = (nextState: OnboardingState) => {
+  const handleOnboardingCompleted = (
+    nextState: OnboardingState,
+    options?: {
+      createDefaultSession?: boolean;
+      projectId?: string | null;
+      workspacePath?: string | null;
+    },
+  ) => {
     setOnboardingState(nextState);
     setOnboardingOverlay(null);
-    setIsCreateSessionModalOpen(true);
+    setIsCreateSessionModalOpen(false);
     closeMobileSidebar();
+    if (options?.createDefaultSession) {
+      void handleCreateDefaultSession({
+        projectId:
+          options.projectId ??
+          nextState.created_project_id ??
+          selectedProjectId,
+        workspacePath:
+          options.workspacePath ??
+          nextState.project_path ??
+          activeProjectWorkspacePath,
+      });
+    }
   };
 
   const handleCreateOnboardingProject = async ({
@@ -1743,7 +1813,7 @@ function WorkspaceLayout() {
           onPreviewLocaleChange={setLocale}
           onPreviewAppearanceChange={handleOnboardingPreviewAppearanceChange}
           onClose={() => setOnboardingOverlay(null)}
-          onOpenCreateSession={handleOnboardingCompleted}
+          onComplete={handleOnboardingCompleted}
           onStateChange={handleOnboardingStateChange}
           onUpgradeRead={handleUpgradeRead}
         />

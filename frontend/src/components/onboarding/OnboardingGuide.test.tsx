@@ -45,6 +45,9 @@ const requiredLocaleKeys = [
   'onboarding.project.namePlaceholder',
   'onboarding.project.nameTitle',
   'onboarding.project.pathPrompt',
+  'onboarding.executor.table.executor',
+  'onboarding.executor.table.model',
+  'onboarding.executor.table.role',
   'onboarding.scenario.recommendedTemplate',
   'onboarding.upgrade.title',
   'onboarding.upgrade.markRead',
@@ -139,7 +142,10 @@ check(
   guideSource.includes('import { DropdownSelect') &&
     guideSource.includes('runnerOptions') &&
     guideSource.includes('modelOptionsForRunner') &&
-    (guideSource.match(/<DropdownSelect/g) ?? []).length >= 2,
+    (guideSource.match(/<DropdownSelect/g) ?? []).length >= 2 &&
+    guideSource.includes("t('onboarding.executor.table.role')") &&
+    guideSource.includes("t('onboarding.executor.table.executor')") &&
+    guideSource.includes("t('onboarding.executor.table.model')"),
   guideSource,
 );
 
@@ -197,7 +203,17 @@ check(
     guideSource.includes('h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#121212]/90') &&
     guideSource.includes('px-5 py-5 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-5') &&
     guideSource.includes('md:grid-cols-[minmax(160px,1fr)_190px_230px]') &&
-    guideSource.includes('!rounded-[6px] !border-white/[0.08] !bg-white/[0.025]') &&
+    guideSource.includes("const executorSelectClassName =") &&
+    guideSource.includes('[&>button]:h-7 [&>button]:rounded-[3px]') &&
+    guideSource.includes('[&>button]:border-transparent [&>button]:bg-transparent') &&
+    guideSource.includes('[&>button:hover]:border-transparent [&>button:hover]:bg-white/[0.035]') &&
+    guideSource.includes('[&>button[data-placeholder=true]>span]:text-[#6f6f76]') &&
+    guideSource.includes('[&>button>svg:last-child]:text-[var(--ink-tertiary)]') &&
+    !guideSource.includes('executorSelectPanelClassName') &&
+    guideSource.includes('text-[9px] font-semibold uppercase leading-none tracking-[0.05em] text-white/45') &&
+    guideSource.includes('hover:bg-white/[0.05] md:mx-2') &&
+    guideSource.includes('leading-[20px]') &&
+    !guideSource.includes("index < teamMembers.length - 1 && 'border-b border-white/[0.08]'") &&
     guideSource.includes('lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.84fr)] lg:gap-10') &&
     guideSource.includes('mx-auto grid w-full max-w-[760px] gap-3 sm:grid-cols-2') &&
     guideSource.includes('group min-h-[104px] cursor-pointer rounded-[8px] border p-3') &&
@@ -299,19 +315,21 @@ check(
 );
 
 check(
-  'final action creates a real project, completes onboarding, then opens the existing session composer',
+  'final action creates a real project, completes onboarding, then creates a default session',
   guideSource.indexOf('await onCreateProjectFromOnboarding') <
     guideSource.indexOf('await onboardingApi.complete') &&
   guideSource.includes('await onboardingApi.complete') &&
     guideSource.includes('path: projectDraft.path') &&
     guideSource.includes('created_project_id: createdProject.projectId') &&
-    guideSource.includes('onOpenCreateSession(state)') &&
+    guideSource.includes('onComplete(state, {') &&
+    guideSource.includes('createDefaultSession: true') &&
     appSource.includes('onCreateProjectFromOnboarding={handleCreateOnboardingProject}') &&
     appSource.includes('return { projectId: project.id, sessionId: null }') &&
     appSource.includes('handleOnboardingCompleted') &&
-    appSource.includes('setIsCreateSessionModalOpen(true)') &&
+    appSource.includes('setIsCreateSessionModalOpen(false)') &&
+    appSource.includes('void handleCreateDefaultSession({') &&
     read('../../locales/zh/common.json').includes(
-      '"onboarding.action.startNow": "创建新会话"',
+      '"onboarding.action.startNow": "创建会话"',
     ),
   { guideSource, appSource },
 );
