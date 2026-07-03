@@ -105,7 +105,7 @@ check(
     guideSource.includes('h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]') &&
     guideSource.includes('ml-4 h-3 w-32 rounded-[3px] border border-white/[0.08] bg-white/[0.065]') &&
     guideSource.includes('flex min-h-0 flex-1 items-center justify-center px-4 py-10 sm:px-20') &&
-    guideSource.includes('max-w-md -translate-y-4 overflow-hidden rounded-[6px] border border-white/[0.12] bg-[#0a0a0a]') &&
+    guideSource.includes('max-w-md -translate-y-4 overflow-hidden rounded-[6px] border border-white/[0.12] bg-[#151617]/95') &&
     guideSource.includes('min-w-6 rounded-[3px] border border-white/[0.18] bg-[#0c0c0c]') &&
     guideSource.includes("active ? 'text-white' : 'text-[#8792a3]'") &&
     guideSource.includes('absolute bottom-2 left-0 top-2 w-px') &&
@@ -171,7 +171,9 @@ check(
     guideSource.includes("grid-rows-[1fr]") &&
     guideSource.includes('chatSessionsApi.initializeWorkspaceGit') &&
     guideSource.includes('className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"') &&
-    guideSource.includes('rounded-[6px] border border-white/[0.08] bg-[#111214]') &&
+    guideSource.includes('rounded-[6px] border border-white/[0.08] bg-[#151617]') &&
+    guideSource.includes('focus:bg-[#171819]') &&
+    !guideSource.includes('bg-[#111214]') &&
     guideSource.includes('border-l-white/[0.28] bg-white/[0.05]') &&
     guideSource.includes('border border-emerald-300/[0.14] bg-emerald-400/[0.06]') &&
     !guideSource.includes("0_4px_20px_rgba(95,99,242,0.25)") &&
@@ -219,6 +221,8 @@ check(
     guideSource.includes('shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]') &&
     guideSource.includes('bg-[linear-gradient(180deg,#FFFFFF_0%,#F2F2F2_100%)]') &&
     guideSource.includes('shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.28)]') &&
+    guideSource.includes('flex h-full min-h-0 flex-col overflow-hidden rounded-[6px] bg-transparent') &&
+    !guideSource.includes('bg-[#0a0a0a]/30') &&
     guideSource.includes('[&>button]:h-7 [&>button]:rounded-[3px]') &&
     guideSource.includes('[&>button]:border-transparent [&>button]:bg-transparent') &&
     guideSource.includes('[&>button:hover]:border-transparent [&>button:hover]:bg-white/[0.035]') &&

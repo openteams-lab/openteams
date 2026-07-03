@@ -131,7 +131,7 @@ const executorSelectClassName =
   'w-full [&>button]:h-7 [&>button]:rounded-[3px] [&>button]:border-transparent [&>button]:bg-transparent [&>button]:px-1.5 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[13px] [&>button]:text-[#d4d4d8] [&>button]:shadow-none [&>button]:transition-colors [&>button]:duration-100 [&>button:hover]:border-transparent [&>button:hover]:bg-white/[0.035] [&>button:focus-visible]:border-white/[0.14] [&>button:focus-visible]:bg-white/[0.045] [&>button:focus-visible]:outline-none [&>button[aria-expanded=true]]:border-white/[0.14] [&>button[aria-expanded=true]]:bg-white/[0.045] [&>button[data-placeholder=true]>span]:text-[#6f6f76] [&>button>svg:last-child]:h-3 [&>button>svg:last-child]:w-3 [&>button>svg:last-child]:text-[var(--ink-tertiary)] [&>button:hover>svg:last-child]:text-[#a1a1aa]';
 
 const onboardingProjectInputClassName =
-  'mt-2 w-full rounded-[5px] border border-white/[0.08] bg-[#111214] px-3 font-mono shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] outline-none transition-[background-color,border-color,box-shadow] placeholder:text-[#5F6672] focus:border-white/[0.24] focus:bg-[#131417] focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.04)]';
+  'mt-2 w-full rounded-[5px] border border-white/[0.08] bg-[#151617] px-3 font-mono shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] outline-none transition-[background-color,border-color,box-shadow] placeholder:text-[#5F6672] focus:border-white/[0.24] focus:bg-[#171819] focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.04)]';
 
 const onboardingNoiseTextureStyle = {
   backgroundImage:
@@ -1212,7 +1212,7 @@ export function OnboardingGuide({
   const renderExecutorStep = () => (
     <div className="flex h-[340px] items-center justify-center">
       <div className="h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#1A1A1A]/90 px-5 py-5 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-5">
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[6px] bg-[#0a0a0a]/30">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[6px] bg-transparent">
           {runtimeError && (
             <p className="shrink-0 border-b border-yellow-500/25 px-4 py-2.5 font-mono text-[12px] text-yellow-200">
               {runtimeError}
@@ -1368,7 +1368,7 @@ export function OnboardingGuide({
               />
             </label>
 
-            <section className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[6px] border border-white/[0.08] bg-[#111214] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]">
+            <section className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[6px] border border-white/[0.08] bg-[#151617] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]">
               <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.05] px-3 py-1.5">
                 <span className="min-w-0 flex-1 truncate font-mono text-[11px] tracking-[0.03em] text-[#8A8F98]">
                   {currentPath || t('onboarding.project.localRoots')}
@@ -1495,7 +1495,7 @@ export function OnboardingGuide({
                 type="button"
                 onClick={() => void validateProjectPath(projectPath)}
                 disabled={!projectPath.trim() || pathLoading || pathDetecting}
-                className="inline-flex h-8 cursor-pointer items-center justify-center rounded-[5px] border border-white/[0.08] bg-[#111214] px-3 font-mono text-[11px] tracking-[0.03em] text-[#c9d2df] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition hover:border-white/[0.16] hover:bg-white/[0.045] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-8 cursor-pointer items-center justify-center rounded-[5px] border border-white/[0.08] bg-[#151617] px-3 font-mono text-[11px] tracking-[0.03em] text-[#c9d2df] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] transition hover:border-white/[0.16] hover:bg-white/[0.045] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {t('onboarding.project.validate')}
               </button>
@@ -1547,7 +1547,7 @@ export function OnboardingGuide({
                         <span
                           aria-hidden="true"
                           className={cn(
-                            'flex h-3.5 w-3.5 shrink-0 items-center justify-center border bg-[#111214] transition-[background-color,border-color,box-shadow,color] peer-focus-visible:shadow-[0_0_0_1px_rgba(255,255,255,0.16),0_0_0_4px_rgba(94,106,210,0.12)]',
+                            'flex h-3.5 w-3.5 shrink-0 items-center justify-center border bg-[#151617] transition-[background-color,border-color,box-shadow,color] peer-focus-visible:shadow-[0_0_0_1px_rgba(255,255,255,0.16),0_0_0_4px_rgba(94,106,210,0.12)]',
                             initializeGit
                               ? 'border-white bg-white text-[#0E0F11]'
                               : 'border-white/[0.22] text-transparent group-hover:border-white/[0.36]',
@@ -1578,7 +1578,7 @@ export function OnboardingGuide({
                                 event.target.value as GitignoreTemplate,
                               )
                             }
-                            className="mt-2 h-8 w-full rounded-[5px] border border-white/[0.08] bg-[#111214] px-2 font-mono text-[12px] text-[#c9d2df] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] outline-none transition-[background-color,border-color,box-shadow] focus:border-white/[0.24] focus:bg-[#131417]"
+                            className="mt-2 h-8 w-full rounded-[5px] border border-white/[0.08] bg-[#151617] px-2 font-mono text-[12px] text-[#c9d2df] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] outline-none transition-[background-color,border-color,box-shadow] focus:border-white/[0.24] focus:bg-[#171819]"
                           >
                             {gitignoreTemplates.map((template) => (
                               <option key={template} value={template}>
@@ -1967,7 +1967,7 @@ export function OnboardingGuide({
               </div>
 
               <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-4 py-10 sm:px-20">
-                <div className="w-full max-w-md -translate-y-4 overflow-hidden rounded-[6px] border border-white/[0.12] bg-[#0a0a0a] text-left">
+                <div className="w-full max-w-md -translate-y-4 overflow-hidden rounded-[6px] border border-white/[0.12] bg-[#151617]/95 text-left">
                   <div className="flex items-center border-b border-white/[0.08] p-4">
                     <span className="mr-3 font-mono text-[15px] text-[#a8b3c2]">/</span>
                     <span className="min-w-0 flex-1 truncate text-[14px] text-[#f5f5f5]">
