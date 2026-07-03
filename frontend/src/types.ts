@@ -17,18 +17,24 @@ export type {
   ContinueQueuedMessageResponse,
   CreateChatMessageResponse,
   DeleteQueuedMessageResponse,
+  GitignoreTemplateSummary,
+  GitignoreTemplatesResponse,
   MemberQueueSnapshot,
   MemberQueueStatus,
   QueuedMessage,
   QueuedMessageListItem,
   QueuedMessageStatus,
+  WorkspaceGitErrorData,
   ValidateWorkspacePathRequest,
   ValidateWorkspacePathResponse,
 } from '../../shared/types';
 
+export { WorkspaceGitErrorCode } from '../../shared/types';
+
 export type MemberQueuesBySessionAgentId = Record<string, MemberQueueSnapshot>;
 
 export type Theme = 'dark' | 'light';
+export type ThemePreference = Theme | 'system';
 
 export type Locale = 'en' | 'zh' | 'ja' | 'ko' | 'fr' | 'es';
 

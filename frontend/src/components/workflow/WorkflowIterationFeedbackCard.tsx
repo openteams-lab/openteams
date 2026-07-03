@@ -67,7 +67,12 @@ export function WorkflowIterationFeedbackCard({
   useEffect(() => {
     if (canReviewCurrentRound) {
       setIsCollapsed(false);
+      return;
     }
+
+    setIsCollapsed(true);
+    setExpandedReject(false);
+    setValidationError(null);
   }, [canReviewCurrentRound, currentRound]);
 
   const handleAccept = () => {

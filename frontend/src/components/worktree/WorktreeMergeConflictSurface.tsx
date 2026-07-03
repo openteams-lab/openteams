@@ -4,9 +4,22 @@ import { cn } from '@/lib/utils';
 
 export function WorktreeMergeConflictFrame({
   children,
+  surface = 'modal',
 }: {
   children: ReactNode;
+  surface?: 'modal' | 'page';
 }) {
+  if (surface === 'page') {
+    return (
+      <section
+        className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-1)] text-[var(--ink)]"
+        aria-label="Merge conflict resolver"
+      >
+        {children}
+      </section>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-3">
       <section

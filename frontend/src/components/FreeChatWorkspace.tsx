@@ -98,6 +98,7 @@ interface FreeChatWorkspaceProps {
     filePath: string,
     area: SourceControlDiffArea,
   ) => void;
+  onOpenWorktreeConflictTab?: (projectId: string, sessionId: string) => void;
 }
 
 type AttachmentImagePreview = {
@@ -743,6 +744,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   embedded = false,
   onOpenDiffTab,
   onOpenSourceControlDiffTab,
+  onOpenWorktreeConflictTab,
 }) => {
   const appScale = useAppScale();
   const {
@@ -2819,7 +2821,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
 
         {isRelatedFilesOpen && (
           <aside
-            className={`relative flex min-h-0 flex-col overflow-hidden border-l border-[var(--hairline)] ${
+            className={`main-right-nav-panel-scrollbars-hidden relative flex min-h-0 flex-col overflow-hidden border-l border-[var(--hairline)] ${
               embedded ? "bg-transparent" : "bg-[var(--canvas)]"
             }`}
           >
@@ -2984,6 +2986,9 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                   filePath,
                   area,
                 );
+              }}
+              onOpenConflictResolver={(projectId, sessionId) => {
+                onOpenWorktreeConflictTab?.(projectId, sessionId);
               }}
             />
           </aside>

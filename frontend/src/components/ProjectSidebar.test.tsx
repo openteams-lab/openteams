@@ -773,8 +773,7 @@ check(
 check(
   "create project modal can read local workspace directories",
   componentSource.includes("filesystemApi.listDirectory") &&
-    componentSource.includes("filesystemApi.listRoots") &&
-    componentSource.includes('translate("sidebar.readWorkspace"'),
+    componentSource.includes("filesystemApi.listRoots"),
   componentSource,
 );
 check(
@@ -788,18 +787,34 @@ check(
   "create project workspace browser uses ghost icon actions and selected rows",
   componentSource.includes("<Home className=\"h-3.5 w-3.5\"") &&
     componentSource.includes("<ChevronUp className=\"h-3.5 w-3.5\"") &&
-    componentSource.includes("<RefreshCw className=\"h-3.5 w-3.5\"") &&
     componentSource.includes("before:w-[2px]") &&
     componentSource.includes("GIT"),
   componentSource,
 );
 check(
-  "create project workspace browser can create and rename folders",
+  "create project workspace browser omits read and per-row right actions",
+  !componentSource.includes('translate("sidebar.readWorkspace"') &&
+    !componentSource.includes("<RefreshCw") &&
+    !componentSource.includes('"sidebar.renameFolder"') &&
+    !componentSource.includes('"sidebar.selectWorkspace"'),
+  componentSource,
+);
+check(
+  "create project workspace browser can create and name folders",
   componentSource.includes("filesystemApi.createDirectory") &&
     componentSource.includes("filesystemApi.renameDirectory") &&
     componentSource.includes('translate("sidebar.newFolder"') &&
-    componentSource.includes('"sidebar.renameFolder"') &&
+    componentSource.includes('"sidebar.saveFolderName"') &&
     componentSource.includes("commitWorkspaceDirectoryRename()"),
+  componentSource,
+);
+check(
+  "create project modal offers Git initialization for non-Git workspaces",
+  componentSource.includes("chatSessionsApi.validateWorkspacePath") &&
+    componentSource.includes("chatSessionsApi.initializeWorkspaceGit") &&
+    componentSource.includes("const gitignoreTemplates") &&
+    componentSource.includes('"sidebar.initializeGit"') &&
+    componentSource.includes('"sidebar.gitignoreTemplate"'),
   componentSource,
 );
 check(

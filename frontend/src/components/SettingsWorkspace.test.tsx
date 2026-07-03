@@ -44,7 +44,16 @@ const requiredLocaleKeys = [
   'settings.archivedSessions.deleteConfirmDesc',
   'settings.archivedSessions.deleteFailed',
   'settings.archivedSessions.restoreFailed',
+  'settings.appearance.systemTheme',
 ];
+
+check(
+  'adds a follow-system theme option to General settings',
+  settingsSource.includes("setTheme('system')") &&
+    settingsSource.includes('themePreference') &&
+    settingsSource.includes('settings.appearance.systemTheme'),
+  settingsSource,
+);
 
 check(
   'adds archived sessions to the General settings menu',

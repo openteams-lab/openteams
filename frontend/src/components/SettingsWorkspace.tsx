@@ -172,7 +172,7 @@ const sessionErrorMessage = (error: unknown, fallback: string) =>
 export const SettingsWorkspace: React.FC = () => {
   const {
     t,
-    theme,
+    themePreference,
     setTheme,
     locale,
     setLocale,
@@ -508,11 +508,11 @@ export const SettingsWorkspace: React.FC = () => {
 
             <div className="space-y-2">
               <h4 className="text-sm font-semibold text-[var(--ink)]">{t('settings.appearance.theme')}</h4>
-              <div className="grid grid-cols-2 gap-3.5">
+              <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-3">
               <div 
                 onClick={() => setTheme('dark')}
                 className={`rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 transition ${
-                  theme === 'dark' ? 'border-[var(--primary)] bg-[var(--surface-2)]' : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)]'
+                  themePreference === 'dark' ? 'border-[var(--primary)] bg-[var(--surface-2)]' : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)]'
                 }`}
               >
                 <div className="h-16 rounded-lg bg-[#010102] border border-[var(--hairline)] relative overflow-hidden">
@@ -520,7 +520,7 @@ export const SettingsWorkspace: React.FC = () => {
                   <div className="absolute bottom-2 left-2 w-8 h-2 bg-[var(--primary)] rounded" />
                 </div>
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-                  <span className={`h-1.5 w-1.5 rounded-full ${theme === 'dark' ? 'bg-[var(--primary)]' : 'bg-transparent'}`} />
+                  <span className={`h-1.5 w-1.5 rounded-full ${themePreference === 'dark' ? 'bg-[var(--primary)]' : 'bg-transparent'}`} />
                   <span>{t('settings.appearance.darkThemeDefault')}</span>
                 </div>
               </div>
@@ -528,7 +528,7 @@ export const SettingsWorkspace: React.FC = () => {
               <div 
                 onClick={() => setTheme('light')}
                 className={`rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 transition ${
-                  theme === 'light' ? 'border-[var(--primary)] bg-[var(--surface-2)]' : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)]'
+                  themePreference === 'light' ? 'border-[var(--primary)] bg-[var(--surface-2)]' : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)]'
                 }`}
               >
                 <div className="h-16 rounded-lg bg-[#fbfbfc] border border-[#e3e5ea] relative overflow-hidden">
@@ -536,8 +536,26 @@ export const SettingsWorkspace: React.FC = () => {
                   <div className="absolute bottom-2 left-2 w-8 h-2 bg-[var(--primary)] rounded" />
                 </div>
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-                  <span className={`h-1.5 w-1.5 rounded-full ${theme === 'light' ? 'bg-[var(--primary)]' : 'bg-transparent'}`} />
+                  <span className={`h-1.5 w-1.5 rounded-full ${themePreference === 'light' ? 'bg-[var(--primary)]' : 'bg-transparent'}`} />
                   <span>{t('settings.appearance.lightThemeInverted')}</span>
+                </div>
+              </div>
+
+              <div
+                onClick={() => setTheme('system')}
+                className={`rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 transition ${
+                  themePreference === 'system' ? 'border-[var(--primary)] bg-[var(--surface-2)]' : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)]'
+                }`}
+              >
+                <div className="h-16 rounded-lg border border-[var(--hairline)] relative overflow-hidden bg-[linear-gradient(90deg,#010102_0%,#010102_50%,#fbfbfc_50%,#fbfbfc_100%)]">
+                  <div className="absolute left-2 right-[calc(50%+0.5rem)] top-2 h-2 rounded bg-[#0f1011]" />
+                  <div className="absolute left-[calc(50%+0.5rem)] right-2 top-2 h-2 rounded border border-[#e3e5ea] bg-white" />
+                  <div className="absolute bottom-2 left-2 h-2 w-8 rounded bg-[var(--primary)]" />
+                  <div className="absolute bottom-2 left-[calc(50%+0.5rem)] h-2 w-8 rounded bg-[var(--primary)]" />
+                </div>
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
+                  <span className={`h-1.5 w-1.5 rounded-full ${themePreference === 'system' ? 'bg-[var(--primary)]' : 'bg-transparent'}`} />
+                  <span>{t('settings.appearance.systemTheme')}</span>
                 </div>
               </div>
               </div>

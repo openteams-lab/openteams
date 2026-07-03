@@ -27,6 +27,7 @@ import {
 
 export interface WorktreeMergeConflictsViewProps {
   sessionId: string;
+  surface?: 'modal' | 'page';
   tr: (
     key: string,
     fallback: string,
@@ -250,7 +251,7 @@ export const buildConflictResolutionContent = (
 
 export const WorktreeMergeConflictsView: React.FC<
   WorktreeMergeConflictsViewProps
-> = ({ sessionId, tr, onCompleted, onAbort, onClose }) => {
+> = ({ sessionId, surface = 'modal', tr, onCompleted, onAbort, onClose }) => {
   const [files, setFiles] = useState<ConflictFileInfo[]>([]);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [detail, setDetail] = useState<ConflictFileContent | null>(null);
@@ -469,7 +470,7 @@ export const WorktreeMergeConflictsView: React.FC<
     containsConflictMarkers(currentResolution.content);
 
   return (
-    <WorktreeMergeConflictFrame>
+    <WorktreeMergeConflictFrame surface={surface}>
       <div className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--hairline)] px-3">
         <div className="flex min-w-0 items-center gap-2">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />

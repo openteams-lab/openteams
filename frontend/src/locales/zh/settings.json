@@ -9,6 +9,7 @@
   "settings.appearance.desc": "管理页面语言和基础显示偏好。",
   "settings.appearance.lightThemeInverted": "浅色主题（反转）",
   "settings.appearance.pageLanguage": "页面语言",
+  "settings.appearance.systemTheme": "跟随系统",
   "settings.appearance.theme": "主题",
   "settings.appearance.title": "常规",
   "settings.onboarding.actionFailed": "引导操作失败",

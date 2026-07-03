@@ -16,11 +16,13 @@ interface WorkflowWorkspaceProps {
     filePath: string,
     area: SourceControlDiffArea,
   ) => void;
+  onOpenWorktreeConflictTab?: (projectId: string, sessionId: string) => void;
 }
 
 export const WorkflowWorkspace: React.FC<WorkflowWorkspaceProps> = ({
   onOpenDiffTab,
   onOpenSourceControlDiffTab,
+  onOpenWorktreeConflictTab,
 }) => {
   return (
     <div className="h-full w-full bg-transparent overflow-hidden font-sans text-xs select-none">
@@ -28,6 +30,7 @@ export const WorkflowWorkspace: React.FC<WorkflowWorkspaceProps> = ({
         embedded
         onOpenDiffTab={onOpenDiffTab}
         onOpenSourceControlDiffTab={onOpenSourceControlDiffTab}
+        onOpenWorktreeConflictTab={onOpenWorktreeConflictTab}
       />
     </div>
   );

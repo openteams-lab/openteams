@@ -431,16 +431,17 @@ export function ChatWorkflowCard({
   const canResumeExecution = canResumeWorkflowExecution(projection);
   const executionStatus = projection.execution_status;
   const executionStatusLabel = workflowExecutionStatusLabel(executionStatus, t);
+  const isWaitingForFinalReview =
+    !isPreview &&
+    (projection.state === 'waiting' ||
+      projection.execution_status === 'waiting');
   const allStepViewsCompleted =
     projection.steps.length > 0 &&
     projection.steps.every((step) =>
       REVIEW_READY_STEP_STATUSES.has(step.status)
     );
   const canReviewCurrentRound =
-    !!finalReviewAction ||
-    (allStepViewsCompleted &&
-      (projection.state === 'waiting' ||
-        projection.execution_status === 'waiting'));
+    isWaitingForFinalReview && (!!finalReviewAction || allStepViewsCompleted);
   const showRetryPlanGenerationButton =
     isPlanGenerationFailed &&
     generationMeta?.retryable !== false &&
@@ -518,7 +519,9 @@ export function ChatWorkflowCard({
     !projection.pending_review &&
     !projection.pending_input &&
     projection.execution_id &&
-    (projection.iteration_history.length > 0 || canReviewCurrentRound);
+    (projection.iteration_history.length > 0 ||
+      canReviewCurrentRound ||
+      isCompletedState);
   const shouldExpandFeedbackCard =
     canReviewCurrentRound && isViewingCurrentRound;
 

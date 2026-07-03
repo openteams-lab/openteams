@@ -1,5 +1,6 @@
 type FinalReviewTranscriptLike = {
   id: string;
+  execution_id?: string | null;
   entry_type: string;
   content: string;
   round_id?: string | null;
@@ -32,9 +33,16 @@ export function parseWorkflowTranscriptMeta(
 
 export function findPendingFinalReviewTranscript<
   T extends FinalReviewTranscriptLike,
->(entries: T[]): T | null {
+>(entries: T[], executionId?: string | null): T | null {
   return (
     entries.find((entry) => {
+      if (
+        entry.execution_id &&
+        executionId &&
+        entry.execution_id !== executionId
+      ) {
+        return false;
+      }
       if (entry.entry_type !== 'final_review') {
         return false;
       }
@@ -54,7 +62,7 @@ export function toWorkflowFinalReviewAction<
     return null;
   }
 
-  const transcript = findPendingFinalReviewTranscript(entries);
+  const transcript = findPendingFinalReviewTranscript(entries, executionId);
   if (!transcript) {
     return null;
   }

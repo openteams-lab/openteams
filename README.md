@@ -301,4 +301,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
 ## License
 
-Apache-2.0
+This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE)
+for the full license text, including copyright and redistribution terms.
+
+You can use, change, ship, and sell this project, including in
+closed-source products. Keep the copyright notice, keep the license text, and
+say what you changed when you modify it. Do not remove the required notices, do
+not use the project owner's name or trademarks as an endorsement, and do not
+expect the patent grant to continue if you start a patent lawsuit over this
+project. The software is provided as-is, without warranty.

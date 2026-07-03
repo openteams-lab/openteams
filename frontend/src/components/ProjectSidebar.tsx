@@ -23,6 +23,7 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  GitBranch,
   Github,
   Hash,
   History,
@@ -34,7 +35,6 @@ import {
   Pin,
   Plus,
   PlusCircle,
-  RefreshCw,
   Settings2,
   Trash2,
   Users,
@@ -49,10 +49,11 @@ import type {
   SidebarNavigationTarget,
   SidebarPrimaryAction,
   SidebarProjectDisplay,
+  ValidateWorkspacePathResponse,
 } from "@/types";
 import { DropdownSelect, type DropdownSelectOption } from "./DropdownSelect";
 import { useAppScale } from "@/context/AppScaleContext";
-import { filesystemApi } from "@/lib/api";
+import { chatSessionsApi, filesystemApi } from "@/lib/api";
 import { buildStatsApi } from "@/lib/buildStatsApi";
 import { onBuildStatsUpdated } from "@/lib/buildStatsEvents";
 import { formatNumber } from "@/lib/buildStatsUtils";
@@ -225,6 +226,10 @@ const createProjectLabelClass =
 
 const createProjectFieldBaseClass =
   "w-full rounded-md border border-[var(--hairline)] bg-[var(--surface-2)] px-3 py-2 text-[var(--ink)] outline-none transition placeholder:text-[var(--ink-tertiary)] hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)] focus:border-[var(--primary)] focus:bg-[var(--surface-1)]";
+
+const gitignoreTemplates = ["node", "go", "python", "none"] as const;
+
+type GitignoreTemplate = (typeof gitignoreTemplates)[number];
 
 const getNavigationIcon = (icon: string): LucideIcon =>
   navigationIcons[icon] ?? CircleDot;
@@ -462,6 +467,14 @@ export function ProjectSidebar({
   const workspaceBrowserScrollResetRef = useRef<
     ReturnType<typeof setTimeout> | null
   >(null);
+  const workspaceGitValidationRef = useRef(0);
+  const [workspaceGitStatus, setWorkspaceGitStatus] =
+    useState<ValidateWorkspacePathResponse | null>(null);
+  const [workspaceGitStatusPath, setWorkspaceGitStatusPath] = useState("");
+  const [workspaceGitDetecting, setWorkspaceGitDetecting] = useState(false);
+  const [initializeWorkspaceGit, setInitializeWorkspaceGit] = useState(true);
+  const [gitignoreTemplate, setGitignoreTemplate] =
+    useState<GitignoreTemplate>("node");
   const [createError, setCreateError] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
   const [deletingProjectDraft, setDeletingProjectDraft] =
@@ -583,6 +596,25 @@ export function ProjectSidebar({
     const translated = t?.(key, replacements);
     return translated && translated !== key ? translated : fallback;
   };
+
+  const gitignoreOptions = useMemo<DropdownSelectOption[]>(
+    () =>
+      gitignoreTemplates.map((template) => ({
+        id: template,
+        label: translate(
+          `sidebar.gitignore.${template}`,
+          template === "none"
+            ? "None"
+            : template.charAt(0).toUpperCase() + template.slice(1),
+        ),
+      })),
+    [t],
+  );
+  const currentWorkspacePath = projectWorkspacePath.trim();
+  const workspaceGitStatusForCurrentPath =
+    currentWorkspacePath && workspaceGitStatusPath === currentWorkspacePath
+      ? workspaceGitStatus
+      : null;
 
   const copySessionIdLabel =
     copySessionIdState === "copied"
@@ -818,12 +850,6 @@ export function ProjectSidebar({
     setRenameWorkspaceError(null);
   };
 
-  const startWorkspaceDirectoryRename = (entry: DirectoryEntry) => {
-    setRenamingWorkspacePath(entry.path);
-    setRenameWorkspaceName(entry.name);
-    setRenameWorkspaceError(null);
-  };
-
   const createWorkspaceDirectory = async () => {
     const parentPath = workspaceCurrentPath.trim();
     if (!parentPath || workspaceDirectoryMutating) return;
@@ -909,6 +935,15 @@ export function ProjectSidebar({
       event.stopPropagation();
       resetWorkspaceDirectoryRename();
     }
+  };
+
+  const validateWorkspaceGitStatus = async (
+    workspacePath: string,
+  ): Promise<ValidateWorkspacePathResponse> => {
+    const status = await chatSessionsApi.validateWorkspacePath(workspacePath);
+    setWorkspaceGitStatus(status);
+    setWorkspaceGitStatusPath(workspacePath);
+    return status;
   };
 
   const updateProjectSwitcherPosition = useCallback(() => {
@@ -1141,6 +1176,9 @@ export function ProjectSidebar({
     setProjectName(draft.name);
     setProjectWorkspacePath(draft.defaultWorkspacePath ?? "");
     setCreateError(null);
+    setWorkspaceGitStatus(null);
+    setWorkspaceGitStatusPath("");
+    setWorkspaceGitDetecting(false);
     setWorkspaceBrowserOpen(false);
     resetWorkspaceDirectoryRename();
     setCreateFormOpen(true);
@@ -1184,6 +1222,11 @@ export function ProjectSidebar({
     setProjectName("");
     setProjectWorkspacePath("");
     setEditingProject(null);
+    setWorkspaceGitStatus(null);
+    setWorkspaceGitStatusPath("");
+    setWorkspaceGitDetecting(false);
+    setInitializeWorkspaceGit(true);
+    setGitignoreTemplate("node");
     resetWorkspaceDirectoryRename();
   };
 
@@ -1192,6 +1235,11 @@ export function ProjectSidebar({
     setCreateError(null);
     setWorkspaceBrowserOpen(false);
     setEditingProject(null);
+    setWorkspaceGitStatus(null);
+    setWorkspaceGitStatusPath("");
+    setWorkspaceGitDetecting(false);
+    setInitializeWorkspaceGit(true);
+    setGitignoreTemplate("node");
     resetWorkspaceDirectoryRename();
   };
 
@@ -1330,6 +1378,50 @@ export function ProjectSidebar({
     workspaceEntries.length,
   ]);
 
+  useEffect(() => {
+    const workspacePath = projectWorkspacePath.trim();
+    const requestId = ++workspaceGitValidationRef.current;
+
+    setWorkspaceGitStatus(null);
+    setWorkspaceGitStatusPath("");
+
+    if (!createFormOpen || editingProject || !workspacePath) {
+      setWorkspaceGitDetecting(false);
+      return;
+    }
+
+    setWorkspaceGitDetecting(true);
+    const timer = window.setTimeout(() => {
+      void chatSessionsApi
+        .validateWorkspacePath(workspacePath)
+        .then((status) => {
+          if (workspaceGitValidationRef.current !== requestId) return;
+          setWorkspaceGitStatus(status);
+          setWorkspaceGitStatusPath(workspacePath);
+        })
+        .catch((err) => {
+          if (workspaceGitValidationRef.current !== requestId) return;
+          setWorkspaceGitStatus({
+            valid: false,
+            is_git_repo: false,
+            error:
+              err instanceof Error
+                ? err.message
+                : "Workspace Git status could not be checked",
+            error_code: null,
+          });
+          setWorkspaceGitStatusPath(workspacePath);
+        })
+        .finally(() => {
+          if (workspaceGitValidationRef.current === requestId) {
+            setWorkspaceGitDetecting(false);
+          }
+        });
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [createFormOpen, editingProject, projectWorkspacePath]);
+
   const handleCreateProject = async (
     event: React.FormEvent<HTMLFormElement>,
   ) => {
@@ -1338,6 +1430,7 @@ export function ProjectSidebar({
       ? projectName.trim()
       : sanitizeProjectName(projectName);
     if (!name || (!editingProject && !onCreateProject)) return;
+    const workspacePath = projectWorkspacePath.trim();
 
     setCreatingProject(true);
     setCreateError(null);
@@ -1348,18 +1441,45 @@ export function ProjectSidebar({
           name,
           description: editingProject.description,
           status: editingProject.status ?? "active",
-          default_workspace_path: projectWorkspacePath.trim() || null,
+          default_workspace_path: workspacePath || null,
           active_repo_id: editingProject.activeRepoId,
         });
       } else {
         if (!onCreateProject) return;
+        if (workspacePath) {
+          const gitStatus =
+            workspaceGitStatusPath === workspacePath && workspaceGitStatus
+              ? workspaceGitStatus
+              : await validateWorkspaceGitStatus(workspacePath);
+
+          if (!gitStatus.valid) {
+            throw new Error(
+              gitStatus.error ??
+                translate(
+                  "sidebar.workspaceInvalid",
+                  "Workspace path is invalid",
+                ),
+            );
+          }
+
+          if (!gitStatus.is_git_repo && initializeWorkspaceGit) {
+            const initialized = await chatSessionsApi.initializeWorkspaceGit({
+              workspace_path: workspacePath,
+              gitignore_template:
+                gitignoreTemplate === "none" ? null : gitignoreTemplate,
+            });
+            setWorkspaceGitStatus(initialized.status);
+            setWorkspaceGitStatusPath(workspacePath);
+          }
+        }
+
         await onCreateProject(
           {
             name,
             repositories: [],
             description: null,
             status: "active",
-            default_workspace_path: projectWorkspacePath.trim() || null,
+            default_workspace_path: workspacePath || null,
             active_repo_id: null,
           },
           {
@@ -1748,20 +1868,6 @@ export function ProjectSidebar({
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
-                        <button
-                          type="button"
-                          className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
-                          onClick={() =>
-                            void loadWorkspaceDirectory(projectWorkspacePath)
-                          }
-                          aria-label={translate(
-                            "sidebar.readWorkspace",
-                            "Read",
-                          )}
-                          title={translate("sidebar.readWorkspace", "Read")}
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        </button>
                       </div>
                       {workspaceBrowserError && (
                         <div className="px-3 py-2 text-[12px] text-red-400">
@@ -1906,48 +2012,6 @@ export function ProjectSidebar({
                                         </span>
                                       )}
                                     </button>
-                                    {entry.is_directory && (
-                                      <>
-                                        <button
-                                          type="button"
-                                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] opacity-0 transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] group-hover/workspace-entry:opacity-100 ${
-                                            selected ? "!opacity-100" : ""
-                                          }`}
-                                          onClick={() =>
-                                            startWorkspaceDirectoryRename(entry)
-                                          }
-                                          aria-label={translate(
-                                            "sidebar.renameFolder",
-                                            "Rename folder",
-                                          )}
-                                          title={translate(
-                                            "sidebar.renameFolder",
-                                            "Rename folder",
-                                          )}
-                                        >
-                                          <Pencil className="h-3.5 w-3.5" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={`mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[var(--ink-tertiary)] opacity-0 transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] group-hover/workspace-entry:opacity-100 ${
-                                            selected ? "!opacity-100" : ""
-                                          }`}
-                                          onClick={() =>
-                                            setProjectWorkspacePath(entry.path)
-                                          }
-                                          aria-label={translate(
-                                            "sidebar.selectWorkspace",
-                                            "Select workspace",
-                                          )}
-                                          title={translate(
-                                            "sidebar.selectWorkspace",
-                                            "Select workspace",
-                                          )}
-                                        >
-                                          <Check className="h-3.5 w-3.5" />
-                                        </button>
-                                      </>
-                                    )}
                                   </>
                                 )}
                               </div>
@@ -1957,6 +2021,102 @@ export function ProjectSidebar({
                       </div>
                     </div>
                   )}
+                  {!editingProject &&
+                    currentWorkspacePath &&
+                    (workspaceGitDetecting ||
+                      workspaceGitStatusForCurrentPath) && (
+                      <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-2)] px-3 py-2.5">
+                        {workspaceGitDetecting ? (
+                          <div className="flex items-center gap-2 text-[12px] text-[var(--ink-tertiary)]">
+                            <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                            {translate(
+                              "sidebar.gitChecking",
+                              "Checking Git status...",
+                            )}
+                          </div>
+                        ) : workspaceGitStatusForCurrentPath?.valid &&
+                          workspaceGitStatusForCurrentPath.is_git_repo ? (
+                          <div className="inline-flex items-center gap-2 rounded-[4px] border border-[color-mix(in_srgb,var(--success)_24%,transparent)] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] px-2 py-1 text-[12px] text-[var(--success)]">
+                            <GitBranch className="h-3.5 w-3.5" />
+                            {translate(
+                              "sidebar.gitDetected",
+                              "Git repository detected.",
+                            )}
+                          </div>
+                        ) : workspaceGitStatusForCurrentPath?.valid ? (
+                          <div className="space-y-2.5">
+                            <div className="flex items-start gap-2 text-[12px] leading-relaxed text-[var(--ink-tertiary)]">
+                              <GitBranch className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                              <span>
+                                {translate(
+                                  "sidebar.gitMissing",
+                                  "Current directory is not a Git repository.",
+                                )}
+                              </span>
+                            </div>
+                            <label className="flex cursor-pointer items-center gap-2 text-[12px] font-medium text-[var(--ink-subtle)]">
+                              <input
+                                type="checkbox"
+                                checked={initializeWorkspaceGit}
+                                onChange={(event) =>
+                                  setInitializeWorkspaceGit(
+                                    event.target.checked,
+                                  )
+                                }
+                                disabled={creatingProject}
+                                className="peer sr-only"
+                              />
+                              <span
+                                aria-hidden="true"
+                                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition ${
+                                  initializeWorkspaceGit
+                                    ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--on-primary)]"
+                                    : "border-[var(--hairline-strong)] bg-[var(--surface-1)] text-transparent peer-hover:border-[var(--ink-tertiary)]"
+                                }`}
+                              >
+                                <Check className="h-3 w-3" />
+                              </span>
+                              {translate(
+                                "sidebar.initializeGit",
+                                "Initialize Git repository",
+                              )}
+                            </label>
+                            {initializeWorkspaceGit && (
+                              <div>
+                                <label className="mb-1.5 block text-[11px] font-semibold tracking-[0.04em] text-[var(--ink-tertiary)]">
+                                  {translate(
+                                    "sidebar.gitignoreTemplate",
+                                    ".gitignore template",
+                                  )}
+                                </label>
+                                <DropdownSelect
+                                  selectionMode="single"
+                                  value={gitignoreTemplate}
+                                  onChange={(value) =>
+                                    setGitignoreTemplate(
+                                      value as GitignoreTemplate,
+                                    )
+                                  }
+                                  options={gitignoreOptions}
+                                  showSearch={false}
+                                  disabled={creatingProject}
+                                  triggerIcon={
+                                    <FileText className="h-3 w-3 text-[var(--ink-tertiary)]" />
+                                  }
+                                  triggerClassName="border-[var(--hairline)] bg-[var(--surface-1)] px-2.5 py-1.5 text-[12px] hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)]"
+                                  panelClassName="z-[1010] max-w-none"
+                                  maxPanelHeightClassName="max-h-[144px]"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ) : workspaceGitStatusForCurrentPath?.error ? (
+                          <div className="text-[12px] leading-relaxed text-red-400">
+                            {workspaceGitStatusForCurrentPath.error}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                 </div>
                 {createError && (
                   <div className="text-[13px] text-red-400">{createError}</div>

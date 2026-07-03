@@ -167,12 +167,13 @@ export function WorkflowCard({
       ? WORKFLOW_CARD_REFETCH_INTERVAL_MS
       : false,
   });
-  const finalReviewAction = projection?.execution_id
-    ? toWorkflowFinalReviewAction(
-        projection.execution_id,
-        finalReviewTranscripts,
-      )
-    : null;
+  const finalReviewAction =
+    shouldLoadFinalReviewAction && projection?.execution_id
+      ? toWorkflowFinalReviewAction(
+          projection.execution_id,
+          finalReviewTranscripts,
+        )
+      : null;
   const workflowRuntimeMessages = useMemo(() => {
     if (!projection?.execution_id) return [];
     return workflowRuntimeLinesByExecution[projection.execution_id] ?? [];

@@ -4,7 +4,6 @@
 //     pnpm exec tsx src/components/source-control/SessionSourceControlPanel.test.tsx
 
 import { readFileSync } from "node:fs";
-import { refreshAfterWorktreeResolution } from "./SessionSourceControlPanel";
 
 let failures = 0;
 const check = (label: string, cond: boolean, detail?: unknown) => {
@@ -78,28 +77,26 @@ check(
 );
 
 check(
-  "renders the ui-new merge conflicts section when conflict resolution is active",
-  source.includes("@/pages/worktree/WorktreeMergeConflictsSection") &&
-    source.includes("<WorktreeMergeConflictsSection") &&
-    source.includes("showConflictResolution") &&
-    source.includes('worktree?.status === "needs_conflict_resolution"') &&
-    source.includes("onClose={() => closeConflictResolutionForScope(scopeKey)}"),
+  "delegates merge conflict resolution to the workspace tab opener",
+  source.includes("onOpenConflictResolver:") &&
+    source.includes("onOpenConflictResolver,") &&
+    source.includes('case "resolve-conflicts":') &&
+    source.includes("onOpenConflictResolver(projectId, sessionId)"),
   source,
 );
 
 check(
-  "renders conflict resolution as an overlay instead of replacing the panel",
-  !source.includes("When the user opens the conflict resolver, it takes over") &&
-    source.includes("</div>") &&
-    source.includes("{showConflictResolution &&"),
+  "does not render conflict resolution as an overlay inside the panel",
+  !source.includes("@/pages/worktree/WorktreeMergeConflictsSection") &&
+    !source.includes("<WorktreeMergeConflictsSection") &&
+    !source.includes("showConflictResolution"),
   source,
 );
 
 check(
-  "auto-exits conflict resolution when status changes away from needs_conflict_resolution",
-  source.includes(
-    'worktree?.status !== "needs_conflict_resolution"',
-  ) && source.includes("closeConflictResolutionForScope(scopeKey)"),
+  "does not keep panel-local conflict resolution state",
+  !source.includes("conflictResolutionScopeKey") &&
+    !source.includes("closeConflictResolutionForScope"),
   source,
 );
 
@@ -172,30 +169,10 @@ check(
 );
 
 check(
-  "refreshes source-control after conflict resolution completes",
-  source.includes("onCompleted") &&
-    source.includes("closeConflictResolutionForScope(scopeKey)") &&
-    source.includes("refreshAfterWorktreeResolution"),
+  "does not retain the old panel-local conflict refresh helper",
+  !source.includes("refreshAfterWorktreeResolution"),
   source,
 );
-
-{
-  let sourceRefreshes = 0;
-  let worktreeRefreshes = 0;
-  await refreshAfterWorktreeResolution(
-    async () => {
-      sourceRefreshes += 1;
-    },
-    async () => {
-      worktreeRefreshes += 1;
-    },
-  );
-  check(
-    "refresh helper refreshes source-control and worktree state",
-    sourceRefreshes === 1 && worktreeRefreshes === 1,
-    { sourceRefreshes, worktreeRefreshes },
-  );
-}
 
 if (failures > 0) {
   // eslint-disable-next-line no-console

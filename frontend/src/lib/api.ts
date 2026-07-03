@@ -46,6 +46,7 @@ import type {
   ExecutePlanRequest,
   ExecutePlanResponse,
   GeneratePlanAndRunResponse,
+  GitignoreTemplatesResponse,
   GitHubAccount,
   GitHubCreatePrResponse,
   GitHubDeviceFlowPollResponse,
@@ -115,6 +116,7 @@ import type {
   WorkflowStepTokenUsageResponse,
   WorkflowTranscriptEntry,
   ValidateWorkspacePathResponse,
+  WorkspaceGitErrorData,
   WorkspaceChangesResponse,
 } from "@/types";
 
@@ -500,6 +502,12 @@ export const chatSessionsApi = {
     });
     return handleApiResponse<ValidateWorkspacePathResponse>(r);
   },
+  listGitignoreTemplates: async (): Promise<GitignoreTemplatesResponse> => {
+    const r = await makeRequest("/api/chat/gitignore-templates", {
+      cache: "no-store",
+    });
+    return handleApiResponse<GitignoreTemplatesResponse>(r);
+  },
   initializeWorkspaceGit: async (
     data: InitializeWorkspaceGitRequest,
   ): Promise<InitializeWorkspaceGitResponse> => {
@@ -507,7 +515,10 @@ export const chatSessionsApi = {
       method: "POST",
       body: JSON.stringify(data),
     });
-    return handleApiResponse<InitializeWorkspaceGitResponse>(r);
+    return handleApiResponse<
+      InitializeWorkspaceGitResponse,
+      WorkspaceGitErrorData
+    >(r);
   },
   update: async (
     sessionId: string,

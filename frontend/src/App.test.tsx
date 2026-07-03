@@ -167,7 +167,7 @@ check(
   "onboarding previews locale and appearance through existing app setters",
   source.includes("onPreviewLocaleChange={setLocale}") &&
     source.includes("handleOnboardingPreviewAppearanceChange") &&
-    source.includes("setTheme(prefersLight ?") &&
+    source.includes('setTheme("system")') &&
     source.includes("OnboardingAppearance.system"),
   source,
 );
@@ -351,6 +351,23 @@ check(
   source.includes("chatMessagesApi.uploadAttachment") &&
     source.includes("attachmentInitialMessage(attachedFiles)") &&
     source.includes("mentions: shouldPersistRouteMentions"),
+  source,
+);
+check(
+  "worktree conflict resolution opens as a workspace tab page",
+  source.includes('kind: "worktree-conflicts"') &&
+    source.includes("createWorktreeConflictTabId") &&
+    source.includes("openWorktreeConflictTab") &&
+    source.includes("<WorktreeMergeConflictsSection") &&
+    source.includes('surface="page"') &&
+    source.includes("onOpenWorktreeConflictTab={openWorktreeConflictTab}"),
+  source,
+);
+check(
+  "worktree conflict tab refreshes source control when finished",
+  source.includes("notifySourceControlRefreshRequested") &&
+    source.includes("completeWorktreeConflictTab") &&
+    source.includes("closeWorktreeConflictTab(tab)"),
   source,
 );
 check(

@@ -297,4 +297,13 @@ Consulta [CONTRIBUTING.md](../CONTRIBUTING.md) para la guía completa.
 
 ## Licencia
 
-Apache-2.0
+Este proyecto usa Apache License 2.0. Consulta [LICENSE](../LICENSE) para ver
+el texto completo, incluidos los avisos de copyright y las reglas de
+redistribución.
+
+Puedes usar, cambiar, publicar y vender este proyecto,
+incluso dentro de productos cerrados. Conserva el aviso de copyright, conserva
+el texto de la licencia y cuenta qué cambiaste si lo modificas. No elimines los
+avisos obligatorios, no uses el nombre o las marcas del dueño del proyecto como
+respaldo, y no esperes mantener la concesión de patentes si inicias una demanda
+de patentes sobre este proyecto. El software se entrega tal cual, sin garantía.

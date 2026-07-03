@@ -2251,11 +2251,12 @@ export function WorkflowWindow({
     projection.steps.every((step) =>
       REVIEW_READY_STEP_STATUSES.has(step.status)
     );
+  const isWaitingForFinalReview =
+    !isPreview &&
+    (projection.state === 'waiting' ||
+      projection.execution_status === 'waiting');
   const canReviewCurrentRound =
-    !!finalReviewAction ||
-    (allStepViewsCompleted &&
-      (projection.state === 'waiting' ||
-        projection.execution_status === 'waiting'));
+    isWaitingForFinalReview && (!!finalReviewAction || allStepViewsCompleted);
 
   const getPendingReviewStep = useCallback(
     (pendingReview: NonNullable<WorkflowCardData['pending_review']>) => {
@@ -2706,6 +2707,7 @@ export function WorkflowWindow({
         {/* Iteration feedback card overlay (bottom-left) */}
         {!isPreview &&
           (projection.iteration_history.length > 0 ||
+            hasWorkflowCompleted ||
             canReviewCurrentRound) && (
             <div className="absolute bottom-6 left-6 z-40">
               <WorkflowIterationFeedbackCard

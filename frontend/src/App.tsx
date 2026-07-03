@@ -11,6 +11,7 @@ import { AppScaleContext } from "@/context/AppScaleContext";
 import { WorkflowWorkspace } from "@/components/WorkflowWorkspace";
 import { CreateAgentSessionModal } from "@/components/CreateAgentSessionModal";
 import { DiffViewTab } from "@/components/DiffViewTab";
+import { WorktreeMergeConflictsSection } from "@/pages/worktree/WorktreeMergeConflictsSection";
 import { NotificationToast } from "@/components/NotificationToast";
 import { ProjectSidebar } from "@/components/ProjectSidebar";
 import {
@@ -27,6 +28,7 @@ import { TeamPage } from "@/pages/TeamPage";
 import { TeamTemplatesPage } from "@/pages/TeamTemplatesPage";
 import {
   Activity,
+  AlertTriangle,
   Bot,
   Box,
   CircleDot,
@@ -68,6 +70,7 @@ import {
   type TeamMemberInviteNavigationTarget,
 } from "@/lib/teamNavigation";
 import { notifyLinkedWorkItemsChanged } from "@/lib/linkedWorkItemsEvents";
+import { notifySourceControlRefreshRequested } from "@/lib/sourceControlEvents";
 import { mapSession } from "@/lib/mappers";
 import { mockFrontendApi } from "@/lib/mockFrontendApi";
 import { projectDisplayName } from "@/lib/projectDisplay";
@@ -124,6 +127,12 @@ type WorkspaceTab =
       sessionId: string;
       filePath: string;
       area: SourceControlDiffArea;
+    }
+  | {
+      id: string;
+      kind: "worktree-conflicts";
+      projectId: string;
+      sessionId: string;
     };
 
 type RenderedWorkspaceTab = {
@@ -163,6 +172,8 @@ const pageTabConfig: Record<
 
 const createSessionTabId = (sessionId: string) => `session:${sessionId}`;
 const createPageTabId = (page: SidebarNavigationTarget) => `page:${page}`;
+const createWorktreeConflictTabId = (sessionId: string) =>
+  `worktree-conflicts:${sessionId}`;
 
 const createSessionTab = (sessionId: string): WorkspaceTab => ({
   id: createSessionTabId(sessionId),
@@ -178,6 +189,16 @@ const createPageTab = (
   kind: "page",
   page,
   label: label ?? pageTabConfig[page].label,
+});
+
+const createWorktreeConflictTab = (
+  projectId: string,
+  sessionId: string,
+): WorkspaceTab => ({
+  id: createWorktreeConflictTabId(sessionId),
+  kind: "worktree-conflicts",
+  projectId,
+  sessionId,
 });
 
 const isDiffWorkspaceTab = (
@@ -623,7 +644,13 @@ function WorkspaceLayout() {
     replacements?: Record<string, string | number>,
   ) => {
     const translated = t(key, replacements);
-    return translated && translated !== key ? translated : fallback;
+    const text = translated && translated !== key ? translated : fallback;
+    if (!replacements) return text;
+    return Object.entries(replacements).reduce(
+      (current, [name, value]) =>
+        current.replace(`{${name}}`, String(value)),
+      text,
+    );
   };
 
   const overlayForOnboardingState = (
@@ -862,7 +889,9 @@ function WorkspaceLayout() {
     const sessionIds = new Set(sessions.map((session) => session.id));
     setOpenTabs((currentTabs) => {
       const validTabs = currentTabs.filter(
-        (tab) => tab.kind !== "session" || sessionIds.has(tab.sessionId),
+        (tab) =>
+          (tab.kind !== "session" && tab.kind !== "worktree-conflicts") ||
+          sessionIds.has(tab.sessionId),
       );
       if (validTabs.length > 0) return validTabs;
       return activeSessionId ? [createSessionTab(activeSessionId)] : [];
@@ -895,6 +924,13 @@ function WorkspaceLayout() {
       if (tab.kind === "sc-diff") {
         const fileName = tab.filePath.split("/").pop() ?? tab.filePath;
         return { tab, label: fileName, Icon: FileText };
+      }
+      if (tab.kind === "worktree-conflicts") {
+        return {
+          tab,
+          label: translate("worktree.merge.tabLabel", "Merge conflicts"),
+          Icon: AlertTriangle,
+        };
       }
       const config = pageTabConfig[tab.page];
       return { tab, label: getPageTabLabel(tab.page), Icon: config.icon };
@@ -938,6 +974,18 @@ function WorkspaceLayout() {
         />
       );
     }
+    if (activeTab?.kind === "worktree-conflicts") {
+      return (
+        <WorktreeMergeConflictsSection
+          sessionId={activeTab.sessionId}
+          surface="page"
+          tr={translate}
+          onClose={() => closeWorktreeConflictTab(activeTab)}
+          onCompleted={() => completeWorktreeConflictTab(activeTab)}
+          onAbort={() => completeWorktreeConflictTab(activeTab)}
+        />
+      );
+    }
 
     switch (activeAppPage) {
       case "team":
@@ -963,6 +1011,7 @@ function WorkspaceLayout() {
             <WorkflowWorkspace
               onOpenDiffTab={openDiffTab}
               onOpenSourceControlDiffTab={openSourceControlDiffTab}
+              onOpenWorktreeConflictTab={openWorktreeConflictTab}
             />
           </div>
         );
@@ -1151,6 +1200,37 @@ function WorkspaceLayout() {
     openReusableDiffTab(nextTab);
   };
 
+  const openWorktreeConflictTab = (projectId: string, sessionId: string) => {
+    const nextTab = createWorktreeConflictTab(projectId, sessionId);
+    setOpenTabs((currentTabs) => {
+      if (currentTabs.some((tab) => tab.id === nextTab.id)) {
+        return currentTabs.map((tab) =>
+          tab.id === nextTab.id ? nextTab : tab,
+        );
+      }
+      return [...currentTabs, nextTab];
+    });
+    setActiveTabId(nextTab.id);
+    setActiveSessionId(sessionId);
+  };
+
+  const closeWorktreeConflictTab = (
+    tab: Extract<WorkspaceTab, { kind: "worktree-conflicts" }>,
+  ) => {
+    replaceActiveTab(createSessionTab(tab.sessionId));
+    setActiveSessionId(tab.sessionId);
+  };
+
+  const completeWorktreeConflictTab = (
+    tab: Extract<WorkspaceTab, { kind: "worktree-conflicts" }>,
+  ) => {
+    notifySourceControlRefreshRequested({
+      projectId: tab.projectId,
+      sessionId: tab.sessionId,
+    });
+    closeWorktreeConflictTab(tab);
+  };
+
   const handleSidebarNavigate = (item: SidebarNavigationItem) => {
     if (!item.targetPage) {
       handleSidebarProjectAction(item.id);
@@ -1215,7 +1295,10 @@ function WorkspaceLayout() {
       const nextActiveTab =
         nextTabs[Math.max(0, closingIndex - 1)] ?? nextTabs[0];
       setActiveTabId(nextActiveTab.id);
-      if (nextActiveTab.kind === "session") {
+      if (
+        nextActiveTab.kind === "session" ||
+        nextActiveTab.kind === "worktree-conflicts"
+      ) {
         setActiveSessionId(nextActiveTab.sessionId);
       }
     }
@@ -1760,10 +1843,7 @@ function WorkspaceLayout() {
       return;
     }
     if (appearance === OnboardingAppearance.system) {
-      const prefersLight =
-        typeof window !== "undefined" &&
-        window.matchMedia?.("(prefers-color-scheme: light)").matches;
-      setTheme(prefersLight ? "light" : "dark");
+      setTheme("system");
       return;
     }
     setTheme("dark");
@@ -1771,6 +1851,9 @@ function WorkspaceLayout() {
 
   const handleOnboardingStateChange = (nextState: OnboardingState) => {
     setOnboardingState(nextState);
+    setOnboardingOverlay((current) =>
+      current ? { ...current, state: nextState } : current,
+    );
   };
 
   const handleUpgradeRead = (nextState: OnboardingState) => {
@@ -1930,7 +2013,10 @@ function WorkspaceLayout() {
                         }`}
                         onClick={() => {
                           setActiveTabId(tab.id);
-                          if (tab.kind === "session") {
+                          if (
+                            tab.kind === "session" ||
+                            tab.kind === "worktree-conflicts"
+                          ) {
                             setActiveSessionId(tab.sessionId);
                           }
                           setIsMobileSidebarOpen(false);
@@ -1978,7 +2064,8 @@ function WorkspaceLayout() {
               activeAppPage === "team" ||
               activeAppPage === "team-templates" ||
               activeTab?.kind === "diff" ||
-              activeTab?.kind === "sc-diff"
+              activeTab?.kind === "sc-diff" ||
+              activeTab?.kind === "worktree-conflicts"
                 ? "overflow-hidden p-0"
                 : "overflow-y-auto p-4 md:p-6"
             }`}
