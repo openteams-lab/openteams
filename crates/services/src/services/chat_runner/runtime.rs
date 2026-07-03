@@ -874,6 +874,7 @@ impl ChatRunner {
         let suppress_stream = stream_filter.suppress_codex_tool_runtime_details
             && matches!(stream_type, ChatStreamDeltaType::Error)
             && is_codex_tool_call_failure(&current);
+        let seen_before = last_content.contains_key(&index);
         let previous = last_content.get(&index).cloned().unwrap_or_default();
         let (delta, is_delta) = if current.starts_with(&previous) {
             (current[previous.len()..].to_string(), true)
@@ -888,11 +889,16 @@ impl ChatRunner {
                 *assistant_update_count = assistant_update_count.saturating_add(1);
             }
         }
-        if matches!(stream_type, ChatStreamDeltaType::Error) && !suppress_stream {
-            if !error_content.is_empty() {
-                error_content.push('\n');
-            }
-            error_content.push_str(&current);
+        if matches!(stream_type, ChatStreamDeltaType::Error)
+            && !suppress_stream
+            && current != previous
+        {
+            let append_content = if seen_before && is_delta {
+                delta.as_str()
+            } else {
+                current.as_str()
+            };
+            Self::append_error_content(error_content, append_content, seen_before && is_delta);
             if current != previous {
                 *error_update_count = error_update_count.saturating_add(1);
             }
@@ -911,6 +917,45 @@ impl ChatRunner {
             content: delta,
             delta: is_delta,
         })
+    }
+
+    fn append_error_content(error_content: &mut String, content: &str, is_continuation: bool) {
+        if content.is_empty() {
+            return;
+        }
+
+        if is_continuation {
+            error_content.push_str(content);
+            return;
+        }
+
+        if !error_content.is_empty() {
+            error_content.push('\n');
+        }
+        error_content.push_str(content);
+    }
+
+    fn dedupe_adjacent_error_lines(content: &str) -> String {
+        let mut lines = Vec::new();
+        let mut previous_non_empty: Option<String> = None;
+
+        for line in content.lines() {
+            let normalized = line.trim();
+            if !normalized.is_empty()
+                && previous_non_empty.as_deref() == Some(normalized)
+            {
+                continue;
+            }
+
+            lines.push(line.to_string());
+            previous_non_empty = if normalized.is_empty() {
+                None
+            } else {
+                Some(normalized.to_string())
+            };
+        }
+
+        lines.join("\n")
     }
 
     fn rebuild_run_stream_state_from_history(
@@ -1586,6 +1631,7 @@ impl ChatRunner {
                         last_token_usage = reconciled_state.last_token_usage;
                         error_content = reconciled_state.error_content;
                         error_type = reconciled_state.error_type;
+                        error_content = Self::dedupe_adjacent_error_lines(&error_content);
 
                         let _ = fs::write(&output_path, &latest_assistant).await;
 

@@ -433,7 +433,9 @@ check(
   guideSource.includes("import { sanitizeProjectName }") &&
     guideSource.includes("sanitizeProjectName('MyProject')") &&
     guideSource.includes('const name = sanitizeProjectName(projectName)') &&
-    guideSource.includes('setProjectName(sanitizeProjectName(event.target.value))'),
+    guideSource.includes('setProjectName(event.target.value)') &&
+    guideSource.includes('onBlur={() => setProjectName((current) => sanitizeProjectName(current))}') &&
+    !guideSource.includes('setProjectName(sanitizeProjectName(event.target.value))'),
   guideSource,
 );
 

@@ -342,7 +342,7 @@
   "turnWorkflowSuccess": "已成功通过本次讨论动态生成了 5 阶段模型流水线计划!",
   "updatePlan": "更新计划",
   "uploadFile": "上传文件",
-  "useTeamBetter": "让 AI 团队事半功倍",
+  "useTeamBetter": "AI 团队，协同开发，助力研发提效。",
   "voiceInput": "语音输入",
   "warnOverDollarSub": "发起特别庞大或多次迭代的长文任务前给予温馨强提示",
   "warnOverDollarTitle": "单次自动运行超过 $1 时强制二次预警",

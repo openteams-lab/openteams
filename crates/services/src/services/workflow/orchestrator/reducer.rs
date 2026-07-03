@@ -601,6 +601,73 @@ pub async fn guarded_transition_step(
     })
 }
 
+pub async fn recover_orphaned_running_step(
+    pool: &SqlitePool,
+    execution: &WorkflowExecution,
+    step: &WorkflowStep,
+) -> Result<Option<TransitionResult<WorkflowStep>>, TransitionError> {
+    if step.status != WorkflowStepStatus::Running {
+        return Ok(None);
+    }
+
+    let to = WorkflowStepStatus::Ready;
+    if !validate_step_in_execution(&execution.status, &to) {
+        return Err(TransitionError::IllegalStepTransition {
+            from: format!("{:?}", step.status),
+            to: format!("{:?} (execution 状态 {:?} 下不允许)", to, execution.status),
+        });
+    }
+
+    let from_str = to_workflow_wire_value(&step.status);
+    let to_str = to_workflow_wire_value(&to);
+
+    let Some(updated) = WorkflowStep::recover_orphaned_running(pool, step.id).await? else {
+        tracing::warn!(
+            step_id = %step.id,
+            expected = ?step.status,
+            "orphaned workflow step recovery skipped: row no longer running"
+        );
+        return Ok(None);
+    };
+
+    let event = WorkflowEvent::create(
+        pool,
+        &CreateWorkflowEvent {
+            execution_id: execution.id,
+            round_id: Some(step.round_id),
+            step_id: Some(step.id),
+            agent_session_id: step.assigned_workflow_agent_session_id,
+            event_type: WorkflowEventType::StepStatusChanged,
+            status_before: Some(from_str.clone()),
+            status_after: Some(to_str.clone()),
+            detail_json: Some(
+                serde_json::json!({
+                    "step_key": step.step_key,
+                    "step_title": step.title,
+                    "recovery": "startup_orphan_recovery",
+                })
+                .to_string(),
+            ),
+        },
+        Uuid::new_v4(),
+    )
+    .await?;
+
+    tracing::info!(
+        execution_id = %execution.id,
+        step_id = %step.id,
+        step_key = %step.step_key,
+        from = %from_str,
+        to = %to_str,
+        "orphaned workflow step recovered"
+    );
+
+    Ok(Some(TransitionResult {
+        entity: updated,
+        event,
+    }))
+}
+
 /// Atomically transition an execution using compare-and-swap at the DB level.
 /// Returns `Err(StaleTransition)` if the execution's current DB status no
 /// longer matches `execution.status`.
