@@ -492,6 +492,19 @@ check(
 );
 
 check(
+  'supports following the operating system theme preference',
+  source.includes('ThemePreference') &&
+    source.includes('const resolveSystemTheme =') &&
+    source.includes("'(prefers-color-scheme: light)'") &&
+    source.includes('themePreference ===') &&
+    source.includes('setThemePreferenceState(t)') &&
+    source.includes("localStorage.setItem('openteams-design-mode', t)") &&
+    source.includes("document.body.setAttribute('data-mode', theme)") &&
+    source.includes('themePreference,'),
+  source,
+);
+
+check(
   'syncs member queue snapshots from REST and websocket updates',
   source.includes('memberQueuesBySessionAgentId') &&
     source.includes('chatQueuesApi.listSession(sid)') &&

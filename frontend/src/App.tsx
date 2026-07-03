@@ -1843,10 +1843,7 @@ function WorkspaceLayout() {
       return;
     }
     if (appearance === OnboardingAppearance.system) {
-      const prefersLight =
-        typeof window !== "undefined" &&
-        window.matchMedia?.("(prefers-color-scheme: light)").matches;
-      setTheme(prefersLight ? "light" : "dark");
+      setTheme("system");
       return;
     }
     setTheme("dark");

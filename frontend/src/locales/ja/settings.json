@@ -9,6 +9,7 @@
   "settings.appearance.desc": "ページ言語と表示設定を管理します。",
   "settings.appearance.lightThemeInverted": "ライトテーマ（反転）",
   "settings.appearance.pageLanguage": "ページ言語",
+  "settings.appearance.systemTheme": "システムに従う",
   "settings.appearance.theme": "テーマ",
   "settings.appearance.title": "一般",
   "settings.onboarding.actionFailed": "Guide action failed",

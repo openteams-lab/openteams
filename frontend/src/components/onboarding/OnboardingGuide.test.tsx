@@ -118,20 +118,23 @@ check(
     guideSource.includes('feTurbulence type=%27fractalNoise%27') &&
     guideSource.includes('opacity-[0.025]') &&
     guideSource.includes('shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]') &&
-    guideSource.includes('pointer-events-none absolute inset-0 bg-[#0E0F11]') &&
+    guideSource.includes("'--onboarding-stage': '#0E0F11'") &&
+    guideSource.includes("'--onboarding-card': 'rgba(26, 26, 26, 0.9)'") &&
+    guideSource.includes("'--onboarding-panel': '#151617'") &&
+    guideSource.includes('pointer-events-none absolute inset-0 bg-[var(--onboarding-stage)]') &&
     guideSource.includes('px-4 text-center sm:px-6') &&
     guideSource.includes('overflow-hidden pb-4 pt-4 sm:pb-8 sm:pt-8 lg:pb-10 lg:pt-10') &&
     guideSource.includes('text-[28px] font-semibold leading-[1.08]') &&
     guideSource.includes('sm:text-[40px]') &&
     guideSource.includes('lg:text-[48px]') &&
     guideSource.includes('text-[13px] leading-5 text-[#a8b3c2]') &&
-    guideSource.includes('mt-4 flex min-h-[220px] w-full max-w-5xl flex-col overflow-hidden rounded-[8px] border border-white/[0.12] bg-[#1A1A1A]/90') &&
+    guideSource.includes('mt-4 flex min-h-[220px] w-full max-w-5xl flex-col overflow-hidden rounded-[8px] border border-white/[0.12] bg-[var(--onboarding-card)]') &&
     guideSource.includes('sm:mt-8 sm:min-h-[320px] lg:mt-14 lg:min-h-[440px]') &&
-    guideSource.includes('border-b border-white/[0.08] bg-[#1A1A1A]/90 px-3 py-2.5 sm:px-4 sm:py-3') &&
+    guideSource.includes('border-b border-white/[0.08] bg-[var(--onboarding-card)] px-3 py-2.5 sm:px-4 sm:py-3') &&
     guideSource.includes('h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]') &&
     guideSource.includes('ml-2 h-3 w-24 rounded-[3px] border border-white/[0.08] bg-white/[0.065] sm:ml-4 sm:w-32') &&
     guideSource.includes('flex min-h-0 flex-1 items-center justify-center px-3 py-4 sm:px-12 sm:py-8 lg:px-20 lg:py-10') &&
-    guideSource.includes('max-w-sm overflow-hidden rounded-[6px] border border-white/[0.12] bg-[#151617]/95') &&
+    guideSource.includes('max-w-sm overflow-hidden rounded-[6px] border border-white/[0.12] bg-[var(--onboarding-panel)]') &&
     guideSource.includes('sm:max-w-md sm:-translate-y-2 lg:-translate-y-4') &&
     guideSource.includes('border-b border-white/[0.08] p-3 sm:p-4') &&
     guideSource.includes('relative flex w-full cursor-pointer items-center justify-between rounded-[5px] border px-3 py-1.5 text-left text-[13px] transition sm:py-2 sm:text-[14px]') &&
@@ -139,8 +142,8 @@ check(
     guideSource.includes("active ? 'text-white' : 'text-[#8792a3]'") &&
     guideSource.includes('absolute bottom-2 left-0 top-2 w-px') &&
     guideSource.includes('text-current opacity-55') &&
-    guideSource.includes('mt-12 flex flex-col items-center gap-4') &&
-    guideSource.includes('tracking-[0.22em] text-[#8f9aaa]') &&
+    guideSource.includes('mt-4 flex w-full flex-col items-center gap-2 sm:mt-9 sm:gap-3 lg:mt-12 lg:gap-4') &&
+    guideSource.includes('tracking-[0.14em] text-[#8f9aaa] sm:text-[10px] sm:tracking-[0.22em]') &&
     guideSource.includes("t('onboarding.welcome.footerSteps'") &&
     !guideSource.includes('ALL 4 STEPS TO FINISH CONFIGURATION') &&
     !guideSource.includes('top-1/2 -z-10 h-3/4 w-3/4') &&
@@ -157,7 +160,8 @@ check(
     guideSource.includes("filter: 'invert(1) hue-rotate(180deg)'") &&
     guideSource.includes('style={onboardingInvertedContentStyle}') &&
     appSource.includes('setTheme("light")') &&
-    appSource.includes('setTheme("dark")'),
+    appSource.includes('setTheme("dark")') &&
+    appSource.includes('setTheme("system")'),
   { guideSource, appSource },
 );
 
@@ -208,7 +212,7 @@ check(
 
 check(
   'project path step uses the shared onboarding panel with micro Git controls',
-  guideSource.includes('h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#1A1A1A]/90') &&
+  guideSource.includes('h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[var(--onboarding-card)]') &&
     guideSource.includes('lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.74fr)]') &&
     guideSource.includes('overflow-y-auto lg:grid-cols') &&
     guideSource.includes('chatSessionsApi.listGitignoreTemplates') &&
@@ -221,7 +225,7 @@ check(
     guideSource.includes('workspaceGitValidationErrorI18nKey') &&
     guideSource.includes('normalizeGitignoreTemplateSelection') &&
     guideSource.includes('className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"') &&
-    guideSource.includes('rounded-[6px] border border-white/[0.08] bg-[#151617]') &&
+    guideSource.includes('rounded-[6px] border border-white/[0.08] bg-[var(--onboarding-panel)]') &&
     guideSource.includes('focus:bg-[#171819]') &&
     !guideSource.includes('bg-[#111214]') &&
     guideSource.includes('<Plus className="h-3.5 w-3.5"') &&
@@ -273,7 +277,7 @@ check(
 
 check(
   'all onboarding step pages use the create-project base background',
-    guideSource.includes('pointer-events-none absolute inset-0 bg-[#0E0F11]') &&
+    guideSource.includes('pointer-events-none absolute inset-0 bg-[var(--onboarding-stage)]') &&
     !guideSource.includes("stepKey === 'project_path' ? 'bg-[#0E0F11]' : 'bg-[#0a0a0a]'") &&
     !guideSource.includes('pointer-events-none absolute inset-0 bg-black') &&
     guideSource.includes('opacity-[0.032] mix-blend-screen') &&
@@ -299,10 +303,10 @@ check(
     guideSource.includes('renderProjectPathStep') &&
     guideSource.includes('renderAppearanceStep') &&
     guideSource.includes('flex h-[340px] items-center justify-center') &&
-    guideSource.includes('h-full w-full max-w-[820px] rounded-[8px] border border-white/[0.08] bg-[#1A1A1A]/90') &&
-    guideSource.includes('h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#1A1A1A]/90') &&
+    guideSource.includes('h-full w-full max-w-[820px] rounded-[8px] border border-white/[0.08] bg-[var(--onboarding-card)]') &&
+    guideSource.includes('h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[var(--onboarding-card)]') &&
     !guideSource.includes('bg-[#121212]/90') &&
-    guideSource.includes('px-5 py-5 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-5') &&
+    guideSource.includes('px-5 py-5 shadow-[var(--onboarding-card-shadow)] sm:px-7 sm:py-5') &&
     guideSource.includes('md:grid-cols-[minmax(160px,1fr)_190px_230px]') &&
     guideSource.includes("const executorSelectClassName =") &&
     guideSource.includes('text-[25px] font-[600] leading-tight tracking-[0] text-[#f4f4f5]') &&
@@ -546,6 +550,36 @@ const sameJson = (left: unknown, right: unknown) =>
 const baselineOnboardingKeys = onboardingLocaleKeys(
   onboardingLocaleDictionaries.en,
 );
+const localizedAppearancePageKeys = [
+  'onboarding.action.back',
+  'onboarding.action.next',
+  'onboarding.action.skip',
+  'onboarding.appearance.dark',
+  'onboarding.appearance.desc',
+  'onboarding.appearance.languageTitle',
+  'onboarding.appearance.light',
+  'onboarding.appearance.system',
+  'onboarding.appearance.themeTitle',
+  'onboarding.appearance.title',
+  'onboarding.header.step',
+  'onboarding.header.title',
+  'onboarding.step.appearance.hint',
+  'onboarding.step.appearance.title',
+  'onboarding.steps.title',
+] as const;
+
+for (const locale of ['ja', 'ko', 'fr', 'es'] as const) {
+  const englishValues = localizedAppearancePageKeys.filter(
+    (key) =>
+      onboardingLocaleDictionaries[locale][key] ===
+      onboardingLocaleDictionaries.en[key],
+  );
+  check(
+    `locale ${locale} localizes the language and appearance onboarding page`,
+    englishValues.length === 0,
+    englishValues,
+  );
+}
 
 for (const locale of localeNames) {
   const localeKeys = onboardingLocaleKeys(onboardingLocaleDictionaries[locale]);

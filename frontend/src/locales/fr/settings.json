@@ -9,6 +9,7 @@
   "settings.appearance.desc": "Gérez la langue de la page et les préférences d’affichage.",
   "settings.appearance.lightThemeInverted": "Thème clair (inversé)",
   "settings.appearance.pageLanguage": "Langue de la page",
+  "settings.appearance.systemTheme": "Suivre le système",
   "settings.appearance.theme": "Thème",
   "settings.appearance.title": "Général",
   "settings.onboarding.actionFailed": "Guide action failed",

@@ -34,6 +34,7 @@ export { WorkspaceGitErrorCode } from '../../shared/types';
 export type MemberQueuesBySessionAgentId = Record<string, MemberQueueSnapshot>;
 
 export type Theme = 'dark' | 'light';
+export type ThemePreference = Theme | 'system';
 
 export type Locale = 'en' | 'zh' | 'ja' | 'ko' | 'fr' | 'es';
 

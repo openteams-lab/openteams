@@ -167,7 +167,7 @@ check(
   "onboarding previews locale and appearance through existing app setters",
   source.includes("onPreviewLocaleChange={setLocale}") &&
     source.includes("handleOnboardingPreviewAppearanceChange") &&
-    source.includes("setTheme(prefersLight ?") &&
+    source.includes('setTheme("system")') &&
     source.includes("OnboardingAppearance.system"),
   source,
 );

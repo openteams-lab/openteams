@@ -8,6 +8,7 @@
 } from 'react';
 import {
   Theme,
+  ThemePreference,
   Locale,
   Member,
   Session,
@@ -263,6 +264,18 @@ const CHAT_STREAM_RECONNECT_MAX_DELAY_MS = 30000;
 const SIDEBAR_RUNNING_INDICATOR_POLL_MS = 5000;
 const CHAT_MESSAGE_FONT_SIZE_DEFAULT = 14;
 export const CHAT_MESSAGE_FONT_SIZE_OPTIONS = [13, 14, 15, 16] as const;
+
+const isThemePreference = (
+  value: string | null | undefined,
+): value is ThemePreference =>
+  value === 'light' || value === 'dark' || value === 'system';
+
+const resolveSystemTheme = (): Theme => {
+  if (typeof window === 'undefined') return 'dark';
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches
+    ? 'light'
+    : 'dark';
+};
 
 const readSessionIdSet = (storageKey: string): Set<string> => {
   if (typeof localStorage === 'undefined') return new Set();
@@ -1117,7 +1130,8 @@ const liveDeltaActivityLineId = (
 
 interface WorkspaceContextProps {
   theme: Theme;
-  setTheme: (t: Theme) => void;
+  themePreference: ThemePreference;
+  setTheme: (t: ThemePreference) => void;
   locale: Locale;
   setLocale: (l: Locale) => void;
   chatMessageFontSize: number;
@@ -1247,14 +1261,18 @@ const WorkspaceContext = createContext<WorkspaceContextProps | undefined>(
 export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    try {
-      const saved = localStorage.getItem('openteams-design-mode');
-      return saved === 'light' || saved === 'dark' ? (saved as Theme) : 'dark';
-    } catch {
-      return 'dark';
-    }
-  });
+  const [themePreference, setThemePreferenceState] =
+    useState<ThemePreference>(() => {
+      try {
+        const saved = localStorage.getItem('openteams-design-mode');
+        return isThemePreference(saved) ? saved : 'dark';
+      } catch {
+        return 'dark';
+      }
+    });
+  const [systemTheme, setSystemTheme] = useState<Theme>(resolveSystemTheme);
+  const theme: Theme =
+    themePreference === 'system' ? systemTheme : themePreference;
 
   const [locale, setLocaleState] = useState<Locale>(() => {
     try {
@@ -1691,8 +1709,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     }, toastDurationMsRef.current);
   };
 
-  const setTheme = (t: Theme) => {
-    setThemeState(t);
+  const setTheme = (t: ThemePreference) => {
+    setThemePreferenceState(t);
     try {
       localStorage.setItem('openteams-design-mode', t);
     } catch {}
@@ -1715,6 +1733,22 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       );
     } catch {}
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia?.('(prefers-color-scheme: light)');
+    if (!mediaQuery) return;
+
+    const updateSystemTheme = () => {
+      setSystemTheme(mediaQuery.matches ? 'light' : 'dark');
+    };
+
+    updateSystemTheme();
+    mediaQuery.addEventListener?.('change', updateSystemTheme);
+    return () => {
+      mediaQuery.removeEventListener?.('change', updateSystemTheme);
+    };
+  }, []);
 
   useEffect(() => {
     document.body.setAttribute('data-mode', theme);
@@ -3904,6 +3938,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     <WorkspaceContext.Provider
       value={{
         theme,
+        themePreference,
         setTheme,
         locale,
         setLocale,
