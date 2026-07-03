@@ -127,7 +127,7 @@ check(
     guideSource.includes('renderScenarioStep') &&
     guideSource.includes('recommendedTeamName') &&
     guideSource.includes('recommendOnboardingTeamTemplate') &&
-    guideSource.includes("t('onboarding.scenario.memberDetailsHint')") &&
+    !guideSource.includes("t('onboarding.scenario.memberDetailsHint')") &&
     guideSource.includes('renderExecutorStep') &&
     guideSource.includes('teamMembers.map') &&
     !/renderScenarioStep[\s\S]*teamMembers\.map/.test(guideSource),
@@ -191,11 +191,14 @@ check(
     guideSource.includes('renderAppearanceStep') &&
     guideSource.includes('flex h-[340px] items-center justify-center') &&
     guideSource.includes('h-full w-full max-w-[820px] rounded-[8px] border border-white/[0.08] bg-[#121212]/90') &&
-    guideSource.includes('px-5 py-5 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-6') &&
+    guideSource.includes('px-5 py-5 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-5') &&
     guideSource.includes('lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.84fr)] lg:gap-10') &&
-    guideSource.includes('mx-auto grid w-full max-w-[700px] gap-3 sm:grid-cols-2') &&
-    guideSource.includes('group min-h-[92px] cursor-pointer rounded-[8px] border p-3') &&
-    guideSource.includes('border-transparent bg-white/[0.025] hover:bg-white/[0.04]') &&
+    guideSource.includes('mx-auto grid w-full max-w-[760px] gap-3 sm:grid-cols-2') &&
+    guideSource.includes('group min-h-[104px] cursor-pointer rounded-[8px] border p-3') &&
+    guideSource.includes('hover:bg-white/[0.04] focus-visible:outline-none') &&
+    guideSource.includes('border-white/[0.18] bg-white/[0.065]') &&
+    guideSource.includes('inset_0_1px_0_rgba(255,255,255,0.05)') &&
+    guideSource.includes(": 'border-transparent bg-transparent'") &&
     guideSource.includes('border-white/[0.14] bg-white/[0.07]') &&
     guideSource.includes('border-transparent bg-transparent text-[#8a8f98] hover:bg-white/[0.04]') &&
     guideSource.includes('className="sr-only"') &&
@@ -210,11 +213,14 @@ check(
     guideSource.includes('border-[#d4d4d8]/80 bg-white/[0.07]') &&
     guideSource.includes('strokeWidth={1.4}') &&
     guideSource.includes('items-center justify-between') &&
-    guideSource.includes('mx-auto mt-5 flex w-full max-w-[700px]') &&
-    guideSource.includes('rounded-[8px] bg-white/[0.025] px-4 py-2.5') &&
+    guideSource.includes('-mx-5 mt-7 border-t border-white/[0.08] px-5 pt-3') &&
+    guideSource.includes('mx-auto flex w-full max-w-[760px] items-center justify-start') &&
+    guideSource.includes('flex min-w-0 items-center gap-3') &&
+    guideSource.includes('border border-white/[0.14] bg-white/[0.05]') &&
+    guideSource.includes('text-[9px] font-medium uppercase tracking-[0]') &&
     guideSource.includes('tracking-[0] text-[#f4f4f5]') &&
-    guideSource.includes("t('onboarding.scenario.memberDetailsHint')") &&
-    guideSource.includes('line-clamp-2 pr-1 text-[11px] leading-[1.45]') &&
+    !guideSource.includes("t('onboarding.scenario.memberDetailsHint')") &&
+    guideSource.includes('mt-0.5 line-clamp-2 pr-1 text-[11px] leading-[1.38]') &&
     !guideSource.includes('[ ↳ Details in next step ]') &&
     guideSource.includes('tracking-[0.12em] text-[#7d8aa3]') &&
     guideSource.includes('rounded-[8px]') &&
@@ -242,8 +248,8 @@ check(
   guideSource.includes('focus-visible:ring-1 focus-visible:ring-white/[0.35]') &&
     guideSource.includes('grid grid-cols-[28px_minmax(0,1fr)]') &&
     guideSource.includes('rounded-[7px] transition-colors') &&
-    guideSource.includes('bg-white/[0.035] text-[#8a8f98] group-hover:text-[#c9cdd6]') &&
-    guideSource.includes('text-[#8a8f98] group-hover:text-[#aeb4bf]') &&
+    guideSource.includes(": 'text-[#8a8f98] group-hover:text-[#c9cdd6]'") &&
+    guideSource.includes('text-white/40 group-hover:text-[#8a8f98]') &&
     guideSource.includes('border-0 bg-[rgba(0,0,0,0.05)]') &&
     guideSource.includes('bg-[rgba(0,0,0,0.05)]') &&
     guideSource.includes('text-black/40 shadow-none') &&

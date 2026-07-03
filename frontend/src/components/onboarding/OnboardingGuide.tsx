@@ -1266,8 +1266,8 @@ export function OnboardingGuide({
 
   const renderScenarioStep = () => (
     <div className="flex h-[340px] items-center justify-center">
-      <div className="h-full w-full max-w-[820px] rounded-[8px] border border-white/[0.08] bg-[#121212]/90 px-5 py-5 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-6">
-        <section className="mx-auto grid w-full max-w-[700px] gap-3 sm:grid-cols-2">
+      <div className="h-full w-full max-w-[820px] rounded-[8px] border border-white/[0.08] bg-[#121212]/90 px-10 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-8">
+        <section className="mx-auto grid w-full max-w-[760px] gap-3 sm:grid-cols-2">
           {scenarios.map((scenario) => {
             const selected = scenario.key === selectedScenario;
             const Icon = scenario.Icon;
@@ -1277,10 +1277,10 @@ export function OnboardingGuide({
                 type="button"
                 onClick={() => handleScenarioSelect(scenario.key)}
                 className={cn(
-                  'group min-h-[92px] cursor-pointer rounded-[8px] border p-3 text-left transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/[0.35] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]',
+                  'group min-h-[104px] cursor-pointer rounded-[8px] border p-3 text-left transition-[background-color,border-color,box-shadow,color] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/[0.35] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]',
                   selected
-                    ? 'border-white/[0.14] bg-white/[0.07] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]'
-                    : 'border-transparent bg-white/[0.025] hover:bg-white/[0.04]',
+                    ? 'border-white/[0.18] bg-white/[0.065] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_1px_0_rgba(0,0,0,0.55)]'
+                    : 'border-transparent bg-transparent',
                 )}
               >
                 <div className="grid grid-cols-[28px_minmax(0,1fr)] items-start gap-x-3">
@@ -1288,8 +1288,8 @@ export function OnboardingGuide({
                     className={cn(
                       'col-start-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
                       selected
-                        ? 'bg-white/[0.09] text-[#f4f4f5]'
-                        : 'bg-white/[0.035] text-[#8a8f98] group-hover:text-[#c9cdd6]',
+                        ? 'text-[#f4f4f5]'
+                        : 'text-[#8a8f98] group-hover:text-[#c9cdd6]',
                     )}
                   >
                     <Icon className="h-3.5 w-3.5" strokeWidth={1.4} />
@@ -1304,10 +1304,10 @@ export function OnboardingGuide({
                   </h3>
                   <p
                     className={cn(
-                      'col-start-2 mt-1 line-clamp-2 pr-1 text-[11px] leading-[1.45] tracking-[0] transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                      'col-start-2 mt-0.5 line-clamp-2 pr-1 text-[11px] leading-[1.38] tracking-[0] transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
                       selected
-                        ? 'text-[#a1a1aa]'
-                        : 'text-[#8a8f98] group-hover:text-[#aeb4bf]',
+                        ? 'text-[#777777]'
+                        : 'text-white/40 group-hover:text-[#8a8f98]',
                     )}
                   >
                     {scenario.desc}
@@ -1317,25 +1317,24 @@ export function OnboardingGuide({
             );
           })}
         </section>
-        <aside className="mx-auto mt-5 flex w-full max-w-[700px] items-center justify-between gap-4 rounded-[8px] bg-white/[0.025] px-4 py-2.5">
-          <div className="flex min-w-0 items-center gap-3">
-            <Users className="h-4 w-4 shrink-0 text-[#a1a1aa]" strokeWidth={1.4} />
-            <div className="min-w-0">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <p className="truncate font-mono text-[12px] font-semibold tracking-[0] text-[#f4f4f5]">
-                  {recommendedTeamName}
-                </p>
-                <span className="inline-flex items-center gap-1 rounded-[4px] border border-white/[0.08] bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#a1a1aa]">
-                  <span className="text-[#d4d4d8]">+</span>
-                  {t('onboarding.scenario.recommendedTeam')}
-                </span>
+        <div className="-mx-5 mt-7 border-t border-white/[0.08] px-5 pt-3 sm:-mx-7 sm:px-8">
+          <aside className="mx-auto flex w-full max-w-[760px] items-center justify-start gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <Users className="h-4 w-4 shrink-0 text-[#a1a1aa]" strokeWidth={1.4} />
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <p className="truncate font-mono text-[12px] font-semibold tracking-[0] text-[#f4f4f5]">
+                    {recommendedTeamName}
+                  </p>
+                  <span className="inline-flex items-center gap-1 rounded-[4px] border border-white/[0.14] bg-white/[0.05] px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-[0] text-[#d4d4d8]">
+                    <span className="text-[#f4f4f5]">+</span>
+                    {t('onboarding.scenario.recommendedTeam')}
+                  </span>
+                </div>
               </div>
-              <p className="mt-1 text-[11px] leading-none text-[#8a8f98]">
-                {t('onboarding.scenario.memberDetailsHint')}
-              </p>
             </div>
-          </div>
-        </aside>
+          </aside>
+        </div>
       </div>
     </div>
   );
