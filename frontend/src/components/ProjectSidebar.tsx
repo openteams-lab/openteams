@@ -1505,7 +1505,7 @@ export function ProjectSidebar({
 
   return (
     <nav
-      className="flex h-full min-h-0 w-full max-w-full flex-col bg-[var(--canvas)] text-[var(--ink)] select-none"
+      className="project-sidebar-scrollbars-hidden flex h-full min-h-0 w-full max-w-full flex-col bg-[var(--canvas)] text-[var(--ink)] select-none"
       aria-label={translate(
         "sidebar.aria.projectNavigation",
         "Project navigation",

@@ -476,12 +476,27 @@ body[data-mode="light"] .animate-shimmer::after {
   display: none;
 }
 
-.main-right-nav-panel-scrollbars-hidden {
+.project-sidebar-scrollbars-hidden,
+.project-sidebar-scrollbars-hidden * {
   scrollbar-color: transparent transparent;
   scrollbar-width: none;
 }
 
-.main-right-nav-panel-scrollbars-hidden::-webkit-scrollbar {
+.project-sidebar-scrollbars-hidden::-webkit-scrollbar,
+.project-sidebar-scrollbars-hidden *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.main-right-nav-panel-scrollbars-hidden,
+.main-right-nav-panel-scrollbars-hidden * {
+  scrollbar-color: transparent transparent;
+  scrollbar-width: none;
+}
+
+.main-right-nav-panel-scrollbars-hidden::-webkit-scrollbar,
+.main-right-nav-panel-scrollbars-hidden *::-webkit-scrollbar {
   display: none;
   width: 0;
   height: 0;
