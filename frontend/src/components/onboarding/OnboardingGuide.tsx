@@ -1,20 +1,35 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import {
   Bot,
   Check,
   ChevronUp,
+  Ellipsis,
   FileText,
   Folder,
-  FolderOpen,
   Home,
+  Info,
+  Layers3,
   LoaderCircle,
-  RefreshCw,
+  Monitor,
+  Moon,
+  Plus,
   Rocket,
   Search,
   Sparkles,
+  Sun,
   Users,
+  X,
   Zap,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { DropdownSelect, type DropdownSelectOption } from '@/components/DropdownSelect';
 import { cn } from '@/lib/utils';
 import {
@@ -49,15 +64,25 @@ import {
 } from '../../../../shared/types';
 
 const welcomeStepKey = 'welcome';
-const onboardingSteps = ['scenario', 'executor', 'project_path', 'appearance'] as const;
+const onboardingSteps = ['appearance', 'scenario', 'executor', 'project_path'] as const;
+const gitignoreTemplates = ['node', 'go', 'python', 'none'] as const;
 
 type OnboardingStepKey = (typeof onboardingSteps)[number];
 type ActiveStepKey = OnboardingStepKey | typeof welcomeStepKey;
 type OnboardingMode = 'onboarding' | 'upgrade';
+type GitignoreTemplate = (typeof gitignoreTemplates)[number];
+const firstOnboardingStep: OnboardingStepKey = 'appearance';
+const finalOnboardingStep: OnboardingStepKey = 'project_path';
 type TranslateFn = (
   key: string,
   replacements?: Record<string, string | number>,
 ) => string;
+
+type OnboardingCompleteOptions = {
+  createDefaultSession?: boolean;
+  projectId?: string | null;
+  workspacePath?: string | null;
+};
 
 interface OnboardingGuideProps {
   mode: 'onboarding' | 'upgrade';
@@ -75,13 +100,16 @@ interface OnboardingGuideProps {
   onPreviewLocaleChange: (locale: Locale) => void;
   onPreviewAppearanceChange: (appearance: OnboardingAppearance) => void;
   onClose: () => void;
-  onOpenCreateSession: (state: OnboardingState) => void;
+  onComplete: (
+    state: OnboardingState,
+    options?: OnboardingCompleteOptions,
+  ) => void | Promise<void>;
   onStateChange?: (state: OnboardingState) => void;
   onUpgradeRead: (state: OnboardingState) => void;
 }
 
 const onboardingDarkThemeVars = {
-  '--canvas': '#010102',
+  '--canvas': '#0a0a0a',
   '--surface-1': '#0f1011',
   '--surface-2': '#141516',
   '--surface-3': '#18191a',
@@ -89,14 +117,37 @@ const onboardingDarkThemeVars = {
   '--hairline': '#23252a',
   '--hairline-strong': '#34343a',
   '--hairline-tertiary': '#3e3e44',
-  '--ink': '#f7f8f8',
-  '--ink-muted': '#d0d6e0',
+  '--ink': '#f4f4f5',
+  '--ink-muted': '#a1a1aa',
   '--ink-subtle': '#8a8f98',
-  '--ink-tertiary': '#62666d',
+  '--ink-tertiary': '#6f6f76',
   '--primary': '#5e6ad2',
   '--primary-hover': '#828fff',
   '--on-primary': '#ffffff',
   '--primary-tint': 'rgba(94, 106, 210, 0.12)',
+} as CSSProperties;
+
+const onboardingMonoFont = {
+  fontFamily:
+    '"JetBrains Mono", "SF Mono", "SFMono-Regular", ui-monospace, "Cascadia Code", monospace',
+} as CSSProperties;
+
+const onboardingSansFont = {
+  fontFamily: '"Inter", ui-sans-serif, system-ui, sans-serif',
+} as CSSProperties;
+
+const executorSelectClassName =
+  'w-full [&>button]:h-7 [&>button]:rounded-[3px] [&>button]:border-transparent [&>button]:bg-transparent [&>button]:px-1.5 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[13px] [&>button]:text-[#d4d4d8] [&>button]:shadow-none [&>button]:transition-colors [&>button]:duration-100 [&>button:hover]:border-transparent [&>button:hover]:bg-white/[0.035] [&>button:focus-visible]:border-white/[0.14] [&>button:focus-visible]:bg-white/[0.045] [&>button:focus-visible]:outline-none [&>button[aria-expanded=true]]:border-white/[0.14] [&>button[aria-expanded=true]]:bg-white/[0.045] [&>button[data-placeholder=true]>span]:text-[#6f6f76] [&>button>svg:last-child]:h-3 [&>button>svg:last-child]:w-3 [&>button>svg:last-child]:text-[var(--ink-tertiary)] [&>button:hover>svg:last-child]:text-[#a1a1aa]';
+
+const onboardingProjectInputClassName =
+  'mt-2 w-full rounded-[5px] border border-white/[0.08] bg-[#151617] px-3 font-mono shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] outline-none transition-[background-color,border-color,box-shadow] placeholder:text-[#5F6672] focus:border-white/[0.24] focus:bg-[#171819] focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.04)]';
+
+const onboardingProjectSelectClassName =
+  'mt-2 w-full [&>button]:h-7 [&>button]:rounded-[5px] [&>button]:border-white/[0.08] [&>button]:bg-[#151617] [&>button]:px-1.5 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[12px] [&>button]:text-[#c9d2df] [&>button]:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] [&>button]:outline-none [&>button:hover]:border-white/[0.16] [&>button:hover]:bg-white/[0.045] [&>button:focus-visible]:border-white/[0.24] [&>button:focus-visible]:bg-[#171819] [&>button:focus-visible]:outline-none [&>button[aria-expanded=true]]:border-white/[0.24] [&>button[aria-expanded=true]]:bg-[#171819] [&>button>svg:last-child]:h-3 [&>button>svg:last-child]:w-3 [&>button>svg:last-child]:text-[#768295]';
+
+const onboardingNoiseTextureStyle = {
+  backgroundImage:
+    'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27128%27 height=%27128%27 viewBox=%270 0 128 128%27%3E%3Cfilter id=%27noise%27 x=%270%27 y=%270%27 width=%27100%25%27 height=%27100%25%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%270.82%27 numOctaves=%274%27 stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect width=%27128%27 height=%27128%27 filter=%27url(%23noise)%27 opacity=%270.68%27/%3E%3C/svg%3E")',
 } as CSSProperties;
 
 type ScenarioDefinition = {
@@ -107,6 +158,7 @@ type ScenarioDefinition = {
   descFallback: string;
   teamKey: string;
   teamFallback: string;
+  Icon: LucideIcon;
   members: OnboardingTeamMemberConfig[];
 };
 
@@ -116,9 +168,11 @@ const scenarioDefinitions: ScenarioDefinition[] = [
     titleKey: 'onboarding.scenario.software.title',
     titleFallback: 'Software product',
     descKey: 'onboarding.scenario.software.desc',
-    descFallback: 'Plan, build, review, and ship product code.',
+    descFallback:
+      'Plan requirements, split engineering tasks, implement frontend and backend changes, and move code through review and testing.',
     teamKey: 'onboarding.scenario.software.team',
     teamFallback: 'Software delivery team',
+    Icon: Layers3,
     members: [
       { member: 'Lead Agent', runner_type: 'codex', model_name: 'gpt-5' },
       { member: 'Frontend Engineer', runner_type: 'claude_code', model_name: 'claude-sonnet' },
@@ -131,9 +185,11 @@ const scenarioDefinitions: ScenarioDefinition[] = [
     titleKey: 'onboarding.scenario.design.title',
     titleFallback: 'Design implementation',
     descKey: 'onboarding.scenario.design.desc',
-    descFallback: 'Turn product screens into polished frontend work.',
+    descFallback:
+      'Translate product screens, interaction states, and visual details into implementation tasks while keeping fidelity and quality aligned.',
     teamKey: 'onboarding.scenario.design.team',
     teamFallback: 'Design implementation team',
+    Icon: Sparkles,
     members: [
       { member: 'UX Lead', runner_type: 'claude_code', model_name: 'claude-sonnet' },
       { member: 'Visual Reviewer', runner_type: 'gemini', model_name: 'gemini-2.5-pro' },
@@ -145,9 +201,11 @@ const scenarioDefinitions: ScenarioDefinition[] = [
     titleKey: 'onboarding.scenario.research.title',
     titleFallback: 'Research and analysis',
     descKey: 'onboarding.scenario.research.desc',
-    descFallback: 'Collect context, compare options, and write decisions.',
+    descFallback:
+      'Collect source context, compare options, capture conclusions, and turn the result into an actionable decision record.',
     teamKey: 'onboarding.scenario.research.team',
     teamFallback: 'Research analysis team',
+    Icon: Search,
     members: [
       { member: 'Research Lead', runner_type: 'gemini', model_name: 'gemini-2.5-pro' },
       { member: 'Analyst', runner_type: 'claude_code', model_name: 'claude-sonnet' },
@@ -159,9 +217,11 @@ const scenarioDefinitions: ScenarioDefinition[] = [
     titleKey: 'onboarding.scenario.other.title',
     titleFallback: 'General collaboration',
     descKey: 'onboarding.scenario.other.desc',
-    descFallback: 'Start with a flexible team and adapt later.',
+    descFallback:
+      'Start with a flexible collaboration team for exploration, execution, and review, then tune the members as the project takes shape.',
     teamKey: 'onboarding.scenario.other.team',
     teamFallback: 'General collaboration team',
+    Icon: Ellipsis,
     members: [
       { member: 'General Lead', runner_type: 'openteams_cli', model_name: 'gpt-5' },
       { member: 'Executor', runner_type: 'codex', model_name: 'gpt-5' },
@@ -196,7 +256,7 @@ const stepFromBackend = (
 ): OnboardingStepKey => {
   return onboardingSteps.includes(value as OnboardingStepKey)
     ? (value as OnboardingStepKey)
-    : 'scenario';
+    : firstOnboardingStep;
 };
 
 const scenarioFromState = (
@@ -237,9 +297,6 @@ const onboardingLanguageToLocale = (
       return fallback;
   }
 };
-
-const isGitRepoLabel = (value: boolean, t: TranslateFn) =>
-  value ? t('onboarding.project.gitYes') : t('onboarding.project.gitNo');
 
 const directoryEntryTime = (entry: DirectoryEntry): number =>
   typeof entry.last_modified === 'number' ? entry.last_modified : 0;
@@ -315,6 +372,13 @@ const teamPresetToOnboardingConfig = (
     }));
 };
 
+const roleBadgeLabel = (name: string) => {
+  const words = name.trim().split(/\s+/u).filter(Boolean);
+  const compact =
+    words.length > 1 ? words.map((word) => word.charAt(0)).join('') : name;
+  return compact.slice(0, 2).toUpperCase();
+};
+
 export { compareVersions };
 
 export function OnboardingGuide({
@@ -329,15 +393,21 @@ export function OnboardingGuide({
   onPreviewLocaleChange,
   onPreviewAppearanceChange,
   onClose,
-  onOpenCreateSession,
+  onComplete,
   onStateChange,
   onUpgradeRead,
 }: OnboardingGuideProps) {
   const initialStep = initialState?.welcome_seen_at
     ? stepFromBackend(initialState.current_step)
     : welcomeStepKey;
+  const initialConfigurationStep: OnboardingStepKey =
+    initialStep === welcomeStepKey ? firstOnboardingStep : initialStep;
   const [state, setState] = useState<OnboardingState | null>(initialState);
   const [activeStepKey, setActiveStepKey] = useState<ActiveStepKey>(initialStep);
+  const [renderedConfigurationStepKey, setRenderedConfigurationStepKey] =
+    useState<OnboardingStepKey>(initialConfigurationStep);
+  const [configurationMotionState, setConfigurationMotionState] =
+    useState<'idle' | 'slide-out' | 'slide-in'>('idle');
   const [selectedScenario, setSelectedScenario] = useState<OnboardingScenario>(
     scenarioFromState(initialState?.selected_scenario),
   );
@@ -361,6 +431,9 @@ export function OnboardingGuide({
           }
         : null,
     );
+  const [initializeGit, setInitializeGit] = useState(true);
+  const [gitignoreTemplate, setGitignoreTemplate] =
+    useState<GitignoreTemplate>('node');
   const [selectedLocale, setSelectedLocale] = useState<Locale>(
     onboardingLanguageToLocale(initialState?.language, locale),
   );
@@ -374,9 +447,22 @@ export function OnboardingGuide({
   const [entries, setEntries] = useState<DirectoryEntry[]>([]);
   const [currentPath, setCurrentPath] = useState('');
   const [pathLoading, setPathLoading] = useState(false);
+  const [pathDetecting, setPathDetecting] = useState(false);
   const [pathError, setPathError] = useState<string | null>(null);
+  const [directoryMutating, setDirectoryMutating] = useState(false);
+  const [renamingDirectoryPath, setRenamingDirectoryPath] = useState<string | null>(
+    null,
+  );
+  const [renamingDirectoryName, setRenamingDirectoryName] = useState('');
+  const [renameDirectoryError, setRenameDirectoryError] = useState<string | null>(
+    null,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedWelcomeCommandId, setSelectedWelcomeCommandId] =
+    useState('workflow_execution');
+  const pathValidationRequestRef = useRef(0);
+  const onboardingTextFont = onboardingSansFont;
 
   const { scenarios, currentScenario } = useTranslatedScenario(
     t,
@@ -390,9 +476,74 @@ export function OnboardingGuide({
   const activeStepIndex = isWelcome
     ? -1
     : onboardingSteps.indexOf(activeStepKey);
+  const targetConfigurationStepKey: OnboardingStepKey =
+    activeStepKey === welcomeStepKey ? firstOnboardingStep : activeStepKey;
   const recommendedTeamName = recommendedTeam?.name ?? currentScenario.teamName;
   const recommendedTeamId = recommendedTeam?.id ?? null;
   const teamMembers = teamConfig;
+  const welcomeCommandOptions = useMemo(
+    () => [
+      {
+        id: 'local_workspace',
+        label: '本地多Agent工作区',
+        Icon: Folder,
+        keyHint: 'L',
+      },
+      {
+        id: 'workflow_execution',
+        label: '工作流编排引擎',
+        Icon: Zap,
+        keyHint: 'W',
+      },
+      {
+        id: 'agent_team',
+        label: '智能体团队模板平台',
+        Icon: Bot,
+        keyHint: 'T',
+      },
+      {
+        id: 'personal_project_management',
+        label: '项目进度加速器',
+        Icon: FileText,
+        keyHint: 'P',
+      },
+    ],
+    [],
+  );
+  const selectedWelcomeCommand =
+    welcomeCommandOptions.find(
+      (option) => option.id === selectedWelcomeCommandId,
+    ) ?? welcomeCommandOptions[0];
+
+  useEffect(() => {
+    if (targetConfigurationStepKey === renderedConfigurationStepKey) {
+      setConfigurationMotionState('idle');
+      return;
+    }
+
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      setRenderedConfigurationStepKey(targetConfigurationStepKey);
+      setConfigurationMotionState('idle');
+      return;
+    }
+
+    setConfigurationMotionState('slide-out');
+    const exitTimer = window.setTimeout(() => {
+      setRenderedConfigurationStepKey(targetConfigurationStepKey);
+      setConfigurationMotionState('slide-in');
+    }, 140);
+    const settleTimer = window.setTimeout(() => {
+      setConfigurationMotionState('idle');
+    }, 300);
+
+    return () => {
+      window.clearTimeout(exitTimer);
+      window.clearTimeout(settleTimer);
+    };
+  }, [renderedConfigurationStepKey, targetConfigurationStepKey]);
 
   const runnerOptions = useMemo(() => {
     const availableRunners = runtimes
@@ -404,6 +555,43 @@ export function OnboardingGuide({
       }));
     return availableRunners.length > 0 ? availableRunners : fallbackRunnerOptions;
   }, [runtimes]);
+
+  const gitignoreOptions = useMemo<DropdownSelectOption[]>(
+    () =>
+      gitignoreTemplates.map((template) => ({
+        id: template,
+        label: t(`onboarding.project.gitignore.${template}`),
+      })),
+    [t],
+  );
+
+  useEffect(() => {
+    if (!isWelcome) return;
+
+    const handleWelcomeShortcut = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest('input, textarea, select, [contenteditable="true"]')
+      ) {
+        return;
+      }
+
+      const key = event.key.toUpperCase();
+      const command = welcomeCommandOptions.find(
+        (option) => option.keyHint === key,
+      );
+      if (!command) return;
+      event.preventDefault();
+      setSelectedWelcomeCommandId(command.id);
+    };
+
+    window.addEventListener('keydown', handleWelcomeShortcut);
+    return () => {
+      window.removeEventListener('keydown', handleWelcomeShortcut);
+    };
+  }, [isWelcome, welcomeCommandOptions]);
 
   const modelOptionsForRunner = (runnerType?: string): DropdownSelectOption[] => {
     const runtime = runtimes.find((candidate) => candidate.runner_type === runnerType);
@@ -433,13 +621,8 @@ export function OnboardingGuide({
   };
 
   const projectNameForScenario = useCallback(
-    (scenarioKey: OnboardingScenario) => {
-      const scenario =
-        scenarios.find((candidate) => candidate.key === scenarioKey) ??
-        currentScenario;
-      return sanitizeProjectName(`${scenario.title} workspace`);
-    },
-    [currentScenario, scenarios],
+    (_scenarioKey: OnboardingScenario) => sanitizeProjectName('MyProject'),
+    [],
   );
 
   const buildTeamConfigForScenario = useCallback(
@@ -617,7 +800,33 @@ export function OnboardingGuide({
       return null;
     }
 
-    return { name, path };
+    return { name, path, status };
+  };
+
+  const initializeProjectWorkspaceGit = async (path: string) => {
+    const initialized = await chatSessionsApi.initializeWorkspaceGit({
+      workspace_path: path,
+      gitignore_template: gitignoreTemplate === 'none' ? null : gitignoreTemplate,
+    });
+    setProjectStatus(initialized.status);
+    return initialized.status;
+  };
+
+  const handleInitializeProjectGit = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const projectDraft = await validateProjectDraft();
+      if (!projectDraft || projectDraft.status.is_git_repo) return;
+      await initializeProjectWorkspaceGit(projectDraft.path);
+      setPathError(null);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : t('onboarding.project.initializeFailed'),
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleFinish = async () => {
@@ -627,19 +836,27 @@ export function OnboardingGuide({
     setSaving(true);
     setError(null);
     try {
+      if (!projectDraft.status.is_git_repo && initializeGit) {
+        await initializeProjectWorkspaceGit(projectDraft.path);
+      }
+
       const createdProject = await onCreateProjectFromOnboarding({
         name: projectDraft.name,
         path: projectDraft.path,
         teamId: recommendedTeamId,
       });
       const state = await onboardingApi.complete({
-        ...currentPayload('appearance'),
+        ...currentPayload(finalOnboardingStep),
         project_name: projectDraft.name,
         project_path: projectDraft.path,
         created_project_id: createdProject.projectId,
       });
       applyState(state);
-      onOpenCreateSession(state);
+      await onComplete(state, {
+        createDefaultSession: true,
+        projectId: createdProject.projectId,
+        workspacePath: projectDraft.path,
+      });
     } catch {
       setError(t('onboarding.project.createFailed'));
     } finally {
@@ -650,11 +867,11 @@ export function OnboardingGuide({
   const handleWelcomeNext = async () => {
     await saveState({
       welcome_seen: true,
-      current_step: OnboardingStep.scenario,
+      current_step: stepToBackend[firstOnboardingStep],
       selected_scenario: selectedScenario,
       recommended_team_name: recommendedTeamName,
     });
-    setActiveStepKey('scenario');
+    setActiveStepKey(firstOnboardingStep);
   };
 
   const handleStepBack = () => {
@@ -669,28 +886,116 @@ export function OnboardingGuide({
       return;
     }
 
+    if (activeStepKey === finalOnboardingStep) {
+      await handleFinish();
+      return;
+    }
+
     if (activeStepKey === 'project_path') {
       const projectDraft = await validateProjectDraft();
       if (!projectDraft) return;
     }
 
-    if (activeStepKey === 'appearance') {
-      await handleFinish();
-      return;
-    }
-
-    const nextStep = onboardingSteps[activeStepIndex + 1] ?? 'appearance';
+    const nextStep = onboardingSteps[activeStepIndex + 1] ?? finalOnboardingStep;
     await saveState(currentPayload(nextStep));
     setActiveStepKey(nextStep);
   };
+
+  useEffect(() => {
+    if (mode !== 'onboarding' || isWelcome) return;
+
+    const handleConfigurationShortcut = (event: KeyboardEvent) => {
+      if (saving || event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest('input, textarea, select, [contenteditable="true"]')
+      ) {
+        return;
+      }
+
+      if (
+        activeStepKey === 'scenario' &&
+        ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)
+      ) {
+        const currentIndex = scenarios.findIndex(
+          (scenario) => scenario.key === selectedScenario,
+        );
+        if (currentIndex < 0) return;
+
+        const usesTwoColumnGrid =
+          typeof window !== 'undefined' &&
+          window.matchMedia?.('(min-width: 768px)').matches;
+        const columns = usesTwoColumnGrid ? 2 : 1;
+        let nextIndex = currentIndex;
+
+        if (columns === 1) {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+            nextIndex = Math.min(currentIndex + 1, scenarios.length - 1);
+          } else {
+            nextIndex = Math.max(currentIndex - 1, 0);
+          }
+        } else {
+          const column = currentIndex % columns;
+          if (
+            event.key === 'ArrowRight' &&
+            column < columns - 1 &&
+            currentIndex + 1 < scenarios.length
+          ) {
+            nextIndex = currentIndex + 1;
+          } else if (event.key === 'ArrowLeft' && column > 0) {
+            nextIndex = currentIndex - 1;
+          } else if (
+            event.key === 'ArrowDown' &&
+            currentIndex + columns < scenarios.length
+          ) {
+            nextIndex = currentIndex + columns;
+          } else if (event.key === 'ArrowUp' && currentIndex - columns >= 0) {
+            nextIndex = currentIndex - columns;
+          }
+        }
+
+        event.preventDefault();
+        if (nextIndex !== currentIndex) {
+          handleScenarioSelect(scenarios[nextIndex].key);
+        }
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        void handleStepNext();
+        return;
+      }
+
+      if (event.key === 'Escape' || event.key === 'ArrowLeft') {
+        event.preventDefault();
+        handleStepBack();
+      }
+    };
+
+    window.addEventListener('keydown', handleConfigurationShortcut);
+    return () => {
+      window.removeEventListener('keydown', handleConfigurationShortcut);
+    };
+  }, [
+    activeStepIndex,
+    activeStepKey,
+    handleStepNext,
+    isWelcome,
+    mode,
+    saving,
+    scenarios,
+    selectedScenario,
+  ]);
 
   const handleSkip = async () => {
     setSaving(true);
     setError(null);
     try {
-      const state = await onboardingApi.complete(currentPayload('appearance'));
+      const state = await onboardingApi.complete(currentPayload(finalOnboardingStep));
       applyState(state);
-      onOpenCreateSession(state);
+      await onComplete(state);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : t('onboarding.error.completeFailed'),
@@ -700,7 +1005,7 @@ export function OnboardingGuide({
     }
   };
 
-  const handleScenarioSelect = (scenarioKey: OnboardingScenario) => {
+  function handleScenarioSelect(scenarioKey: OnboardingScenario) {
     const scenario =
       scenarioDefinitions.find((candidate) => candidate.key === scenarioKey) ??
       scenarioDefinitions[0];
@@ -727,7 +1032,7 @@ export function OnboardingGuide({
           }
         : current,
     );
-  };
+  }
 
   const updateTeamMember = (
     index: number,
@@ -764,6 +1069,10 @@ export function OnboardingGuide({
       setEntries(sortedEntries);
       setCurrentPath(response.current_path);
       setProjectPath(response.current_path);
+      setProjectStatus(null);
+      setRenamingDirectoryPath(null);
+      setRenamingDirectoryName('');
+      setRenameDirectoryError(null);
     } catch (err) {
       setPathError(
         err instanceof Error ? err.message : t('onboarding.project.readFailed'),
@@ -780,6 +1089,9 @@ export function OnboardingGuide({
       const roots = await filesystemApi.listRoots();
       setEntries(roots);
       setCurrentPath('');
+      setRenamingDirectoryPath(null);
+      setRenamingDirectoryName('');
+      setRenameDirectoryError(null);
     } catch (err) {
       setPathError(
         err instanceof Error ? err.message : t('onboarding.project.rootsFailed'),
@@ -789,31 +1101,139 @@ export function OnboardingGuide({
     }
   };
 
-  const validateProjectPath = async (path: string) => {
+  const resetDirectoryRename = () => {
+    setRenamingDirectoryPath(null);
+    setRenamingDirectoryName('');
+    setRenameDirectoryError(null);
+  };
+
+  const createProjectDirectory = async () => {
+    const parentPath = currentPath.trim();
+    if (!parentPath || pathLoading || directoryMutating) return;
+
+    setDirectoryMutating(true);
+    setPathError(null);
+    setRenameDirectoryError(null);
+    try {
+      const created = await filesystemApi.createDirectory({
+        parent_path: parentPath,
+        name: t('sidebar.newFolderName'),
+      });
+      await loadDirectory(parentPath);
+      setProjectPath(created.path);
+      setProjectStatus(null);
+      setRenamingDirectoryPath(created.path);
+      setRenamingDirectoryName(created.name);
+    } catch (err) {
+      setPathError(
+        err instanceof Error ? err.message : t('sidebar.createFolderFailed'),
+      );
+    } finally {
+      setDirectoryMutating(false);
+    }
+  };
+
+  const commitDirectoryRename = async () => {
+    const targetPath = renamingDirectoryPath;
+    const nextName = renamingDirectoryName.trim();
+    if (!targetPath || directoryMutating) return;
+    if (!nextName) {
+      setRenameDirectoryError(t('sidebar.folderNameRequired'));
+      return;
+    }
+
+    const originalEntry = entries.find((entry) => entry.path === targetPath);
+    if (originalEntry?.name === nextName) {
+      resetDirectoryRename();
+      return;
+    }
+
+    setDirectoryMutating(true);
+    setRenameDirectoryError(null);
+    try {
+      const renamed = await filesystemApi.renameDirectory({
+        path: targetPath,
+        name: nextName,
+      });
+      const parentPath = getParentPath(renamed.path) || currentPath;
+      await loadDirectory(parentPath);
+      setProjectPath(renamed.path);
+      setProjectStatus(null);
+      resetDirectoryRename();
+    } catch (err) {
+      setRenameDirectoryError(
+        err instanceof Error ? err.message : t('sidebar.renameFolderFailed'),
+      );
+    } finally {
+      setDirectoryMutating(false);
+    }
+  };
+
+  const handleDirectoryRenameKeyDown = (
+    event: ReactKeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      void commitDirectoryRename();
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      resetDirectoryRename();
+    }
+  };
+
+  const validateProjectPath = useCallback(async (path: string) => {
     const trimmed = path.trim();
+    const requestId = pathValidationRequestRef.current + 1;
+    pathValidationRequestRef.current = requestId;
     if (!trimmed) {
       setProjectStatus(null);
+      setPathDetecting(false);
       return null;
     }
-    setPathLoading(true);
+    setPathDetecting(true);
     setPathError(null);
     try {
       const status = await chatSessionsApi.validateWorkspacePath(trimmed);
+      if (pathValidationRequestRef.current !== requestId) return status;
       setProjectStatus(status);
       if (!status.valid) {
         setPathError(status.error ?? t('onboarding.project.invalid'));
       }
       return status;
     } catch (err) {
-      setProjectStatus(null);
-      setPathError(
-        err instanceof Error ? err.message : t('onboarding.project.invalid'),
-      );
+      if (pathValidationRequestRef.current === requestId) {
+        setProjectStatus(null);
+        setPathError(
+          err instanceof Error ? err.message : t('onboarding.project.invalid'),
+        );
+      }
       throw err;
     } finally {
-      setPathLoading(false);
+      if (pathValidationRequestRef.current === requestId) {
+        setPathDetecting(false);
+      }
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    if (mode !== 'onboarding' || activeStepKey !== 'project_path') return;
+    const trimmed = projectPath.trim();
+    if (!trimmed) {
+      pathValidationRequestRef.current += 1;
+      setProjectStatus(null);
+      setPathDetecting(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void validateProjectPath(trimmed).catch(() => undefined);
+    }, 100);
+    return () => window.clearTimeout(timeout);
+  }, [activeStepKey, mode, projectPath, validateProjectPath]);
 
   const handleMarkUpgradeRead = async () => {
     setSaving(true);
@@ -914,7 +1334,7 @@ export function OnboardingGuide({
             type="button"
             onClick={() => void handleMarkUpgradeRead()}
             disabled={saving}
-            className="mt-4 inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] bg-[#5e6ad2] px-[14px] py-2 text-[13px] font-semibold text-white transition hover:bg-[#6f7ae6] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-4 inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] bg-[#5e6ad2] px-[14px] py-2 text-[13px] font-semibold text-[#f5f5f5] transition hover:bg-[#6f7ae6] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
             {t('onboarding.upgrade.markRead')}
@@ -925,291 +1345,467 @@ export function OnboardingGuide({
   );
 
   const renderExecutorStep = () => (
-    <div className="space-y-4">
-      {runtimeError && (
-        <p className="rounded-[8px] border border-yellow-500/25 bg-yellow-500/10 px-3 py-2 text-[12px] text-yellow-200">
-          {runtimeError}
-        </p>
-      )}
-      <div className="overflow-hidden rounded-[10px] border border-white/10 bg-[#161616]/85">
-        {teamMembers.map((member, index) => {
-          const runnerValue = member.runner_type || runnerOptions[0]?.id || '';
-          const modelOptions = modelOptionsForRunner(runnerValue);
-          const modelValue = member.model_name || modelOptions[0]?.id || '';
-          return (
-            <div
-              key={`${member.member}-${index}`}
-              className={cn(
-                'grid gap-3 px-6 py-4 md:grid-cols-[minmax(150px,1fr)_minmax(160px,220px)_minmax(160px,220px)] md:items-center',
-                index < teamMembers.length - 1 && 'border-b border-white/5',
-              )}
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] font-mono text-[11px] font-semibold text-[#d0d6e0]">
-                  {member.member.slice(0, 2).toUpperCase()}
-                </span>
-                <span className="truncate text-[13px] font-semibold text-[var(--ink)]">
-                  {member.member}
-                </span>
-              </div>
-              <DropdownSelect
-                value={runnerValue}
-                options={runnerOptions}
-                showSearch={false}
-                placeholder={t('onboarding.executor.runnerPlaceholder')}
-                onChange={(value) =>
-                  updateTeamMember(index, {
-                    runner_type: value,
-                    model_name: modelOptionsForRunner(value)[0]?.id,
-                  })
-                }
-                maxPanelHeightClassName="max-h-[190px]"
-              />
-              <DropdownSelect
-                value={modelValue}
-                options={modelOptions}
-                placeholder={t('onboarding.executor.modelPlaceholder')}
-                onChange={(value) => updateTeamMember(index, { model_name: value })}
-                maxPanelHeightClassName="max-h-[190px]"
-              />
-            </div>
-          );
-        })}
+    <div className="flex h-[340px] items-center justify-center">
+      <div className="h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#1A1A1A]/90 px-5 py-5 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-5">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[6px] bg-transparent">
+          {runtimeError && (
+            <p className="shrink-0 border-b border-yellow-500/25 px-4 py-2.5 font-mono text-[12px] text-yellow-200">
+              {runtimeError}
+            </p>
+          )}
+          <div className="hidden shrink-0 px-5 pb-1.5 pt-2.5 font-mono text-[9px] font-semibold uppercase leading-none tracking-[0.05em] text-white/45 md:grid md:grid-cols-[minmax(160px,1fr)_190px_230px] md:gap-3">
+            <span>{t('onboarding.executor.table.role')}</span>
+            <span>{t('onboarding.executor.table.executor')}</span>
+            <span>{t('onboarding.executor.table.model')}</span>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {teamMembers.map((member, index) => {
+              const runnerValue = member.runner_type || runnerOptions[0]?.id || '';
+              const modelOptions = modelOptionsForRunner(runnerValue);
+              const modelValue = member.model_name || modelOptions[0]?.id || '';
+              return (
+                <div
+                  key={`${member.member}-${index}`}
+                  className="mx-1 grid min-h-[54px] gap-2.5 rounded-[6px] px-3 py-2.5 transition-colors duration-100 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-white/[0.05] md:mx-2 md:grid-cols-[minmax(160px,1fr)_190px_230px] md:items-center md:gap-3"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="inline-flex h-5 min-w-8 shrink-0 items-center justify-center rounded-[4px] border border-white/[0.12] bg-white/[0.03] px-1.5 text-center font-mono text-[11px] font-semibold uppercase leading-[20px] tracking-[0] text-[#a1a1aa]">
+                      {roleBadgeLabel(member.member)}
+                    </span>
+                    <span className="truncate text-[13px] font-semibold tracking-tight text-[#f5f5f5]">
+                      {member.member}
+                    </span>
+                  </div>
+                  <DropdownSelect
+                    value={runnerValue}
+                    options={runnerOptions}
+                    showSearch={false}
+                    placeholder={t('onboarding.executor.runnerPlaceholder')}
+                    className={executorSelectClassName}
+                    onChange={(value) =>
+                      updateTeamMember(index, {
+                        runner_type: value,
+                        model_name: modelOptionsForRunner(value)[0]?.id,
+                      })
+                    }
+                    maxPanelHeightClassName="max-h-[190px]"
+                  />
+                  <DropdownSelect
+                    value={modelValue}
+                    options={modelOptions}
+                    placeholder={t('onboarding.executor.modelPlaceholder')}
+                    className={executorSelectClassName}
+                    onChange={(value) => updateTeamMember(index, { model_name: value })}
+                    maxPanelHeightClassName="max-h-[190px]"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
 
   const renderScenarioStep = () => (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2">
-        {scenarios.map((scenario) => {
-          const selected = scenario.key === selectedScenario;
-          return (
-            <button
-              key={scenario.key}
-              type="button"
-              onClick={() => handleScenarioSelect(scenario.key)}
-              className={cn(
-                'min-h-[118px] cursor-pointer rounded-[10px] border bg-[#161616]/75 p-6 text-left transition hover:border-white/20 hover:bg-white/[0.06]',
-                selected
-                  ? 'border-white/25 bg-white/[0.08]'
-                  : 'border-white/10',
-              )}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="truncate text-[13px] font-semibold text-[var(--ink)]">
-                  {scenario.title}
-                </h3>
-                {selected && <Check className="h-4 w-4 text-[var(--primary)]" />}
-              </div>
-              <p className="mt-2 text-[12px] leading-relaxed text-[#aeb8c8]">
-                {scenario.desc}
-              </p>
-            </button>
-          );
-        })}
-      </div>
-      <div className="rounded-[10px] border border-white/10 bg-[#161616]/70 p-6">
-        <p className="text-[12px] font-semibold text-[#7e8795]">
-          {t('onboarding.scenario.recommendedTeam')}
-        </p>
-        <div className="mt-3 flex items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.04] px-3 py-3">
-          <Users className="h-4 w-4 shrink-0 text-[var(--primary)]" />
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold text-[var(--ink)]">
-              {recommendedTeamName}
-            </p>
-            <p className="mt-0.5 text-[12px] text-[#aeb8c8]">
-              {t('onboarding.scenario.memberDetailsHint')}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderProjectPathStep = () => (
-    <div className="space-y-4">
-      <section className="grid gap-3 rounded-[10px] border border-white/10 bg-[#161616]/75 p-6 md:grid-cols-[minmax(0,1fr)_260px]">
-        <label className="block min-w-0 text-[12px] font-semibold text-[#7e8795]">
-          {t('onboarding.project.nameTitle')}
-          <input
-            value={projectName}
-            onChange={(event) => {
-              setProjectName(sanitizeProjectName(event.target.value));
-              setProjectNameTouched(true);
-            }}
-            className="mt-2 h-9 w-full rounded-[8px] border border-white/10 bg-white/[0.04] px-3 text-[13px] text-white outline-none transition placeholder:text-[#7e8795] focus:border-white/25"
-            placeholder={t('onboarding.project.namePlaceholder')}
-          />
-        </label>
-        <div className="min-w-0 rounded-[8px] border border-white/10 bg-white/[0.04] px-3 py-2">
-          <p className="font-mono text-[11px] font-semibold text-[#7e8795]">
-            {t('onboarding.scenario.recommendedTemplate')}
-          </p>
-          <p className="mt-1 truncate text-[13px] font-semibold text-[var(--ink)]">
-            {recommendedTeamName}
-          </p>
-        </div>
-      </section>
-      <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
-        <section className="overflow-hidden rounded-[10px] border border-white/10 bg-[#161616]/75">
-          <div className="flex items-center gap-1.5 border-b border-white/5 px-3 py-2">
-            <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[#7e8795]">
-              {currentPath || t('onboarding.project.localRoots')}
-            </span>
-            <button
-              type="button"
-              onClick={() => void loadRoots()}
-              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[#7e8795] transition hover:bg-white/[0.06] hover:text-white"
-              aria-label={t('onboarding.project.roots')}
-              title={t('onboarding.project.roots')}
-            >
-              <Home className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              disabled={!currentPath}
-              onClick={() => {
-                const parent = getParentPath(currentPath);
-                if (parent) void loadDirectory(parent);
-              }}
-              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[#7e8795] transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label={t('onboarding.project.up')}
-              title={t('onboarding.project.up')}
-            >
-              <ChevronUp className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => void loadDirectory(projectPath)}
-              className="flex h-7 w-7 items-center justify-center rounded-[5px] text-[#7e8795] transition hover:bg-white/[0.06] hover:text-white"
-              aria-label={t('onboarding.project.refresh')}
-              title={t('onboarding.project.refresh')}
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="h-[236px] overflow-y-auto p-1.5">
-            {pathLoading ? (
-              <div className="px-2 py-2 text-[12px] text-[#7e8795]">
-                {t('onboarding.project.loading')}
-              </div>
-            ) : entries.length === 0 ? (
-              <div className="px-2 py-2 text-[12px] text-[#7e8795]">
-                {t('onboarding.project.empty')}
-              </div>
-            ) : (
-              entries.map((entry) => {
-                const Icon = entry.is_directory ? Folder : FileText;
-                const selected = entry.path === projectPath.trim();
-                return (
-                  <div
-                    key={`${entry.path}-${directoryEntryTime(entry)}`}
+    <div className="flex h-[340px] items-center justify-center">
+      <div className="h-full w-full max-w-[820px] rounded-[8px] border border-white/[0.08] bg-[#1A1A1A]/90 px-10 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-8">
+        <section className="mx-auto grid w-full max-w-[760px] gap-3 sm:grid-cols-2">
+          {scenarios.map((scenario) => {
+            const selected = scenario.key === selectedScenario;
+            const Icon = scenario.Icon;
+            return (
+              <button
+                key={scenario.key}
+                type="button"
+                onClick={() => handleScenarioSelect(scenario.key)}
+                className={cn(
+                  'group min-h-[104px] cursor-pointer rounded-[8px] border p-3 text-left transition-[background-color,border-color,box-shadow,color] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/[0.35] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]',
+                  selected
+                    ? 'border-white/[0.18] bg-white/[0.065] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_1px_0_rgba(0,0,0,0.55)]'
+                    : 'border-transparent bg-transparent',
+                )}
+              >
+                <div className="grid grid-cols-[28px_minmax(0,1fr)] items-start gap-x-3">
+                  <span
                     className={cn(
-                      'group/path-entry flex items-center rounded-[6px]',
-                      selected && 'bg-white/[0.06]',
+                      'col-start-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                      selected
+                        ? 'text-[#f4f4f5]'
+                        : 'text-[#8a8f98] group-hover:text-[#c9cdd6]',
                     )}
                   >
-                    <button
-                      type="button"
-                      disabled={!entry.is_directory}
-                      onClick={() => {
-                        if (entry.is_directory) void loadDirectory(entry.path);
-                      }}
-                      className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[12px] text-[#aeb8c8] transition hover:bg-white/[0.06] hover:text-white disabled:cursor-default disabled:opacity-55"
-                    >
-                      <Icon
-                        className={cn(
-                          'h-4 w-4 shrink-0',
-                          entry.is_git_repo
-                            ? 'text-[var(--primary)]'
-                            : 'text-[#7e8795]',
-                        )}
-                      />
-                      <span className="min-w-0 flex-1 truncate font-mono">
-                        {entry.name}
-                      </span>
-                      {entry.is_git_repo && (
-                        <span className="rounded-[4px] bg-[var(--primary-tint)] px-1.5 py-px font-mono text-[10px] font-semibold text-[var(--primary-hover)]">
-                          GIT
-                        </span>
-                      )}
-                    </button>
-                    {entry.is_directory && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProjectPath(entry.path);
-                          void validateProjectPath(entry.path);
-                        }}
-                        className={cn(
-                          'mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[5px] text-[#7e8795] opacity-0 transition hover:bg-white/[0.06] hover:text-white group-hover/path-entry:opacity-100',
-                          selected && '!opacity-100',
-                        )}
-                        aria-label={t('onboarding.project.select')}
-                        title={t('onboarding.project.select')}
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                      </button>
+                    <Icon className="h-3.5 w-3.5" strokeWidth={1.4} />
+                  </span>
+                  <h3
+                    className={cn(
+                      'col-start-2 min-w-0 truncate text-[13px] font-semibold tracking-[0] transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                      selected ? 'text-[#f4f4f5]' : 'text-[#d4d4d8] group-hover:text-[#f4f4f5]',
                     )}
-                  </div>
-                );
-              })
-            )}
-          </div>
+                  >
+                    {scenario.title}
+                  </h3>
+                  <p
+                    className={cn(
+                      'col-start-2 mt-0.5 line-clamp-2 pr-1 text-[11px] leading-[1.38] tracking-[0] transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                      selected
+                        ? 'text-[#777777]'
+                        : 'text-white/40 group-hover:text-[#8a8f98]',
+                    )}
+                  >
+                    {scenario.desc}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </section>
-
-        <aside className="space-y-3 rounded-[10px] border border-white/10 bg-[#161616]/75 p-4">
-          <label className="block text-[12px] font-semibold text-[#7e8795]">
-            {t('onboarding.project.selectedPath')}
-            <input
-              value={projectPath}
-              onChange={(event) => setProjectPath(event.target.value)}
-              className="mt-2 h-9 w-full rounded-[8px] border border-white/10 bg-white/[0.04] px-3 font-mono text-[12px] text-white outline-none transition placeholder:text-[#7e8795] focus:border-white/25"
-              placeholder={t('onboarding.project.pathPlaceholder')}
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => void validateProjectPath(projectPath)}
-            disabled={!projectPath.trim() || pathLoading}
-            className="inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.06] px-[14px] py-2 text-[12px] font-semibold text-[#d0d6e0] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <FolderOpen className="h-3.5 w-3.5" />
-            {t('onboarding.project.validate')}
-          </button>
-          <div className="divide-y divide-white/5 rounded-[8px] border border-white/10 bg-white/[0.04] text-[12px]">
-            <div className="flex items-center justify-between gap-2 px-3 py-2">
-              <span className="text-[var(--ink-subtle)]">
-                {t('onboarding.project.status')}
-              </span>
-              <span className="font-semibold text-[var(--ink)]">
-                {projectStatus?.valid
-                  ? t('onboarding.project.valid')
-                  : t('onboarding.project.pending')}
-              </span>
+        <div className="-mx-5 mt-7 border-t border-white/[0.08] px-5 pt-3 sm:-mx-7 sm:px-8">
+          <aside className="mx-auto flex w-full max-w-[760px] items-center justify-start gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <Users className="h-4 w-4 shrink-0 text-[#a1a1aa]" strokeWidth={1.4} />
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <p className="truncate font-mono text-[12px] font-semibold tracking-[0] text-[#f4f4f5]">
+                    {recommendedTeamName}
+                  </p>
+                  <span className="inline-flex items-center gap-1 rounded-[4px] border border-white/[0.14] bg-white/[0.05] px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-[0] text-[#d4d4d8]">
+                    <span className="text-[#f4f4f5]">+</span>
+                    {t('onboarding.scenario.recommendedTeam')}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center justify-between gap-2 px-3 py-2">
-              <span className="text-[var(--ink-subtle)]">
-                {t('onboarding.project.gitStatus')}
-              </span>
-              <span className="font-semibold text-[var(--ink)]">
-                {projectStatus
-                  ? isGitRepoLabel(projectStatus.is_git_repo, t)
-                  : '-'}
-              </span>
-            </div>
-          </div>
-          {(pathError || error) && (
-            <p className="text-[12px] leading-relaxed text-red-400">
-              {pathError || error}
-            </p>
-          )}
-        </aside>
+          </aside>
+        </div>
       </div>
     </div>
   );
+
+  const renderProjectPathStep = () => {
+    const projectConfigurationError = pathError || error;
+    const showInitializeGitAction = Boolean(
+      projectPath.trim() &&
+        initializeGit &&
+        projectStatus?.valid &&
+        !projectStatus.is_git_repo,
+    );
+
+    return (
+      <div className="flex h-[340px] items-center justify-center">
+        <div className="h-full w-full max-w-[820px] overflow-hidden rounded-[8px] border border-white/[0.08] bg-[#1A1A1A]/90 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_18px_60px_rgba(0,0,0,0.30)] backdrop-blur-sm sm:px-7 sm:py-5">
+          <div className="grid h-full min-h-0 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.74fr)] lg:gap-0 lg:divide-x lg:divide-white/[0.05] lg:overflow-hidden">
+          <section className="flex min-h-0 flex-col lg:pr-6">
+            <label className="block min-w-0 font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#8A8F98]">
+              {t('onboarding.project.nameTitle')}
+              <input
+                value={projectName}
+                onChange={(event) => {
+                  setProjectName(sanitizeProjectName(event.target.value));
+                  setProjectNameTouched(true);
+                }}
+                className={cn(
+                  onboardingProjectInputClassName,
+                  'h-9 text-[13px] font-semibold normal-case tracking-[0] text-white/[0.92]',
+                )}
+                placeholder={t('onboarding.project.namePlaceholder')}
+              />
+            </label>
+
+            <section className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[6px] border border-white/[0.08] bg-[#151617] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]">
+              <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.05] px-3 py-1.5">
+                <span className="min-w-0 flex-1 truncate font-mono text-[11px] tracking-[0.03em] text-[#8A8F98]">
+                  {currentPath || t('onboarding.project.localRoots')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void loadRoots()}
+                  className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"
+                  aria-label={t('onboarding.project.roots')}
+                  title={t('onboarding.project.roots')}
+                >
+                  <Home className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </button>
+                <button
+                  type="button"
+                  disabled={!currentPath}
+                  onClick={() => {
+                    const parent = getParentPath(currentPath);
+                    if (parent) void loadDirectory(parent);
+                  }}
+                  className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-35"
+                  aria-label={t('onboarding.project.up')}
+                  title={t('onboarding.project.up')}
+                >
+                  <ChevronUp className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </button>
+                <button
+                  type="button"
+                  disabled={!currentPath || pathLoading || directoryMutating}
+                  onClick={() => void createProjectDirectory()}
+                  className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-35"
+                  aria-label={t('sidebar.newFolder')}
+                  title={t('sidebar.newFolder')}
+                >
+                  <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
+                {pathLoading ? (
+                  <div className="px-1 py-2 font-mono text-[12px] text-[#768295]">
+                    {t('onboarding.project.loading')}
+                  </div>
+                ) : entries.length === 0 ? (
+                  <div className="px-1 py-2 font-mono text-[12px] text-[#768295]">
+                    {t('onboarding.project.empty')}
+                  </div>
+                ) : (
+                  entries.map((entry) => {
+                    const Icon = entry.is_directory ? Folder : FileText;
+                    const selected = entry.path === projectPath.trim();
+                    const isRenaming = renamingDirectoryPath === entry.path;
+                    return (
+                      <div
+                        key={`${entry.path}-${directoryEntryTime(entry)}`}
+                        className={cn(
+                          'group/path-entry flex items-center rounded-[6px] border border-transparent px-2',
+                          selected &&
+                            'border-white/[0.08] border-l-white/[0.28] bg-white/[0.05]',
+                        )}
+                      >
+                        {isRenaming ? (
+                          <>
+                            <div className="flex min-h-6 min-w-0 flex-1 items-center gap-2 py-0.5">
+                              <Folder
+                                className="h-3 w-3 shrink-0 text-[#768295]"
+                                strokeWidth={1.5}
+                              />
+                              <input
+                                className="h-6 min-w-0 flex-1 rounded-[4px] border border-white/[0.18] bg-[#171819] px-2 font-mono text-[11px] tracking-[0.02em] text-[#f5f5f5] outline-none focus:border-white/[0.32]"
+                                value={renamingDirectoryName}
+                                onChange={(event) =>
+                                  setRenamingDirectoryName(event.target.value)
+                                }
+                                onKeyDown={handleDirectoryRenameKeyDown}
+                                onClick={(event) => event.stopPropagation()}
+                                disabled={directoryMutating}
+                                aria-label={t('sidebar.folderName')}
+                                autoFocus
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void commitDirectoryRename()}
+                              disabled={directoryMutating}
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-45"
+                              aria-label={t('sidebar.saveFolderName')}
+                              title={t('sidebar.saveFolderName')}
+                            >
+                              <Check className="h-3.5 w-3.5" strokeWidth={1.5} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={resetDirectoryRename}
+                              disabled={directoryMutating}
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-45"
+                              aria-label={t('sidebar.cancelFolderRename')}
+                              title={t('sidebar.cancelFolderRename')}
+                            >
+                              <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              disabled={!entry.is_directory}
+                              onClick={() => {
+                                if (entry.is_directory) void loadDirectory(entry.path);
+                              }}
+                              className="flex min-h-6 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left font-mono text-[11px] leading-none tracking-[0.02em] text-[#8A8F98] transition hover:text-[#f5f5f5] disabled:cursor-default disabled:opacity-55"
+                            >
+                              <Icon
+                                className="h-3 w-3 shrink-0 text-[#768295]"
+                                strokeWidth={1.5}
+                              />
+                              <span className="min-w-0 flex-1 truncate">
+                                {entry.name}
+                              </span>
+                              {entry.is_git_repo && (
+                                <span className="inline-flex h-4 items-center rounded-[3px] border border-emerald-300/[0.14] bg-emerald-400/[0.06] px-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-emerald-200/55">
+                                  git
+                                </span>
+                              )}
+                            </button>
+                            {entry.is_directory && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProjectPath(entry.path);
+                                  void validateProjectPath(entry.path);
+                                }}
+                                className={cn(
+                                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[#768295] opacity-0 transition hover:bg-white/[0.05] hover:text-[#f5f5f5] group-hover/path-entry:opacity-100',
+                                  selected && '!opacity-100',
+                                )}
+                                aria-label={t('onboarding.project.select')}
+                                title={t('onboarding.project.select')}
+                              >
+                                <Check
+                                  className="h-3.5 w-3.5"
+                                  strokeWidth={1.5}
+                                />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+                {renameDirectoryError && (
+                  <div className="px-1 py-2 font-mono text-[12px] text-red-400">
+                    {renameDirectoryError}
+                  </div>
+                )}
+              </div>
+            </section>
+          </section>
+
+          <aside className="flex min-h-0 flex-col lg:pl-6">
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="space-y-4">
+              <label className="block font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#8A8F98]">
+                {t('onboarding.project.selectedPath')}
+                <input
+                  value={projectPath}
+                  onChange={(event) => {
+                    setProjectPath(event.target.value);
+                    setProjectStatus(null);
+                  }}
+                  className={cn(
+                    onboardingProjectInputClassName,
+                    'h-8 truncate text-[12px] normal-case tracking-[0.03em] text-[#d4d4d8]',
+                  )}
+                  placeholder={t('onboarding.project.pathPlaceholder')}
+                />
+              </label>
+
+              {!projectPath.trim() && (
+                <p className="font-mono text-[12px] leading-relaxed tracking-[0.03em] text-[#768295]">
+                  {t('onboarding.project.pathPrompt')}
+                </p>
+              )}
+
+              {projectPath.trim() && pathDetecting && (
+                <p className="font-mono text-[12px] tracking-[0.03em] text-[#768295]">
+                  {t('onboarding.project.detecting')}
+                </p>
+              )}
+
+              {projectPath.trim() &&
+                !pathDetecting &&
+                projectStatus?.valid &&
+                projectStatus.is_git_repo && (
+                  <p className="inline-flex w-fit items-center gap-2 rounded-[4px] border border-emerald-300/[0.14] bg-emerald-400/[0.06] px-2 py-1 font-mono text-[11px] tracking-[0.03em] text-emerald-200/60">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-300/50" />
+                    {t('onboarding.project.gitDetected')}
+                  </p>
+                )}
+
+              {projectPath.trim() &&
+                !pathDetecting &&
+                projectStatus?.valid &&
+                !projectStatus.is_git_repo && (
+                  <div className="grid grid-rows-[1fr] border-t border-white/[0.05] pt-4 transition-[grid-template-rows] duration-200">
+                    <div className="space-y-4 overflow-hidden">
+                      <p className="flex items-start gap-2 font-mono text-[12px] leading-relaxed tracking-[0.03em] text-[#8f9aaa]">
+                        <Info
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#768295]"
+                          strokeWidth={1.5}
+                        />
+                        <span>{t('onboarding.project.gitMissing')}</span>
+                      </p>
+                      <label className="group flex cursor-pointer items-center gap-2 font-mono text-[12px] tracking-[0.03em] text-[#c9d2df]">
+                        <input
+                          type="checkbox"
+                          checked={initializeGit}
+                          onChange={(event) =>
+                            setInitializeGit(event.target.checked)
+                          }
+                          className="peer sr-only"
+                        />
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            'flex h-3.5 w-3.5 shrink-0 items-center justify-center border bg-[#151617] transition-[background-color,border-color,box-shadow,color] peer-focus-visible:shadow-[0_0_0_1px_rgba(255,255,255,0.16),0_0_0_4px_rgba(94,106,210,0.12)]',
+                            initializeGit
+                              ? 'border-white bg-white text-[#0E0F11]'
+                              : 'border-white/[0.22] text-transparent group-hover:border-white/[0.36]',
+                          )}
+                        >
+                          <Check
+                            className={cn(
+                              'h-3 w-3 transition-opacity',
+                              initializeGit ? 'opacity-100' : 'opacity-0',
+                            )}
+                            strokeWidth={2.3}
+                          />
+                        </span>
+                        {t('onboarding.project.initializeGit')}
+                      </label>
+                      <div
+                        className={cn(
+                          'grid transition-[grid-template-rows] duration-200',
+                          initializeGit ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                        )}
+                      >
+                        <label className="block overflow-hidden font-mono text-[12px] tracking-[0.03em] text-[#a1a1aa]">
+                          {t('onboarding.project.gitignoreTemplate')}
+                          <DropdownSelect
+                            value={gitignoreTemplate}
+                            options={gitignoreOptions}
+                            showSearch={false}
+                            className={onboardingProjectSelectClassName}
+                            panelClassName="[&_*]:!text-[12px] [&_[role=listbox]]:!py-0.5 [&_[role=option]]:!px-2 [&_[role=option]]:!py-1"
+                            maxPanelHeightClassName="max-h-[144px]"
+                            onChange={(value) =>
+                              setGitignoreTemplate(value as GitignoreTemplate)
+                            }
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+            <div className="mt-4 flex min-h-[42px] shrink-0 items-end justify-between gap-3 pt-2">
+              <div className="min-w-0 flex-1">
+                {projectConfigurationError && (
+                  <p className="font-mono text-[12px] leading-relaxed tracking-[0.03em] text-red-400">
+                    {projectConfigurationError}
+                  </p>
+                )}
+              </div>
+              {showInitializeGitAction && (
+                <button
+                  type="button"
+                  onClick={() => void handleInitializeProjectGit()}
+                  disabled={saving || pathDetecting}
+                  className="inline-flex h-7 shrink-0 cursor-pointer items-center justify-center rounded-[4px] border border-white/[0.14] bg-white/[0.06] px-3 font-mono text-[11px] font-medium tracking-[0.03em] text-[#d4d4d8] transition hover:border-white/[0.24] hover:bg-white/[0.1] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {t('onboarding.project.initializeAction')}
+                </button>
+              )}
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+    );
+  };
 
   const renderAppearanceStep = () => {
     const languageOptions: Array<{ id: Locale; label: string }> = [
@@ -1220,79 +1816,170 @@ export function OnboardingGuide({
       { id: 'fr', label: t('language.fr') },
       { id: 'es', label: t('language.es') },
     ];
-    const appearanceOptions = [
+    const appearanceOptions: Array<{
+      id: OnboardingAppearance;
+      label: string;
+      Icon: LucideIcon;
+    }> = [
       {
         id: OnboardingAppearance.dark,
         label: t('onboarding.appearance.dark'),
+        Icon: Moon,
       },
       {
         id: OnboardingAppearance.light,
         label: t('onboarding.appearance.light'),
+        Icon: Sun,
       },
       {
         id: OnboardingAppearance.system,
         label: t('onboarding.appearance.system'),
+        Icon: Monitor,
       },
     ];
 
     return (
-      <div className="space-y-5">
-        <section className="space-y-2">
-          <h3 className="text-[13px] font-semibold text-[var(--ink)]">
-            {t('onboarding.appearance.languageTitle')}
-          </h3>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {languageOptions.map((option) => (
-              <label
-                key={option.id}
-                className={cn(
-                  'flex cursor-pointer items-center gap-2 rounded-[8px] border px-3 py-2 text-[13px] transition',
-                  selectedLocale === option.id
-                    ? 'border-white/25 bg-white/[0.08] text-white'
-                    : 'border-white/10 bg-[#161616]/75 text-[#aeb8c8] hover:border-white/20 hover:text-white',
-                )}
-              >
-                <input
-                  type="radio"
-                  name="onboarding-language"
-                  value={option.id}
-                  checked={selectedLocale === option.id}
-                  onChange={() => handleLocaleSelect(option)}
-                  className="h-3.5 w-3.5 accent-[var(--primary)]"
-                />
-                <span className="truncate">{option.label}</span>
-              </label>
-            ))}
+      <div className="flex h-[340px] items-center justify-center">
+        <div className="h-full w-full max-w-[820px] rounded-[8px] border border-white/[0.08] bg-[#1A1A1A]/90 px-5 py-5 shadow-[0_18px_60px_rgba(0,0,0,0.32)] sm:px-7 sm:py-6">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.84fr)] lg:gap-10">
+            <section className="space-y-3">
+              <h3 className="font-mono text-[12px] font-medium tracking-[0] text-[#a1a1aa]">
+                {t('onboarding.appearance.languageTitle')}
+              </h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {languageOptions.map((option) => (
+                  <label
+                    key={option.id}
+                    className={cn(
+                      'group flex h-10 cursor-pointer items-center gap-2 rounded-[6px] border px-3 text-[13px] transition',
+                      selectedLocale === option.id
+                        ? 'border-white/[0.14] bg-white/[0.07] text-[#f4f4f5] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]'
+                        : 'border-transparent bg-transparent text-[#8a8f98] hover:bg-white/[0.04] hover:text-[#e4e4e7]',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="onboarding-language"
+                      value={option.id}
+                      checked={selectedLocale === option.id}
+                      onChange={() => handleLocaleSelect(option)}
+                      className="sr-only"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'flex h-3 w-3 shrink-0 items-center justify-center rounded-full border transition-colors',
+                        selectedLocale === option.id
+                          ? 'border-[#d4d4d8]'
+                          : 'border-white/[0.18] group-hover:border-white/[0.28]',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'h-1.5 w-1.5 rounded-full transition-colors',
+                          selectedLocale === option.id
+                            ? 'bg-[#d4d4d8]'
+                            : 'bg-transparent',
+                        )}
+                      />
+                    </span>
+                    <span className="truncate">{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
+            <section className="space-y-4">
+              <h3 className="font-mono text-[12px] font-medium tracking-[0] text-[#a1a1aa]">
+                {t('onboarding.appearance.themeTitle')}
+              </h3>
+              <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+                {appearanceOptions.map((option) => {
+                  const selected = selectedAppearance === option.id;
+                  const lightPreview = option.id === OnboardingAppearance.light;
+                  const systemPreview = option.id === OnboardingAppearance.system;
+                  const Icon = option.Icon;
+
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => handleAppearanceSelect(option)}
+                      className={cn(
+                        'cursor-pointer rounded-[8px] border p-2 text-left transition',
+                        selected
+                          ? 'border-[#d4d4d8]/80 bg-white/[0.07] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05),inset_0_1px_18px_rgba(255,255,255,0.025)]'
+                          : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]',
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'flex h-8 items-center justify-between rounded-[8px] border px-2.5',
+                          lightPreview
+                            ? 'border-black/[0.08] bg-[#e4e4e7]'
+                            : systemPreview
+                              ? 'border-white/[0.08] bg-[#151516]'
+                              : 'border-white/[0.08] bg-[#0d0d0e]',
+                        )}
+                      >
+                        <Icon
+                          className={cn(
+                            'h-3.5 w-3.5',
+                            lightPreview
+                              ? 'text-[#52525b]'
+                              : systemPreview
+                                ? 'text-[#b8bcc6]'
+                                : 'text-[#a1a1aa]',
+                          )}
+                          strokeWidth={1.4}
+                        />
+                        <div className="flex items-end gap-1">
+                          <span
+                            className={cn(
+                              'h-2 w-3.5 rounded-[2px]',
+                              lightPreview
+                                ? 'bg-black/[0.18]'
+                                : systemPreview
+                                  ? 'bg-white/[0.14]'
+                                  : 'bg-white/[0.16]',
+                            )}
+                          />
+                          <span
+                            className={cn(
+                              'h-3 w-3.5 rounded-[2px]',
+                              lightPreview
+                                ? 'bg-black/[0.24]'
+                                : systemPreview
+                                  ? 'bg-[#d4d4d8]/70'
+                                  : 'bg-white/[0.22]',
+                            )}
+                          />
+                          <span
+                            className={cn(
+                              'h-1.5 w-3.5 rounded-[2px]',
+                              lightPreview
+                                ? 'bg-black/[0.12]'
+                                : systemPreview
+                                  ? 'bg-white/[0.09]'
+                                  : 'bg-white/[0.1]',
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <p
+                        className={cn(
+                          'mt-1.5 text-[12px] font-semibold',
+                          selected ? 'text-[#f4f4f5]' : 'text-[#a1a1aa]',
+                        )}
+                      >
+                        {option.label}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
           </div>
-        </section>
-        <section className="space-y-2">
-          <h3 className="text-[13px] font-semibold text-[var(--ink)]">
-            {t('onboarding.appearance.themeTitle')}
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {appearanceOptions.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => handleAppearanceSelect(option)}
-                className={cn(
-                  'cursor-pointer rounded-[8px] border p-6 text-left transition',
-                  selectedAppearance === option.id
-                    ? 'border-white/25 bg-white/[0.08]'
-                    : 'border-white/10 bg-[#161616]/75 hover:border-white/20 hover:bg-white/[0.06]',
-                )}
-              >
-                <div className="h-12 rounded-[6px] border border-white/10 bg-white/[0.04] p-2">
-                  <div className="h-2 rounded bg-white/10" />
-                  <div className="mt-3 h-2 w-1/2 rounded bg-[var(--primary)]" />
-                </div>
-                <p className="mt-2 text-[13px] font-semibold text-[var(--ink)]">
-                  {option.label}
-                </p>
-              </button>
-            ))}
-          </div>
-        </section>
+        </div>
       </div>
     );
   };
@@ -1333,83 +2020,127 @@ export function OnboardingGuide({
     const stepLabel = t(`onboarding.step.${stepI18nKeys[stepKey]}.title`);
 
     return (
-      <div className="relative isolate flex min-h-0 flex-1 flex-col items-center overflow-hidden px-6 text-center">
-        <div className="pointer-events-none absolute inset-0 bg-[#030303]" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(94,106,210,0.22)_0%,rgba(3,3,3,0)_58%)]" />
+      <div
+        className="relative isolate flex min-h-0 flex-1 flex-col items-center overflow-hidden px-6 text-center"
+        style={onboardingTextFont}
+      >
+        <div className="pointer-events-none absolute inset-0 bg-[#0E0F11]" />
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.08]"
-          style={{
-            backgroundImage:
-              'linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
+          className="pointer-events-none absolute inset-0 opacity-[0.032] mix-blend-screen"
+          style={onboardingNoiseTextureStyle}
         />
 
-        <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto pb-10 pt-10">
-          <div className="flex gap-3">
-            {onboardingSteps.map((step, index) => (
-              <div
-                key={step}
-                className={cn(
-                  'h-0.5 w-10 rounded-full',
-                  index <= activeStepIndex ? 'bg-white' : 'bg-white/10',
-                )}
-              />
-            ))}
+        <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col items-center justify-center overflow-y-auto py-8">
+          <div className="relative flex gap-2">
+            {onboardingSteps.map((step, index) => {
+              const current = index === activeStepIndex;
+              const completed = index < activeStepIndex;
+              return (
+                <div
+                  key={step}
+                  className={cn(
+                    'h-[2px] w-10 rounded-none transition-colors duration-150',
+                    current
+                      ? 'bg-[#f4f4f5]'
+                      : completed
+                        ? 'bg-white/[0.28]'
+                        : 'bg-white/[0.15]',
+                  )}
+                />
+              );
+            })}
           </div>
 
-          <div className="mt-12 max-w-4xl">
-            <h1 className="font-sans text-[44px] font-semibold leading-[1.08] tracking-[-1.2px] text-white">
+          <div className="mt-9 max-w-4xl">
+            <h1 className="text-[25px] font-[600] leading-tight tracking-[0] text-[#f4f4f5]">
               {stepTitle}
             </h1>
-            <p className="mx-auto mt-5 max-w-3xl text-[17px] leading-relaxed text-[#aeb8c8]">
+            <p
+              className={cn(
+                'mx-auto mt-2 max-w-3xl text-[12px] leading-relaxed tracking-[0]',
+                stepKey === 'project_path' ? 'text-[#8A8F98]' : 'text-[#a1a1aa]',
+              )}
+            >
               {stepDescription}
             </p>
           </div>
 
-          <div className="relative mt-12 w-full max-w-5xl rounded-[14px] border border-white/10 bg-white/[0.03] p-6 text-left shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-8">
-            {renderActiveConfigurationContent(stepKey)}
+          <div className="relative mt-7 w-full max-w-5xl p-0 text-left">
+            <div
+              className={cn(
+                'relative transition-[opacity,transform] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform motion-reduce:transform-none motion-reduce:transition-none',
+                configurationMotionState === 'slide-out' &&
+                  '-translate-x-8 opacity-0',
+                configurationMotionState === 'slide-in' &&
+                  'translate-x-6 opacity-0',
+                configurationMotionState === 'idle' && 'translate-x-0 opacity-100',
+              )}
+            >
+              {renderActiveConfigurationContent(renderedConfigurationStepKey)}
+            </div>
           </div>
 
-          {error && (
+          {error && stepKey !== 'project_path' && (
             <p className="mt-4 max-w-3xl text-center text-[12px] leading-relaxed text-red-300">
               {error}
             </p>
           )}
 
-          <div className="mt-8 flex flex-col items-center gap-4">
-            <div className="flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-12 flex min-h-10 w-full max-w-5xl flex-col items-center gap-4 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <div className="flex min-h-10 flex-wrap items-center justify-center gap-3 leading-none sm:justify-start">
               <button
                 type="button"
-                onClick={() => void handleSkip()}
-                disabled={saving}
-                className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/[0.06] px-5 py-2 text-[13px] font-medium text-[#d0d6e0] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => {
+                  if (saving) return;
+                  void handleSkip();
+                }}
+                aria-disabled={saving}
+                className="inline-flex h-10 cursor-pointer items-center justify-center px-0 py-2 text-[12px] font-medium leading-none text-[rgba(255,255,255,0.35)] transition-colors hover:text-white"
               >
                 {t('onboarding.action.skip')}
               </button>
               <button
                 type="button"
-                onClick={handleStepBack}
-                disabled={saving || activeStepIndex === 0}
-                className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/[0.06] px-5 py-2 text-[13px] font-medium text-[#d0d6e0] transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-45"
+                onClick={() => {
+                  if (saving || activeStepIndex === 0) return;
+                  handleStepBack();
+                }}
+                aria-disabled={saving || activeStepIndex === 0}
+                className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 px-3 py-2 text-[12px] font-medium leading-none text-[rgba(255,255,255,0.35)] transition-colors hover:text-white"
               >
                 {t('onboarding.action.back')}
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] leading-none text-white/35">
+                  <kbd className="inline-flex h-[18px] min-w-[22px] items-center justify-center rounded-[3px] border border-white/[0.06] bg-white/[0.035] px-1.5 leading-none text-white/35">
+                    Esc
+                  </kbd>
+                </span>
               </button>
+            </div>
+            <p className="flex min-h-10 items-center justify-center font-mono text-[10px] leading-none uppercase tracking-[0.12em] text-[#7d8aa3]">
+              Step {activeStepIndex + 1} of {onboardingSteps.length}: {stepLabel}
+            </p>
+            <div className="flex min-h-10 items-center justify-center sm:justify-end">
               <button
                 type="button"
                 onClick={() => void handleStepNext()}
                 disabled={saving}
-                className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-8 py-3 text-[15px] font-semibold text-black transition hover:bg-[#e7e9ee] disabled:cursor-not-allowed disabled:opacity-60"
+                className={cn(
+                  stepKey === finalOnboardingStep
+                    ? 'inline-flex min-h-10 cursor-pointer items-center justify-center gap-2.5 rounded-[4px] border border-white bg-[linear-gradient(180deg,#FFFFFF_0%,#F2F2F2_100%)] px-6 py-2 text-[13px] font-semibold text-black shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.28)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-[linear-gradient(180deg,#FFFFFF_0%,#EDEDED_100%)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60'
+                    : 'inline-flex min-h-10 cursor-pointer items-center justify-center gap-2.5 rounded-[4px] border border-white bg-white px-6 py-2 text-[13px] font-semibold text-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.92)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-[#f2f2f2] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60',
+                  stepKey === 'scenario' &&
+                    'origin-center will-change-transform hover:-translate-y-[2px] hover:scale-[1.02] hover:shadow-[0_12px_30px_rgba(255,255,255,0.18)] active:translate-y-[1px] active:scale-[0.98] motion-reduce:transform-none',
+                )}
               >
                 {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                {stepKey === 'appearance'
+                {stepKey === finalOnboardingStep
                   ? t('onboarding.action.startNow')
                   : t('onboarding.action.next')}
+                <kbd className="inline-flex h-[18px] items-center rounded-[3px] border-0 bg-[rgba(0,0,0,0.05)] px-1.5 font-mono text-[10px] font-medium leading-none text-black/40 shadow-none">
+                  Enter <span aria-hidden="true">&#8617;</span>
+                </kbd>
               </button>
             </div>
-            <p className="font-mono text-[12px] uppercase tracking-[0.2em] text-[#5f6d82]">
-              Step {activeStepIndex + 1} of {onboardingSteps.length}: {stepLabel}
-            </p>
           </div>
         </div>
       </div>
@@ -1420,109 +2151,99 @@ export function OnboardingGuide({
     if (isWelcome) {
       return (
         <div className="relative isolate flex min-h-0 flex-1 flex-col items-center overflow-hidden px-6 text-center">
-          <div className="pointer-events-none absolute inset-0 bg-[#030303]" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(94,106,210,0.22)_0%,rgba(3,3,3,0)_58%)]" />
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.08]"
-            style={{
-              backgroundImage:
-                'linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)',
-              backgroundSize: '40px 40px',
-            }}
-          />
+          <div className="pointer-events-none absolute inset-0 bg-[#0E0F11]" />
 
           <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto pb-10 pt-10">
-            <div className="flex gap-3">
-              <div className="h-0.5 w-10 rounded-full bg-white" />
-              <div className="h-0.5 w-10 rounded-full bg-white/10" />
-              <div className="h-0.5 w-10 rounded-full bg-white/10" />
-              <div className="h-0.5 w-10 rounded-full bg-white/10" />
-            </div>
-
             <div className="mt-16 max-w-4xl">
-              <h1 className="font-sans text-[48px] font-semibold leading-[1.06] tracking-[-1.3px] text-white">
+              <h1 className="font-sans text-[48px] font-semibold leading-[1.06] tracking-[0] text-[#f5f5f5]">
                 {t('onboarding.welcome.title')}
               </h1>
-              <p className="mx-auto mt-5 max-w-3xl text-[18px] leading-relaxed text-[#aeb8c8]">
+              <p className="mx-auto mt-5 max-w-3xl text-[18px] leading-relaxed text-[#a8b3c2]">
                 {t('onboarding.welcome.desc')}
               </p>
             </div>
 
-            <div className="relative mt-14 w-full max-w-5xl rounded-[14px] border border-white/10 bg-white/[0.03] p-2 shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-              <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
-                <div className="h-2 w-2 rounded-full bg-white/10" />
-                <div className="h-2 w-2 rounded-full bg-white/10" />
-                <div className="h-2 w-2 rounded-full bg-white/10" />
-                <div className="ml-4 h-3 w-32 rounded bg-white/5" />
+            <div className="relative mt-14 flex min-h-[440px] w-full max-w-5xl flex-col overflow-hidden rounded-[8px] border border-white/[0.12] bg-[#1A1A1A]/90 p-px shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+              <div
+                className="pointer-events-none absolute inset-0 opacity-[0.025]"
+                style={onboardingNoiseTextureStyle}
+              />
+              <div className="relative z-10 flex items-center gap-2 border-b border-white/[0.08] bg-[#1A1A1A]/90 px-4 py-3">
+                <div className="h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]" />
+                <div className="h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]" />
+                <div className="h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]" />
+                <div className="ml-4 h-3 w-32 rounded-[3px] border border-white/[0.08] bg-white/[0.065]" />
               </div>
 
-              <div className="flex justify-center px-4 py-12 sm:px-20">
-                <div className="w-full max-w-md overflow-hidden rounded-[10px] border border-white/10 bg-[#161616]/95 text-left shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-                  <div className="flex items-center border-b border-white/5 p-4">
-                    <span className="mr-3 font-mono text-[15px] text-[#8a8f98]">/</span>
-                    <span className="min-w-0 flex-1 truncate text-[14px] text-white/80">
-                      {t('onboarding.welcome.pointWorkflow')}
+              <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-4 py-10 sm:px-20">
+                <div className="w-full max-w-md -translate-y-4 overflow-hidden rounded-[6px] border border-white/[0.12] bg-[#151617]/95 text-left">
+                  <div className="flex items-center border-b border-white/[0.08] p-4">
+                    <span className="mr-3 font-mono text-[15px] text-[#a8b3c2]">/</span>
+                    <span className="min-w-0 flex-1 truncate text-[14px] text-[#f5f5f5]">
+                      {selectedWelcomeCommand.label}
                     </span>
                   </div>
                   <div className="p-2">
-                    {[
-                      {
-                        label: t('onboarding.welcome.pointTeams'),
-                        Icon: Users,
-                        keyHint: 'T',
-                        active: true,
-                      },
-                      {
-                        label: t('onboarding.welcome.pointLocal'),
-                        Icon: Search,
-                        keyHint: 'L',
-                        active: false,
-                      },
-                      {
-                        label: t('onboarding.welcome.pointWorkflow'),
-                        Icon: Zap,
-                        keyHint: 'W',
-                        active: false,
-                      },
-                    ].map(({ label, Icon, keyHint, active }) => (
-                      <div
-                        key={label}
-                        className={cn(
-                          'flex items-center justify-between rounded-[8px] px-3 py-2 text-[14px]',
-                          active
-                            ? 'bg-white/[0.06] text-white'
-                            : 'text-[#7e8795]',
-                        )}
-                      >
-                        <div className="flex min-w-0 items-center gap-3">
-                          <Icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{label}</span>
-                        </div>
-                        <span className="ml-3 rounded-[4px] border border-white/10 bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-[#8a8f98]">
-                          {keyHint}
-                        </span>
-                      </div>
-                    ))}
+                    {welcomeCommandOptions.map(({ id, label, Icon, keyHint }) => {
+                      const active = selectedWelcomeCommand.id === id;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setSelectedWelcomeCommandId(id)}
+                          onFocus={() => setSelectedWelcomeCommandId(id)}
+                          onMouseEnter={() => setSelectedWelcomeCommandId(id)}
+                          aria-pressed={active}
+                          className={cn(
+                            'relative flex w-full cursor-pointer items-center justify-between rounded-[5px] border px-3 py-2 text-left text-[14px] transition',
+                            active
+                              ? 'border-white/[0.1] bg-white/[0.065] text-white'
+                              : 'border-transparent text-[#8792a3] hover:border-white/[0.08] hover:bg-white/[0.035] hover:text-[#f5f5f5]',
+                          )}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              'absolute bottom-2 left-0 top-2 w-px',
+                              active ? 'bg-white' : 'bg-transparent',
+                            )}
+                          />
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Icon className="h-4 w-4 shrink-0 text-current opacity-55" />
+                            <span className="truncate">{label}</span>
+                          </div>
+                          <span
+                            className={cn(
+                              'ml-3 min-w-6 rounded-[3px] border border-white/[0.18] bg-[#0c0c0c] px-1.5 py-0.5 text-center font-mono text-[10px] font-semibold',
+                              active ? 'text-white' : 'text-[#8792a3]',
+                            )}
+                            style={onboardingMonoFont}
+                          >
+                            {keyHint}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
-
-              <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-3/4 w-3/4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#5e6ad2]/10 blur-[100px]" />
             </div>
 
-            <div className="mt-16 flex flex-col items-center gap-4">
+            <div className="mt-12 flex flex-col items-center gap-4">
               <button
                 type="button"
                 onClick={() => void handleWelcomeNext()}
                 disabled={saving}
-                className="inline-flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-10 py-3 text-[16px] font-semibold text-black transition hover:bg-[#e7e9ee] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-12 origin-center cursor-pointer items-center justify-center gap-3 rounded-[6px] border border-white bg-white px-9 py-3 text-[14px] font-semibold text-black shadow-[inset_0_-1px_0_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.35)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform hover:-translate-y-[2px] hover:scale-[1.012] hover:bg-[#f7f7f7] hover:shadow-[inset_0_-1px_0_rgba(0,0,0,0.18),0_0_0_1px_rgba(255,255,255,0.55),0_14px_34px_rgba(255,255,255,0.11)] active:translate-y-[1px] active:scale-[0.988] active:bg-[#e7e7e7] active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.22),0_1px_2px_rgba(0,0,0,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
                 {t('onboarding.welcome.next')}
-                <span className="font-mono text-[12px] font-normal text-black/45">Enter</span>
               </button>
-              <p className="font-mono text-[12px] uppercase tracking-[0.2em] text-[#5f6d82]">
-                Step 1 of {onboardingSteps.length}: Command center
+              <p
+                className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8f9aaa]"
+                style={onboardingMonoFont}
+              >
+                ALL 4 STEPS TO FINISH CONFIGURATION
               </p>
             </div>
           </div>
@@ -1537,7 +2258,7 @@ export function OnboardingGuide({
     return (
       <div
         className="fixed inset-0 z-[90] bg-[var(--canvas)] p-4 text-[var(--ink)]"
-        style={onboardingDarkThemeVars}
+        style={{ ...onboardingDarkThemeVars, ...onboardingTextFont }}
       >
         <div className="mx-auto flex h-full max-w-6xl flex-col">
           {renderUpgradeGuide()}
@@ -1549,7 +2270,7 @@ export function OnboardingGuide({
   return (
     <div
       className="fixed inset-0 z-[90] bg-[var(--canvas)] text-[var(--ink)]"
-      style={onboardingDarkThemeVars}
+      style={{ ...onboardingDarkThemeVars, ...onboardingTextFont }}
     >
       <section className="mx-auto flex h-full w-full max-w-none flex-col overflow-hidden bg-transparent">
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">

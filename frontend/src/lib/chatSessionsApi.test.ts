@@ -43,14 +43,25 @@ console.log('chatSessionsApi behavior');
 const response = await chatSessionsApi.validateWorkspacePath(
   'E:/workspace/project',
 );
-const call = calls[0];
+await chatSessionsApi.initializeWorkspaceGit({
+  workspace_path: 'E:/workspace/project',
+  gitignore_template: 'node',
+});
+const validateCall = calls[0];
+const initCall = calls[1];
 const body =
-  typeof call?.init?.body === 'string' ? JSON.parse(call.init.body) : null;
+  typeof validateCall?.init?.body === 'string'
+    ? JSON.parse(validateCall.init.body)
+    : null;
+const initBody =
+  typeof initCall?.init?.body === 'string'
+    ? JSON.parse(initCall.init.body)
+    : null;
 
 check(
   'validateWorkspacePath posts to the chat workspace validator',
-  String(call?.input) === '/api/chat/validate-workspace-path',
-  call?.input,
+  String(validateCall?.input) === '/api/chat/validate-workspace-path',
+  validateCall?.input,
 );
 
 check(
@@ -63,6 +74,14 @@ check(
   'validateWorkspacePath returns Git repo metadata',
   response.valid === true && response.is_git_repo === true,
   response,
+);
+
+check(
+  'initializeWorkspaceGit posts the selected template to the chat initializer',
+  String(initCall?.input) === '/api/chat/initialize-workspace-git' &&
+    initBody?.workspace_path === 'E:/workspace/project' &&
+    initBody?.gitignore_template === 'node',
+  { input: initCall?.input, body: initBody },
 );
 
 globalThis.fetch = originalFetch;

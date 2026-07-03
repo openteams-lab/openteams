@@ -490,7 +490,8 @@ export function useSessionSourceControl({
     async (request: CommitInput) => {
       const context = requireSourceControlContext(projectId, sessionId);
       try {
-        await flushBatchedOperation("stage");
+        // Commit must use the current Git index only. Flushing staged writes
+        // here can pull newer worktree edits into the commit.
         await flushBatchedOperation("unstage");
         invalidatePendingRefresh();
         const response = await projectSourceControlApi.commit(context.projectId, {

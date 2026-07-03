@@ -3441,7 +3441,7 @@ export function TeamTemplatesPage() {
         )}
 
         {!loading && !loadError && !editorMode && !selectedId && (
-          <div className="mx-auto w-full max-w-[1280px] p-6 md:p-8 lg:p-10">
+          <div className="w-full px-4 py-6 sm:px-5 md:px-6 md:py-8 lg:px-8 lg:py-10">
             {currentActiveTemplate && (
               <section className="mb-8">
                 <div className={`group relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 ${activeSurfaceClassName} transition-all duration-200 ease-out hover:-translate-y-px hover:bg-[var(--team-template-surface-hover)]`} onClick={() => openTemplateDetail(currentActiveTemplate.id)}>
@@ -3512,7 +3512,7 @@ export function TeamTemplatesPage() {
                   </p>
                 </button>
               ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {myTeamTemplates.map((template) => (
                     <TemplateCard
                       key={template.id}
@@ -3528,7 +3528,7 @@ export function TeamTemplatesPage() {
               <h2 className="mb-5 text-xs font-medium text-[var(--team-template-muted)]">
                 更多推荐模板
               </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {advancedTeamTemplates.map((template) => (
                   <TemplateCard
                     key={template.id}

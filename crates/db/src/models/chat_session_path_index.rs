@@ -16,6 +16,7 @@ pub struct UpsertChatSessionPathIndex {
 pub struct SharedSessionPath {
     pub path: String,
     pub session_id: Uuid,
+    pub last_observed_at: DateTime<Utc>,
 }
 
 pub struct ChatSessionPathIndex;
@@ -132,7 +133,7 @@ impl ChatSessionPathIndex {
         for chunk in paths.chunks(PATH_INDEX_QUERY_CHUNK_SIZE) {
             let mut builder = QueryBuilder::<Sqlite>::new(
                 r#"
-                SELECT idx.path, idx.session_id
+                SELECT idx.path, idx.session_id, idx.last_observed_at
                 FROM chat_session_path_index idx
                 JOIN chat_sessions sessions ON sessions.id = idx.session_id
                 WHERE idx.project_id = 
@@ -157,6 +158,7 @@ impl ChatSessionPathIndex {
                 shared_paths.push(SharedSessionPath {
                     path: row.try_get("path")?,
                     session_id: row.try_get("session_id")?,
+                    last_observed_at: row.try_get("last_observed_at")?,
                 });
             }
         }

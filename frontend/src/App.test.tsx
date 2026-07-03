@@ -21,6 +21,9 @@ const check = (label: string, cond: boolean, detail?: unknown) => {
 console.log("App ProjectSidebar wiring");
 
 const source = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+const createAgentSessionSource = source.slice(
+  source.indexOf("const handleCreateAgentSession"),
+);
 const legacyDefaultMemberFlag = ["is", "default"].join("_");
 const projectSidebarUsages = source.match(/<ProjectSidebar\b/g) ?? [];
 const sidebarPropsMatches =
@@ -133,6 +136,7 @@ check(
   "creates selected team preset members during project creation",
   source.includes("createTeamPresetMembers") &&
     source.includes("buildTemplateMemberSpecs") &&
+    source.includes("options?.forceWorkspacePath && workspacePath") &&
     source.includes("teamPresets.find") &&
     source.includes("for (const spec of memberSpecs)") &&
     source.includes("toast.projectCreatedWithTeam") &&
@@ -140,13 +144,23 @@ check(
   source,
 );
 check(
-  "onboarding creates a real project before opening the existing composer",
+  "onboarding creates a real project before opening a default focused session",
   source.includes("handleCreateOnboardingProject") &&
     source.includes("onCreateProjectFromOnboarding={handleCreateOnboardingProject}") &&
     source.includes("default_workspace_path: path") &&
+    source.includes("forceMemberWorkspacePath: true") &&
     source.includes("return { project }") &&
     source.includes("return { projectId: project.id, sessionId: null }") &&
-    source.includes("setIsCreateSessionModalOpen(true)"),
+    source.includes("onComplete={handleOnboardingCompleted}") &&
+    source.includes("setIsCreateSessionModalOpen(false)") &&
+    source.includes("await handleCreateDefaultSession({"),
+  source,
+);
+check(
+  "onboarding handoff animates the app after default session creation",
+  source.includes("onboardingAppTransitionActive") &&
+    source.includes("startOnboardingAppTransition()") &&
+    source.includes("animate-onboarding-app-enter"),
   source,
 );
 check(
@@ -316,11 +330,11 @@ check(
 );
 check(
   "new session stages the initial message before activation",
-  source.indexOf("sendMessageToSession(backendSession.id, content") <
-    source.indexOf("setActiveSessionId(backendSession.id)") &&
-    source.indexOf("setSessionChatInputMode(backendSession.id, nextChatInputMode)") <
-      source.indexOf("sendMessageToSession(backendSession.id, content"),
-  source,
+  createAgentSessionSource.indexOf("sendMessageToSession(backendSession.id, content") <
+    createAgentSessionSource.indexOf("setActiveSessionId(backendSession.id)") &&
+    createAgentSessionSource.indexOf("setSessionChatInputMode(backendSession.id, nextChatInputMode)") <
+      createAgentSessionSource.indexOf("sendMessageToSession(backendSession.id, content"),
+  createAgentSessionSource,
 );
 check(
   "create-agent session can link the new session to a work item",

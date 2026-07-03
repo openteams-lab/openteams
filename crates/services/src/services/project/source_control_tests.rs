@@ -1,10 +1,12 @@
 use std::{fs, path::Path};
 
+use chrono::{Duration, Utc};
 use db::models::{
     chat_agent::{ChatAgent, CreateChatAgent},
     chat_run::{ChatRun, CreateChatRun},
     chat_session::{ChatSession, CreateChatSession},
     chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
+    chat_session_path_index::{ChatSessionPathIndex, UpsertChatSessionPathIndex},
     member_execution_config::MemberExecutionConfig,
     project::{CreateProject, Project},
     project_delivery_record::{ProjectDeliveryEventTypeV2, ProjectDeliveryRecord},
@@ -787,6 +789,77 @@ async fn committed_other_session_path_is_not_shared() {
 }
 
 #[tokio::test]
+async fn stale_committed_other_session_path_index_is_not_shared() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+    let first_session =
+        seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
+    fs::write(repo_path.join("tracked.txt"), "first session\n").expect("modify tracked");
+    git_add(&repo_path, "tracked.txt");
+
+    SourceControlService::new()
+        .commit(
+            &pool,
+            project.id,
+            SourceControlCommitRequest {
+                session_id: first_session,
+                workspace_id: None,
+                message: "commit first session".to_string(),
+                expected_staged_paths: vec!["tracked.txt".to_string()],
+                force_shared: None,
+                work_item_ids: None,
+                expected_head_sha: None,
+            },
+        )
+        .await
+        .expect("commit succeeds");
+
+    let records = ProjectDeliveryRecord::find_by_project(&pool, project.id, None, None)
+        .await
+        .expect("delivery records");
+    let commit_record = records
+        .iter()
+        .find(|record| {
+            record.source_session_id == Some(first_session)
+                && record.event_type == ProjectDeliveryEventTypeV2::CommitCreated
+        })
+        .expect("commit delivery record");
+    let workspace_path_string = repo_path.to_string_lossy().to_string();
+    ChatSessionPathIndex::upsert_many(
+        &pool,
+        project.id,
+        &workspace_path_string,
+        first_session,
+        &[UpsertChatSessionPathIndex {
+            path: "tracked.txt".to_string(),
+            last_run_id: None,
+            last_observed_at: commit_record.occurred_at - Duration::milliseconds(1),
+            existed_after_run: true,
+        }],
+    )
+    .await
+    .expect("restore stale path index row");
+
+    let second_session =
+        seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
+    fs::write(repo_path.join("tracked.txt"), "second session\n").expect("modify tracked again");
+
+    let status = SourceControlService::new()
+        .session_status(&pool, project.id, second_session, None)
+        .await
+        .expect("status");
+
+    let SessionSourceControlStatus::Git { changes, .. } = status else {
+        panic!("expected git status");
+    };
+    assert_eq!(changes.len(), 1);
+    assert_eq!(changes[0].path, "tracked.txt");
+    assert!(!changes[0].shared);
+    assert!(changes[0].shared_session_ids.is_empty());
+}
+
+#[tokio::test]
 async fn externally_committed_other_session_path_is_not_shared() {
     let pool = setup_pool().await;
     let (_tempdir, repo_path) = setup_git_workspace();
@@ -795,15 +868,40 @@ async fn externally_committed_other_session_path_is_not_shared() {
         seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
     fs::write(repo_path.join("tracked.txt"), "external commit\n").expect("modify tracked");
     git_add(&repo_path, "tracked.txt");
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     GitService::new()
-        .commit(&repo_path, "external session commit")
-        .expect("external commit");
-    SourceControlService::invalidate_session_caches(first_session);
+        .commit(&repo_path, "external commit")
+        .expect("manual external commit");
+
+    let workspace_path_string = repo_path.to_string_lossy().to_string();
+    let tracked_paths = vec!["tracked.txt".to_string()];
+    ChatSessionPathIndex::delete_paths(
+        &pool,
+        project.id,
+        &workspace_path_string,
+        first_session,
+        &tracked_paths,
+    )
+    .await
+    .expect("remove original path index row");
+    ChatSessionPathIndex::upsert_many(
+        &pool,
+        project.id,
+        &workspace_path_string,
+        first_session,
+        &[UpsertChatSessionPathIndex {
+            path: "tracked.txt".to_string(),
+            last_run_id: None,
+            last_observed_at: Utc::now() - Duration::seconds(5),
+            existed_after_run: true,
+        }],
+    )
+    .await
+    .expect("restore stale path index row");
 
     let second_session =
         seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
-    fs::write(repo_path.join("tracked.txt"), "second session\n").expect("modify tracked again");
+    fs::write(repo_path.join("tracked.txt"), "single session follow-up\n")
+        .expect("modify tracked again");
 
     let status = SourceControlService::new()
         .session_status(&pool, project.id, second_session, None)
@@ -977,6 +1075,52 @@ async fn commit_succeeds_with_valid_request() {
         .expect("status after commit");
     let (changes, staged) = git_status_paths(&status);
     assert!(changes.is_empty());
+    assert!(staged.is_empty());
+}
+
+#[tokio::test]
+async fn commit_preserves_unstaged_changes_for_staged_paths() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+    let session_id = seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
+    fs::write(repo_path.join("tracked.txt"), "base\nstaged\n").expect("write staged content");
+    git_add(&repo_path, "tracked.txt");
+    fs::write(repo_path.join("tracked.txt"), "base\nstaged\nunstaged\n")
+        .expect("write unstaged content");
+
+    let response = SourceControlService::new()
+        .commit(
+            &pool,
+            project.id,
+            SourceControlCommitRequest {
+                session_id,
+                workspace_id: None,
+                message: "commit staged only".to_string(),
+                expected_staged_paths: vec!["tracked.txt".to_string()],
+                force_shared: None,
+                work_item_ids: None,
+                expected_head_sha: None,
+            },
+        )
+        .await
+        .expect("commit succeeds");
+
+    assert_eq!(response.committed_paths, vec!["tracked.txt"]);
+    let committed_content = GitCli::new()
+        .git(&repo_path, ["show", "HEAD:tracked.txt"])
+        .expect("read committed file");
+    assert_eq!(committed_content, "base\nstaged\n");
+    let worktree_content =
+        fs::read_to_string(repo_path.join("tracked.txt")).expect("read worktree file");
+    assert_eq!(worktree_content, "base\nstaged\nunstaged\n");
+
+    let status = SourceControlService::new()
+        .session_status(&pool, project.id, session_id, None)
+        .await
+        .expect("status after commit");
+    let (changes, staged) = git_status_paths(&status);
+    assert_eq!(changes, vec!["tracked.txt"]);
     assert!(staged.is_empty());
 }
 

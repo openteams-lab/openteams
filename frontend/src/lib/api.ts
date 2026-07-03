@@ -127,6 +127,8 @@ import type {
   ChatTeamPreset,
   CreateProjectRequest,
   CreateTeamPresetRequest,
+  InitializeWorkspaceGitRequest,
+  InitializeWorkspaceGitResponse,
   Project,
   ProjectDetail,
   ProjectMemberWithRuntime,
@@ -497,6 +499,15 @@ export const chatSessionsApi = {
       body: JSON.stringify({ workspace_path: workspacePath }),
     });
     return handleApiResponse<ValidateWorkspacePathResponse>(r);
+  },
+  initializeWorkspaceGit: async (
+    data: InitializeWorkspaceGitRequest,
+  ): Promise<InitializeWorkspaceGitResponse> => {
+    const r = await makeRequest("/api/chat/initialize-workspace-git", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse<InitializeWorkspaceGitResponse>(r);
   },
   update: async (
     sessionId: string,

@@ -221,6 +221,19 @@ body {
   }
 }
 
+@keyframes onboardingAppEnter {
+  from {
+    opacity: 0.92;
+    transform: translateY(8px) scale(0.996);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
 @keyframes planModePulse {
   0%,
   100% {
@@ -307,6 +320,10 @@ body[data-mode="light"] .animate-shimmer::after {
   animation: fadeIn 0.3s ease-out forwards;
 }
 
+.animate-onboarding-app-enter {
+  animation: onboardingAppEnter 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 .animate-spin-slow {
   animation: spin 3s linear infinite;
 }
@@ -345,6 +362,7 @@ body[data-mode="light"] .animate-shimmer::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .animate-onboarding-app-enter,
   .plan-mode-toggle-active,
   .plan-mode-toggle-active::after,
   .plan-mode-input-active {
@@ -467,6 +485,9 @@ body[data-mode="light"] .animate-shimmer::after {
   --team-template-surface: #09090a;
   --team-template-surface-top: #0b0b0c;
   --team-template-surface-hover: rgba(255, 255, 255, 0.035);
+  --team-template-card-surface: #111214;
+  --team-template-card-surface-top: #15161a;
+  --team-template-card-surface-hover: #191b20;
   --team-template-active-surface: rgba(255, 255, 255, 0.025);
   --team-template-inner-stroke: rgba(255, 255, 255, 0.06);
   --team-template-inner-stroke-strong: rgba(255, 255, 255, 0.12);
@@ -518,6 +539,7 @@ body[data-mode="light"] .animate-shimmer::after {
   --team-template-description: var(--team-template-muted);
   --team-template-icon: #8a8f98;
   --team-template-tag-text: var(--team-template-muted);
+  background: var(--team-template-canvas);
 }
 
 body[data-mode="light"] .team-template-page {
@@ -529,6 +551,9 @@ body[data-mode="light"] .team-template-page {
   --team-template-surface: #ffffff;
   --team-template-surface-top: #ffffff;
   --team-template-surface-hover: #f7f8fa;
+  --team-template-card-surface: #ffffff;
+  --team-template-card-surface-top: #ffffff;
+  --team-template-card-surface-hover: #f7f8fa;
   --team-template-active-surface: #f5f6f8;
   --team-template-inner-stroke: rgba(15, 23, 42, 0.08);
   --team-template-inner-stroke-strong: rgba(15, 23, 42, 0.12);
@@ -818,10 +843,18 @@ body[data-mode="light"] .team-template-status-rule {
 }
 
 .team-template-card {
+  background: linear-gradient(
+    180deg,
+    var(--team-template-card-surface-top),
+    var(--team-template-card-surface)
+  );
   cursor: pointer;
   overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 var(--team-template-top-highlight),
+    0 1px 0 rgba(0, 0, 0, 0.18);
   transition:
-    background-color 0.2s ease,
+    background 0.2s ease,
     border-color 0.2s ease,
     box-shadow 0.2s ease,
     color 0.2s ease,
@@ -829,7 +862,11 @@ body[data-mode="light"] .team-template-status-rule {
 }
 
 .team-template-card:hover {
-  background-color: var(--team-template-hover);
+  background: linear-gradient(
+    180deg,
+    var(--team-template-card-surface-hover),
+    var(--team-template-card-surface)
+  );
 }
 
 .team-template-card :where(h3, p, .team-template-tag),

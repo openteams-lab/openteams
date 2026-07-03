@@ -337,6 +337,15 @@ const extractMentionHandles = (text: string): string[] =>
     mention.toLowerCase(),
   );
 
+const routeMentionsForText = (text: string): string[] =>
+  Array.from(
+    new Set(
+      Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
+        match[1].toLowerCase(),
+      ),
+    ),
+  );
+
 const normalizeMentionHandle = (name: string): string => {
   const trimmed = name.trim();
   if (!trimmed) return "";
@@ -1725,11 +1734,22 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
         if (chatInputMode === "workflow") {
           await ensureWorkflowRouteToMainAgent();
         }
+        const explicitAttachmentMentions = routeMentionsForText(messageText);
+        const mainAgentRouteMention = mainAgentName
+          ? normalizeMentionHandle(mainAgentName).replace(/^@/, "")
+          : null;
+        const attachmentRouteMentions =
+          explicitAttachmentMentions.length > 0
+            ? explicitAttachmentMentions
+            : chatInputMode !== "workflow" && mainAgentRouteMention
+              ? [mainAgentRouteMention]
+              : undefined;
         await chatMessagesApi.uploadAttachment(activeSessionId, attachedFiles, {
           chatInputMode,
           content: trimmedInput ? messageText : undefined,
           appLanguage: locale,
           referenceMessageId: quotedMessage?.id,
+          mentions: attachmentRouteMentions,
         });
         setInputTextDraft("");
         setQuotedMessage(null);

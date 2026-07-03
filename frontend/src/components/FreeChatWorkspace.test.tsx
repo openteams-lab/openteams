@@ -484,13 +484,14 @@ check(
   source.includes(
     "chatMessagesApi.uploadAttachment(activeSessionId, attachedFiles",
   ) &&
-    source.includes("stagePendingAgentPlaceholder(activeSessionId, messageText") &&
     source.includes("chatInputMode,") &&
     source.includes("ensureWorkflowRouteToMainAgent") &&
     source.includes('if (chatInputMode === "workflow")') &&
     source.includes("await ensureWorkflowRouteToMainAgent()") &&
+    source.includes("const attachmentRouteMentions =") &&
     source.includes("content: trimmedInput ? messageText : undefined") &&
     source.includes("referenceMessageId: quotedMessage?.id") &&
+    source.includes("mentions: attachmentRouteMentions") &&
     source.includes("await refreshMessages()") &&
     apiSource.includes('form.append("file", file, file.name)') &&
     apiSource.includes('form.append("content", options.content)') &&
@@ -498,6 +499,16 @@ check(
       'form.append("reference_message_id", options.referenceMessageId)',
     ) &&
     apiSource.includes('form.append("chat_input_mode", "workflow")'),
+  { source, apiSource },
+);
+check(
+  "attachment send routes unmentioned free-mode uploads to the main agent",
+  source.includes("const routeMentionsForText = (text: string): string[]") &&
+    source.includes("const explicitAttachmentMentions = routeMentionsForText(messageText)") &&
+    source.includes("const mainAgentRouteMention = mainAgentName") &&
+    source.includes('chatInputMode !== "workflow" && mainAgentRouteMention') &&
+    source.includes("mentions: attachmentRouteMentions") &&
+    apiSource.includes('form.append("mentions", JSON.stringify(options.mentions))'),
   { source, apiSource },
 );
 check(

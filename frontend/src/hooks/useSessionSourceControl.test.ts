@@ -115,6 +115,13 @@ check(
 );
 
 check(
+  'commit does not flush pending stage operations',
+  !source.includes('await flushBatchedOperation("stage");') &&
+    source.includes('await flushBatchedOperation("unstage");'),
+  source,
+);
+
+check(
   'updates local status from embedded commit errors',
   source.includes('sourceControlStatusFromError') &&
     source.includes('errorData?.status ?? null') &&
