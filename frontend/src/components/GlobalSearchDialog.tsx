@@ -252,9 +252,9 @@ export function GlobalSearchDialog({
         aria-label="全局搜索"
         className="relative flex max-h-[min(520px,calc(100vh-32px))] w-full max-w-xl flex-col overflow-hidden rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[#17181A]/95 text-[var(--ink)] shadow-[0_28px_72px_rgba(0,0,0,0.48),0_2px_8px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl"
       >
-        <div className="flex items-center gap-3 border-b border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-4 py-2.5">
+        <div className="flex items-center gap-3 border-b border-[rgba(255,255,255,0.045)] bg-[rgba(255,255,255,0.018)] px-4 py-2.5">
           <Search
-            strokeWidth={1.5}
+            strokeWidth={1.75}
             className="h-4.5 w-4.5 shrink-0 text-[rgba(255,255,255,0.42)]"
           />
           <input
@@ -273,13 +273,13 @@ export function GlobalSearchDialog({
             aria-label="筛选隔离 worktree"
             title="筛选隔离 worktree"
             onClick={toggleWorktreeMode}
-            className={`flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-[7px] border shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition ${
+            className={`flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition ${
               worktreeModeActive
-                ? "border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.08)] text-[rgba(255,255,255,0.82)]"
-                : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.035)] text-[rgba(255,255,255,0.42)] hover:border-[rgba(255,255,255,0.14)] hover:bg-[rgba(255,255,255,0.055)] hover:text-[rgba(255,255,255,0.72)]"
+                ? "bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.82)]"
+                : "text-[rgba(255,255,255,0.42)] hover:bg-[rgba(255,255,255,0.045)] hover:text-[rgba(255,255,255,0.72)]"
             }`}
           >
-            <GitBranch strokeWidth={1.5} className="h-3.5 w-3.5" />
+            <GitBranch strokeWidth={1.75} className="h-3.5 w-3.5" />
           </button>
         </div>
 
@@ -306,7 +306,7 @@ export function GlobalSearchDialog({
               className="flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] border border-transparent px-3 py-2 text-left text-[12px] text-[rgba(255,255,255,0.5)] transition hover:border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[rgba(255,255,255,0.86)]"
             >
               <RefreshCw
-                strokeWidth={1.5}
+                strokeWidth={1.75}
                 className="h-3.5 w-3.5 shrink-0 text-[rgba(255,255,255,0.42)]"
               />
               <span className="min-w-0 flex-1 truncate">
@@ -332,10 +332,10 @@ export function GlobalSearchDialog({
                     role="option"
                     aria-selected={active}
                     onClick={() => openResult(result)}
-                    className={`flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] border px-3 py-2 text-left transition ${
+                    className={`flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-left transition ${
                       active
-                        ? "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.9)]"
-                        : "border-transparent text-[rgba(255,255,255,0.58)] hover:bg-[rgba(255,255,255,0.028)] hover:text-[rgba(255,255,255,0.82)]"
+                        ? "bg-[rgba(255,255,255,0.06)] text-[rgba(255,255,255,0.9)]"
+                        : "text-[rgba(255,255,255,0.58)] hover:bg-[rgba(255,255,255,0.035)] hover:text-[rgba(255,255,255,0.82)]"
                     }`}
                   >
                     <span
@@ -345,17 +345,17 @@ export function GlobalSearchDialog({
                           : "text-[rgba(255,255,255,0.38)]"
                       }`}
                     >
-                      <ResultIcon strokeWidth={1.5} className="h-3.5 w-3.5" />
+                      <ResultIcon strokeWidth={1.75} className="h-3.5 w-3.5" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-medium leading-[18px] text-[rgba(255,255,255,0.9)]">
+                      <span className="block truncate text-[14px] font-medium leading-[18px] text-[#f2f2f2]">
                         {resultTitle(result)}
                       </span>
-                      <span className="block truncate text-[12px] leading-[16px] text-[rgba(255,255,255,0.46)]">
+                      <span className="block truncate text-[12px] leading-[16px] text-[rgba(255,255,255,0.4)]">
                         {resultSnippet(result)}
                       </span>
                     </span>
-                    <span className="shrink-0 rounded-full border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.025)] px-1.5 py-0.5 text-[11px] leading-4 text-[rgba(255,255,255,0.48)]">
+                    <span className="shrink-0 rounded-[4px] bg-[rgba(255,255,255,0.04)] px-1.5 py-0.5 text-[11px] leading-4 text-[rgba(255,255,255,0.42)]">
                       {resultMeta(result)}
                     </span>
                   </button>
