@@ -20,7 +20,6 @@ use services::services::{
     config::{Config, load_config_from_file, save_config_to_file},
     container::ContainerService,
     events::EventService,
-    file_search::FileSearchCache,
     filesystem::FilesystemService,
     image::ImageService,
     oauth_credentials::OAuthCredentials,
@@ -55,7 +54,6 @@ pub struct LocalDeployment {
     image: ImageService,
     filesystem: FilesystemService,
     events: EventService,
-    file_search_cache: Arc<FileSearchCache>,
     approvals: Approvals,
     chat_runner: ChatRunner,
     queued_message_service: QueuedMessageService,
@@ -228,8 +226,6 @@ impl Deployment for LocalDeployment {
 
         let events = EventService::new(db.clone(), events_msg_store, events_entry_count);
 
-        let file_search_cache = Arc::new(FileSearchCache::new());
-
         let pty = PtyService::new();
         let deployment = Self {
             config,
@@ -244,7 +240,6 @@ impl Deployment for LocalDeployment {
             image,
             filesystem,
             events,
-            file_search_cache,
             approvals,
             chat_runner,
             queued_message_service,
@@ -301,10 +296,6 @@ impl Deployment for LocalDeployment {
         &self.events
     }
 
-    fn file_search_cache(&self) -> &Arc<FileSearchCache> {
-        &self.file_search_cache
-    }
-
     fn approvals(&self) -> &Approvals {
         &self.approvals
     }
@@ -352,7 +343,6 @@ impl LocalDeployment {
         )
         .await;
         let events = EventService::new(db.clone(), events_msg_store, events_entry_count);
-        let file_search_cache = Arc::new(FileSearchCache::new());
         let pty = PtyService::new();
 
         Ok(Self {
@@ -368,7 +358,6 @@ impl LocalDeployment {
             image,
             filesystem,
             events,
-            file_search_cache,
             approvals,
             chat_runner,
             queued_message_service,

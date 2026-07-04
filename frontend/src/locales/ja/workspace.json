@@ -264,7 +264,7 @@
   "worktree.badge.mergingHint": "セッションの変更をベース workspace にマージしています",
   "worktree.badge.openFailed": "Workspace フォルダーを開けませんでした",
   "worktree.badge.openHint": "ダブルクリックで隔離 workspace を開く",
-  "worktree.badge.pending": "Worktree 未作成",
+  "worktree.badge.pending": "Workspace 作成待ち",
   "worktree.badge.pendingHint": "最初のエージェント実行開始時に隔離 worktree が自動作成されます。",
   "worktree.error.actionFailed": "Worktree 操作に失敗しました: {message}",
   "worktree.history.baseBranch": "ベースブランチ",

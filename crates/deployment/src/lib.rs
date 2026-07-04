@@ -21,7 +21,6 @@ use services::services::{
     config::{Config, ConfigError},
     container::{ContainerError, ContainerService},
     events::{EventError, EventService},
-    file_search::FileSearchCache,
     filesystem::{FilesystemError, FilesystemService},
     filesystem_watcher::FilesystemWatcherError,
     image::{ImageError, ImageService},
@@ -94,8 +93,6 @@ pub trait Deployment: Clone + Send + Sync + 'static {
     fn filesystem(&self) -> &FilesystemService;
 
     fn events(&self) -> &EventService;
-
-    fn file_search_cache(&self) -> &Arc<FileSearchCache>;
 
     fn approvals(&self) -> &Approvals;
 

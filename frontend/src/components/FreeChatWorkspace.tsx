@@ -62,6 +62,10 @@ import {
 } from "@/lib/linkedWorkItemsEvents";
 import { markPendingIssueStatusSync } from "@/lib/pendingIssueStatusSync";
 import { notifyBuildStatsUsageUpdated } from "@/lib/buildStatsEvents";
+import {
+  SOURCE_CONTROL_REFRESH_REQUESTED_EVENT,
+  type SourceControlRefreshRequestedDetail,
+} from "@/lib/sourceControlEvents";
 import { requestTeamMemberInviteNavigation } from "@/lib/teamNavigation";
 import { openInSystemFileManager } from "@/lib/systemFileManager";
 import {
@@ -1265,6 +1269,34 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   useEffect(() => {
     reloadRelatedFiles();
   }, [reloadRelatedFiles]);
+
+  useEffect(() => {
+    const handleSourceControlRefresh = (event: Event) => {
+      const detail = (
+        event as CustomEvent<SourceControlRefreshRequestedDetail>
+      ).detail;
+      if (!detail || detail.sessionId !== activeSessionId) return;
+      if (detail.projectId && detail.projectId !== selectedProjectId) return;
+      if (usesProjectSourceControl) return;
+      reloadRelatedFiles();
+    };
+
+    window.addEventListener(
+      SOURCE_CONTROL_REFRESH_REQUESTED_EVENT,
+      handleSourceControlRefresh,
+    );
+    return () => {
+      window.removeEventListener(
+        SOURCE_CONTROL_REFRESH_REQUESTED_EVENT,
+        handleSourceControlRefresh,
+      );
+    };
+  }, [
+    activeSessionId,
+    reloadRelatedFiles,
+    selectedProjectId,
+    usesProjectSourceControl,
+  ]);
 
   const reloadLinkedWorkItems = useCallback(() => {
     if (!activeSessionId || !selectedProjectId) {

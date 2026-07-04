@@ -297,7 +297,7 @@
   "worktree.badge.mergingHint": "正在将会话变更合并到基础工作区",
   "worktree.badge.openFailed": "无法打开工作区文件夹",
   "worktree.badge.openHint": "双击打开隔离工作区",
-  "worktree.badge.pending": "工作区尚未创建",
+  "worktree.badge.pending": "待创建工作区",
   "worktree.badge.pendingHint": "首次智能体运行开始时会自动创建隔离工作区。",
   "worktree.error.actionFailed": "工作区操作失败：{message}",
   "worktree.history.baseBranch": "基础分支",

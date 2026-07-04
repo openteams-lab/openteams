@@ -34,6 +34,7 @@ use super::{
     IterationFeedbackOutcome, OrchestratorError, ResolvedTranscriptAction, WorkflowOrchestrator,
     load_agents_for_session,
 };
+use crate::services::project::source_control::SourceControlService;
 
 impl WorkflowOrchestrator {
     pub async fn handle_iteration_feedback(
@@ -86,6 +87,7 @@ impl WorkflowOrchestrator {
         execution: &WorkflowExecution,
     ) -> Result<WorkflowExecution, OrchestratorError> {
         if execution.status == WorkflowExecutionStatus::Completed {
+            SourceControlService::invalidate_session_caches(execution.session_id);
             Self::refresh_execution_projection_with_reason(
                 pool,
                 chat_runner,
@@ -165,6 +167,7 @@ impl WorkflowOrchestrator {
             &agents,
         )
         .await?;
+        SourceControlService::invalidate_session_caches(completed_execution.session_id);
 
         Ok(completed_execution)
     }

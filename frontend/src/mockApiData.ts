@@ -518,10 +518,10 @@ export const mockShellOptions: ShellOptionsMock = {
   ],
   primaryActions: [
     {
-      id: 'inbox',
-      label: 'Inbox',
-      icon: 'inbox',
-      helper: 'Local placeholder for incoming project updates.',
+      id: 'search',
+      label: '搜索',
+      icon: 'search',
+      helper: '搜索当前项目的会话、事项、消息和隔离 worktree。',
     },
     {
       id: 'new-session',

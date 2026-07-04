@@ -5,6 +5,14 @@
 // Exits non-zero if any assertion fails.
 
 import { readFileSync } from "node:fs";
+import { resolveGlobalSearchNavigationAction } from "@/lib/globalSearchNavigation";
+import {
+  ChatSenderType,
+  ProjectWorkItemPriority,
+  ProjectWorkItemStatus,
+  SessionWorktreeStatus,
+  type ChatSearchResult,
+} from "../../shared/types";
 
 let failures = 0;
 const check = (label: string, cond: boolean, detail?: unknown) => {
@@ -28,8 +36,52 @@ const legacyDefaultMemberFlag = ["is", "default"].join("_");
 const projectSidebarUsages = source.match(/<ProjectSidebar\b/g) ?? [];
 const sidebarPropsMatches =
   source.match(/\{\.\.\.projectSidebarProps\}/g) ?? [];
+const searchSessionResult: ChatSearchResult = {
+  type: "session",
+  session_id: "sess-1",
+  title: "Fix login flicker",
+  snippet: null,
+  updated_at: "2026-07-04T00:00:00Z",
+};
+const searchMessageResult: ChatSearchResult = {
+  type: "message",
+  message_id: "msg-1",
+  session_id: "sess-2",
+  session_title: "Stripe checkout",
+  snippet: "checkout copy",
+  sender_type: ChatSenderType.user,
+  sender_id: null,
+  sender_label: "User",
+  message_time: "2026-07-04T00:00:00Z",
+};
+const searchWorktreeResult: ChatSearchResult = {
+  type: "worktree",
+  session_id: "sess-3",
+  session_title: "Worktree QA",
+  worktree_id: "wt-1",
+  status: SessionWorktreeStatus.active,
+  branch_name: "session/wt-1",
+  path_summary: "sessions/wt-1",
+  updated_at: "2026-07-04T00:00:00Z",
+};
+const searchIssueResult: ChatSearchResult = {
+  type: "issue",
+  issue_id: "issue-1",
+  project_id: "project-main",
+  title: "Fix issue drawer",
+  snippet: "drawer overflows",
+  status: ProjectWorkItemStatus.open,
+  priority: ProjectWorkItemPriority.high,
+  updated_at: "2026-07-04T00:00:00Z",
+};
 
 check("imports ProjectSidebar", source.includes("import { ProjectSidebar }"));
+check(
+  "imports GlobalSearchDialog",
+  source.includes("GlobalSearchDialog") &&
+    source.includes("@/components/GlobalSearchDialog"),
+  source,
+);
 check(
   "imports CreateAgentSessionModal",
   source.includes("import { CreateAgentSessionModal }"),
@@ -196,9 +248,45 @@ check(
   source,
 );
 check(
-  "passes new-session primary action callback through sidebar props",
+  "passes search/new-session primary action callback through sidebar props",
   source.includes("onPrimaryAction: handlePrimarySidebarAction"),
   source,
+);
+check(
+  "opens global search from search primary action",
+  source.includes("const [isGlobalSearchOpen") &&
+    source.includes('action.id === "search"') &&
+    source.includes("setIsGlobalSearchOpen(true)") &&
+    source.includes("<GlobalSearchDialog"),
+  source,
+);
+check(
+  "global search opens sessions, messages, worktrees, and issues centrally",
+  source.includes("handleGlobalSearchResultOpen") &&
+    source.includes("resolveGlobalSearchNavigationAction(result)") &&
+    source.includes("openIssueTarget(action.target)") &&
+    source.includes("replaceActiveTab(createSessionTab(action.sessionId))"),
+  source,
+);
+check(
+  "resolves global search session result to a session tab jump",
+  JSON.stringify(resolveGlobalSearchNavigationAction(searchSessionResult)) ===
+    JSON.stringify({ kind: "session", sessionId: "sess-1" }),
+);
+check(
+  "resolves global search message and worktree results to session tab jumps",
+  JSON.stringify(resolveGlobalSearchNavigationAction(searchMessageResult)) ===
+    JSON.stringify({ kind: "session", sessionId: "sess-2" }) &&
+    JSON.stringify(resolveGlobalSearchNavigationAction(searchWorktreeResult)) ===
+      JSON.stringify({ kind: "session", sessionId: "sess-3" }),
+);
+check(
+  "resolves global search issue result to issue navigation target",
+  JSON.stringify(resolveGlobalSearchNavigationAction(searchIssueResult)) ===
+    JSON.stringify({
+      kind: "issue",
+      target: { projectId: "project-main", workItemId: "issue-1" },
+    }),
 );
 check(
   "opens create-agent modal from new session action",

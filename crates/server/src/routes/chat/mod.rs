@@ -4,6 +4,7 @@ pub mod presets;
 pub mod queues;
 pub mod runs;
 pub mod runtime;
+pub mod search;
 pub mod sessions;
 pub mod skills;
 pub mod work_items;
@@ -255,6 +256,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             "/chat",
             Router::new()
                 .nest("/sessions", sessions_router)
+                .route("/search", get(search::search_chat))
                 .nest("/agents", agents_router)
                 .nest("/messages", messages_router)
                 .nest("/skills", skills_router)

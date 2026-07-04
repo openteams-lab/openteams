@@ -422,6 +422,13 @@ check(
   { source, workflowCardSource },
 );
 check(
+  'workflow iteration acceptance requests a source-control refresh',
+  workflowCardSource.includes('notifySourceControlRefreshRequested') &&
+    workflowCardSource.includes("payload.action === 'accept'") &&
+    workflowCardSource.includes('notifySourceControlRefreshRequested({ sessionId })'),
+  workflowCardSource,
+);
+check(
   'workflow sidebar running states are centralized',
   source.includes("from '@/lib/workflowSidebarState'") &&
     workflowSidebarStateSource.includes('workflowRunningSidebarStates') &&

@@ -127,6 +127,8 @@ export interface ChatMessageMutationResponse {
 import type {
   AddProjectMemberRequest,
   ChatTeamPreset,
+  ChatSearchQuery,
+  ChatSearchResponse,
   CreateProjectRequest,
   CreateTeamPresetRequest,
   InitializeWorkspaceGitRequest,
@@ -618,6 +620,22 @@ export const chatSessionsApi = {
    */
   streamUrl: (sessionId: string): string =>
     `/api/chat/sessions/${encodeURIComponent(sessionId)}/stream`,
+};
+
+export const chatSearchApi = {
+  search: async (
+    params: ChatSearchQuery = {},
+  ): Promise<ChatSearchResponse> => {
+    const r = await makeRequest(
+      `/api/chat/search${qs({
+        project_id: params.project_id,
+        q: params.q,
+        mode: params.mode,
+      })}`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<ChatSearchResponse>(r);
+  },
 };
 
 export const chatQueuesApi = {
@@ -2288,6 +2306,7 @@ export const api = {
   chatQueues: chatQueuesApi,
   chatRuntime: chatRuntimeApi,
   chatMessages: chatMessagesApi,
+  chatSearch: chatSearchApi,
   chatRuns: chatRunsApi,
   chatAgents: chatAgentsApi,
   sessionAgents: sessionAgentsApi,

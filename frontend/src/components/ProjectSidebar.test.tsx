@@ -374,7 +374,11 @@ check(
   !migratedProjectHtml.includes("__migrate__"),
   migratedProjectHtml,
 );
-check("renders Inbox action", html.includes("Inbox"), html);
+check(
+  "renders Search action in the former Inbox slot",
+  html.includes("搜索") && html.includes("lucide-search") && !html.includes("Inbox"),
+  html,
+);
 check("renders New session action", html.includes("New session"), html);
 check(
   "renders build stats as navigation button",

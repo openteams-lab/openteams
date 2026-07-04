@@ -60,23 +60,6 @@ pub struct ProjectDetails {
     pub session_count: i64,
 }
 
-#[derive(Debug, Serialize, TS)]
-pub struct SearchResult {
-    pub path: String,
-    pub is_file: bool,
-    pub match_type: SearchMatchType,
-    /// Ranking score based on git history (higher = more recently/frequently edited)
-    #[serde(default)]
-    pub score: i64,
-}
-
-#[derive(Debug, Clone, Serialize, TS)]
-pub enum SearchMatchType {
-    FileName,
-    DirectoryName,
-    FullPath,
-}
-
 impl Project {
     pub async fn count(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar!(r#"SELECT COUNT(*) as "count!: i64" FROM projects"#)

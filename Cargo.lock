@@ -2337,12 +2337,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fst"
-version = "0.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ab85b9b05e3978cc9a9cf8fea7f01b494e1a09ed3037e16ba39edc7a29eb61a"
-
-[[package]]
 name = "futures"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3873,13 +3867,10 @@ version = "0.12.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ac832c50ced444ef6be0767a008b02c106a909ba79d1d830501e94b96f6b7e"
 dependencies = [
- "async-lock",
  "crossbeam-channel",
  "crossbeam-epoch",
  "crossbeam-utils",
  "equivalent",
- "event-listener",
- "futures-util",
  "parking_lot",
  "portable-atomic",
  "smallvec",
@@ -6289,7 +6280,6 @@ dependencies = [
  "dunce",
  "enum_dispatch",
  "executors",
- "fst",
  "futures",
  "futures-util",
  "git",
@@ -6297,7 +6287,6 @@ dependencies = [
  "ignore",
  "json-patch",
  "keyring",
- "moka",
  "notify",
  "notify-debouncer-full",
  "notify-rust",

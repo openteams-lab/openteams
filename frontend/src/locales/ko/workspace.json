@@ -264,7 +264,7 @@
   "worktree.badge.mergingHint": "세션 변경 사항을 기본 workspace에 병합 중입니다",
   "worktree.badge.openFailed": "Workspace 폴더를 열 수 없습니다",
   "worktree.badge.openHint": "두 번 클릭해 격리 workspace 열기",
-  "worktree.badge.pending": "Worktree가 생성되지 않음",
+  "worktree.badge.pending": "Workspace 생성 대기",
   "worktree.badge.pendingHint": "첫 에이전트 실행이 시작되면 격리 worktree가 자동으로 생성됩니다.",
   "worktree.error.actionFailed": "Worktree 작업 실패: {message}",
   "worktree.history.baseBranch": "기본 브랜치",

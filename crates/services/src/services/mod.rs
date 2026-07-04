@@ -14,8 +14,6 @@ pub mod cli_manager;
 pub mod config;
 pub mod container;
 pub mod events;
-pub mod file_ranker;
-pub mod file_search;
 pub mod filesystem;
 pub mod filesystem_watcher;
 pub mod git_host;

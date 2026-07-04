@@ -28,13 +28,13 @@ import {
   Hash,
   History,
   Home,
-  Inbox,
   LoaderCircle,
   MoreHorizontal,
   Pencil,
   Pin,
   Plus,
   PlusCircle,
+  Search,
   Settings2,
   Trash2,
   Users,
@@ -120,7 +120,7 @@ interface ProjectSidebarProps {
 }
 
 const primaryActionIcons: Record<SidebarPrimaryAction["icon"], LucideIcon> = {
-  inbox: Inbox,
+  search: Search,
   "plus-circle": PlusCircle,
 };
 

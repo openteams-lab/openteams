@@ -297,7 +297,7 @@
   "worktree.badge.mergingHint": "Merging session changes into the base workspace",
   "worktree.badge.openFailed": "Failed to open workspace folder",
   "worktree.badge.openHint": "Double-click to open isolated workspace",
-  "worktree.badge.pending": "Worktree not created",
+  "worktree.badge.pending": "Workspace pending creation",
   "worktree.badge.pendingHint": "The isolated worktree will be created automatically when the first agent run starts.",
   "worktree.error.actionFailed": "Worktree action failed: {message}",
   "worktree.history.baseBranch": "Base branch",

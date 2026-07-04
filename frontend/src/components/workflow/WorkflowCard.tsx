@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { useQuery } from '@/lib/queryCompat';
 import { chatMessagesApi, workflowApi } from '@/lib/api';
+import { notifySourceControlRefreshRequested } from '@/lib/sourceControlEvents';
 import {
   shouldPollWorkflowProjection,
   WORKFLOW_CARD_REFETCH_INTERVAL_MS,
@@ -277,8 +278,8 @@ export function WorkflowCard({
       additional_notes?: string | null;
     };
   }) =>
-    void withPending(payload.executionId, () =>
-      workflowApi.submitIterationFeedback({
+    void withPending(payload.executionId, async () => {
+      await workflowApi.submitIterationFeedback({
         execution_id: payload.executionId,
         action: payload.action,
         feedback: payload.feedback
@@ -287,8 +288,11 @@ export function WorkflowCard({
               additional_notes: payload.feedback.additional_notes ?? null,
             }
           : null,
-      }),
-    );
+      });
+      if (payload.action === 'accept') {
+        notifySourceControlRefreshRequested({ sessionId });
+      }
+    });
 
   const handleUpdateReviewSettings = (
     executionId: string,

@@ -264,7 +264,7 @@
   "worktree.badge.mergingHint": "Fusionando cambios de la sesión en el workspace base",
   "worktree.badge.openFailed": "No se pudo abrir la carpeta del workspace",
   "worktree.badge.openHint": "Doble clic para abrir el workspace aislado",
-  "worktree.badge.pending": "Worktree no creado",
+  "worktree.badge.pending": "Workspace pendiente de creación",
   "worktree.badge.pendingHint": "El worktree aislado se creará automáticamente cuando empiece la primera ejecución del agente.",
   "worktree.error.actionFailed": "La acción de worktree falló: {message}",
   "worktree.history.baseBranch": "Rama base",

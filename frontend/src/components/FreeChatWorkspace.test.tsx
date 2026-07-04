@@ -163,6 +163,16 @@ check(
   source,
 );
 check(
+  "refreshes plain related files from source-control refresh events",
+  source.includes("SOURCE_CONTROL_REFRESH_REQUESTED_EVENT") &&
+    source.includes("SourceControlRefreshRequestedDetail") &&
+    source.includes("handleSourceControlRefresh") &&
+    source.includes("detail.sessionId !== activeSessionId") &&
+    source.includes("usesProjectSourceControl") &&
+    source.includes("reloadRelatedFiles();"),
+  source,
+);
+check(
   "keeps the member invite action fixed outside the avatar rail and uses click filtering",
   memberRailIndex >= 0 &&
     memberRailCloseIndex > memberRailIndex &&
