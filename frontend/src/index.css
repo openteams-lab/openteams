@@ -476,6 +476,31 @@ body[data-mode="light"] .animate-shimmer::after {
   display: none;
 }
 
+.global-search-input::-webkit-search-decoration,
+.global-search-input::-webkit-search-cancel-button,
+.global-search-input::-webkit-search-results-button,
+.global-search-input::-webkit-search-results-decoration {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.global-search-clear-button {
+  color: #3f3f46;
+}
+
+.global-search-clear-button:hover {
+  color: #52525b;
+}
+
+body[data-mode="light"] .global-search-clear-button {
+  color: #d4d4d8;
+}
+
+body[data-mode="light"] .global-search-clear-button:hover {
+  color: #f4f4f5;
+}
+
 .project-sidebar-scrollbars-hidden,
 .project-sidebar-scrollbars-hidden * {
   scrollbar-color: transparent transparent;

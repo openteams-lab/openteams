@@ -537,6 +537,12 @@ const getOptions = (): HTMLButtonElement[] =>
       node instanceof dom.window.HTMLButtonElement,
   );
 
+const getResultsPanel = (): HTMLElement | null =>
+  document.querySelector("[data-global-search-results-panel]");
+
+const getClearButton = (): HTMLButtonElement | null =>
+  document.querySelector("[data-global-search-clear]");
+
 const getSelectedIndex = (): number =>
   getOptions().findIndex(
     (option) => option.getAttribute("aria-selected") === "true",
@@ -586,14 +592,11 @@ await openSearch();
 check("clicking sidebar Search opens the dialog", !!document.querySelector('[role="dialog"]'));
 check("dialog focuses the query input", document.activeElement === getInput());
 check(
-  "empty query goes through the real API adapter with project scope",
-  fetchCalls.some(
-    (call) =>
-      call.pathname === "/api/chat/search" &&
-      call.projectId === projectMain &&
-      call.q === "" &&
-      call.mode === ChatSearchMode.all,
-  ),
+  "empty query does not call the search API or render result rows",
+  !fetchCalls.some((call) => call.pathname === "/api/chat/search") &&
+    getOptions().length === 0 &&
+    getResultsPanel() === null &&
+    getClearButton() === null,
   fetchCalls,
 );
 const dialogShell = document.querySelector('[role="dialog"]')?.parentElement;
@@ -602,7 +605,7 @@ check(
   dialogShell?.className.includes("px-4") === true &&
     document
       .querySelector('[role="dialog"]')
-      ?.className.includes("calc(100vh-32px)") === true,
+      ?.className.includes("max-h-[min(640px,calc(100vh-32px))]") === true,
   document.body.innerHTML,
 );
 
@@ -623,7 +626,11 @@ check(
 );
 check(
   "session title matches have priority over issue and message matches",
-  getOptions().length === 1 &&
+    getOptions().length === 1 &&
+    getResultsPanel()?.className.includes("max-h-[min(520px,calc(100vh-128px))]") === true &&
+    getClearButton()?.className.includes("global-search-clear-button") === true &&
+    getClearButton()?.className.includes("hover:bg") === false &&
+    getClearButton()?.innerHTML.includes("lucide-x") === true &&
     getOptions()[0]?.textContent?.includes("Alpha planning session") === true &&
     !document.body.textContent?.includes("Alpha issue should lose") &&
     !document.body.textContent?.includes("another project"),
@@ -680,6 +687,8 @@ check(
 await openSearch();
 await click(getFilterButton());
 await wait(30);
+await setInputValue("worktree-filter");
+await wait(220);
 check(
   "worktree filter requests worktree mode and shows scoped worktree sessions",
   getFilterButton().getAttribute("aria-pressed") === "true" &&

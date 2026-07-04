@@ -185,6 +185,12 @@ const getOptions = (): HTMLButtonElement[] =>
       node instanceof dom.window.HTMLButtonElement,
   );
 
+const getResultsPanel = (): HTMLElement | null =>
+  document.querySelector("[data-global-search-results-panel]");
+
+const getClearButton = (): HTMLButtonElement | null =>
+  document.querySelector("[data-global-search-clear]");
+
 const setInputValue = async (value: string): Promise<void> => {
   await act(async () => {
     const input = getInput();
@@ -238,15 +244,16 @@ const main = async () => {
 
   check("打开后真实聚焦输入框", document.activeElement === getInput());
   check(
-    "空查询真实请求最近会话",
-    searchCalls[0]?.project_id === "project-main" &&
-      searchCalls[0]?.q === "" &&
-      searchCalls[0]?.mode === ChatSearchMode.all,
+    "空查询不请求接口也不显示结果项",
+    searchCalls.length === 0 &&
+      getOptions().length === 0 &&
+      getResultsPanel() === null &&
+      getClearButton() === null,
     searchCalls,
   );
   check(
-    "结果列表默认真实选中第一项",
-    getOptions()[0]?.getAttribute("aria-selected") === "true",
+    "空查询没有默认选中项",
+    getOptions().length === 0,
   );
 
   const callsBeforeDebounce = searchCalls.length;
@@ -259,6 +266,16 @@ const main = async () => {
     searchCalls.at(-1)?.q === "ab" &&
       searchCalls.at(-1)?.mode === ChatSearchMode.all,
     searchCalls,
+  );
+  check(
+    "results panel uses the expanded height cap after a query",
+    getResultsPanel()?.className.includes(
+      "max-h-[min(520px,calc(100vh-128px))]",
+    ) === true &&
+      getClearButton()?.className.includes("global-search-clear-button") ===
+        true &&
+      getClearButton()?.className.includes("hover:bg") === false &&
+      getClearButton()?.innerHTML.includes("lucide-x") === true,
   );
 
   await pressKey("ArrowDown");
@@ -304,6 +321,8 @@ const main = async () => {
     },
   });
   await wait(20);
+  await setInputValue("ab");
+  await wait(220);
   await click(getOptions()[1]);
   check(
     "鼠标点击真实直接打开目标结果",
@@ -327,6 +346,8 @@ const main = async () => {
   await wait(20);
   await click(getFilterButton());
   await wait(20);
+  await setInputValue("qa");
+  await wait(220);
   check(
     "worktree 筛选真实切换模式并请求 worktree 结果",
     getFilterButton().getAttribute("aria-pressed") === "true" &&
@@ -337,10 +358,26 @@ const main = async () => {
 
   await renderDialog({ search: async () => ({ results: [] }) });
   await wait(20);
+  await setInputValue("zz");
+  await wait(220);
   check(
     "空结果真实显示空状态",
     document.body.textContent?.includes("没有匹配结果") === true,
   );
+
+  const clearButton = getClearButton();
+  if (!clearButton) {
+    check("clear button renders for a non-empty query", false);
+  } else {
+    await click(clearButton);
+    await wait(20);
+    check(
+      "clear button empties the query and collapses the results panel",
+      getInput().value === "" &&
+        getOptions().length === 0 &&
+        getResultsPanel() === null,
+    );
+  }
 
   const retryCalls: ChatSearchQuery[] = [];
   let shouldFail = true;
