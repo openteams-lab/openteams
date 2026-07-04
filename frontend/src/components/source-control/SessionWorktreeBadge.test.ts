@@ -111,6 +111,13 @@ check(
     source.includes("<WorktreeActionButton"),
 );
 
+check(
+  "uses FolderGit2 for worktree identity states",
+  source.includes("FolderGit2") &&
+    source.includes('<FolderGit2 className="h-3 w-3 text-[var(--ink-tertiary)]"') &&
+    source.includes('<FolderGit2 className="h-3 w-3 text-[var(--primary)]"'),
+);
+
 // Verify all backend statuses are mapped in badgeConfigFor.
 const statuses = [
   "creating",

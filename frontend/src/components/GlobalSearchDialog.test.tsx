@@ -269,6 +269,12 @@ const main = async () => {
     getOptions().length === 0,
   );
 
+  check(
+    "worktree filter uses a workspace-oriented icon",
+    getFilterButton().innerHTML.includes("lucide-folder-git-2") === true &&
+      getFilterButton().innerHTML.includes("lucide-git-branch") === false,
+  );
+
   const callsBeforeDebounce = searchCalls.length;
   await setInputValue("ab");
   await wait(80);

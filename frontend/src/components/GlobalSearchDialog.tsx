@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import {
-  GitBranch,
+  FolderGit2,
   MessageSquareText,
   RefreshCw,
   Search,
@@ -98,7 +98,7 @@ const resultIcon = (result: ChatSearchResult) =>
   result.type === "message"
     ? MessageSquareText
     : result.type === "worktree"
-      ? GitBranch
+      ? FolderGit2
       : Search;
 
 export function GlobalSearchDialog({
@@ -326,7 +326,7 @@ export function GlobalSearchDialog({
                 : "text-[rgba(255,255,255,0.42)] hover:bg-[rgba(255,255,255,0.045)] hover:text-[rgba(255,255,255,0.72)]"
             }`}
           >
-            <GitBranch strokeWidth={1.75} className="h-3.5 w-3.5" />
+            <FolderGit2 strokeWidth={1.6} className="h-3.5 w-3.5" />
           </button>
         </div>
 

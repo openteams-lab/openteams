@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BookOpen,
   CheckCircle2,
+  FolderGit2,
   Loader2,
   RefreshCw,
   Trash2,
@@ -161,19 +162,13 @@ const toneIcon = (tone: BadgeConfig['tone'], busy: boolean) => {
   switch (tone) {
     case 'pending':
       return (
-        <span
-          className="h-1.5 w-1.5 rounded-full bg-[var(--ink-tertiary)]"
-          aria-hidden
-        />
+        <FolderGit2 className="h-3 w-3 text-[var(--ink-tertiary)]" aria-hidden />
       );
     case 'preparing':
       return <Loader2 className="h-3 w-3 animate-spin" aria-hidden />;
     case 'active':
       return (
-        <span
-          className="h-1.5 w-1.5 rounded-full bg-[var(--primary)]"
-          aria-hidden
-        />
+        <FolderGit2 className="h-3 w-3 text-[var(--primary)]" aria-hidden />
       );
     case 'conflict':
       return <AlertTriangle className="h-3 w-3" aria-hidden />;

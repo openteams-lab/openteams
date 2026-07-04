@@ -1,4 +1,4 @@
-import { Check, GitFork, X } from 'lucide-react';
+import { Check, FolderGit2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import {
@@ -137,7 +137,7 @@ export function IssueWorktreeSessionDialog({
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex min-w-0 items-start gap-1.5 text-[14px] font-semibold leading-snug text-[var(--ink)]">
-                <GitFork className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <FolderGit2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span className="min-w-0 break-words">
                   {tr(
                     'createSession.isolateWorktree',

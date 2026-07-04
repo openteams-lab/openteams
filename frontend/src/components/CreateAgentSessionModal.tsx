@@ -4,8 +4,8 @@ import {
   Check,
   ChevronRight,
   FileText,
+  FolderGit2,
   GitBranch,
-  GitFork,
   Image as ImageIcon,
   Maximize2,
   Paperclip,
@@ -927,7 +927,7 @@ export function CreateAgentSessionModal({
                 )
               }
             >
-              <GitFork className="h-3 w-3" />
+              <FolderGit2 className="h-3 w-3" />
               <span>
                 {translate(
                   t,

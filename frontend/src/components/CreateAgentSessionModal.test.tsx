@@ -286,6 +286,13 @@ check(
   source,
 );
 check(
+  'worktree toggle uses the shared FolderGit2 icon',
+  source.includes('FolderGit2') &&
+    source.includes('<FolderGit2 className="h-3 w-3" />') &&
+    !source.includes('GitFork'),
+  source,
+);
+check(
   'plan mode control toggles between workflow and free chat',
   source.includes('handleTogglePlanMode') &&
     source.includes("isPlanMode ? 'freeChat' : 'workflow'"),

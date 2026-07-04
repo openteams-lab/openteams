@@ -26,8 +26,9 @@ console.log('IssueWorktreeSessionDialog');
 
 check(
   'uses an icon for the checked state instead of corrupted text',
-  source.includes("import { Check, GitFork, X }") &&
+  source.includes("import { Check, FolderGit2, X }") &&
     source.includes('<Check className="h-3 w-3" aria-hidden />') &&
+    source.includes('<FolderGit2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />') &&
     !source.includes('鉁'),
   source,
 );
