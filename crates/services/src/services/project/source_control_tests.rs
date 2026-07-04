@@ -918,6 +918,47 @@ async fn externally_committed_other_session_path_is_not_shared() {
 }
 
 #[tokio::test]
+async fn externally_committed_current_session_path_is_pruned_when_path_changes_again() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+    let first_session =
+        seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
+    sqlx::query(
+        "UPDATE chat_runs SET created_at = datetime('now', '-10 seconds') WHERE session_id = ?",
+    )
+    .bind(first_session)
+    .execute(&pool)
+    .await
+    .expect("backdate first session observation");
+    SourceControlService::invalidate_session_caches(first_session);
+
+    fs::write(repo_path.join("tracked.txt"), "external commit\n").expect("modify tracked");
+    git_add(&repo_path, "tracked.txt");
+    GitService::new()
+        .commit(&repo_path, "external commit")
+        .expect("manual external commit");
+
+    let _second_session =
+        seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
+    fs::write(repo_path.join("tracked.txt"), "second session follow-up\n")
+        .expect("modify tracked again");
+
+    let status = SourceControlService::new()
+        .session_status(&pool, project.id, first_session, None)
+        .await
+        .expect("status");
+
+    let SessionSourceControlStatus::Git { changes, .. } = status else {
+        panic!("expected git status");
+    };
+    assert!(
+        changes.is_empty(),
+        "externally committed first-session path should be pruned even when the path is dirty again"
+    );
+}
+
+#[tokio::test]
 async fn other_session_path_observed_after_commit_is_shared_again() {
     let pool = setup_pool().await;
     let (_tempdir, repo_path) = setup_git_workspace();

@@ -1678,12 +1678,15 @@ async fn filter_committed_session_paths(
         return Ok(paths);
     }
 
+    let path_list = paths.keys().cloned().collect::<Vec<_>>();
     let committed_paths = collect_committed_path_times(pool, context, session_id).await?;
-    if committed_paths.is_empty() {
-        return Ok(paths);
-    }
-
-    let remaining_changed_paths = if is_git_repo(&context.workspace_path) {
+    let workspace_is_git_repo = is_git_repo(&context.workspace_path);
+    let head_commit_times_by_path = if workspace_is_git_repo {
+        last_head_commit_times_for_paths(&context.workspace_path, &path_list)
+    } else {
+        HashMap::new()
+    };
+    let remaining_changed_paths = if workspace_is_git_repo {
         changed_paths(&context.workspace_path)?
     } else {
         BTreeSet::new()
@@ -1691,16 +1694,32 @@ async fn filter_committed_session_paths(
     let mut retained_paths = BTreeMap::new();
     let mut pruned_paths = Vec::new();
     for (path, state) in paths {
-        let keep = remaining_changed_paths.contains(&path)
-            || state
-                .last_observed_at
-                .as_ref()
-                .and_then(|last_observed_at| {
-                    committed_paths
-                        .get(&path)
-                        .map(|committed_at| committed_at < last_observed_at)
-                })
-                .unwrap_or(true);
+        let committed_after_observation = state
+            .last_observed_at
+            .as_ref()
+            .map(|last_observed_at| {
+                let delivery_committed_after_observation = committed_paths
+                    .get(&path)
+                    .map(|committed_at| committed_at >= last_observed_at)
+                    .unwrap_or(false);
+                let head_committed_after_observation = head_commit_times_by_path
+                    .get(&path)
+                    .map(|committed_at| committed_at >= last_observed_at)
+                    .unwrap_or(false);
+                delivery_committed_after_observation || head_committed_after_observation
+            })
+            .unwrap_or(false);
+        let keep = !committed_after_observation
+            && (remaining_changed_paths.contains(&path)
+                || state
+                    .last_observed_at
+                    .as_ref()
+                    .and_then(|last_observed_at| {
+                        committed_paths
+                            .get(&path)
+                            .map(|committed_at| committed_at < last_observed_at)
+                    })
+                    .unwrap_or(true));
         if keep {
             retained_paths.insert(path, state);
         } else {
