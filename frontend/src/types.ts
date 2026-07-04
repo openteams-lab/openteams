@@ -213,7 +213,7 @@ export interface Strategy {
   recommended?: boolean;
 }
 
-export type SidebarPrimaryActionId = 'inbox' | 'new-session';
+export type SidebarPrimaryActionId = 'search' | 'new-session';
 
 export type SidebarNavigationTarget =
   | 'workspace'

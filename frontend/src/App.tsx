@@ -14,6 +14,7 @@ import { DiffViewTab } from "@/components/DiffViewTab";
 import { WorktreeMergeConflictsSection } from "@/pages/worktree/WorktreeMergeConflictsSection";
 import { NotificationToast } from "@/components/NotificationToast";
 import { ProjectSidebar } from "@/components/ProjectSidebar";
+import { GlobalSearchDialog } from "@/components/GlobalSearchDialog";
 import {
   OnboardingGuide,
   compareVersions,
@@ -71,6 +72,7 @@ import {
 } from "@/lib/teamNavigation";
 import { notifyLinkedWorkItemsChanged } from "@/lib/linkedWorkItemsEvents";
 import { notifySourceControlRefreshRequested } from "@/lib/sourceControlEvents";
+import { resolveGlobalSearchNavigationAction } from "@/lib/globalSearchNavigation";
 import { mapSession } from "@/lib/mappers";
 import { mockFrontendApi } from "@/lib/mockFrontendApi";
 import { projectDisplayName } from "@/lib/projectDisplay";
@@ -86,6 +88,7 @@ import type { ShellOptionsMock } from "@/mockApiData";
 import {
   type BaseCodingAgent as ProjectBaseCodingAgent,
   type ChatMemberPreset,
+  type ChatSearchResult,
   type ChatTeamPreset,
   OnboardingAppearance,
   type OnboardingState,
@@ -481,6 +484,7 @@ function WorkspaceLayout() {
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   const [isCreateSessionModalOpen, setIsCreateSessionModalOpen] =
     useState(false);
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
   const [onboardingOverlay, setOnboardingOverlay] =
     useState<OnboardingOverlay>(null);
   const [onboardingState, setOnboardingState] =
@@ -1063,6 +1067,17 @@ function WorkspaceLayout() {
     replaceActiveTab(createPageTab(page, label));
   };
 
+  const openIssueTarget = (target: IssueNavigationTarget) => {
+    storeIssueNavigationTarget(target);
+    if (target.projectId && target.projectId !== selectedProjectId) {
+      setSelectedProjectId(target.projectId);
+    }
+    openPageTab("issue", getPageTabLabel("issue"));
+    window.dispatchEvent(
+      new CustomEvent(ISSUE_NAVIGATION_TARGET_CHANGED_EVENT),
+    );
+  };
+
   const openReusableDiffTab = (
     nextTab: Extract<WorkspaceTab, { kind: "diff" | "sc-diff" }>,
   ) => {
@@ -1108,14 +1123,7 @@ function WorkspaceLayout() {
       const target = (event as CustomEvent<IssueNavigationTarget>).detail;
       if (!target?.workItemId) return;
 
-      storeIssueNavigationTarget(target);
-      if (target.projectId && target.projectId !== selectedProjectId) {
-        setSelectedProjectId(target.projectId);
-      }
-      openPageTab("issue", getPageTabLabel("issue"));
-      window.dispatchEvent(
-        new CustomEvent(ISSUE_NAVIGATION_TARGET_CHANGED_EVENT),
-      );
+      openIssueTarget(target);
     };
     const handleNavigateTeamMemberInvite = (event: Event) => {
       const target =
@@ -1261,6 +1269,21 @@ function WorkspaceLayout() {
     closeMobileSidebar();
   };
 
+  const handleGlobalSearchResultOpen = (result: ChatSearchResult) => {
+    const action = resolveGlobalSearchNavigationAction(result);
+    if (!action) return;
+
+    if (action.kind === "issue") {
+      openIssueTarget(action.target);
+      closeMobileSidebar();
+      return;
+    }
+
+    replaceActiveTab(createSessionTab(action.sessionId));
+    setActiveSessionId(action.sessionId);
+    closeMobileSidebar();
+  };
+
   const handleAddSessionTab = () => {
     const nextSession = sessions.find(
       (session) => !openSessionTabIds.includes(session.id),
@@ -1359,6 +1382,11 @@ function WorkspaceLayout() {
   };
 
   const handlePrimarySidebarAction = (action: SidebarPrimaryAction) => {
+    if (action.id === "search") {
+      setIsGlobalSearchOpen(true);
+      closeMobileSidebar();
+      return;
+    }
     if (action.id === "new-session") {
       setIsCreateSessionModalOpen(true);
       closeMobileSidebar();
@@ -1920,6 +1948,13 @@ function WorkspaceLayout() {
         t={t}
         onClose={() => setIsCreateSessionModalOpen(false)}
         onCreate={handleCreateAgentSession}
+      />
+
+      <GlobalSearchDialog
+        open={isGlobalSearchOpen}
+        projectId={selectedProjectId}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        onOpenResult={handleGlobalSearchResultOpen}
       />
 
       {onboardingOverlay && (

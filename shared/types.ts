@@ -616,6 +616,14 @@ export type ValidateProviderResponse = { valid: boolean, message: string, };
 
 export type ChatSessionListQuery = { status: ChatSessionStatus | null, project_id: string | null, };
 
+export enum ChatSearchMode { all = "all", worktree = "worktree" }
+
+export type ChatSearchQuery = { project_id?: string | null, q?: string | null, mode?: ChatSearchMode | null, };
+
+export type ChatSearchResult = { "type": "session", session_id: string, title: string, snippet: string | null, updated_at: string, } | { "type": "issue", issue_id: string, project_id: string, title: string, snippet: string | null, status: ProjectWorkItemStatus, priority: ProjectWorkItemPriority, updated_at: string, } | { "type": "message", message_id: string, session_id: string, session_title: string, snippet: string, sender_type: ChatSenderType, sender_id: string | null, sender_label: string, message_time: string, } | { "type": "worktree", session_id: string, session_title: string, worktree_id: string, status: SessionWorktreeStatus, branch_name: string, path_summary: string, updated_at: string, };
+
+export type ChatSearchResponse = { results: Array<ChatSearchResult>, };
+
 export type CreateChatSessionAgentRequest = { agent_id: string, workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
 
 export type UpdateChatSessionAgentRequest = { workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
