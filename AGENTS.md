@@ -242,6 +242,103 @@ Workflow invariants:
 - Source-control data should be scoped to the selected project/session/worktree
   and must not leak files from unrelated session roots.
 
+## Current Implementation Boundary Notes
+
+These notes are based on the current code shape and should guide small future
+changes. Keep new behavior on the core path instead of extending compatibility
+or duplicate paths.
+
+### Core Paths
+
+- Chat execution: `crates/services/src/services/chat_runner/` is the runtime
+  center for free-chat runs, queues, streams, run records, workspace prompts,
+  token metadata, and file-change capture. Route handlers in
+  `crates/server/src/routes/chat/` should remain thin adapters.
+- Workflow execution: `workflow/compiler/` validates and materializes plan
+  JSON; `workflow/orchestrator/` schedules work, owns runtime commands, and
+  routes status changes through `orchestrator/reducer.rs`; `workflow/runtime/`
+  builds prompts, runs agents, persists transcripts, and builds card
+  projections.
+- Session worktrees: `SessionWorktreeService` plus
+  `chat_session_worktree.rs` form the state machine and persistence boundary.
+  `worktree_manager.rs` is the low-level Git worktree adapter, and
+  `routes/chat/worktree.rs` should only call the service.
+- Source control: `services/project/source_control.rs` is the authoritative
+  service for session-scoped status, diff, stage/unstage/discard, commit,
+  shared-file guards, cache invalidation, and worktree-aware workspace
+  selection.
+- Frontend runtime state: `frontend/src/context/WorkspaceContext.tsx`,
+  `frontend/src/App.tsx`, `FreeChatWorkspace`, `WorkflowWorkspace`,
+  `frontend/src/components/workflow/`, `useSessionWorktree`, and
+  `SessionSourceControlPanel` are the main UI coordination path.
+
+### Compatibility, Historical, And Duplicate Logic
+
+- `ChatSessionWorktreeMode::inherit | disabled` and the generated
+  `assets/chat/session_*/agents/*` workspace fallback preserve the historical
+  main-workspace behavior for sessions that do not opt into isolation.
+- Workspace routing is currently duplicated across
+  `chat_runner/prompting.rs`, `workflow/runtime/prompts.rs`,
+  `project/source_control.rs`, and `routes/chat/sessions.rs`. They must agree
+  on active worktree vs base workspace behavior.
+- `routes/chat/sessions.rs` contains historical workspace discovery from
+  session-agent rows, chat runs, work items, and artifact text so old runs still
+  appear in workspace/source-control views.
+- Workflow card projection has full and lightweight builders in
+  `workflow/runtime/projection.rs` with substantial shared mapping logic.
+- Some route responses still return status strings with
+  `format!("{:?}", status).to_lowercase()` for legacy frontend compatibility.
+  New status output should use typed wire helpers such as
+  `to_workflow_wire_value` or enum serde.
+- Worktree cleanup has a disabled legacy `/cleanup` route and a newer explicit
+  discard path. Conflict resolution also keeps compatibility aliases such as
+  `/worktree/resolve`.
+- Startup/database compatibility includes migration shims, legacy project
+  migration, and executor/profile legacy key normalization. Do not add product
+  behavior there unless the change is explicitly migration-only.
+
+### Areas That Will Get Complex If Extended In Place
+
+- Adding another workspace resolver will make chat runs, workflow runs,
+  source-control status, and worktree merge UI diverge. Add one shared resolver
+  instead of copying conditions.
+- Adding workflow states or controls directly in route handlers or frontend
+  conditionals will bypass reducer/projection semantics and create state
+  combinations the backend does not accept.
+- Adding fields to workflow card projections requires touching both full and
+  lightweight builders; otherwise session lists and expanded cards drift.
+- Expanding `source_control.rs` further in one file will mix workspace
+  resolution, Git mutation, cache policy, shared-file safety, and delivery
+  record updates in ways that are hard to test narrowly.
+- Extending `SessionWorktreeService` with more merge strategies, cleanup
+  policies, or conflict formats in the same file will blur reducer rules,
+  Git execution, and UI-facing read models.
+- Adding more session badges, workflow indicators, or tab behaviors directly to
+  `WorkspaceContext.tsx` / `App.tsx` will increase cross-feature coupling in
+  the main shell.
+
+### Suggested Minimum Refactor Scope
+
+- Extract a shared session workspace resolver used by chat runner, workflow
+  runtime, project source control, and session workspace routes. It should
+  return the effective path plus why it was chosen (`active_worktree`,
+  `base_after_terminal_worktree`, `session_agent`, `session_default`,
+  `generated_fallback`).
+- Replace remaining raw debug-lowercase status responses with typed wire helper
+  functions while keeping response shapes unchanged.
+- Factor workflow projection into shared mapping helpers or a projection
+  context so full/lightweight modes only differ in detail level, not in copied
+  business logic.
+- Split source control into internal modules for workspace context, status/diff
+  reads, mutations, shared-file guards, and cache invalidation, preserving the
+  existing public service API first.
+- Split `SessionWorktreeService` internally into transition/reducer, merge and
+  conflict operations, cleanup operations, and workspace-routing helpers while
+  keeping `routes/chat/worktree.rs` unchanged.
+- Keep the first pass behavior-preserving and test it with targeted coverage:
+  worktree lifecycle tests, workflow orchestrator/projection tests,
+  source-control scoping tests, and frontend view-model/hook tests.
+
 ## Shared Types
 
 Rust structs/enums intended for the frontend should derive `TS` and be listed
