@@ -48,8 +48,18 @@ const requiredLocaleKeys = [
 ];
 
 const requiredNotificationLocaleKeys = [
-  'settings.notifications.inboxAlwaysOn.title',
-  'settings.notifications.inboxAlwaysOn.desc',
+  'settings.notifications.inboxSources.title',
+  'settings.notifications.inboxSources.desc',
+  'settings.notifications.source.chatMessage.title',
+  'settings.notifications.source.chatMessage.desc',
+  'settings.notifications.source.workflowAction.title',
+  'settings.notifications.source.workflowAction.desc',
+  'settings.notifications.source.approval.title',
+  'settings.notifications.source.approval.desc',
+  'settings.notifications.source.worktree.title',
+  'settings.notifications.source.worktree.desc',
+  'settings.notifications.source.failure.title',
+  'settings.notifications.source.failure.desc',
   'settings.notifications.saveFailed',
   'settings.notifications.sound.abstractSound1',
   'settings.notifications.sound.abstractSound2',
@@ -75,7 +85,31 @@ check(
     settingsSource.includes('push_enabled') &&
     settingsSource.includes('sound_enabled') &&
     settingsSource.includes('sound_file') &&
+    settingsSource.includes('inbox_sources') &&
+    settingsSource.includes("key: 'chat_message'") &&
+    settingsSource.includes("key: 'workflow_action'") &&
+    settingsSource.includes("key: 'approval'") &&
+    settingsSource.includes("key: 'worktree'") &&
+    settingsSource.includes("key: 'failure'") &&
     settingsSource.includes('SoundFile.ABSTRACT_SOUND3'),
+  settingsSource,
+);
+
+check(
+  'notification source settings control Bell inbox reminders, not per-source sounds',
+  settingsSource.includes('settings.notifications.inboxSources.title') &&
+    settingsSource.includes('NotificationInboxSourcesConfig') &&
+    !settingsSource.includes('sound_sources') &&
+    !settingsSource.includes('settings.notifications.soundSources') &&
+    !settingsSource.includes('settings.notifications.sources'),
+  settingsSource,
+);
+
+check(
+  'notification settings avoid stale Bell persistence copy',
+  !settingsSource.includes('Persistent Bell inbox') &&
+    !settingsSource.includes('inboxAlwaysOn') &&
+    !settingsSource.includes('always stored in the Bell inbox'),
   settingsSource,
 );
 
@@ -134,6 +168,14 @@ for (const locale of ['en', 'zh', 'ja', 'ko', 'fr', 'es']) {
     requiredNotificationLocaleKeys.every((key) =>
       localeSource.includes(`"${key}"`),
     ),
+    localeSource,
+  );
+  check(
+    `locale ${locale} does not describe per-source sound settings`,
+    !localeSource.includes('sound_sources') &&
+      !localeSource.includes('settings.notifications.soundSources') &&
+      !localeSource.includes('settings.notifications.sources') &&
+      !localeSource.includes('按通知来源控制哪些事件允许播放提示音'),
     localeSource,
   );
 }

@@ -369,6 +369,8 @@ fn generate_types_content() -> String {
         services::services::workflow::workflow_iteration::UserIterationFeedback::decl(),
         services::services::config::Config::decl(),
         services::services::config::NotificationConfig::decl(),
+        services::services::config::NotificationInboxSourcesConfig::decl(),
+        services::services::config::NotificationInboxSource::decl(),
         services::services::config::ThemeMode::decl(),
         services::services::config::EditorConfig::decl(),
         services::services::config::EditorType::decl(),

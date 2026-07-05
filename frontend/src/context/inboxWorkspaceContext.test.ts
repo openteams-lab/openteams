@@ -24,10 +24,24 @@ const source = readFileSync(
   'utf8',
 );
 const autoReadableStart = source.indexOf('const isAutoReadableInboxItem');
-const autoReadableEnd = source.indexOf('const isThemePreference', autoReadableStart);
+const autoReadableEnd = source.indexOf(
+  'const isThemePreference',
+  autoReadableStart,
+);
 const autoReadableSource =
   autoReadableStart >= 0 && autoReadableEnd > autoReadableStart
     ? source.slice(autoReadableStart, autoReadableEnd)
+    : '';
+const refreshInboxStart = source.indexOf(
+  'const refreshInbox = useCallback(async (): Promise<void> => {',
+);
+const refreshInboxEnd = source.indexOf(
+  'const scheduleInboxRefresh = useCallback',
+  refreshInboxStart,
+);
+const refreshInboxSource =
+  refreshInboxStart >= 0 && refreshInboxEnd > refreshInboxStart
+    ? source.slice(refreshInboxStart, refreshInboxEnd)
     : '';
 const runningSidebarRefreshStart = source.indexOf(
   'const refreshRunningSidebarSessions = () => {',
@@ -89,6 +103,23 @@ check(
     'void refreshSessionRunningIndicators(sessionId);',
   ) && runningSidebarRefreshSource.includes('scheduleInboxRefresh();'),
   runningSidebarRefreshSource,
+);
+
+check(
+  'filters Bell reminders by source and plays one global inbox sound without a separate sound helper file',
+  !source.includes("from '@/lib/inboxNotificationSound'") &&
+    refreshInboxSource.includes('filterInboxSummaryForEnabledSources') &&
+    refreshInboxSource.includes('filterInboxItemsForEnabledSources') &&
+    refreshInboxSource.includes('inboxNotificationSettingsSignature') &&
+    source.includes('const playInboxNotificationSound') &&
+    refreshInboxSource.includes(
+      'playInboxNotificationSound(configAsync.data, newUnreadItems)',
+    ) &&
+    refreshInboxSource.includes('inboxSoundSettingsSignatureRef') &&
+    refreshInboxSource.includes('inboxSoundPrimedRef') &&
+    refreshInboxSource.includes('inboxUnreadSoundIdsRef') &&
+    !refreshInboxSource.includes('showToast'),
+  refreshInboxSource,
 );
 
 check(

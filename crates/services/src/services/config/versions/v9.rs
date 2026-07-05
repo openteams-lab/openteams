@@ -6,8 +6,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 use ts_rs::TS;
 use utils::{path::home_directory, text::sanitize_member_handle};
 pub use v8::{
-    EditorConfig, EditorType, GitHubConfig, NotificationConfig, SendMessageShortcut, ShowcaseState,
-    SoundFile, ThemeMode, UiLanguage,
+    EditorConfig, EditorType, GitHubConfig, NotificationConfig, NotificationInboxSource,
+    NotificationInboxSourcesConfig, SendMessageShortcut, ShowcaseState, SoundFile, ThemeMode,
+    UiLanguage,
 };
 
 use crate::services::config::{preset_loader::PresetLoader, versions::v8};

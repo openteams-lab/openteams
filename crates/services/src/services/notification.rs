@@ -27,13 +27,17 @@ impl NotificationService {
 
     /// Internal method to send notifications with a given config
     async fn send_notification(config: &NotificationConfig, title: &str, message: &str) {
-        if config.sound_enabled {
+        if Self::should_play_sound(config) {
             Self::play_sound_notification(&config.sound_file).await;
         }
 
         if config.push_enabled {
             Self::send_push_notification(title, message).await;
         }
+    }
+
+    fn should_play_sound(config: &NotificationConfig) -> bool {
+        config.sound_enabled
     }
 
     /// Play a system sound notification across platforms
@@ -234,5 +238,29 @@ impl NotificationService {
             );
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NotificationService;
+    use crate::services::config::{NotificationConfig, NotificationInboxSourcesConfig, SoundFile};
+
+    fn notification_config() -> NotificationConfig {
+        NotificationConfig {
+            sound_enabled: true,
+            push_enabled: false,
+            sound_file: SoundFile::AbstractSound3,
+            inbox_sources: NotificationInboxSourcesConfig::default(),
+        }
+    }
+
+    #[test]
+    fn sound_gate_respects_global_sound_switch() {
+        let mut config = notification_config();
+        assert!(NotificationService::should_play_sound(&config));
+
+        config.sound_enabled = false;
+        assert!(!NotificationService::should_play_sound(&config));
     }
 }

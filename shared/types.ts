@@ -854,7 +854,11 @@ chat_bubble_font_size: ChatBubbleFontSize,
  */
 chat_compression: ChatCompressionConfig, max_agent_chain_depth: number, };
 
-export type NotificationConfig = { sound_enabled: boolean, push_enabled: boolean, sound_file: SoundFile, };
+export type NotificationConfig = { sound_enabled: boolean, push_enabled: boolean, sound_file: SoundFile, inbox_sources: NotificationInboxSourcesConfig, };
+
+export type NotificationInboxSourcesConfig = { chat_message: boolean, workflow_action: boolean, approval: boolean, worktree: boolean, failure: boolean, };
+
+export enum NotificationInboxSource { chat_message = "chat_message", workflow_action = "workflow_action", approval = "approval", worktree = "worktree", failure = "failure" }
 
 export enum ThemeMode { LIGHT = "LIGHT", DARK = "DARK", SYSTEM = "SYSTEM" }
 

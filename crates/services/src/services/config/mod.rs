@@ -38,6 +38,8 @@ pub enum ConfigError {
 
 pub type Config = versions::v9::Config;
 pub type NotificationConfig = versions::v9::NotificationConfig;
+pub type NotificationInboxSourcesConfig = versions::v9::NotificationInboxSourcesConfig;
+pub type NotificationInboxSource = versions::v9::NotificationInboxSource;
 pub type EditorConfig = versions::v9::EditorConfig;
 pub type ThemeMode = versions::v9::ThemeMode;
 pub type SoundFile = versions::v9::SoundFile;

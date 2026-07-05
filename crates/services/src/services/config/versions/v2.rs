@@ -156,6 +156,62 @@ pub struct NotificationConfig {
     pub sound_enabled: bool,
     pub push_enabled: bool,
     pub sound_file: SoundFile,
+    #[serde(default)]
+    pub inbox_sources: NotificationInboxSourcesConfig,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS, EnumString)]
+#[ts(use_ts_enum)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum NotificationInboxSource {
+    ChatMessage,
+    WorkflowAction,
+    Approval,
+    Worktree,
+    Failure,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct NotificationInboxSourcesConfig {
+    #[serde(default = "default_notification_source_enabled")]
+    pub chat_message: bool,
+    #[serde(default = "default_notification_source_enabled")]
+    pub workflow_action: bool,
+    #[serde(default = "default_notification_source_enabled")]
+    pub approval: bool,
+    #[serde(default = "default_notification_source_enabled")]
+    pub worktree: bool,
+    #[serde(default = "default_notification_source_enabled")]
+    pub failure: bool,
+}
+
+fn default_notification_source_enabled() -> bool {
+    true
+}
+
+impl Default for NotificationInboxSourcesConfig {
+    fn default() -> Self {
+        Self {
+            chat_message: true,
+            workflow_action: true,
+            approval: true,
+            worktree: true,
+            failure: true,
+        }
+    }
+}
+
+impl NotificationInboxSourcesConfig {
+    pub fn is_enabled(&self, source: NotificationInboxSource) -> bool {
+        match source {
+            NotificationInboxSource::ChatMessage => self.chat_message,
+            NotificationInboxSource::WorkflowAction => self.workflow_action,
+            NotificationInboxSource::Approval => self.approval,
+            NotificationInboxSource::Worktree => self.worktree,
+            NotificationInboxSource::Failure => self.failure,
+        }
+    }
 }
 
 impl From<v1::Config> for NotificationConfig {
@@ -164,6 +220,7 @@ impl From<v1::Config> for NotificationConfig {
             sound_enabled: old.sound_alerts,
             push_enabled: old.push_notifications,
             sound_file: SoundFile::from(old.sound_file), // Now SCREAMING_SNAKE_CASE
+            inbox_sources: NotificationInboxSourcesConfig::default(),
         }
     }
 }
@@ -174,6 +231,7 @@ impl Default for NotificationConfig {
             sound_enabled: true,
             push_enabled: true,
             sound_file: SoundFile::AbstractSound3,
+            inbox_sources: NotificationInboxSourcesConfig::default(),
         }
     }
 }

@@ -39,12 +39,17 @@ import {
 import { mockFrontendApi } from '@/lib/mockFrontendApi';
 import type { SettingsOptionsMock } from '@/mockApiData';
 import type { GitHubAccount, Session, UserSystemInfo } from '@/types';
-import { SoundFile, type NotificationConfig } from '../../../shared/types';
+import {
+  SoundFile,
+  type NotificationConfig,
+  type NotificationInboxSourcesConfig,
+} from '../../../shared/types';
 
 type NotificationConfigField =
   | 'push_enabled'
   | 'sound_enabled'
-  | 'sound_file';
+  | 'sound_file'
+  | 'inbox_sources';
 
 const trimTrailingPathSeparators = (path: string): string =>
   path.replace(/[\\/]+$/, '');
@@ -125,9 +130,58 @@ const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
   sound_enabled: true,
   push_enabled: true,
   sound_file: SoundFile.ABSTRACT_SOUND3,
+  inbox_sources: {
+    chat_message: true,
+    workflow_action: true,
+    approval: true,
+    worktree: true,
+    failure: true,
+  },
 };
 
 const SOUND_FILE_VALUES = new Set<string>(Object.values(SoundFile));
+
+const notificationInboxSourcesFrom = (
+  value: unknown,
+): NotificationInboxSourcesConfig => {
+  const candidate =
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Partial<Record<keyof NotificationInboxSourcesConfig, unknown>>)
+      : {};
+  const defaults = DEFAULT_NOTIFICATION_CONFIG.inbox_sources;
+  return {
+    chat_message:
+      typeof candidate.chat_message === 'boolean'
+        ? candidate.chat_message
+        : defaults.chat_message,
+    workflow_action:
+      typeof candidate.workflow_action === 'boolean'
+        ? candidate.workflow_action
+        : defaults.workflow_action,
+    approval:
+      typeof candidate.approval === 'boolean'
+        ? candidate.approval
+        : defaults.approval,
+    worktree:
+      typeof candidate.worktree === 'boolean'
+        ? candidate.worktree
+        : defaults.worktree,
+    failure:
+      typeof candidate.failure === 'boolean'
+        ? candidate.failure
+        : defaults.failure,
+  };
+};
+
+const notificationInboxSourcesEqual = (
+  left: NotificationInboxSourcesConfig,
+  right: NotificationInboxSourcesConfig,
+) =>
+  left.chat_message === right.chat_message &&
+  left.workflow_action === right.workflow_action &&
+  left.approval === right.approval &&
+  left.worktree === right.worktree &&
+  left.failure === right.failure;
 
 const notificationConfigFrom = (value: unknown): NotificationConfig => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -138,6 +192,7 @@ const notificationConfigFrom = (value: unknown): NotificationConfig => {
     sound_enabled?: unknown;
     push_enabled?: unknown;
     sound_file?: unknown;
+    inbox_sources?: unknown;
   };
   return {
     sound_enabled:
@@ -153,6 +208,7 @@ const notificationConfigFrom = (value: unknown): NotificationConfig => {
       SOUND_FILE_VALUES.has(candidate.sound_file)
         ? (candidate.sound_file as SoundFile)
         : DEFAULT_NOTIFICATION_CONFIG.sound_file,
+    inbox_sources: notificationInboxSourcesFrom(candidate.inbox_sources),
   };
 };
 
@@ -359,7 +415,11 @@ export const SettingsWorkspace: React.FC = () => {
     if (
       nextNotifications.push_enabled === currentNotifications.push_enabled &&
       nextNotifications.sound_enabled === currentNotifications.sound_enabled &&
-      nextNotifications.sound_file === currentNotifications.sound_file
+      nextNotifications.sound_file === currentNotifications.sound_file &&
+      notificationInboxSourcesEqual(
+        nextNotifications.inbox_sources,
+        currentNotifications.inbox_sources,
+      )
     ) {
       return;
     }
@@ -373,6 +433,13 @@ export const SettingsWorkspace: React.FC = () => {
           sound_enabled: nextNotifications.sound_enabled,
           push_enabled: nextNotifications.push_enabled,
           sound_file: nextNotifications.sound_file,
+          inbox_sources: {
+            chat_message: nextNotifications.inbox_sources.chat_message,
+            workflow_action: nextNotifications.inbox_sources.workflow_action,
+            approval: nextNotifications.inbox_sources.approval,
+            worktree: nextNotifications.inbox_sources.worktree,
+            failure: nextNotifications.inbox_sources.failure,
+          },
         },
       });
       await refreshConfig();
@@ -821,30 +888,68 @@ export const SettingsWorkspace: React.FC = () => {
             ),
           },
         ];
+        const notificationSourceRows: Array<{
+          key: keyof NotificationInboxSourcesConfig;
+          titleKey: string;
+          descKey: string;
+        }> = [
+          {
+            key: 'chat_message',
+            titleKey: 'settings.notifications.source.chatMessage.title',
+            descKey: 'settings.notifications.source.chatMessage.desc',
+          },
+          {
+            key: 'workflow_action',
+            titleKey: 'settings.notifications.source.workflowAction.title',
+            descKey: 'settings.notifications.source.workflowAction.desc',
+          },
+          {
+            key: 'approval',
+            titleKey: 'settings.notifications.source.approval.title',
+            descKey: 'settings.notifications.source.approval.desc',
+          },
+          {
+            key: 'worktree',
+            titleKey: 'settings.notifications.source.worktree.title',
+            descKey: 'settings.notifications.source.worktree.desc',
+          },
+          {
+            key: 'failure',
+            titleKey: 'settings.notifications.source.failure.title',
+            descKey: 'settings.notifications.source.failure.desc',
+          },
+        ];
 
         return (
           <div className="settings-notifications-panel mx-auto max-w-5xl space-y-10 text-sm">
             <section className="space-y-5">
               <div>
-                <h3 className="text-sm font-semibold text-[var(--ink)] tracking-tight">{t('settings.notifications.inbox.title')}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-[var(--ink-subtle)]">{t('settings.notifications.inbox.desc')}</p>
+                <h3 className="text-sm font-semibold text-[var(--ink)] tracking-tight">{t('settings.notifications.inboxSources.title')}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-[var(--ink-subtle)]">{t('settings.notifications.inboxSources.desc')}</p>
               </div>
 
               <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)]">
-                <div className="px-5 py-4">
-                  <p className="text-sm leading-tight text-[var(--ink)]">
-                    {translate(
-                      'settings.notifications.inboxAlwaysOn.title',
-                      'Persistent Bell inbox',
-                    )}
-                  </p>
-                  <p className="mt-1 text-sm leading-snug text-[var(--ink-subtle)]">
-                    {translate(
-                      'settings.notifications.inboxAlwaysOn.desc',
-                      'Agent messages, workflow actions, approvals, worktree conflicts and failures are stored in the Bell inbox.',
-                    )}
-                  </p>
-                </div>
+                {notificationSourceRows.map((row, index) => (
+                  <NotificationSettingRow
+                    key={row.key}
+                    title={t(row.titleKey)}
+                    description={t(row.descKey)}
+                    checked={notificationConfig.inbox_sources[row.key]}
+                    disabled={notificationSettingsDisabled}
+                    onToggle={() =>
+                      void persistNotificationConfig(
+                        {
+                          inbox_sources: {
+                            ...notificationConfig.inbox_sources,
+                            [row.key]: !notificationConfig.inbox_sources[row.key],
+                          },
+                        },
+                        'inbox_sources',
+                      )
+                    }
+                    divided={index < notificationSourceRows.length - 1}
+                  />
+                ))}
               </div>
             </section>
 
