@@ -70,6 +70,20 @@ const requiredNotificationLocaleKeys = [
   'settings.notifications.sound.cowMooing',
 ];
 
+const disallowedNotificationLocaleSnippets = [
+  'NotificationService',
+  'notifications.push_enabled',
+  'notifications.sound_enabled',
+  'notifications.sound_file',
+  'notifications.inbox_sources',
+  'Bell inbox',
+  'Bell 收件箱',
+  'Bell 受信箱',
+  'Bell 받은함',
+  'boîte Bell',
+  'bandeja Bell',
+];
+
 check(
   'adds a follow-system theme option to General settings',
   settingsSource.includes("setTheme('system')") &&
@@ -169,6 +183,18 @@ for (const locale of ['en', 'zh', 'ja', 'ko', 'fr', 'es']) {
       localeSource.includes(`"${key}"`),
     ),
     localeSource,
+  );
+  const localeSettings = JSON.parse(localeSource) as Record<string, string>;
+  const notificationLocaleValues = Object.entries(localeSettings)
+    .filter(([key]) => key.startsWith('settings.notifications.'))
+    .map(([, value]) => value)
+    .join('\n');
+  check(
+    `locale ${locale} notification copy stays user-facing`,
+    disallowedNotificationLocaleSnippets.every(
+      (snippet) => !notificationLocaleValues.includes(snippet),
+    ),
+    notificationLocaleValues,
   );
   check(
     `locale ${locale} does not describe per-source sound settings`,
