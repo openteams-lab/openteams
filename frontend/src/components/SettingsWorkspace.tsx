@@ -9,6 +9,7 @@ import {
   Archive,
   RotateCcw,
   Bell,
+  Check,
   Cpu,
   CreditCard,
   FlaskConical,
@@ -562,22 +563,22 @@ export const SettingsWorkspace: React.FC = () => {
     switch (activeSettingsTab) {
       case 'appearance':
         return (
-          <div className="space-y-6">
+          <div className="mx-auto max-w-[720px] space-y-8 text-sm">
             <div>
-              <h3 className="text-sm font-semibold text-[var(--ink)] tracking-tight">{t('settings.appearance.title')}</h3>
-              <p className="mt-0.5 text-sm text-[var(--ink-subtle)]">{t('settings.appearance.desc')}</p>
+              <h3 className="text-sm font-semibold text-[var(--ink)]">{t('settings.appearance.title')}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-[var(--ink-subtle)]">{t('settings.appearance.desc')}</p>
             </div>
 
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-[var(--ink)]">{t('settings.appearance.pageLanguage')}</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <section className="space-y-2.5">
+              <h4 className="text-sm font-medium text-[var(--ink)]">{t('settings.appearance.pageLanguage')}</h4>
+              <div className="overflow-hidden rounded-lg border border-[color-mix(in_srgb,var(--hairline)_70%,transparent)] bg-[var(--surface-1)] divide-y divide-[var(--hairline)]">
                 {(settingsOptions?.languages ?? []).map((lang) => (
                   <label
                     key={lang.code}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition ${
+                    className={`flex min-h-10 cursor-pointer items-center gap-3 px-3.5 py-2.5 text-sm transition hover:bg-[var(--surface-2)] ${
                       locale === lang.code
-                        ? 'border-[var(--primary)] bg-[var(--surface-2)] text-[var(--ink)]'
-                        : 'border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--ink-subtle)] hover:text-[var(--ink)] hover:border-[var(--hairline-strong)]'
+                        ? 'text-[var(--ink)]'
+                        : 'text-[var(--ink-subtle)] hover:text-[var(--ink)]'
                     }`}
                   >
                     <input
@@ -586,186 +587,183 @@ export const SettingsWorkspace: React.FC = () => {
                       value={lang.code}
                       checked={locale === lang.code}
                       onChange={() => setLocale(lang.code)}
-                      className="h-3.5 w-3.5 accent-[var(--primary)]"
+                      className="sr-only"
                     />
-                    <span className="truncate">{translate(`language.${lang.code}`, lang.label)}</span>
+                    <span className="min-w-0 flex-1 truncate">{translate(`language.${lang.code}`, lang.label)}</span>
+                    {locale === lang.code ? (
+                      <Check className="h-3.5 w-3.5 shrink-0 text-[var(--primary)]" strokeWidth={1.7} />
+                    ) : (
+                      <span className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    )}
                   </label>
                 ))}
               </div>
-            </div>
+            </section>
 
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-[var(--ink)]">{t('settings.appearance.theme')}</h4>
-              <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-3">
-              <div 
-                onClick={() => setTheme('dark')}
-                className={`rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 transition ${
-                  themePreference === 'dark' ? 'border-[var(--primary)] bg-[var(--surface-2)]' : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)]'
-                }`}
-              >
-                <div className="h-16 rounded-lg bg-[#010102] border border-[var(--hairline)] relative overflow-hidden">
-                  <div className="absolute top-2 left-2 right-2 h-2 bg-[#0f1011] rounded" />
-                  <div className="absolute bottom-2 left-2 w-8 h-2 bg-[var(--primary)] rounded" />
-                </div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-                  <span className={`h-1.5 w-1.5 rounded-full ${themePreference === 'dark' ? 'bg-[var(--primary)]' : 'bg-transparent'}`} />
-                  <span>{t('settings.appearance.darkThemeDefault')}</span>
-                </div>
+            <section className="space-y-2.5">
+              <h4 className="text-sm font-medium text-[var(--ink)]">{t('settings.appearance.theme')}</h4>
+              <div className="grid grid-cols-3 gap-1 rounded-lg border border-[color-mix(in_srgb,var(--hairline)_70%,transparent)] bg-[var(--surface-1)] p-1">
+                <button
+                  type="button"
+                  aria-pressed={themePreference === 'dark'}
+                  onClick={() => setTheme('dark')}
+                  className={`flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-md px-2 text-sm font-medium transition ${
+                    themePreference === 'dark'
+                      ? 'bg-[var(--surface-3)] text-[var(--ink)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--hairline-strong)_55%,transparent)]'
+                      : 'text-[var(--ink-subtle)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <span className="h-3.5 w-3.5 rounded-full border border-white/10 bg-[#050506]" />
+                  <span className="truncate">{t('settings.appearance.darkThemeDefault')}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={themePreference === 'light'}
+                  onClick={() => setTheme('light')}
+                  className={`flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-md px-2 text-sm font-medium transition ${
+                    themePreference === 'light'
+                      ? 'bg-[var(--surface-3)] text-[var(--ink)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--hairline-strong)_55%,transparent)]'
+                      : 'text-[var(--ink-subtle)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <span className="h-3.5 w-3.5 rounded-full border border-black/10 bg-[#f5f6f8]" />
+                  <span className="truncate">{t('settings.appearance.lightThemeInverted')}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={themePreference === 'system'}
+                  onClick={() => setTheme('system')}
+                  className={`flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-md px-2 text-sm font-medium transition ${
+                    themePreference === 'system'
+                      ? 'bg-[var(--surface-3)] text-[var(--ink)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--hairline-strong)_55%,transparent)]'
+                      : 'text-[var(--ink-subtle)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <span className="h-3.5 w-3.5 rounded-full border border-[var(--hairline-strong)] bg-[linear-gradient(90deg,#050506_0%,#050506_50%,#f5f6f8_50%,#f5f6f8_100%)]" />
+                  <span className="truncate">{t('settings.appearance.systemTheme')}</span>
+                </button>
               </div>
+            </section>
 
-              <div 
-                onClick={() => setTheme('light')}
-                className={`rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 transition ${
-                  themePreference === 'light' ? 'border-[var(--primary)] bg-[var(--surface-2)]' : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)]'
-                }`}
-              >
-                <div className="h-16 rounded-lg bg-[#fbfbfc] border border-[#e3e5ea] relative overflow-hidden">
-                  <div className="absolute top-2 left-2 right-2 h-2 bg-[#ffffff] border border-[#e3e5ea] rounded" />
-                  <div className="absolute bottom-2 left-2 w-8 h-2 bg-[var(--primary)] rounded" />
+            <section className="overflow-hidden rounded-lg border border-[color-mix(in_srgb,var(--hairline)_70%,transparent)] bg-[var(--surface-1)] divide-y divide-[var(--hairline)]">
+              <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <h4 className="text-sm font-medium text-[var(--ink)]">{t('settings.appearance.chatMessageFontSize')}</h4>
+                  <p className="mt-1 text-sm leading-snug text-[var(--ink-subtle)]">{t('settings.appearance.chatMessageFontSizeDesc')}</p>
                 </div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-                  <span className={`h-1.5 w-1.5 rounded-full ${themePreference === 'light' ? 'bg-[var(--primary)]' : 'bg-transparent'}`} />
-                  <span>{t('settings.appearance.lightThemeInverted')}</span>
-                </div>
-              </div>
-
-              <div
-                onClick={() => setTheme('system')}
-                className={`rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 transition ${
-                  themePreference === 'system' ? 'border-[var(--primary)] bg-[var(--surface-2)]' : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)]'
-                }`}
-              >
-                <div className="h-16 rounded-lg border border-[var(--hairline)] relative overflow-hidden bg-[linear-gradient(90deg,#010102_0%,#010102_50%,#fbfbfc_50%,#fbfbfc_100%)]">
-                  <div className="absolute left-2 right-[calc(50%+0.5rem)] top-2 h-2 rounded bg-[#0f1011]" />
-                  <div className="absolute left-[calc(50%+0.5rem)] right-2 top-2 h-2 rounded border border-[#e3e5ea] bg-white" />
-                  <div className="absolute bottom-2 left-2 h-2 w-8 rounded bg-[var(--primary)]" />
-                  <div className="absolute bottom-2 left-[calc(50%+0.5rem)] h-2 w-8 rounded bg-[var(--primary)]" />
-                </div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-                  <span className={`h-1.5 w-1.5 rounded-full ${themePreference === 'system' ? 'bg-[var(--primary)]' : 'bg-transparent'}`} />
-                  <span>{t('settings.appearance.systemTheme')}</span>
-                </div>
-              </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-[var(--ink)]">{t('settings.appearance.chatMessageFontSize')}</h4>
-              <div className="flex flex-col gap-3 rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm leading-snug text-[var(--ink-subtle)]">{t('settings.appearance.chatMessageFontSizeDesc')}</p>
                 <DropdownSelect
                   value={String(chatMessageFontSize)}
                   options={chatMessageFontSizeOptions}
                   showSearch={false}
                   placeholder={t('settings.appearance.chatMessageFontSize')}
                   onChange={(value) => setChatMessageFontSize(Number(value))}
-                  className="w-full shrink-0 sm:w-[160px]"
+                  className="w-full shrink-0 sm:w-[108px]"
+                  triggerClassName="!border-transparent !bg-transparent !px-2 !py-1.5 !text-[var(--ink-muted)] hover:!bg-[var(--surface-3)] hover:!text-[var(--ink)]"
+                  panelMinWidth={132}
                   maxPanelHeightClassName="max-h-[180px]"
                 />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-[var(--ink)]">
-                {translate(
-                  'settings.storage.worktreeSessionsDir',
-                  'Session worktree directory',
-                )}
-              </h4>
-              <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-3">
-                <p className="text-sm leading-snug text-[var(--ink-subtle)]">
-                  {translate(
-                    'settings.storage.worktreeSessionsDirDesc',
-                    'Choose where isolated session worktree folders are created.',
-                  )}
-                </p>
-                <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center">
-                  <input
-                    type="text"
-                    value={worktreeSessionsDirDraft}
-                    onChange={(event) =>
-                      setWorktreeSessionsDirDraft(event.target.value)
-                    }
-                    onBlur={() =>
-                      void persistWorktreeSessionsDir(worktreeSessionsDirDraft)
-                    }
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.currentTarget.blur();
+              <div className="px-4 py-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 lg:max-w-[270px]">
+                    <h4 className="text-sm font-medium text-[var(--ink)]">
+                      {translate(
+                        'settings.storage.worktreeSessionsDir',
+                        'Session worktree directory',
+                      )}
+                    </h4>
+                    <p className="mt-1 text-sm leading-snug text-[var(--ink-subtle)]">
+                      {translate(
+                        'settings.storage.worktreeSessionsDirDesc',
+                        'Choose where isolated session worktree folders are created.',
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex min-w-0 flex-1 items-center gap-2 lg:max-w-[430px]">
+                    <input
+                      type="text"
+                      value={worktreeSessionsDirDraft}
+                      onChange={(event) =>
+                        setWorktreeSessionsDirDraft(event.target.value)
                       }
-                    }}
-                    placeholder={worktreeSessionsDirPlaceholder}
-                    className="min-h-9 min-w-0 flex-1 rounded-md border border-[var(--hairline-strong)] bg-[var(--surface-2)] px-3 font-mono text-sm text-[var(--ink)] outline-none transition focus:border-[var(--primary)]"
-                  />
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                      onBlur={() =>
+                        void persistWorktreeSessionsDir(worktreeSessionsDirDraft)
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.currentTarget.blur();
+                        }
+                      }}
+                      placeholder={worktreeSessionsDirPlaceholder}
+                      className="min-h-9 min-w-0 flex-1 rounded-md border border-[var(--mono-border)] bg-[var(--mono-bg)] px-3 font-mono text-[13px] text-[var(--ink)] outline-none transition placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)]"
+                    />
                     <button
                       type="button"
+                      aria-label={translate('settings.storage.browse', 'Browse')}
+                      title={
+                        worktreeSessionsDirSaving
+                          ? translate('settings.storage.saving', 'Saving...')
+                          : translate('settings.storage.browse', 'Browse')
+                      }
                       onClick={() => void handleSelectWorktreeSessionsDir()}
                       disabled={
                         worktreeSessionsDirSaving ||
                         worktreeSessionsDirSelecting ||
                         !configAsync.data
                       }
-                      className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[var(--hairline-strong)] px-3 py-2 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent text-[var(--ink-subtle)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <FolderOpen className="h-3.5 w-3.5" />
-                      {worktreeSessionsDirSaving
-                        ? translate('settings.storage.saving', 'Saving...')
-                        : translate('settings.storage.browse', 'Browse')}
+                      <FolderOpen className="h-4 w-4" strokeWidth={1.5} />
                     </button>
                   </div>
                 </div>
                 {worktreeSessionsDirMessage && (
-                  <p className="mt-2 text-xs text-[var(--ink-subtle)]">
+                  <p className="mt-2 text-xs text-[var(--ink-subtle)] lg:ml-[282px]">
                     {worktreeSessionsDirMessage}
                   </p>
                 )}
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-[var(--ink)]">{t('settings.onboarding.title')}</h4>
-              <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)]">
-                <NotificationSettingRow
-                  title={t('settings.onboarding.resetGuide')}
-                  description={t('settings.onboarding.resetGuideDesc')}
-                  control={
-                    <button
-                      type="button"
-                      onClick={() => void handleResetOnboardingGuide()}
-                      disabled={Boolean(onboardingAction)}
-                      className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[var(--hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <RotateCcw className={`h-3.5 w-3.5 ${onboardingAction === 'reset' ? 'animate-spin' : ''}`} />
-                      {onboardingAction === 'reset'
-                        ? t('settings.onboarding.working')
-                        : t('settings.onboarding.resetGuide')}
-                    </button>
-                  }
-                />
-                <NotificationSettingRow
-                  title={t('settings.onboarding.replayUpgrade')}
-                  description={t('settings.onboarding.replayUpgradeDesc')}
-                  divided={false}
-                  control={
-                    <button
-                      type="button"
-                      onClick={() => void handleReplayUpgradeGuide()}
-                      disabled={Boolean(onboardingAction)}
-                      className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[var(--hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Sparkles className={`h-3.5 w-3.5 ${onboardingAction === 'upgrade' ? 'animate-pulse' : ''}`} />
-                      {onboardingAction === 'upgrade'
-                        ? t('settings.onboarding.working')
-                        : t('settings.onboarding.replayUpgrade')}
-                    </button>
-                  }
-                />
+              <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <h4 className="text-sm font-medium text-[var(--ink)]">{t('settings.onboarding.resetGuide')}</h4>
+                  <p className="mt-1 text-sm leading-snug text-[var(--ink-subtle)]">{t('settings.onboarding.resetGuideDesc')}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleResetOnboardingGuide()}
+                  disabled={Boolean(onboardingAction)}
+                  className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RotateCcw className={`h-3.5 w-3.5 ${onboardingAction === 'reset' ? 'animate-spin' : ''}`} />
+                  {onboardingAction === 'reset'
+                    ? t('settings.onboarding.working')
+                    : t('settings.onboarding.resetGuide')}
+                </button>
               </div>
-              {onboardingActionMessage && (
-                <p className="text-xs text-[var(--ink-subtle)]">{onboardingActionMessage}</p>
-              )}
-            </div>
+              <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <h4 className="text-sm font-medium text-[var(--ink)]">{t('settings.onboarding.replayUpgrade')}</h4>
+                  <p className="mt-1 text-sm leading-snug text-[var(--ink-subtle)]">{t('settings.onboarding.replayUpgradeDesc')}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleReplayUpgradeGuide()}
+                  disabled={Boolean(onboardingAction)}
+                  className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Sparkles className={`h-3.5 w-3.5 ${onboardingAction === 'upgrade' ? 'animate-pulse' : ''}`} />
+                  {onboardingAction === 'upgrade'
+                    ? t('settings.onboarding.working')
+                    : t('settings.onboarding.replayUpgrade')}
+                </button>
+              </div>
+            </section>
+
+            {onboardingActionMessage && (
+              <p className="px-1 text-xs text-[var(--ink-subtle)]">{onboardingActionMessage}</p>
+            )}
           </div>
         );
 
