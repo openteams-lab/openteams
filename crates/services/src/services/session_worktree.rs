@@ -15,7 +15,10 @@ use tracing::{debug, info, warn};
 use ts_rs::TS;
 use uuid::Uuid;
 
-use super::worktree_manager::{WorktreeCleanup, WorktreeError, WorktreeManager};
+use super::{
+    inbox::InboxService,
+    worktree_manager::{WorktreeCleanup, WorktreeError, WorktreeManager},
+};
 
 /// Length of the short session-id suffix used in branch names and worktree
 /// paths. Kept short to avoid Windows path-length issues and to produce
@@ -792,9 +795,12 @@ impl SessionWorktreeService {
             SessionWorktreeStatus::NeedsConflictResolution,
         )
         .await?;
-        SessionWorktree::set_conflict_files(&self.pool, updated.id, conflict_files)
-            .await
-            .map_err(Into::into)
+        let updated =
+            SessionWorktree::set_conflict_files(&self.pool, updated.id, conflict_files).await?;
+        InboxService::new()
+            .notify_worktree_conflict(&self.pool, &updated, conflict_files)
+            .await;
+        Ok(updated)
     }
 
     /// Abort an in-progress merge and return the worktree to its pre-merge
@@ -1577,6 +1583,12 @@ impl SessionWorktreeService {
                 )
                 .await?;
                 let _ = SessionWorktree::set_cleanup_error(&self.pool, failed.id, &message).await;
+                let failed = SessionWorktree::find_by_id(&self.pool, failed.id)
+                    .await?
+                    .unwrap_or(failed);
+                InboxService::new()
+                    .notify_worktree_cleanup_failed(&self.pool, &failed, &message)
+                    .await;
                 Err(SessionWorktreeError::WorktreeManager(err))
             }
         }
@@ -1632,6 +1644,12 @@ impl SessionWorktreeService {
                 )
                 .await?;
                 let _ = SessionWorktree::set_cleanup_error(&self.pool, failed.id, &message).await;
+                let failed = SessionWorktree::find_by_id(&self.pool, failed.id)
+                    .await?
+                    .unwrap_or(failed);
+                InboxService::new()
+                    .notify_worktree_cleanup_failed(&self.pool, &failed, &message)
+                    .await;
                 Err(SessionWorktreeError::WorktreeManager(err))
             }
         }

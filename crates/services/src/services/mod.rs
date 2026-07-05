@@ -24,6 +24,7 @@ pub use github::{
     rest_client as github_rest_client, token_store as github_token_store,
 };
 pub mod image;
+pub mod inbox;
 pub mod member_execution;
 pub use build_stats::{model_pricing_sync, project_stats, token_cost_stats};
 pub mod native_skills;

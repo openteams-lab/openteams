@@ -445,7 +445,7 @@ impl<'a> LoopExecutor<'a> {
             None,
         )
         .await?;
-        WorkflowOrchestrator::write_transcript(
+        let transcript = WorkflowOrchestrator::write_transcript(
             self.pool,
             self.execution.id,
             Some(waiting_step.round_id),
@@ -466,6 +466,14 @@ impl<'a> LoopExecutor<'a> {
             ),
         )
         .await?;
+        InboxService::new()
+            .notify_workflow_user_action(
+                self.pool,
+                self.execution,
+                &transcript,
+                Some(&transcript.content),
+            )
+            .await;
         WorkflowOrchestrator::synchronize_runtime_state(self.pool, self.execution.id, false)
             .await?;
         WorkflowOrchestrator::refresh_execution_projection(

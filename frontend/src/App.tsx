@@ -73,6 +73,7 @@ import {
 import { notifyLinkedWorkItemsChanged } from "@/lib/linkedWorkItemsEvents";
 import { notifySourceControlRefreshRequested } from "@/lib/sourceControlEvents";
 import { resolveGlobalSearchNavigationAction } from "@/lib/globalSearchNavigation";
+import { notifyInboxWorkflowFocus } from "@/lib/inboxNavigation";
 import { mapSession } from "@/lib/mappers";
 import { mockFrontendApi } from "@/lib/mockFrontendApi";
 import { projectDisplayName } from "@/lib/projectDisplay";
@@ -90,6 +91,7 @@ import {
   type ChatMemberPreset,
   type ChatSearchResult,
   type ChatTeamPreset,
+  type InboxItem,
   OnboardingAppearance,
   type OnboardingState,
   ProjectMemberType,
@@ -263,6 +265,51 @@ const chatSessionUpdatePayload = (
   default_workspace_path: null,
   ...patch,
 });
+
+const inboxSourcesKeptUnread = new Set([
+  "workflow_input",
+  "workflow_continue",
+  "workflow_review",
+  "workflow_final_review",
+  "workflow_approval",
+  "executor_approval",
+  "worktree_conflict",
+  "worktree_cleanup",
+]);
+
+const inboxKindsKeptUnread = new Set([
+  "workflow_input",
+  "workflow_review",
+  "workflow_final_review",
+  "workflow_approval",
+  "executor_approval",
+  "worktree_conflict",
+  "worktree_cleanup_failed",
+  "workflow_execution_failed",
+  "chat_agent_failed",
+  "chat_mention_failed",
+]);
+
+const shouldKeepInboxItemUnreadOnOpen = (item: InboxItem): boolean =>
+  inboxSourcesKeptUnread.has(item.source_type) ||
+  inboxKindsKeptUnread.has(item.kind);
+
+const isWorktreeConflictInboxItem = (item: InboxItem): boolean =>
+  item.kind === "worktree_conflict" ||
+  item.source_type === "worktree_conflict";
+
+const isWorktreeCleanupFailedInboxItem = (item: InboxItem): boolean =>
+  item.kind === "worktree_cleanup_failed" ||
+  item.source_type === "worktree_cleanup";
+
+const isExecutorApprovalInboxItem = (item: InboxItem): boolean =>
+  item.kind === "executor_approval" ||
+  item.source_type === "executor_approval";
+
+const isWorkflowInboxItem = (item: InboxItem): boolean =>
+  item.source_type.startsWith("workflow_") ||
+  item.kind.startsWith("workflow_") ||
+  isExecutorApprovalInboxItem(item);
 
 const findWorkflowProjectAgent = (projectMembers: ProjectMemberWithRuntime[]) =>
   projectMembers.find(
@@ -475,6 +522,12 @@ function WorkspaceLayout() {
     weeklyCost,
     showToast,
     setActiveSettingsTab,
+    inboxSummaryAsync,
+    inboxItemsAsync,
+    refreshInbox,
+    markInboxItemRead,
+    markAllInboxRead,
+    archiveInboxItem,
   } = useWorkspace();
   const appScale = React.useContext(AppScaleContext);
 
@@ -1222,6 +1275,49 @@ function WorkspaceLayout() {
     setActiveSessionId(sessionId);
   };
 
+  const openInboxSessionTab = (sessionId: string) => {
+    replaceActiveTab(createSessionTab(sessionId));
+    setActiveSessionId(sessionId);
+    closeMobileSidebar();
+  };
+
+  const handleInboxItemOpen = (item: InboxItem) => {
+    const sessionId = item.session_id ?? activeSessionId;
+    const projectId = item.project_id ?? selectedProjectId;
+    if (projectId && projectId !== selectedProjectId) {
+      setSelectedProjectId(projectId);
+    }
+
+    if (sessionId && projectId && isWorktreeConflictInboxItem(item)) {
+      openWorktreeConflictTab(projectId, sessionId);
+      closeMobileSidebar();
+    } else if (sessionId && isWorktreeCleanupFailedInboxItem(item)) {
+      openInboxSessionTab(sessionId);
+      window.setTimeout(() => {
+        notifySourceControlRefreshRequested({
+          projectId,
+          sessionId,
+        });
+      }, 0);
+    } else if (sessionId) {
+      openInboxSessionTab(sessionId);
+      if (isWorkflowInboxItem(item)) {
+        window.setTimeout(() => {
+          notifyInboxWorkflowFocus({
+            sessionId,
+            kind: item.kind,
+            sourceType: item.source_type,
+            sourceId: item.source_id,
+          });
+        }, 0);
+      }
+    }
+
+    if (!shouldKeepInboxItemUnreadOnOpen(item)) {
+      void markInboxItemRead(item.id).catch(() => undefined);
+    }
+  };
+
   const closeWorktreeConflictTab = (
     tab: Extract<WorkspaceTab, { kind: "worktree-conflicts" }>,
   ) => {
@@ -1921,6 +2017,15 @@ function WorkspaceLayout() {
     onCreateProject: handleCreateProject,
     onUpdateProject: handleUpdateProject,
     onDeleteProject: handleDeleteProject,
+    inboxSummary: inboxSummaryAsync.data,
+    inboxItems: inboxItemsAsync.data,
+    inboxLoading: inboxSummaryAsync.loading || inboxItemsAsync.loading,
+    inboxError: inboxSummaryAsync.error ?? inboxItemsAsync.error,
+    onRefreshInbox: refreshInbox,
+    onInboxItemOpen: handleInboxItemOpen,
+    onMarkInboxItemRead: markInboxItemRead,
+    onMarkAllInboxRead: markAllInboxRead,
+    onArchiveInboxItem: archiveInboxItem,
     teamPresets,
   };
   return (

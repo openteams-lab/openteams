@@ -39,6 +39,7 @@ use super::{
         run_workflow_step_agent_prompt, should_retry_workflow_protocol_parse_failure,
     },
 };
+use crate::services::inbox::InboxService;
 
 include!("types.rs");
 include!("review.rs");

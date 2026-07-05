@@ -60,6 +60,10 @@ import {
   LINKED_WORK_ITEMS_CHANGED_EVENT,
   type LinkedWorkItemsChangedDetail,
 } from "@/lib/linkedWorkItemsEvents";
+import {
+  SOURCE_CONTROL_REFRESH_REQUESTED_EVENT,
+  type SourceControlRefreshRequestedDetail,
+} from "@/lib/sourceControlEvents";
 import { markPendingIssueStatusSync } from "@/lib/pendingIssueStatusSync";
 import { notifyBuildStatsUsageUpdated } from "@/lib/buildStatsEvents";
 import {
@@ -1038,6 +1042,34 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     setWasRelatedFilesAutoCollapsed(false);
     setIsRelatedFilesOpen(false);
   };
+
+  useEffect(() => {
+    const handleSourceControlRefreshRequested = (event: Event) => {
+      const detail = (
+        event as CustomEvent<SourceControlRefreshRequestedDetail>
+      ).detail;
+      if (!detail?.sessionId || detail.sessionId !== activeSessionId) return;
+      if (
+        detail.projectId &&
+        selectedProjectId &&
+        detail.projectId !== selectedProjectId
+      ) {
+        return;
+      }
+      setWasRelatedFilesAutoCollapsed(false);
+      setIsRelatedFilesOpen(true);
+    };
+
+    window.addEventListener(
+      SOURCE_CONTROL_REFRESH_REQUESTED_EVENT,
+      handleSourceControlRefreshRequested,
+    );
+    return () =>
+      window.removeEventListener(
+        SOURCE_CONTROL_REFRESH_REQUESTED_EVENT,
+        handleSourceControlRefreshRequested,
+      );
+  }, [activeSessionId, selectedProjectId]);
 
   useLayoutEffect(() => {
     const element = workspaceGridRef.current;

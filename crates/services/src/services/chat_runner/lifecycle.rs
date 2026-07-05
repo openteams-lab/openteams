@@ -491,6 +491,17 @@ impl ChatRunner {
             },
         );
 
+        InboxService::new()
+            .notify_chat_mention_failed(
+                &self.db.pool,
+                session_id,
+                message_id,
+                agent_name,
+                agent_id,
+                &compact_reason,
+            )
+            .await;
+
         let mut failure_meta = serde_json::json!({
             "mention_failure": {
                 "source_message_id": message_id,
@@ -1933,6 +1944,16 @@ impl ChatRunner {
                     "agent_startup_failed",
                     None,
                 );
+                let failure_detail = format!("Failed to start agent run: {err}");
+                InboxService::new()
+                    .notify_chat_agent_failed(
+                        &self.db.pool,
+                        session_id,
+                        run_id,
+                        &agent.name,
+                        Some(&failure_detail),
+                    )
+                    .await;
                 if track_source_message {
                     self.report_mention_failure(
                         session_id,

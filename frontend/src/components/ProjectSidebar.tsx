@@ -26,7 +26,6 @@ import {
   GitBranch,
   Github,
   Hash,
-  History,
   Home,
   LoaderCircle,
   MoreHorizontal,
@@ -53,6 +52,7 @@ import type {
   ValidateWorkspacePathResponse,
 } from "@/types";
 import { DropdownSelect, type DropdownSelectOption } from "./DropdownSelect";
+import { InboxNotificationsPopover } from "./InboxNotificationsPopover";
 import { useAppScale } from "@/context/AppScaleContext";
 import { chatSessionsApi, filesystemApi } from "@/lib/api";
 import { buildStatsApi } from "@/lib/buildStatsApi";
@@ -71,6 +71,8 @@ import type { ShellOptionsMock } from "@/mockApiData";
 import type {
   ChatTeamPreset,
   CreateProjectRequest,
+  InboxItem,
+  InboxSummary,
   Project,
   UpdateProject,
 } from "../../../shared/types";
@@ -116,6 +118,15 @@ interface ProjectSidebarProps {
   ) => Promise<unknown>;
   onUpdateProject?: (projectId: string, data: UpdateProject) => Promise<void>;
   onDeleteProject?: (projectId: string) => Promise<void>;
+  inboxSummary?: InboxSummary | null;
+  inboxItems?: InboxItem[];
+  inboxLoading?: boolean;
+  inboxError?: string | null;
+  onRefreshInbox?: () => Promise<void>;
+  onInboxItemOpen?: (item: InboxItem) => void;
+  onMarkInboxItemRead?: (itemId: string) => Promise<void>;
+  onMarkAllInboxRead?: () => Promise<void>;
+  onArchiveInboxItem?: (itemId: string) => Promise<void>;
   teamPresets?: ChatTeamPreset[];
 }
 
@@ -398,6 +409,15 @@ export function ProjectSidebar({
   onCreateProject,
   onUpdateProject,
   onDeleteProject,
+  inboxSummary = null,
+  inboxItems = [],
+  inboxLoading = false,
+  inboxError = null,
+  onRefreshInbox,
+  onInboxItemOpen,
+  onMarkInboxItemRead,
+  onMarkAllInboxRead,
+  onArchiveInboxItem,
   teamPresets = [],
 }: ProjectSidebarProps) {
   const appScale = useAppScale();
@@ -1676,14 +1696,21 @@ export function ProjectSidebar({
       )}
     >
       <div className="flex h-10 shrink-0 items-center px-2.5">
-        <button
-          type="button"
-          className={topControlClass}
-          onClick={() => onProjectAction("history")}
-          aria-label={translate("sidebar.aria.openHistory", "Open history")}
-        >
-          <History className="h-3.5 w-3.5" />
-        </button>
+        <InboxNotificationsPopover
+          triggerClassName={topControlClass}
+          portalTarget={portalTarget}
+          sessions={sessions}
+          summary={inboxSummary}
+          items={inboxItems}
+          loading={inboxLoading}
+          error={inboxError}
+          translate={translate}
+          onRefresh={onRefreshInbox}
+          onItemOpen={onInboxItemOpen}
+          onMarkItemRead={onMarkInboxItemRead}
+          onMarkAllRead={onMarkAllInboxRead}
+          onArchiveItem={onArchiveInboxItem}
+        />
       </div>
 
       <div className="px-3 py-1.5">

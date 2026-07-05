@@ -20,6 +20,7 @@ pub mod frontend;
 pub mod github;
 pub mod health;
 pub mod images;
+pub mod inbox;
 pub mod onboarding;
 pub mod project_github;
 pub mod project_source_control;
@@ -51,6 +52,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .merge(version::router())
         .merge(analytics::router())
         .merge(build_stats::router())
+        .merge(inbox::router())
         .merge(admin::router())
         .nest("/images", images::routes())
         .layer(ValidateRequestHeaderLayer::custom(

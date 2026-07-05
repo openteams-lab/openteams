@@ -16,6 +16,7 @@ pub mod github_operation_audit;
 pub mod github_pending_operation;
 pub mod github_pending_pr_creation;
 pub mod image;
+pub mod inbox_item;
 pub mod member_execution_config;
 pub mod merge;
 pub mod model_price_cache;

@@ -23,6 +23,7 @@ use super::{
     OrchestratorError, ResolvedTranscriptAction, WorkflowOrchestrator, load_agents_for_session,
     resolve_step_workflow_session,
 };
+use crate::services::inbox::InboxService;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum StepFollowUpMode {
@@ -550,6 +551,10 @@ impl WorkflowOrchestrator {
             );
         }
 
+        InboxService::new()
+            .notify_workflow_user_action(pool, &waiting_execution, &transcript, Some(content))
+            .await;
+
         Self::refresh_execution_projection(pool, chat_runner, waiting_execution.id, None).await?;
 
         Ok(transcript)
@@ -562,6 +567,10 @@ impl WorkflowOrchestrator {
         execution: &WorkflowExecution,
     ) -> Result<WorkflowTranscript, OrchestratorError> {
         let transcript = Self::ensure_unresolved_final_review(pool, execution.id).await?;
+
+        InboxService::new()
+            .notify_workflow_user_action(pool, execution, &transcript, Some(&transcript.content))
+            .await;
 
         Self::refresh_execution_projection_with_reason(
             pool,

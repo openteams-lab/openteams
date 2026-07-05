@@ -250,6 +250,9 @@ impl ChatRunner {
         )
         .await?;
 
+        InboxService::new()
+            .notify_chat_agent_message(&self.db.pool, &message, Some(agent_name))
+            .await;
         self.emit_message_new(session_id, message.clone());
 
         let entry = WorkRecordEntry {
@@ -321,6 +324,15 @@ impl ChatRunner {
         )
         .await?;
 
+        InboxService::new()
+            .notify_chat_agent_failed(
+                &self.db.pool,
+                session_id,
+                run_id,
+                agent_name,
+                Some(error_content),
+            )
+            .await;
         self.emit_message_new(session_id, message);
 
         Ok(())
@@ -388,6 +400,9 @@ impl ChatRunner {
             Some(meta),
         )
         .await?;
+        InboxService::new()
+            .notify_chat_agent_message(&self.db.pool, &message, None)
+            .await;
         self.emit_message_new(session_id, message);
         Ok(())
     }
@@ -565,7 +580,18 @@ impl ChatRunner {
         )
         .await
         {
-            Ok(message) => self.emit_message_new(session_id, message),
+            Ok(message) => {
+                InboxService::new()
+                    .notify_chat_agent_failed(
+                        &self.db.pool,
+                        session_id,
+                        run_id,
+                        agent_name,
+                        Some(reason),
+                    )
+                    .await;
+                self.emit_message_new(session_id, message);
+            }
             Err(err) => {
                 tracing::warn!(
                     session_id = %session_id,
@@ -884,6 +910,9 @@ impl ChatRunner {
                 Some(meta),
             )
             .await?;
+            InboxService::new()
+                .notify_chat_agent_message(&self.db.pool, &routed_message, Some(agent_name))
+                .await;
 
             if let Some(ref session) = session {
                 self.handle_message(session, &routed_message).await;

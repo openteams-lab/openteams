@@ -144,7 +144,17 @@ import type {
   UpdateProjectMemberRequest,
   UpdateTeamPresetRequest,
   ChatRunFilesResponse,
+  InboxItem,
+  InboxItemResponse,
+  InboxItemsArchivedResponse,
+  InboxItemsMarkedReadResponse,
+  InboxItemsQuery,
+  InboxItemsResponse,
+  InboxSummary,
+  InboxSummaryQuery,
   MarkUpgradeReadRequest,
+  MarkAllInboxItemsReadRequest,
+  MarkInboxItemsReadRequest,
   OnboardingState,
   UpdateOnboardingStateRequest,
 } from "../../../shared/types";
@@ -377,6 +387,73 @@ export const onboardingApi = {
       method: "POST",
     });
     return handleApiResponse<OnboardingState>(r);
+  },
+};
+
+// -----------------------------------------------------------------------------
+// Inbox notifications
+// -----------------------------------------------------------------------------
+
+export const inboxApi = {
+  getSummary: async (
+    query: Partial<InboxSummaryQuery> = {},
+  ): Promise<InboxSummary> => {
+    const r = await makeRequest(
+      `/api/inbox/summary${qs({
+        project_id: query.project_id,
+        session_id: query.session_id,
+      })}`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<InboxSummary>(r);
+  },
+  listItems: async (
+    query: Partial<InboxItemsQuery> = {},
+  ): Promise<InboxItemsResponse> => {
+    const r = await makeRequest(
+      `/api/inbox/items${qs({
+        project_id: query.project_id,
+        session_id: query.session_id,
+        unread: query.unread,
+        archived: query.archived,
+        limit: query.limit,
+      })}`,
+      { cache: "no-store" },
+    );
+    return handleApiResponse<InboxItemsResponse>(r);
+  },
+  markRead: async (itemId: string): Promise<InboxItem> => {
+    const r = await makeRequest(
+      `/api/inbox/items/${encodeURIComponent(itemId)}/mark-read`,
+      { method: "POST" },
+    );
+    const response = await handleApiResponse<InboxItemResponse>(r);
+    return response.item;
+  },
+  markManyRead: async (
+    data: MarkInboxItemsReadRequest,
+  ): Promise<InboxItemsMarkedReadResponse> => {
+    const r = await makeRequest("/api/inbox/items/mark-read", {
+      method: "POST",
+      body: jsonBody(data),
+    });
+    return handleApiResponse<InboxItemsMarkedReadResponse>(r);
+  },
+  markAllRead: async (
+    data: MarkAllInboxItemsReadRequest,
+  ): Promise<InboxItemsMarkedReadResponse> => {
+    const r = await makeRequest("/api/inbox/items/mark-all-read", {
+      method: "POST",
+      body: jsonBody(data),
+    });
+    return handleApiResponse<InboxItemsMarkedReadResponse>(r);
+  },
+  archive: async (itemId: string): Promise<InboxItemsArchivedResponse> => {
+    const r = await makeRequest(
+      `/api/inbox/items/${encodeURIComponent(itemId)}/archive`,
+      { method: "POST" },
+    );
+    return handleApiResponse<InboxItemsArchivedResponse>(r);
   },
 };
 
@@ -2318,6 +2395,7 @@ export const api = {
   cliConfig: cliConfigApi,
   buildStats: buildStatsApi,
   onboarding: onboardingApi,
+  inbox: inboxApi,
   profiles: profilesApi,
   teamPresets: teamPresetsApi,
   githubAuth: githubAuthApi,

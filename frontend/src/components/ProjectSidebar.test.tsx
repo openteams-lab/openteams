@@ -9,7 +9,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { prioritizeSessions, ProjectSidebar } from "./ProjectSidebar";
 import { mockShellOptions, mockWorkspaceBootstrap } from "@/mockApiData";
-import type { Project } from "../../../shared/types";
+import {
+  InboxItemSeverity,
+  type InboxItem,
+  type Project,
+} from "../../../shared/types";
 
 let failures = 0;
 const check = (label: string, cond: boolean, detail?: unknown) => {
@@ -66,6 +70,22 @@ const migratedProjects: Project[] = [
     updated_at: new Date("2026-05-31T00:00:00Z"),
   },
 ];
+const inboxItem: InboxItem = {
+  id: "inbox-1",
+  project_id: "project-api-1",
+  session_id: mockWorkspaceBootstrap.sessions[0].id,
+  kind: "workflow_review",
+  severity: InboxItemSeverity.warning,
+  title: "Review required",
+  body: "The workflow is waiting for review.",
+  source_type: "workflow_review",
+  source_id: "review-1",
+  dedupe_key: "workflow_review:review-1",
+  read_at: null,
+  archived_at: null,
+  created_at: new Date("2026-07-05T00:00:00Z"),
+  updated_at: new Date("2026-07-05T00:00:00Z"),
+};
 const projectSwitcherHtml = renderToStaticMarkup(
   <ProjectSidebar
     shellOptions={mockShellOptions}
@@ -83,6 +103,25 @@ const projectSwitcherHtml = renderToStaticMarkup(
     onCreateProject={async () => undefined}
     onUpdateProject={async () => undefined}
     onDeleteProject={async () => undefined}
+  />,
+);
+const inboxBadgeHtml = renderToStaticMarkup(
+  <ProjectSidebar
+    shellOptions={mockShellOptions}
+    sessions={mockWorkspaceBootstrap.sessions}
+    activeSessionId={mockWorkspaceBootstrap.defaults.activeSessionId}
+    activePage="workspace"
+    weeklyCost={mockWorkspaceBootstrap.defaults.weeklyCost}
+    inboxSummary={{
+      unread_count: 3n,
+      unread_by_severity: [],
+      unread_by_kind: [],
+    }}
+    inboxItems={[inboxItem]}
+    onNavigate={() => undefined}
+    onSessionSelect={() => undefined}
+    onPrimaryAction={() => undefined}
+    onProjectAction={() => undefined}
   />,
 );
 const migratedProjectHtml = renderToStaticMarkup(
@@ -349,6 +388,10 @@ const componentSource = readFileSync(
   new URL("./ProjectSidebar.tsx", import.meta.url),
   "utf8",
 );
+const inboxPopoverSource = readFileSync(
+  new URL("./InboxNotificationsPopover.tsx", import.meta.url),
+  "utf8",
+);
 const appSource = readFileSync(new URL("../App.tsx", import.meta.url), "utf8");
 
 check("renders active project monogram", html.includes("MS"), html);
@@ -378,6 +421,22 @@ check(
   "renders Search action in the former Inbox slot",
   html.includes("搜索") && html.includes("lucide-search") && !html.includes("Inbox"),
   html,
+check("renders Inbox action", html.includes("Inbox"), html);
+check(
+  "replaces top history entry with Bell notification entry",
+  inboxBadgeHtml.includes("Open notifications") &&
+    inboxBadgeHtml.includes(">3</span>") &&
+    componentSource.includes("<InboxNotificationsPopover") &&
+    inboxPopoverSource.includes("Bell") &&
+    !componentSource.includes("Open history") &&
+    !componentSource.includes("<History"),
+  { inboxBadgeHtml, componentSource, inboxPopoverSource },
+);
+check(
+  "keeps right-side Inbox primary action unchanged",
+  componentSource.includes("const primaryActionIcons") &&
+    componentSource.includes("inbox: Inbox"),
+  componentSource,
 );
 check("renders New session action", html.includes("New session"), html);
 check(
@@ -713,6 +772,40 @@ check(
     appSource.includes("onPinSession: pinSession") &&
     appSource.includes("onDeleteSession: deleteSession"),
   appSource,
+);
+check(
+  "wires centralized inbox state into ProjectSidebar",
+  appSource.includes("inboxSummaryAsync,") &&
+    appSource.includes("inboxItemsAsync,") &&
+    appSource.includes("onRefreshInbox: refreshInbox") &&
+    appSource.includes("onInboxItemOpen: handleInboxItemOpen") &&
+    appSource.includes("onMarkInboxItemRead: markInboxItemRead") &&
+    appSource.includes("onMarkAllInboxRead: markAllInboxRead") &&
+    appSource.includes("onArchiveInboxItem: archiveInboxItem"),
+  appSource,
+);
+check(
+  "keeps actionable inbox items unread while routing to handling views",
+  appSource.includes("shouldKeepInboxItemUnreadOnOpen") &&
+    appSource.includes("inboxKindsKeptUnread") &&
+    appSource.includes("notifyInboxWorkflowFocus") &&
+    appSource.includes("isExecutorApprovalInboxItem") &&
+    appSource.includes("openWorktreeConflictTab(projectId, sessionId)") &&
+    appSource.includes("isWorktreeCleanupFailedInboxItem") &&
+    appSource.includes("notifySourceControlRefreshRequested({") &&
+    appSource.includes("void markInboxItemRead(item.id).catch"),
+  appSource,
+);
+check(
+  "renders compact unread inbox popover states and actions",
+  inboxPopoverSource.includes("No unread notifications") &&
+    inboxPopoverSource.includes("Refresh failed") &&
+    inboxPopoverSource.includes("Mark all") &&
+    inboxPopoverSource.includes("inboxActionLabel(item)") &&
+    inboxPopoverSource.includes("worktree_cleanup_failed") &&
+    inboxPopoverSource.includes('return "Retry";') &&
+    inboxPopoverSource.includes("onArchiveItem"),
+  inboxPopoverSource,
 );
 check(
   "supports creating projects from sidebar",

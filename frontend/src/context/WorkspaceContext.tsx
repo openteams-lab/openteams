@@ -45,6 +45,7 @@ import {
   chatRuntimeApi,
   chatSessionsApi,
   cliConfigApi,
+  inboxApi,
   projectApi,
   sessionAgentsApi,
   skillsApi,
@@ -53,6 +54,8 @@ import {
 } from '@/lib/api';
 import type {
   CreateProjectRequest,
+  InboxItem,
+  InboxSummary,
   Project,
   ProjectMemberWithRuntime,
 } from '../../../shared/types';
@@ -262,8 +265,20 @@ const LIVE_DELTA_ACTIVITY_LINE_PREFIX = 'live-delta-';
 const CHAT_STREAM_RECONNECT_BASE_DELAY_MS = 1000;
 const CHAT_STREAM_RECONNECT_MAX_DELAY_MS = 30000;
 const SIDEBAR_RUNNING_INDICATOR_POLL_MS = 5000;
+const INBOX_REFRESH_INTERVAL_MS = 30000;
+const INBOX_LIGHT_REFRESH_DELAY_MS = 800;
+const INBOX_LIST_LIMIT = 25;
 const CHAT_MESSAGE_FONT_SIZE_DEFAULT = 14;
 export const CHAT_MESSAGE_FONT_SIZE_OPTIONS = [13, 14, 15, 16] as const;
+
+const EMPTY_INBOX_SUMMARY: InboxSummary = {
+  unread_count: 0n,
+  unread_by_severity: [],
+  unread_by_kind: [],
+};
+
+const isAutoReadableInboxItem = (item: InboxItem): boolean =>
+  item.kind === 'chat_message' || item.source_type === 'chat_message';
 
 const isThemePreference = (
   value: string | null | undefined,
@@ -1238,6 +1253,13 @@ interface WorkspaceContextProps {
   config: Config | null;
   configAsync: AsyncResourceState<Config | null>;
   refreshConfig: () => Promise<void>;
+  inboxSummaryAsync: AsyncResourceState<InboxSummary>;
+  inboxItemsAsync: AsyncResourceState<InboxItem[]>;
+  refreshInbox: () => Promise<void>;
+  markInboxItemRead: (itemId: string) => Promise<void>;
+  markInboxItemsRead: (itemIds: string[]) => Promise<void>;
+  markAllInboxRead: () => Promise<void>;
+  archiveInboxItem: (itemId: string) => Promise<void>;
   workflowCard: WorkflowCardProjection | null;
   workflowCardAsync: AsyncResourceState<WorkflowCardProjection | null>;
   refreshWorkflowCard: (messageId: string) => Promise<void>;
@@ -1349,6 +1371,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const [configAsync, setConfigAsync] = useState<
     AsyncResourceState<Config | null>
   >(() => initialAsync(null));
+  const [inboxSummaryAsync, setInboxSummaryAsync] = useState<
+    AsyncResourceState<InboxSummary>
+  >(() => initialAsync(EMPTY_INBOX_SUMMARY));
+  const [inboxItemsAsync, setInboxItemsAsync] = useState<
+    AsyncResourceState<InboxItem[]>
+  >(() => initialAsync([]));
   const [workflowCardAsync, setWorkflowCardAsync] = useState<
     AsyncResourceState<WorkflowCardProjection | null>
   >(() => initialAsync(null));
@@ -1357,6 +1385,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   >(() => initialAsync(null));
   const messagesRequestIdRef = useRef(0);
   const queueRequestIdRef = useRef(0);
+  const inboxRequestIdRef = useRef(0);
+  const inboxLightRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const autoMarkedInboxItemIdsRef = useRef<Set<string>>(new Set());
   const workspaceChangesRequestIdRef = useRef(0);
   const initialRefreshStartedRef = useRef(false);
   const initialRefreshCompletedRef = useRef(false);
@@ -2266,6 +2299,146 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
+  const refreshInbox = useCallback(async (): Promise<void> => {
+    const projectId = selectedProjectIdRef.current;
+    const requestId = inboxRequestIdRef.current + 1;
+    inboxRequestIdRef.current = requestId;
+
+    if (!projectId) {
+      setInboxSummaryAsync(succeed(EMPTY_INBOX_SUMMARY));
+      setInboxItemsAsync(succeed([]));
+      return;
+    }
+
+    setInboxSummaryAsync(beginLoad);
+    setInboxItemsAsync(beginLoad);
+    try {
+      const [summary, itemsResponse] = await Promise.all([
+        inboxApi.getSummary({ project_id: projectId, session_id: null }),
+        inboxApi.listItems({
+          project_id: projectId,
+          session_id: null,
+          unread: true,
+          archived: false,
+          limit: INBOX_LIST_LIMIT,
+        }),
+      ]);
+      if (
+        inboxRequestIdRef.current !== requestId ||
+        selectedProjectIdRef.current !== projectId
+      ) {
+        return;
+      }
+      setInboxSummaryAsync(succeed(summary));
+      setInboxItemsAsync(succeed(itemsResponse.items));
+    } catch (err) {
+      if (inboxRequestIdRef.current !== requestId) return;
+      setInboxSummaryAsync((prev) => fail(prev, err));
+      setInboxItemsAsync((prev) => fail(prev, err));
+    }
+  }, []);
+
+  const scheduleInboxRefresh = useCallback(() => {
+    if (inboxLightRefreshTimerRef.current) return;
+    inboxLightRefreshTimerRef.current = setTimeout(() => {
+      inboxLightRefreshTimerRef.current = null;
+      void refreshInbox();
+    }, INBOX_LIGHT_REFRESH_DELAY_MS);
+  }, [refreshInbox]);
+
+  const removeInboxItemsFromList = useCallback((itemIds: string[]) => {
+    if (itemIds.length === 0) return;
+    const ids = new Set(itemIds);
+    setInboxItemsAsync((prev) => {
+      const nextItems = prev.data.filter((item) => !ids.has(item.id));
+      return nextItems.length === prev.data.length ? prev : succeed(nextItems);
+    });
+  }, []);
+
+  const markInboxItemRead = useCallback(
+    async (itemId: string): Promise<void> => {
+      if (!itemId) return;
+      await inboxApi.markRead(itemId);
+      removeInboxItemsFromList([itemId]);
+      scheduleInboxRefresh();
+    },
+    [removeInboxItemsFromList, scheduleInboxRefresh],
+  );
+
+  const markInboxItemsRead = useCallback(
+    async (itemIds: string[]): Promise<void> => {
+      const ids = Array.from(new Set(itemIds.filter(Boolean)));
+      if (ids.length === 0) return;
+      await inboxApi.markManyRead({ ids });
+      removeInboxItemsFromList(ids);
+      scheduleInboxRefresh();
+    },
+    [removeInboxItemsFromList, scheduleInboxRefresh],
+  );
+
+  const markAllInboxRead = useCallback(async (): Promise<void> => {
+    const projectId = selectedProjectIdRef.current;
+    await inboxApi.markAllRead({
+      project_id: projectId || null,
+      session_id: null,
+    });
+    setInboxItemsAsync(succeed([]));
+    setInboxSummaryAsync(succeed(EMPTY_INBOX_SUMMARY));
+    scheduleInboxRefresh();
+  }, [scheduleInboxRefresh]);
+
+  const archiveInboxItem = useCallback(
+    async (itemId: string): Promise<void> => {
+      if (!itemId) return;
+      await inboxApi.archive(itemId);
+      removeInboxItemsFromList([itemId]);
+      scheduleInboxRefresh();
+    },
+    [removeInboxItemsFromList, scheduleInboxRefresh],
+  );
+
+  useEffect(() => {
+    if (!activeSessionId) return;
+    const ids = inboxItemsAsync.data
+      .filter(
+        (item) =>
+          item.session_id === activeSessionId &&
+          item.read_at === null &&
+          item.archived_at === null &&
+          isAutoReadableInboxItem(item) &&
+          !autoMarkedInboxItemIdsRef.current.has(item.id),
+      )
+      .map((item) => item.id);
+    if (ids.length === 0) return;
+
+    for (const id of ids) {
+      autoMarkedInboxItemIdsRef.current.add(id);
+    }
+    void markInboxItemsRead(ids).catch(() => {
+      for (const id of ids) {
+        autoMarkedInboxItemIdsRef.current.delete(id);
+      }
+    });
+  }, [activeSessionId, inboxItemsAsync.data, markInboxItemsRead]);
+
+  useEffect(() => {
+    void refreshInbox();
+    if (!selectedProjectId) return undefined;
+    const intervalId = setInterval(() => {
+      void refreshInbox();
+    }, INBOX_REFRESH_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [refreshInbox, selectedProjectId]);
+
+  useEffect(
+    () => () => {
+      if (inboxLightRefreshTimerRef.current) {
+        clearTimeout(inboxLightRefreshTimerRef.current);
+      }
+    },
+    [],
+  );
+
   const refreshSessionLists = useCallback(async (): Promise<void> => {
     await Promise.all([refreshSessions(), refreshArchivedSessions()]);
   }, [refreshArchivedSessions, refreshSessions]);
@@ -2917,6 +3090,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       refreshMembers(),
       refreshMessages(),
       refreshMemberQueues(),
+      refreshInbox(),
     ]);
   }, [
     refreshSessions,
@@ -2928,6 +3102,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     refreshMembers,
     refreshMessages,
     refreshMemberQueues,
+    refreshInbox,
   ]);
 
   // Initial load: hydrate local mock API data first, then try backend-backed
@@ -3437,6 +3612,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         parsed.session_id === sid
       ) {
         void refreshSessionRunningIndicators(sid);
+        scheduleInboxRefresh();
         return;
       }
 
@@ -3492,6 +3668,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
             return next;
           });
         }
+        scheduleInboxRefresh();
         return;
       }
 
@@ -3609,6 +3786,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     refreshSessionWorkflowStatus,
     refreshWorkspaceChanges,
     refreshMembers,
+    scheduleInboxRefresh,
     setSessionRunningIndicator,
     setSessionWorkflowRunningIndicator,
     sessionsAsync.source,
@@ -4025,6 +4203,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         config: configAsync.data,
         configAsync,
         refreshConfig,
+        inboxSummaryAsync,
+        inboxItemsAsync,
+        refreshInbox,
+        markInboxItemRead,
+        markInboxItemsRead,
+        markAllInboxRead,
+        archiveInboxItem,
         workflowCard: workflowCardAsync.data,
         workflowCardAsync,
         refreshWorkflowCard,

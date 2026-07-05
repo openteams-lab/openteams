@@ -2242,6 +2242,18 @@ impl ChatRunner {
                                 &Self::normalized_entry_error_name(error_type.as_ref()),
                                 None,
                             );
+                            let failure_detail = visible_error_content
+                                .or_else(|| (!error_content.is_empty()).then_some(error_content.as_str()))
+                                .unwrap_or("Agent run failed.");
+                            InboxService::new()
+                                .notify_chat_agent_failed(
+                                    &runner.db.pool,
+                                    session_id,
+                                    run_id,
+                                    &agent_name,
+                                    Some(failure_detail),
+                                )
+                                .await;
                         }
 
                         if !(latest_assistant.is_empty() && visible_error_content.is_some()) {

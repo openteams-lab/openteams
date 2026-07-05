@@ -15,6 +15,12 @@ import type {
   WorkflowTranscriptEntry,
 } from '@/types';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import {
+  clearInboxWorkflowFocus,
+  getPendingInboxWorkflowFocus,
+  INBOX_WORKFLOW_FOCUS_EVENT,
+  type InboxWorkflowFocusTarget,
+} from '@/lib/inboxNavigation';
 import { ChatWorkflowCard } from './ChatWorkflowCard';
 import {
   WorkflowReviewSettingsDialog,
@@ -49,6 +55,14 @@ const toOldTranscriptEntry = (
   ...entry,
   message_type: senderToMessageType(entry.sender_type),
 });
+
+const isWorkflowInboxActionTranscript = (
+  entry: WorkflowTranscriptEntry,
+): boolean =>
+  entry.entry_type === 'input_request' ||
+  entry.entry_type === 'continue_confirmation' ||
+  entry.entry_type === 'approval_request' ||
+  entry.entry_type === 'permission_request';
 
 export function WorkflowCard({
   sessionId,
@@ -175,6 +189,82 @@ export function WorkflowCard({
           finalReviewTranscripts,
         )
       : null;
+  const shouldLoadWorkflowInboxActionTranscripts =
+    !!sessionId &&
+    !!projection?.execution_id &&
+    projection.has_transcripts !== false &&
+    !(
+      projection.state === 'preview_ready' ||
+      projection.state === 'preview_invalid'
+    );
+  const { data: workflowInboxActionTranscripts = [] } = useQuery({
+    queryKey: [
+      'workflowInboxActionTranscripts',
+      sessionId,
+      projection?.execution_id,
+    ],
+    queryFn: () => {
+      if (!sessionId || !projection?.execution_id) return [];
+      return workflowApi
+        .getExecutionTranscripts(sessionId, projection.execution_id, {
+          unresolved: true,
+          limit: 50,
+        })
+        .then((entries) => entries.filter(isWorkflowInboxActionTranscript));
+    },
+    enabled: shouldLoadWorkflowInboxActionTranscripts,
+    staleTime: 30_000,
+    gcTime: 5 * 60 * 1000,
+    refetchInterval: shouldPollWorkflowProjection(projection)
+      ? WORKFLOW_CARD_REFETCH_INTERVAL_MS
+      : false,
+  });
+  const workflowInboxActionIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (projection?.pending_input?.input_id) {
+      ids.add(projection.pending_input.input_id);
+    }
+    for (const review of projection?.pending_reviews ?? []) {
+      ids.add(review.review_id);
+    }
+    if (projection?.pending_review?.review_id) {
+      ids.add(projection.pending_review.review_id);
+    }
+    if (finalReviewAction?.transcriptId) {
+      ids.add(finalReviewAction.transcriptId);
+    }
+    for (const entry of workflowInboxActionTranscripts) {
+      ids.add(entry.id);
+    }
+    return ids;
+  }, [
+    finalReviewAction?.transcriptId,
+    projection?.pending_input,
+    projection?.pending_review,
+    projection?.pending_reviews,
+    workflowInboxActionTranscripts,
+  ]);
+
+  useEffect(() => {
+    const shouldOpenForTarget = (target: InboxWorkflowFocusTarget | null) => {
+      if (!target || target.sessionId !== sessionId) return;
+      const sourceId = target.sourceId ?? null;
+      if (sourceId && workflowInboxActionIds.has(sourceId)) {
+        setWindowOpen(true);
+        clearInboxWorkflowFocus(target);
+      }
+    };
+    shouldOpenForTarget(getPendingInboxWorkflowFocus(sessionId));
+    const handleInboxFocus = (event: Event) => {
+      shouldOpenForTarget(
+        (event as CustomEvent<InboxWorkflowFocusTarget>).detail,
+      );
+    };
+    window.addEventListener(INBOX_WORKFLOW_FOCUS_EVENT, handleInboxFocus);
+    return () =>
+      window.removeEventListener(INBOX_WORKFLOW_FOCUS_EVENT, handleInboxFocus);
+  }, [sessionId, workflowInboxActionIds]);
+
   const workflowRuntimeMessages = useMemo(() => {
     if (!projection?.execution_id) return [];
     return workflowRuntimeLinesByExecution[projection.execution_id] ?? [];
