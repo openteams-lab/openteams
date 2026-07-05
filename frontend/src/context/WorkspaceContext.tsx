@@ -3035,6 +3035,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       for (const sessionId of runningSidebarSessionIds) {
         void refreshSessionRunningIndicators(sessionId);
       }
+      scheduleInboxRefresh();
     };
 
     const intervalId = window.setInterval(
@@ -3045,6 +3046,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [
     activeSessionId,
     refreshSessionRunningIndicators,
+    scheduleInboxRefresh,
     sessionsAsync.data,
     sessionsAsync.source,
   ]);

@@ -29,6 +29,18 @@ const autoReadableSource =
   autoReadableStart >= 0 && autoReadableEnd > autoReadableStart
     ? source.slice(autoReadableStart, autoReadableEnd)
     : '';
+const runningSidebarRefreshStart = source.indexOf(
+  'const refreshRunningSidebarSessions = () => {',
+);
+const runningSidebarRefreshEnd = source.indexOf(
+  'const intervalId = window.setInterval',
+  runningSidebarRefreshStart,
+);
+const runningSidebarRefreshSource =
+  runningSidebarRefreshStart >= 0 &&
+  runningSidebarRefreshEnd > runningSidebarRefreshStart
+    ? source.slice(runningSidebarRefreshStart, runningSidebarRefreshEnd)
+    : '';
 
 check(
   'centralizes inbox summary and unread list state in WorkspaceContext',
@@ -69,6 +81,14 @@ check(
     autoReadableSource.includes("item.source_type === 'chat_message'") &&
     !autoReadableSource.includes('workflow_'),
   autoReadableSource,
+);
+
+check(
+  'refreshes inbox while polling non-active attention sessions before Bell opens',
+  runningSidebarRefreshSource.includes(
+    'void refreshSessionRunningIndicators(sessionId);',
+  ) && runningSidebarRefreshSource.includes('scheduleInboxRefresh();'),
+  runningSidebarRefreshSource,
 );
 
 check(
