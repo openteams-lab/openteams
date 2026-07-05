@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronsDown } from 'lucide-react';
 import type { SessionCostEntry } from '@/types';
-import { truncateTitle, formatNumber } from '@/lib/buildStatsUtils';
+import {
+  truncateTitle,
+  formatCompactNumber,
+  formatNumber,
+  formatPrice,
+} from '@/lib/buildStatsUtils';
 
 export type SessionCostViewMode = 'list' | 'bar';
 
@@ -87,6 +92,7 @@ export function SessionCostList({
   );
   const inputShortLabel = label('buildStats.inputShort', 'in');
   const cacheShortLabel = label('buildStats.cacheShort', 'cache');
+  const tokensLabel = label('buildStats.tokens', 'tokens');
 
   if (mode === 'bar') {
     return (
@@ -97,6 +103,7 @@ export function SessionCostList({
         >
           {visibleSessions.map((session) => {
             const totalTokens = numberValue(session.total_tokens);
+            const estimatedCost = numberValue(session.estimated_cost);
             const width = Math.max(4, (totalTokens / maxTokens) * 100);
             const selected = selectedSessionId === session.session_id;
             return (
@@ -119,8 +126,18 @@ export function SessionCostList({
                   >
                     {truncateTitle(session.title || session.session_id, 56)}
                   </span>
-                  <span className="font-mono text-[12px] text-[var(--ink)]">
-                    {formatNumber(totalTokens)}
+                  <span
+                    className="inline-flex shrink-0 items-baseline gap-2 font-mono text-[12px]"
+                    title={`${formatNumber(
+                      totalTokens,
+                    )} ${tokensLabel} / ${formatPrice(estimatedCost)}`}
+                  >
+                    <span className="font-medium text-[var(--ink)]">
+                      {formatPrice(estimatedCost)}
+                    </span>
+                    <span className="text-[var(--ink-subtle)]">
+                      {formatCompactNumber(totalTokens)}
+                    </span>
                   </span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-sm bg-[var(--surface-2)]">

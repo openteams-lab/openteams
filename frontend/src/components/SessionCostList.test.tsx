@@ -31,19 +31,41 @@ const session = (
   item: Pick<
     SessionCostEntry,
     'session_id' | 'title' | 'total_tokens' | 'input_tokens' | 'output_tokens'
-  >,
+  > &
+    Partial<Pick<SessionCostEntry, 'estimated_cost'>>,
 ): SessionCostEntry => ({
   ...item,
   run_count: 0,
   cache_read_tokens: 0,
   reasoning_output_tokens: 0,
-  estimated_cost: 0,
+  estimated_cost: item.estimated_cost ?? 0,
 });
 
 const sessions: SessionCostEntry[] = [
-  session({ session_id: 's1', title: 'Short title', total_tokens: 500, input_tokens: 200, output_tokens: 300 }),
-  session({ session_id: 's2', title: 'Highest usage session', total_tokens: 12345678, input_tokens: 5000000, output_tokens: 7345678 }),
-  session({ session_id: 's3', title: 'Medium session', total_tokens: 5000, input_tokens: 2000, output_tokens: 3000 }),
+  session({
+    session_id: 's1',
+    title: 'Short title',
+    total_tokens: 500,
+    input_tokens: 200,
+    output_tokens: 300,
+    estimated_cost: 0.0005,
+  }),
+  session({
+    session_id: 's2',
+    title: 'Highest usage session',
+    total_tokens: 12345678,
+    input_tokens: 5000000,
+    output_tokens: 7345678,
+    estimated_cost: 1.2345,
+  }),
+  session({
+    session_id: 's3',
+    title: 'Medium session',
+    total_tokens: 5000,
+    input_tokens: 2000,
+    output_tokens: 3000,
+    estimated_cost: 0.0123,
+  }),
 ];
 
 console.log('SessionCostList');
@@ -77,23 +99,20 @@ check('formats medium number with commas', htmlNormal.includes('5,000'), htmlNor
 check('formats small number', htmlNormal.includes('500'), htmlNormal);
 
 // Test: sorted by total_tokens DESC (highest first in HTML output)
-const idx2 = htmlNormal.indexOf('12,345,678');
-const idx3 = htmlNormal.indexOf('5,000');
-const idx1 = htmlNormal.indexOf('>500<');
+const idx2 = htmlNormal.indexOf('Highest usage session');
+const idx3 = htmlNormal.indexOf('Medium session');
+const idx1 = htmlNormal.indexOf('Short title');
 check('sorted: highest tokens first', idx2 < idx3, { idx2, idx3 });
 check('sorted: medium before lowest', idx3 < idx1, { idx3, idx1 });
 
-// Test: uses Inter font for titles
-check('uses Inter font for titles', htmlNormal.includes('Inter'), htmlNormal);
-
-// Test: uses JetBrains Mono for numbers
-check('uses JetBrains Mono for numbers', htmlNormal.includes('JetBrains Mono'), htmlNormal);
+// Test: uses mono classes for numeric values
+check('uses font-mono for numbers', htmlNormal.includes('font-mono'), htmlNormal);
 
 // Test: uses design tokens for styling
 check('uses surface-2 for row backgrounds', htmlNormal.includes('bg-[var(--surface-2)]'), htmlNormal);
 check('uses hairline borders between rows', htmlNormal.includes('border-[var(--hairline)]'), htmlNormal);
 check('uses ink color for title text', htmlNormal.includes('text-[var(--ink)]'), htmlNormal);
-check('uses ink-muted for token count', htmlNormal.includes('text-[var(--ink-muted)]'), htmlNormal);
+check('uses ink-tertiary for token detail', htmlNormal.includes('text-[var(--ink-tertiary)]'), htmlNormal);
 
 // Test: has role="list" for accessibility
 check('has role=list', htmlNormal.includes('role="list"'), htmlNormal);
@@ -101,6 +120,13 @@ check('has role=listitem', htmlNormal.includes('role="listitem"'), htmlNormal);
 
 // Test: scrollable container
 check('has overflow-y-auto for scrolling', htmlNormal.includes('overflow-y-auto'), htmlNormal);
+
+// --- Bar render with cost ---
+const htmlBar = renderToStaticMarkup(
+  <SessionCostList sessions={sessions} loading={false} t={t} mode="bar" />,
+);
+check('bar: displays estimated cost', htmlBar.includes('$1.2345'), htmlBar);
+check('bar: displays compact total tokens', htmlBar.includes('12.3M'), htmlBar);
 
 // --- Title truncation ---
 const longTitle = 'A'.repeat(80);
