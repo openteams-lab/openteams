@@ -66,10 +66,6 @@ import {
 } from "@/lib/sourceControlEvents";
 import { markPendingIssueStatusSync } from "@/lib/pendingIssueStatusSync";
 import { notifyBuildStatsUsageUpdated } from "@/lib/buildStatsEvents";
-import {
-  SOURCE_CONTROL_REFRESH_REQUESTED_EVENT,
-  type SourceControlRefreshRequestedDetail,
-} from "@/lib/sourceControlEvents";
 import { requestTeamMemberInviteNavigation } from "@/lib/teamNavigation";
 import { openInSystemFileManager } from "@/lib/systemFileManager";
 import {

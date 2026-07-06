@@ -425,9 +425,47 @@ const filterInboxSummaryForEnabledSources = (
 const inboxNotificationSettingsSignature = (config: Config | null): string => {
   const notificationConfig = notificationConfigFromWorkspaceConfig(config);
   return JSON.stringify({
+    push_enabled: notificationConfig.push_enabled,
     sound_enabled: notificationConfig.sound_enabled,
     sound_file: notificationConfig.sound_file,
     inbox_sources: notificationConfig.inbox_sources,
+  });
+};
+
+const browserNotificationApi = (): typeof Notification | null => {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return null;
+  }
+  return window.Notification;
+};
+
+const showInboxSystemNotification = (
+  config: Config | null,
+  newItems: InboxItem[],
+) => {
+  if (!config || newItems.length === 0) return;
+
+  const notificationConfig = notificationConfigFromWorkspaceConfig(config);
+  if (!notificationConfig.push_enabled) return;
+
+  const BrowserNotification = browserNotificationApi();
+  if (!BrowserNotification || BrowserNotification.permission !== 'granted') {
+    return;
+  }
+
+  newItems.forEach((item) => {
+    const notification = new BrowserNotification(
+      item.title || 'OpenTeams notification',
+      {
+        body: item.body?.trim() || undefined,
+        tag: `openteams-inbox-${item.id}`,
+        silent: true,
+      },
+    );
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
   });
 };
 
@@ -2534,6 +2572,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         (item) => !inboxUnreadSoundIdsRef.current.has(item.id),
       );
       if (inboxSoundPrimedRef.current) {
+        showInboxSystemNotification(configAsync.data, newUnreadItems);
         playInboxNotificationSound(configAsync.data, newUnreadItems);
       }
       inboxUnreadSoundIdsRef.current = unreadItemIds;

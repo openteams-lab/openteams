@@ -106,12 +106,20 @@ check(
 );
 
 check(
-  'filters Bell reminders by source and plays one global inbox sound without a separate sound helper file',
+  'filters Bell reminders by source and emits configured sound/system notifications',
   !source.includes("from '@/lib/inboxNotificationSound'") &&
     refreshInboxSource.includes('filterInboxSummaryForEnabledSources') &&
     refreshInboxSource.includes('filterInboxItemsForEnabledSources') &&
     refreshInboxSource.includes('inboxNotificationSettingsSignature') &&
     source.includes('const playInboxNotificationSound') &&
+    source.includes('const showInboxSystemNotification') &&
+    source.includes('notificationConfig.push_enabled') &&
+    source.includes('new BrowserNotification') &&
+    source.includes('BrowserNotification.permission') &&
+    source.includes('push_enabled: notificationConfig.push_enabled') &&
+    refreshInboxSource.includes(
+      'showInboxSystemNotification(configAsync.data, newUnreadItems)',
+    ) &&
     refreshInboxSource.includes(
       'playInboxNotificationSound(configAsync.data, newUnreadItems)',
     ) &&
