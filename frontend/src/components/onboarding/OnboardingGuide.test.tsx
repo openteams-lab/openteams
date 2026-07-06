@@ -69,7 +69,11 @@ const requiredLocaleKeys = [
   'onboarding.executor.table.role',
   'onboarding.scenario.recommendedTemplate',
   'onboarding.upgrade.title',
-  'onboarding.upgrade.markRead',
+  'onboarding.upgrade.currentVersion',
+  'onboarding.upgrade.latestVersion',
+  'onboarding.upgrade.releaseNotes',
+  'onboarding.upgrade.updateNow',
+  'onboarding.upgrade.toastAction',
   'settings.onboarding.title',
   'settings.onboarding.resetGuide',
   'settings.onboarding.replayUpgrade',
@@ -124,11 +128,20 @@ check(
     guideSource.includes("'--onboarding-panel': '#151617'") &&
     guideSource.includes('pointer-events-none absolute inset-0 bg-[var(--onboarding-stage)]') &&
     guideSource.includes('px-4 text-center sm:px-6') &&
-    guideSource.includes('overflow-hidden pb-4 pt-4 sm:pb-8 sm:pt-8 lg:pb-10 lg:pt-10') &&
+    guideSource.includes('items-center justify-center overflow-hidden px-4 text-center sm:px-6') &&
+    guideSource.includes('h-full max-h-[860px] w-full max-w-[1200px] flex-col items-center overflow-y-auto overflow-x-hidden') &&
+    !guideSource.includes('useAppScale') &&
+    !guideSource.includes('welcomeStageStyle') &&
+    !guideSource.includes('transform: `scale(${welcomeStageScale})`') &&
+    !guideSource.includes('zoom: welcomeVisualScale') &&
+    !guideSource.includes('calculateWelcomeViewportScale') &&
+    !guideSource.includes('setWelcomeViewportScale') &&
+    guideSource.includes('overflow-y-auto overflow-x-hidden pb-4 pt-4 sm:pb-8 sm:pt-8 lg:pb-10 lg:pt-10') &&
     guideSource.includes('text-[28px] font-semibold leading-[1.08]') &&
     guideSource.includes('sm:text-[40px]') &&
     guideSource.includes('lg:text-[48px]') &&
     guideSource.includes('text-[13px] leading-5 text-[#a8b3c2]') &&
+    guideSource.includes('mt-2 max-w-4xl shrink-0 sm:mt-8 lg:mt-16') &&
     guideSource.includes('mt-4 flex min-h-[220px] w-full max-w-5xl flex-col overflow-hidden rounded-[8px] border border-white/[0.12] bg-[var(--onboarding-card)]') &&
     guideSource.includes('sm:mt-8 sm:min-h-[320px] lg:mt-14 lg:min-h-[440px]') &&
     guideSource.includes('border-b border-white/[0.08] bg-[var(--onboarding-card)] px-3 py-2.5 sm:px-4 sm:py-3') &&
@@ -143,7 +156,7 @@ check(
     guideSource.includes("active ? 'text-white' : 'text-[#8792a3]'") &&
     guideSource.includes('absolute bottom-2 left-0 top-2 w-px') &&
     guideSource.includes('text-current opacity-55') &&
-    guideSource.includes('mt-4 flex w-full flex-col items-center gap-2 sm:mt-9 sm:gap-3 lg:mt-12 lg:gap-4') &&
+    guideSource.includes('mt-4 flex w-full shrink-0 flex-col items-center gap-2 sm:mt-9 sm:gap-3 lg:mt-12 lg:gap-4') &&
     guideSource.includes('tracking-[0.14em] text-[#8f9aaa] sm:text-[10px] sm:tracking-[0.22em]') &&
     guideSource.includes("t('onboarding.welcome.footerSteps'") &&
     !guideSource.includes('ALL 4 STEPS TO FINISH CONFIGURATION') &&
@@ -459,10 +472,11 @@ check(
 );
 
 check(
-  'App loads onboarding state on startup and gates upgrade by current version',
+  'App loads onboarding state and polls latest release version on an interval',
   appSource.includes('onboardingApi.getState()') &&
-    appSource.includes('compareVersions(') &&
-    appSource.includes('last_seen_upgrade_version') &&
+    appSource.includes('versionApi.check()') &&
+    appSource.includes('versionUpdateCheckIntervalMs') &&
+    appSource.includes('setVersionUpdateToast(info)') &&
     appSource.includes('currentUpgradeVersion') &&
     appSource.includes('<OnboardingGuide'),
   appSource,
@@ -497,21 +511,29 @@ check(
 );
 
 check(
-  'upgrade guide marks the current version as read',
-  guideSource.includes('onboardingApi.markUpgradeRead({ version: currentVersion })') &&
-    guideSource.includes('onUpgradeRead(state)'),
-  guideSource,
+  'upgrade guide checks versions and installs updates through version API',
+  appSource.includes('versionApi.check()') &&
+    appSource.includes('versionUpdateCheckIntervalMs') &&
+    appSource.includes('versionUpdateToast') &&
+    appSource.includes('openVersionUpdatePage') &&
+    appSource.includes('versionApi.updateNpx()') &&
+    appSource.includes('versionApi.restart()') &&
+    guideSource.includes('onInstallUpdate()') &&
+    guideSource.includes('onboarding.upgrade.updateNow'),
+  { appSource, guideSource },
 );
 
 check(
   'upgrade guide uses a floating onboarding-style window',
   guideSource.includes('bg-black/45') &&
     guideSource.includes('backdrop-blur-[2px]') &&
-    guideSource.includes('max-h-[min(680px,calc(100vh-48px))]') &&
+    guideSource.includes('max-h-[min(720px,calc(100vh-48px))]') &&
     guideSource.includes('border border-white/[0.12] bg-[var(--onboarding-card)]') &&
     guideSource.includes('pointer-events-none absolute inset-0 bg-[var(--onboarding-stage)]') &&
     guideSource.includes('opacity-[0.032] mix-blend-screen') &&
     guideSource.includes('bg-[linear-gradient(180deg,#FFFFFF_0%,#F2F2F2_100%)]') &&
+    guideSource.includes('onboarding.upgrade.releaseNotes') &&
+    guideSource.includes('style={onboardingInvertedContentStyle}') &&
     guideSource.includes('onboarding.upgrade.later'),
   guideSource,
 );
