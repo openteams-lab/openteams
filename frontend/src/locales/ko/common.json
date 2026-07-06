@@ -364,5 +364,9 @@
   "onboarding.upgrade.releaseLink": "Open release",
   "onboarding.upgrade.toastTitle": "OpenTeams {version} is available",
   "onboarding.upgrade.toastMessage": "You are on v{current}. Latest release is v{latest}.",
-  "onboarding.upgrade.toastAction": "View update"
+  "onboarding.upgrade.toastAction": "View update",
+  "fixedMainAgentMention": "Plan mode routes to {agent}",
+  "planMode": "Plan mode",
+  "switchToChatMode": "Switch to chat mode",
+  "switchToPlanMode": "Switch to plan mode"
 }

@@ -1341,9 +1341,9 @@ fn validate_workspace_path_legality_data(trimmed: &str) -> Result<PathBuf, Works
     }
 
     if !is_absolute {
-        return Err(workspace_git_error(
-            WorkspaceGitErrorCode::WorkspacePathInvalid,
-        ));
+        let mut error = workspace_git_error(WorkspaceGitErrorCode::WorkspacePathInvalid);
+        error.message = "Workspace path must be an absolute path.".to_string();
+        return Err(error);
     }
 
     if trimmed.chars().any(|ch| ch == '\0' || ch.is_control()) {
@@ -2398,6 +2398,9 @@ mod gitignore_templates {
             Ok(mut file) => {
                 use tokio::io::AsyncWriteExt;
                 file.write_all(body.as_bytes()).await.map_err(|_| {
+                    workspace_git_error(WorkspaceGitErrorCode::GitignoreWriteFailed)
+                })?;
+                file.flush().await.map_err(|_| {
                     workspace_git_error(WorkspaceGitErrorCode::GitignoreWriteFailed)
                 })?;
                 Ok(true)

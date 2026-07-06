@@ -27,6 +27,7 @@ use uuid::Uuid;
 include!("dependencies.rs");
 include!("types.rs");
 include!("agent_adapters.rs");
+include!("link_manager.rs");
 include!("remote_registry.rs");
 include!("frontmatter.rs");
 include!("discovery.rs");

@@ -421,6 +421,7 @@ check(
   "renders Search action in the former Inbox slot",
   html.includes("搜索") && html.includes("lucide-search") && !html.includes("Inbox"),
   html,
+);
 check("renders Inbox action", html.includes("Inbox"), html);
 check(
   "replaces top history entry with Bell notification entry",

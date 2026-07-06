@@ -108,5 +108,6 @@
   "settings.shortcuts.dismissModalTriggers": "Fermer les modales",
   "settings.shortcuts.startTaskExecution": "Démarrer le pipeline de tâches",
   "settings.shortcuts.title": "Raccourcis clavier",
-  "settings.shortcuts.toggleWorkspaceSearch": "Basculer la recherche de workspace"
+  "settings.shortcuts.toggleWorkspaceSearch": "Basculer la recherche de workspace",
+  "settings.providers.effective": "Applied"
 }

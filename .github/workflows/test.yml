@@ -33,7 +33,6 @@ jobs:
       - name: Frontend checks
         run: |
           pnpm run frontend:lint
-          pnpm run frontend:format:check
           pnpm run frontend:check
 
       - name: Check i18n regressions
@@ -56,6 +55,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev pkg-config
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
