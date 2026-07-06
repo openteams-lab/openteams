@@ -9,6 +9,8 @@ import {
   Archive,
   RotateCcw,
   Bell,
+  Check,
+  ChevronDown,
   Cpu,
   CreditCard,
   FlaskConical,
@@ -16,9 +18,13 @@ import {
   Github,
   Key,
   Keyboard,
+  Languages,
+  Monitor,
+  Moon,
   Route,
   SlidersHorizontal,
   Sparkles,
+  Sun,
   Trash2,
   User,
   Users,
@@ -37,6 +43,7 @@ import {
   ONBOARDING_UPGRADE_REPLAY_EVENT,
 } from '@/lib/onboardingEvents';
 import { mockFrontendApi } from '@/lib/mockFrontendApi';
+import { cn } from '@/lib/utils';
 import type { SettingsOptionsMock } from '@/mockApiData';
 import type { GitHubAccount, Session, UserSystemInfo } from '@/types';
 import {
@@ -234,10 +241,10 @@ const NotificationSettingRow: React.FC<NotificationSettingRowProps> = ({
   const toggleDisabled = disabled || !onToggle;
 
   return (
-    <div className={`flex items-center justify-between gap-5 px-5 py-4 ${divided ? 'border-b border-[var(--hairline)]' : ''}`}>
+    <div className={`settings-preference-row flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between ${divided ? 'border-b border-[var(--hairline)]' : ''}`}>
       <div className="min-w-0">
-        <p className="text-sm leading-tight text-[var(--ink)]">{title}</p>
-        <p className="mt-1 text-sm leading-snug text-[var(--ink-subtle)]">{description}</p>
+        <p className="settings-row-title leading-tight">{title}</p>
+        <p className="settings-row-description mt-1 leading-snug">{description}</p>
       </div>
       {control ?? (
         <button
@@ -270,6 +277,13 @@ const NotificationSettingRow: React.FC<NotificationSettingRowProps> = ({
 const sessionErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? `${fallback}: ${error.message}` : fallback;
 
+const browserNotificationApi = (): typeof Notification | null => {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return null;
+  }
+  return window.Notification;
+};
+
 export const SettingsWorkspace: React.FC = () => {
   const {
     t,
@@ -290,6 +304,7 @@ export const SettingsWorkspace: React.FC = () => {
   } = useWorkspace();
   const [settingsOptions, setSettingsOptions] =
     useState<SettingsOptionsMock | null>(null);
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [githubAccount, setGithubAccount] = useState<GitHubAccount | null>(
     null,
   );
@@ -310,8 +325,6 @@ export const SettingsWorkspace: React.FC = () => {
   const [onboardingAction, setOnboardingAction] = useState<
     'reset' | 'upgrade' | null
   >(null);
-  const [onboardingActionMessage, setOnboardingActionMessage] =
-    useState<string | null>(null);
   const [worktreeSessionsDirDraft, setWorktreeSessionsDirDraft] =
     useState('');
   const [worktreeSessionsDirSaving, setWorktreeSessionsDirSaving] =
@@ -424,6 +437,40 @@ export const SettingsWorkspace: React.FC = () => {
       return;
     }
 
+    if (field === 'push_enabled' && nextNotifications.push_enabled) {
+      const BrowserNotification = browserNotificationApi();
+      if (!BrowserNotification) {
+        setNotificationSettingsMessage(
+          translate(
+            'settings.notifications.systemPermission.unsupported',
+            'System notifications are not supported in this browser.',
+          ),
+        );
+        return;
+      }
+      if (BrowserNotification.permission === 'denied') {
+        setNotificationSettingsMessage(
+          translate(
+            'settings.notifications.systemPermission.denied',
+            'Allow system notifications in your browser or operating system settings, then turn this on again.',
+          ),
+        );
+        return;
+      }
+      if (BrowserNotification.permission !== 'granted') {
+        const permission = await BrowserNotification.requestPermission();
+        if (permission !== 'granted') {
+          setNotificationSettingsMessage(
+            translate(
+              'settings.notifications.systemPermission.denied',
+              'Allow system notifications in your browser or operating system settings, then turn this on again.',
+            ),
+          );
+          return;
+        }
+      }
+    }
+
     setNotificationSavingField(field);
     setNotificationSettingsMessage(null);
     try {
@@ -512,19 +559,13 @@ export const SettingsWorkspace: React.FC = () => {
   const handleResetOnboardingGuide = async () => {
     if (onboardingAction) return;
     setOnboardingAction('reset');
-    setOnboardingActionMessage(null);
     try {
       const state = await onboardingApi.reset();
       window.dispatchEvent(
         new CustomEvent(ONBOARDING_GUIDE_RESET_EVENT, { detail: state }),
       );
-      setOnboardingActionMessage(t('settings.onboarding.resetGuideDone'));
     } catch (error) {
-      setOnboardingActionMessage(
-        error instanceof Error
-          ? error.message
-          : t('settings.onboarding.actionFailed'),
-      );
+      console.error(t('settings.onboarding.actionFailed'), error);
     } finally {
       setOnboardingAction(null);
     }
@@ -533,19 +574,13 @@ export const SettingsWorkspace: React.FC = () => {
   const handleReplayUpgradeGuide = async () => {
     if (onboardingAction) return;
     setOnboardingAction('upgrade');
-    setOnboardingActionMessage(null);
     try {
       const state = await onboardingApi.resetUpgradeRead();
       window.dispatchEvent(
         new CustomEvent(ONBOARDING_UPGRADE_REPLAY_EVENT, { detail: state }),
       );
-      setOnboardingActionMessage(t('settings.onboarding.replayUpgradeDone'));
     } catch (error) {
-      setOnboardingActionMessage(
-        error instanceof Error
-          ? error.message
-          : t('settings.onboarding.actionFailed'),
-      );
+      console.error(t('settings.onboarding.actionFailed'), error);
     } finally {
       setOnboardingAction(null);
     }
@@ -624,147 +659,263 @@ export const SettingsWorkspace: React.FC = () => {
 
   const accountDisplayLabel =
     githubAccount?.login ?? settingsOptions?.account.email ?? '-';
+  const languageOptions = settingsOptions?.languages ?? [];
+  const selectedLanguage = languageOptions.find((lang) => lang.code === locale);
+  const selectedLanguageLabel = selectedLanguage
+    ? translate(`language.${selectedLanguage.code}`, selectedLanguage.label)
+    : translate(`language.${locale}`, locale);
 
   const renderActiveSettingPanel = () => {
     switch (activeSettingsTab) {
       case 'appearance':
         return (
-          <div className="space-y-6">
+          <div className="settings-content-panel settings-preferences-panel space-y-7">
             <div>
-              <h3 className="text-sm font-semibold text-[var(--ink)] tracking-tight">{t('settings.appearance.title')}</h3>
-              <p className="mt-0.5 text-sm text-[var(--ink-subtle)]">{t('settings.appearance.desc')}</p>
+              <h3 className="settings-preference-main-title">{t('settings.appearance.title')}</h3>
+              <p className="settings-preference-panel-desc mt-0.5">{t('settings.appearance.desc')}</p>
             </div>
 
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-[var(--ink)]">{t('settings.appearance.pageLanguage')}</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {(settingsOptions?.languages ?? []).map((lang) => (
-                  <label
-                    key={lang.code}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition ${
-                      locale === lang.code
-                        ? 'border-[var(--primary)] bg-[var(--surface-2)] text-[var(--ink)]'
-                        : 'border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--ink-subtle)] hover:text-[var(--ink)] hover:border-[var(--hairline-strong)]'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="workspace-language"
-                      value={lang.code}
-                      checked={locale === lang.code}
-                      onChange={() => setLocale(lang.code)}
-                      className="h-3.5 w-3.5 accent-[var(--primary)]"
-                    />
-                    <span className="truncate">{translate(`language.${lang.code}`, lang.label)}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-[var(--ink)]">{t('settings.appearance.theme')}</h4>
-              <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-3">
-              <div 
-                onClick={() => setTheme('dark')}
-                className={`rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 transition ${
-                  themePreference === 'dark' ? 'border-[var(--primary)] bg-[var(--surface-2)]' : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)]'
-                }`}
-              >
-                <div className="h-16 rounded-lg bg-[#010102] border border-[var(--hairline)] relative overflow-hidden">
-                  <div className="absolute top-2 left-2 right-2 h-2 bg-[#0f1011] rounded" />
-                  <div className="absolute bottom-2 left-2 w-8 h-2 bg-[var(--primary)] rounded" />
-                </div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-                  <span className={`h-1.5 w-1.5 rounded-full ${themePreference === 'dark' ? 'bg-[var(--primary)]' : 'bg-transparent'}`} />
-                  <span>{t('settings.appearance.darkThemeDefault')}</span>
-                </div>
-              </div>
-
-              <div 
-                onClick={() => setTheme('light')}
-                className={`rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 transition ${
-                  themePreference === 'light' ? 'border-[var(--primary)] bg-[var(--surface-2)]' : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)]'
-                }`}
-              >
-                <div className="h-16 rounded-lg bg-[#fbfbfc] border border-[#e3e5ea] relative overflow-hidden">
-                  <div className="absolute top-2 left-2 right-2 h-2 bg-[#ffffff] border border-[#e3e5ea] rounded" />
-                  <div className="absolute bottom-2 left-2 w-8 h-2 bg-[var(--primary)] rounded" />
-                </div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-                  <span className={`h-1.5 w-1.5 rounded-full ${themePreference === 'light' ? 'bg-[var(--primary)]' : 'bg-transparent'}`} />
-                  <span>{t('settings.appearance.lightThemeInverted')}</span>
-                </div>
-              </div>
-
-              <div
-                onClick={() => setTheme('system')}
-                className={`rounded-xl border p-4 cursor-pointer flex flex-col gap-2.5 transition ${
-                  themePreference === 'system' ? 'border-[var(--primary)] bg-[var(--surface-2)]' : 'border-[var(--hairline)] bg-[var(--surface-1)] hover:border-[var(--hairline-strong)]'
-                }`}
-              >
-                <div className="h-16 rounded-lg border border-[var(--hairline)] relative overflow-hidden bg-[linear-gradient(90deg,#010102_0%,#010102_50%,#fbfbfc_50%,#fbfbfc_100%)]">
-                  <div className="absolute left-2 right-[calc(50%+0.5rem)] top-2 h-2 rounded bg-[#0f1011]" />
-                  <div className="absolute left-[calc(50%+0.5rem)] right-2 top-2 h-2 rounded border border-[#e3e5ea] bg-white" />
-                  <div className="absolute bottom-2 left-2 h-2 w-8 rounded bg-[var(--primary)]" />
-                  <div className="absolute bottom-2 left-[calc(50%+0.5rem)] h-2 w-8 rounded bg-[var(--primary)]" />
-                </div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-                  <span className={`h-1.5 w-1.5 rounded-full ${themePreference === 'system' ? 'bg-[var(--primary)]' : 'bg-transparent'}`} />
-                  <span>{t('settings.appearance.systemTheme')}</span>
-                </div>
-              </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-[var(--ink)]">{t('settings.appearance.chatMessageFontSize')}</h4>
-              <div className="flex flex-col gap-3 rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm leading-snug text-[var(--ink-subtle)]">{t('settings.appearance.chatMessageFontSizeDesc')}</p>
-                <DropdownSelect
-                  value={String(chatMessageFontSize)}
-                  options={chatMessageFontSizeOptions}
-                  showSearch={false}
-                  placeholder={t('settings.appearance.chatMessageFontSize')}
-                  onChange={(value) => setChatMessageFontSize(Number(value))}
-                  className="w-full shrink-0 sm:w-[160px]"
-                  maxPanelHeightClassName="max-h-[180px]"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-[var(--ink)]">
-                {translate(
-                  'settings.storage.worktreeSessionsDir',
-                  'Session worktree directory',
-                )}
+            <section className="space-y-2.5">
+              <h4 className="settings-section-header">
+                {translate('settings.appearance.group.appearance', 'Appearance')}
               </h4>
-              <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-3">
-                <p className="text-sm leading-snug text-[var(--ink-subtle)]">
-                  {translate(
-                    'settings.storage.worktreeSessionsDirDesc',
-                    'Choose where isolated session worktree folders are created.',
-                  )}
-                </p>
-                <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center">
-                  <input
-                    type="text"
-                    value={worktreeSessionsDirDraft}
-                    onChange={(event) =>
-                      setWorktreeSessionsDirDraft(event.target.value)
-                    }
-                    onBlur={() =>
-                      void persistWorktreeSessionsDir(worktreeSessionsDirDraft)
-                    }
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.currentTarget.blur();
+              <div className="settings-list-group rounded-lg border">
+                <div className="settings-theme-selector-row border-b border-[var(--hairline)] px-4 py-3.5">
+                  <div
+                    className="grid grid-cols-3 gap-5"
+                    aria-label={t('settings.appearance.theme')}
+                  >
+                    {([
+                      {
+                        id: 'dark',
+                        label: t('settings.appearance.darkThemeDefault'),
+                        Icon: Moon,
+                      },
+                      {
+                        id: 'light',
+                        label: t('settings.appearance.lightThemeInverted'),
+                        Icon: Sun,
+                      },
+                      {
+                        id: 'system',
+                        label: t('settings.appearance.systemTheme'),
+                        Icon: Monitor,
+                      },
+                    ] as const).map((option) => {
+                      const selected = themePreference === option.id;
+                      const lightPreview = option.id === 'light';
+                      const systemPreview = option.id === 'system';
+                      const Icon = option.Icon;
+
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => setTheme(option.id)}
+                          aria-pressed={selected}
+                          className={cn(
+                            'cursor-pointer rounded-[8px] border p-2 text-left transition',
+                            selected
+                              ? 'border-[var(--primary)] bg-white/[0.07] shadow-[inset_0_0_0_1px_rgba(94,106,210,0.26),inset_0_1px_18px_rgba(94,106,210,0.08)]'
+                              : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]',
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              'flex h-8 items-center justify-between rounded-[8px] border px-2.5',
+                              lightPreview
+                                ? 'border-black/[0.08] bg-[#e4e4e7]'
+                                : systemPreview
+                                  ? 'border-white/[0.08] bg-[#151516]'
+                                  : 'border-white/[0.08] bg-[#0d0d0e]',
+                            )}
+                          >
+                            <Icon
+                              className={cn(
+                                'h-3.5 w-3.5',
+                                lightPreview ? 'text-[#52525b]' : 'text-white',
+                              )}
+                              strokeWidth={1.4}
+                            />
+                            <div className="flex items-end gap-1">
+                              <span
+                                className={cn(
+                                  'h-2 w-3.5 rounded-[2px]',
+                                  lightPreview
+                                    ? 'bg-black/[0.18]'
+                                    : systemPreview
+                                      ? 'bg-white/[0.14]'
+                                      : 'bg-white/[0.16]',
+                                )}
+                              />
+                              <span
+                                className={cn(
+                                  'h-3 w-3.5 rounded-[2px]',
+                                  lightPreview
+                                    ? 'bg-black/[0.24]'
+                                    : systemPreview
+                                      ? 'bg-[#d4d4d8]/70'
+                                      : 'bg-white/[0.22]',
+                                )}
+                              />
+                              <span
+                                className={cn(
+                                  'h-1.5 w-3.5 rounded-[2px]',
+                                  lightPreview
+                                    ? 'bg-black/[0.12]'
+                                    : systemPreview
+                                      ? 'bg-white/[0.09]'
+                                      : 'bg-white/[0.1]',
+                                )}
+                              />
+                            </div>
+                          </div>
+                          <p
+                            className="settings-row-title mt-1.5 leading-tight"
+                          >
+                            {option.label}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="settings-preference-row flex flex-col gap-3 border-b border-[var(--hairline)] px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="settings-row-title leading-tight">
+                      {t('settings.appearance.pageLanguage')}
+                    </p>
+                  </div>
+                  <div
+                    className="settings-language-dropdown relative w-full shrink-0 sm:w-[220px]"
+                    onBlur={(event) => {
+                      const nextFocus = event.relatedTarget as Node | null;
+                      if (!event.currentTarget.contains(nextFocus)) {
+                        setLanguageMenuOpen(false);
                       }
                     }}
-                    placeholder={worktreeSessionsDirPlaceholder}
-                    className="min-h-9 min-w-0 flex-1 rounded-md border border-[var(--hairline-strong)] bg-[var(--surface-2)] px-3 font-mono text-sm text-[var(--ink)] outline-none transition focus:border-[var(--primary)]"
-                  />
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                  >
+                    <button
+                      type="button"
+                      className="settings-language-trigger flex w-full items-center gap-2 rounded-md border px-3 py-2 transition disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-haspopup="listbox"
+                      aria-expanded={languageMenuOpen}
+                      disabled={languageOptions.length === 0}
+                      onClick={() => setLanguageMenuOpen((open) => !open)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                          setLanguageMenuOpen(false);
+                        }
+                      }}
+                    >
+                      <Languages className="h-3.5 w-3.5 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate text-left">
+                        {selectedLanguageLabel}
+                      </span>
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 shrink-0 transition-transform ${
+                          languageMenuOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </button>
+                    {languageMenuOpen && languageOptions.length > 0 && (
+                      <div
+                        className="settings-language-menu absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-md border"
+                        role="listbox"
+                        aria-label={t('settings.appearance.pageLanguage')}
+                      >
+                        {languageOptions.map((lang) => {
+                          const selected = locale === lang.code;
+                          return (
+                            <button
+                              key={lang.code}
+                              type="button"
+                              role="option"
+                              aria-selected={selected}
+                              className={`settings-language-menu-option flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition ${
+                                selected
+                                  ? 'settings-language-menu-option-active'
+                                  : ''
+                              }`}
+                              onClick={() => {
+                                setLocale(lang.code);
+                                setLanguageMenuOpen(false);
+                              }}
+                            >
+                              <span className="truncate">
+                                {translate(`language.${lang.code}`, lang.label)}
+                              </span>
+                              {selected && (
+                                <Check className="h-3.5 w-3.5 shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <NotificationSettingRow
+                  title={t('settings.appearance.chatMessageFontSize')}
+                  description={t('settings.appearance.chatMessageFontSizeDesc')}
+                  divided={false}
+                  control={
+                    <DropdownSelect
+                      value={String(chatMessageFontSize)}
+                      options={chatMessageFontSizeOptions}
+                      showSearch={false}
+                      placeholder={t('settings.appearance.chatMessageFontSize')}
+                      onChange={(value) =>
+                        setChatMessageFontSize(Number(value))
+                      }
+                      className="w-full shrink-0 sm:w-[132px]"
+                      maxPanelHeightClassName="max-h-[180px]"
+                    />
+                  }
+                />
+              </div>
+            </section>
+
+            <section className="space-y-2.5">
+              <h4 className="settings-section-header">
+                {translate('settings.appearance.group.environment', 'Environment')}
+              </h4>
+              <div className="settings-list-group rounded-lg border">
+                <div className="settings-preference-row flex flex-col gap-3 px-4 py-3.5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="settings-row-title leading-tight">
+                      {translate(
+                        'settings.storage.worktreeSessionsDir',
+                        'Session worktree directory',
+                      )}
+                    </p>
+                    <p className="settings-row-description mt-1 leading-snug">
+                      {translate(
+                        'settings.storage.worktreeSessionsDirDesc',
+                        'Choose where isolated session worktree folders are created.',
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex min-w-0 shrink-0 flex-col gap-2 lg:w-[420px] lg:flex-row lg:items-center">
+                    <input
+                      type="text"
+                      value={worktreeSessionsDirDraft}
+                      onChange={(event) =>
+                        setWorktreeSessionsDirDraft(event.target.value)
+                      }
+                      onBlur={() =>
+                        void persistWorktreeSessionsDir(worktreeSessionsDirDraft)
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.currentTarget.blur();
+                        }
+                      }}
+                      placeholder={worktreeSessionsDirPlaceholder}
+                      className="settings-path-input min-h-9 min-w-0 flex-1 rounded-md border px-3 font-mono text-sm outline-none transition"
+                    />
                     <button
                       type="button"
                       onClick={() => void handleSelectWorktreeSessionsDir()}
@@ -773,7 +924,7 @@ export const SettingsWorkspace: React.FC = () => {
                         worktreeSessionsDirSelecting ||
                         !configAsync.data
                       }
-                      className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[var(--hairline-strong)] px-3 py-2 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="settings-secondary-button inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <FolderOpen className="h-3.5 w-3.5" />
                       {worktreeSessionsDirSaving
@@ -783,16 +934,18 @@ export const SettingsWorkspace: React.FC = () => {
                   </div>
                 </div>
                 {worktreeSessionsDirMessage && (
-                  <p className="mt-2 text-xs text-[var(--ink-subtle)]">
+                  <p className="border-t border-[var(--hairline)] px-4 py-2 text-xs text-[var(--ink-subtle)]">
                     {worktreeSessionsDirMessage}
                   </p>
                 )}
               </div>
-            </div>
+            </section>
 
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-[var(--ink)]">{t('settings.onboarding.title')}</h4>
-              <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)]">
+            <section className="space-y-2.5">
+              <h4 className="settings-section-header">
+                {translate('settings.appearance.group.actions', 'Actions')}
+              </h4>
+              <div className="settings-list-group overflow-hidden rounded-lg border">
                 <NotificationSettingRow
                   title={t('settings.onboarding.resetGuide')}
                   description={t('settings.onboarding.resetGuideDesc')}
@@ -801,7 +954,7 @@ export const SettingsWorkspace: React.FC = () => {
                       type="button"
                       onClick={() => void handleResetOnboardingGuide()}
                       disabled={Boolean(onboardingAction)}
-                      className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[var(--hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="settings-secondary-button inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <RotateCcw className={`h-3.5 w-3.5 ${onboardingAction === 'reset' ? 'animate-spin' : ''}`} />
                       {onboardingAction === 'reset'
@@ -819,7 +972,7 @@ export const SettingsWorkspace: React.FC = () => {
                       type="button"
                       onClick={() => void handleReplayUpgradeGuide()}
                       disabled={Boolean(onboardingAction)}
-                      className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[var(--hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="settings-secondary-button inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Sparkles className={`h-3.5 w-3.5 ${onboardingAction === 'upgrade' ? 'animate-pulse' : ''}`} />
                       {onboardingAction === 'upgrade'
@@ -829,10 +982,7 @@ export const SettingsWorkspace: React.FC = () => {
                   }
                 />
               </div>
-              {onboardingActionMessage && (
-                <p className="text-xs text-[var(--ink-subtle)]">{onboardingActionMessage}</p>
-              )}
-            </div>
+            </section>
           </div>
         );
 
@@ -921,7 +1071,7 @@ export const SettingsWorkspace: React.FC = () => {
         ];
 
         return (
-          <div className="settings-notifications-panel mx-auto max-w-5xl space-y-10 text-sm">
+          <div className="settings-content-panel settings-notifications-panel space-y-10 text-sm">
             <section className="space-y-5">
               <div>
                 <h3 className="text-sm font-semibold text-[var(--ink)] tracking-tight">{t('settings.notifications.inboxSources.title')}</h3>
@@ -1023,7 +1173,7 @@ export const SettingsWorkspace: React.FC = () => {
 
       case 'archived-sessions':
         return (
-          <div className="space-y-4">
+          <div className="settings-content-panel space-y-4">
             <div>
               <h3 className="text-sm font-semibold text-[var(--ink)] tracking-tight">{t('settings.archivedSessions.title')}</h3>
               <p className="mt-0.5 text-sm text-[var(--ink-subtle)]">{t('settings.archivedSessions.desc')}</p>
@@ -1102,7 +1252,7 @@ export const SettingsWorkspace: React.FC = () => {
 
       case 'account':
         return (
-          <div className="space-y-4">
+          <div className="settings-content-panel space-y-4">
             <div>
               <h3 className="text-sm font-semibold text-[var(--ink)] tracking-tight">{t('settings.account.title')}</h3>
               <p className="mt-0.5 text-sm text-[var(--ink-subtle)]">{t('settings.account.desc')}</p>
@@ -1140,7 +1290,7 @@ export const SettingsWorkspace: React.FC = () => {
 
       case 'shortcuts':
         return (
-          <div className="space-y-4">
+          <div className="settings-content-panel space-y-4">
             <div>
               <h3 className="text-sm font-semibold text-[var(--ink)] tracking-tight">{t('settings.shortcuts.title')}</h3>
               <p className="mt-0.5 text-sm text-[var(--ink-subtle)]">{t('settings.shortcuts.desc')}</p>
