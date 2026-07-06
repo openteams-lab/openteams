@@ -124,6 +124,22 @@ export interface ChatMessageMutationResponse {
   message: BackendChatMessage;
   runtime: ChatSessionRuntimeSnapshot;
 }
+
+export interface VersionCheckResponse {
+  current_version: string;
+  latest_version: string;
+  has_update: boolean;
+  deploy_mode: string;
+  release_url: string;
+  release_notes: string | null;
+  published_at: string | null;
+}
+
+export interface UpdateNpxResponse {
+  success: boolean;
+  message: string;
+}
+
 import type {
   AddProjectMemberRequest,
   ChatTeamPreset,
@@ -388,6 +404,25 @@ export const onboardingApi = {
       method: "POST",
     });
     return handleApiResponse<OnboardingState>(r);
+  },
+};
+
+// -----------------------------------------------------------------------------
+// Version updates
+// -----------------------------------------------------------------------------
+
+export const versionApi = {
+  check: async (): Promise<VersionCheckResponse> => {
+    const r = await makeRequest("/api/version/check", { cache: "no-store" });
+    return handleApiResponse<VersionCheckResponse>(r);
+  },
+  updateNpx: async (): Promise<UpdateNpxResponse> => {
+    const r = await makeRequest("/api/version/update-npx", { method: "POST" });
+    return handleApiResponse<UpdateNpxResponse>(r);
+  },
+  restart: async (): Promise<UpdateNpxResponse> => {
+    const r = await makeRequest("/api/version/restart", { method: "POST" });
+    return handleApiResponse<UpdateNpxResponse>(r);
   },
 };
 
@@ -2423,6 +2458,7 @@ export const api = {
   cliConfig: cliConfigApi,
   buildStats: buildStatsApi,
   onboarding: onboardingApi,
+  version: versionApi,
   inbox: inboxApi,
   profiles: profilesApi,
   teamPresets: teamPresetsApi,
