@@ -68,6 +68,8 @@ const requiredNotificationLocaleKeys = [
   'settings.notifications.sound.phoneVibration',
   'settings.notifications.sound.rooster',
   'settings.notifications.sound.cowMooing',
+  'settings.notifications.systemPermission.denied',
+  'settings.notifications.systemPermission.unsupported',
 ];
 
 const disallowedNotificationLocaleSnippets = [
@@ -86,9 +88,23 @@ const disallowedNotificationLocaleSnippets = [
 
 check(
   'adds a follow-system theme option to General settings',
-  settingsSource.includes("setTheme('system')") &&
+  settingsSource.includes("id: 'system'") &&
+    settingsSource.includes('setTheme(option.id)') &&
+    settingsSource.includes('Icon: Monitor') &&
     settingsSource.includes('themePreference') &&
     settingsSource.includes('settings.appearance.systemTheme'),
+  settingsSource,
+);
+
+check(
+  'appearance theme cards reuse onboarding card styling',
+    settingsSource.includes('cursor-pointer rounded-[8px] border p-2 text-left transition') &&
+    settingsSource.includes('flex h-8 items-center justify-between rounded-[8px] border px-2.5') &&
+    settingsSource.includes('border-[var(--primary)] bg-white/[0.07]') &&
+    settingsSource.includes("lightPreview ? 'text-[#52525b]' : 'text-white'") &&
+    settingsSource.includes('settings-row-title mt-1.5 leading-tight') &&
+    settingsSource.includes('strokeWidth={1.4}') &&
+    !settingsSource.includes('settings-theme-card'),
   settingsSource,
 );
 
@@ -132,6 +148,16 @@ check(
   !settingsSource.includes("key: 'newMessage'") &&
     !settingsSource.includes("key: 'workflowStatus'") &&
     !settingsSource.includes("key: 'agentActivity'"),
+  settingsSource,
+);
+
+check(
+  'system notification toggle requests browser permission before enabling push notifications',
+  settingsSource.includes("field === 'push_enabled'") &&
+    settingsSource.includes('nextNotifications.push_enabled') &&
+    settingsSource.includes('BrowserNotification.requestPermission()') &&
+    settingsSource.includes('settings.notifications.systemPermission.denied') &&
+    settingsSource.includes('settings.notifications.systemPermission.unsupported'),
   settingsSource,
 );
 

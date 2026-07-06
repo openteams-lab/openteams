@@ -504,6 +504,19 @@ check(
 );
 
 check(
+  'upgrade guide uses a floating onboarding-style window',
+  guideSource.includes('bg-black/45') &&
+    guideSource.includes('backdrop-blur-[2px]') &&
+    guideSource.includes('max-h-[min(680px,calc(100vh-48px))]') &&
+    guideSource.includes('border border-white/[0.12] bg-[var(--onboarding-card)]') &&
+    guideSource.includes('pointer-events-none absolute inset-0 bg-[var(--onboarding-stage)]') &&
+    guideSource.includes('opacity-[0.032] mix-blend-screen') &&
+    guideSource.includes('bg-[linear-gradient(180deg,#FFFFFF_0%,#F2F2F2_100%)]') &&
+    guideSource.includes('onboarding.upgrade.later'),
+  guideSource,
+);
+
+check(
   'language and appearance selections preview immediately and save draft state',
   guideSource.includes('onPreviewLocaleChange(option.id)') &&
     guideSource.includes('onPreviewAppearanceChange(option.id)') &&

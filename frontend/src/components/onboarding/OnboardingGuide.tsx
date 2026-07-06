@@ -539,6 +539,10 @@ export function OnboardingGuide({
     ...onboardingThemeVars,
     ...onboardingTextFont,
   } as CSSProperties;
+  const upgradeRootStyle = {
+    ...onboardingDarkThemeVars,
+    ...onboardingTextFont,
+  } as CSSProperties;
   const onboardingInvertedContentStyle = isOnboardingLightMode
     ? ({
         ...onboardingDarkThemeVars,
@@ -1375,98 +1379,141 @@ export function OnboardingGuide({
     }
   };
 
-  const renderUpgradeGuide = () => (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)]">
-      <div className="flex min-h-12 items-center justify-between border-b border-[var(--hairline)] px-5">
-        <div className="flex min-w-0 items-center gap-2">
-          <Sparkles className="h-4 w-4 text-[var(--primary)]" />
-          <span className="truncate text-[13px] font-semibold text-[var(--ink)]">
-            {t('onboarding.upgrade.eyebrow', { version: currentVersion })}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-3)] px-[14px] py-2 text-[12px] font-medium text-[var(--ink-muted)] transition hover:bg-[var(--surface-4)] hover:text-[var(--ink)]"
-        >
-          {t('onboarding.upgrade.later')}
-        </button>
-      </div>
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-5 lg:grid-cols-[1fr_280px]">
-        <div className="space-y-4">
-          <div className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] p-6">
-            <h1 className="font-sans text-[22px] font-semibold tracking-[-0.02em] text-[var(--ink)]">
-              {t('onboarding.upgrade.title')}
-            </h1>
-            <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-[var(--ink-muted)]">
-              {t('onboarding.upgrade.desc')}
-            </p>
+  const renderUpgradeGuide = () => {
+    const upgradeFeatures = [
+      {
+        title: t('onboarding.upgrade.featureGuide.title'),
+        desc: t('onboarding.upgrade.featureGuide.desc'),
+        Icon: Rocket,
+      },
+      {
+        title: t('onboarding.upgrade.featureTeam.title'),
+        desc: t('onboarding.upgrade.featureTeam.desc'),
+        Icon: Users,
+      },
+      {
+        title: t('onboarding.upgrade.featureComposer.title'),
+        desc: t('onboarding.upgrade.featureComposer.desc'),
+        Icon: Bot,
+      },
+    ];
+
+    return (
+      <section className="relative isolate flex max-h-[min(680px,calc(100vh-48px))] min-h-[500px] w-full flex-col overflow-hidden rounded-[8px] border border-white/[0.12] bg-[var(--onboarding-card)] text-[#f4f4f5] shadow-[0_24px_80px_rgba(0,0,0,0.44),inset_0_0_0_1px_rgba(255,255,255,0.035)]">
+        <div className="pointer-events-none absolute inset-0 bg-[var(--onboarding-stage)]" />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.032] mix-blend-screen"
+          style={onboardingNoiseTextureStyle}
+        />
+        <div className="relative z-10 flex min-h-11 items-center gap-2 border-b border-white/[0.08] bg-[var(--onboarding-card)] px-3 py-2.5">
+          <span className="h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]" />
+          <span className="h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]" />
+          <span className="h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]" />
+          <div className="ml-2 flex min-w-0 flex-1 items-center gap-2 rounded-[5px] border border-white/[0.08] bg-white/[0.045] px-2.5 py-1.5">
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#cfd5ff]" />
+            <span className="truncate font-mono text-[11px] font-medium tracking-[0] text-[#a8b3c2]">
+              {t('onboarding.upgrade.eyebrow', { version: currentVersion })}
+            </span>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {[
-              {
-                title: t('onboarding.upgrade.featureGuide.title'),
-                desc: t('onboarding.upgrade.featureGuide.desc'),
-                Icon: Rocket,
-              },
-              {
-                title: t('onboarding.upgrade.featureTeam.title'),
-                desc: t('onboarding.upgrade.featureTeam.desc'),
-                Icon: Users,
-              },
-              {
-                title: t('onboarding.upgrade.featureComposer.title'),
-                desc: t('onboarding.upgrade.featureComposer.desc'),
-                Icon: Bot,
-              },
-            ].map(({ title, desc, Icon }) => (
-              <div
-                key={title}
-                className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] p-6"
-              >
-                <Icon className="h-4 w-4 text-[var(--primary)]" />
-                <h2 className="mt-3 text-[13px] font-semibold text-[var(--ink)]">
-                  {title}
-                </h2>
-                <p className="mt-1 text-[12px] leading-relaxed text-[var(--ink-muted)]">
-                  {desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-        <aside className="rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] p-6">
-          <h2 className="text-[13px] font-semibold text-[var(--ink)]">
-            {t('onboarding.upgrade.stateTitle')}
-          </h2>
-          <div className="mt-3 divide-y divide-[var(--hairline)] rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-1)] text-[12px]">
-            <div className="flex items-center justify-between gap-3 px-3 py-2">
-              <span className="text-[var(--ink-subtle)]">current_version</span>
-              <span className="font-mono text-[var(--ink)]">{currentVersion}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3 px-3 py-2">
-              <span className="text-[var(--ink-subtle)]">
-                last_seen_upgrade_version
-              </span>
-              <span className="truncate font-mono text-[var(--ink)]">
-                {state?.last_seen_upgrade_version ?? 'null'}
-              </span>
-            </div>
-          </div>
-          {error && <p className="mt-3 text-[12px] text-red-400">{error}</p>}
           <button
             type="button"
-            onClick={() => void handleMarkUpgradeRead()}
-            disabled={saving}
-            className="mt-4 inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-[8px] bg-[#5e6ad2] px-[14px] py-2 text-[13px] font-semibold text-[#f5f5f5] transition hover:bg-[#6f7ae6] disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={onClose}
+            aria-label={t('onboarding.upgrade.later')}
+            className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-[5px] border border-transparent text-[#8a8f98] transition hover:border-white/[0.08] hover:bg-white/[0.05] hover:text-[#f4f4f5] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/[0.35]"
           >
-            {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
-            {t('onboarding.upgrade.markRead')}
+            <X className="h-3.5 w-3.5" />
           </button>
-        </aside>
-      </div>
-    </section>
-  );
+        </div>
+
+        <div className="relative z-10 grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_280px]">
+          <main className="min-w-0 px-5 py-6 sm:px-7 sm:py-7 lg:px-8">
+            <p
+              className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#8A8F98]"
+              style={onboardingMonoFont}
+            >
+              {t('onboarding.upgrade.eyebrow', { version: currentVersion })}
+            </p>
+            <h1 className="mt-3 max-w-2xl font-sans text-[25px] font-[600] leading-tight tracking-[0] text-[#f4f4f5] sm:text-[31px]">
+              {t('onboarding.upgrade.title')}
+            </h1>
+            <p className="mt-3 max-w-2xl text-[13px] leading-5 text-[#a8b3c2] sm:text-[14px] sm:leading-6">
+              {t('onboarding.upgrade.desc')}
+            </p>
+
+            <div className="mt-7 grid gap-3 md:grid-cols-3">
+              {upgradeFeatures.map(({ title, desc, Icon }, index) => (
+                <article
+                  key={title}
+                  className="group min-h-[150px] rounded-[8px] border border-white/[0.09] bg-white/[0.035] p-4 transition hover:border-white/[0.16] hover:bg-white/[0.055]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-[7px] border border-white/[0.12] bg-white/[0.055] text-[#dbe0ff] transition group-hover:border-white/[0.18] group-hover:bg-white/[0.08]">
+                      <Icon className="h-4 w-4" strokeWidth={1.6} />
+                    </span>
+                    <span
+                      className="font-mono text-[10px] font-medium tracking-[0] text-white/35"
+                      style={onboardingMonoFont}
+                    >
+                      0{index + 1}
+                    </span>
+                  </div>
+                  <h2 className="mt-4 text-[13px] font-semibold tracking-[0] text-[#f4f4f5]">
+                    {title}
+                  </h2>
+                  <p className="mt-1.5 text-[12px] leading-relaxed text-[#8a8f98]">
+                    {desc}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </main>
+
+          <aside className="flex min-h-0 flex-col border-t border-white/[0.08] bg-black/[0.08] p-5 lg:border-l lg:border-t-0">
+            <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#8A8F98]">
+              {t('onboarding.upgrade.stateTitle')}
+            </h2>
+            <div className="mt-3 divide-y divide-white/[0.08] rounded-[7px] border border-white/[0.09] bg-white/[0.035] text-[12px]">
+              <div className="grid gap-1 px-3 py-2.5">
+                <span className="font-mono text-[10px] tracking-[0] text-[#6f6f76]">
+                  current_version
+                </span>
+                <span className="truncate font-mono text-[#d4d4d8]">
+                  {currentVersion}
+                </span>
+              </div>
+              <div className="grid gap-1 px-3 py-2.5">
+                <span className="font-mono text-[10px] tracking-[0] text-[#6f6f76]">
+                  last_seen_upgrade_version
+                </span>
+                <span className="truncate font-mono text-[#d4d4d8]">
+                  {state?.last_seen_upgrade_version ?? 'null'}
+                </span>
+              </div>
+            </div>
+            {error && <p className="mt-3 text-[12px] text-red-300">{error}</p>}
+            <div className="mt-auto grid gap-2 pt-5">
+              <button
+                type="button"
+                onClick={() => void handleMarkUpgradeRead()}
+                disabled={saving}
+                className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2.5 rounded-[4px] border border-white bg-[linear-gradient(180deg,#FFFFFF_0%,#F2F2F2_100%)] px-5 py-2 text-[13px] font-semibold text-black shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.28)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-[linear-gradient(180deg,#FFFFFF_0%,#EDEDED_100%)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                {t('onboarding.upgrade.markRead')}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-[4px] border border-white/[0.09] bg-white/[0.035] px-4 py-2 text-[12px] font-medium text-[#a8b3c2] transition hover:border-white/[0.14] hover:bg-white/[0.055] hover:text-[#f4f4f5]"
+              >
+                {t('onboarding.upgrade.later')}
+              </button>
+            </div>
+          </aside>
+        </div>
+      </section>
+    );
+  };
 
   const renderExecutorStep = () => (
     <div className="flex h-[340px] items-center justify-center">
@@ -2405,10 +2452,10 @@ export function OnboardingGuide({
   if (mode === 'upgrade') {
     return (
       <div
-        className="fixed inset-0 z-[90] bg-[var(--canvas)] p-4 text-[var(--ink)]"
-        style={onboardingRootStyle}
+        className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-black/45 p-3 text-[var(--ink)] backdrop-blur-[2px] sm:p-6"
+        style={upgradeRootStyle}
       >
-        <div className="mx-auto flex h-full max-w-6xl flex-col">
+        <div className="w-full max-w-5xl">
           {renderUpgradeGuide()}
         </div>
       </div>
