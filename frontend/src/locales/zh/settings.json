@@ -108,5 +108,6 @@
   "settings.shortcuts.dismissModalTriggers": "关闭弹窗触发器",
   "settings.shortcuts.startTaskExecution": "启动任务执行流水线",
   "settings.shortcuts.title": "键盘快捷键",
-  "settings.shortcuts.toggleWorkspaceSearch": "切换工作区搜索"
+  "settings.shortcuts.toggleWorkspaceSearch": "切换工作区搜索",
+  "settings.providers.effective": "Applied"
 }

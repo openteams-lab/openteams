@@ -47,20 +47,23 @@ check_duplicate_keys() {
   fi
 
   local duplicates
-  if duplicates=$(node "$REPO_ROOT/scripts/check-i18n-json.mjs" check-duplicate-keys "$file" 2>/dev/null); then
+  duplicates=$(node "$REPO_ROOT/scripts/check-i18n-json.mjs" check-duplicate-keys "$file" 2>&1)
+  local status=$?
+  if [ "$status" -eq 0 ]; then
     return 0
   fi
 
-  if [ -n "$duplicates" ]; then
+  if [ "$status" -eq 1 ]; then
     printf '%s\n' "$duplicates"
     return 1
   fi
 
+  [ -n "$duplicates" ] && printf '%s\n' "$duplicates"
   return 2
 }
 
 check_duplicate_json_keys() {
-  local locales_dir="$REPO_ROOT/frontend/src/i18n/locales"
+  local locales_dir="$REPO_ROOT/frontend/src/locales"
   local exit_code=0
 
   if [ ! -d "$locales_dir" ]; then
@@ -76,9 +79,15 @@ check_duplicate_json_keys() {
     if duplicates=$(check_duplicate_keys "$file"); then
       : # No duplicates found
     else
-      echo "❌ [$rel_path] Duplicate keys found:"
-      printf '   - %s\n' $duplicates
-      echo "   JSON silently overwrites duplicate keys - only the last occurrence is used!"
+      local status=$?
+      if [ "$status" -eq 1 ]; then
+        echo "❌ [$rel_path] Duplicate keys found:"
+        printf '   - %s\n' $duplicates
+        echo "   JSON silently overwrites duplicate keys - only the last occurrence is used!"
+      else
+        echo "❌ [$rel_path] Invalid or unreadable JSON:"
+        [ -n "$duplicates" ] && printf '   %s\n' "$duplicates"
+      fi
       exit_code=1
     fi
   done < <(find "$locales_dir" -type f -name "*.json" 2>/dev/null)
@@ -87,7 +96,7 @@ check_duplicate_json_keys() {
 }
 
 check_key_consistency() {
-  local locales_dir="$REPO_ROOT/frontend/src/i18n/locales"
+  local locales_dir="$REPO_ROOT/frontend/src/locales"
   local exit_code=0
   local fail_on_extra="${I18N_FAIL_ON_EXTRA:-0}"
   local verbose="${I18N_VERBOSE:-0}"

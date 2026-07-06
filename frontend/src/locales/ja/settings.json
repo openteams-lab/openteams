@@ -108,5 +108,6 @@
   "settings.shortcuts.dismissModalTriggers": "モーダルを閉じる",
   "settings.shortcuts.startTaskExecution": "タスク実行パイプラインを開始",
   "settings.shortcuts.title": "キーボードショートカット",
-  "settings.shortcuts.toggleWorkspaceSearch": "ワークスペース検索を切り替え"
+  "settings.shortcuts.toggleWorkspaceSearch": "ワークスペース検索を切り替え",
+  "settings.providers.effective": "Applied"
 }

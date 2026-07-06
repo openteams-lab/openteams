@@ -108,5 +108,6 @@
   "settings.shortcuts.dismissModalTriggers": "모달 닫기",
   "settings.shortcuts.startTaskExecution": "작업 실행 파이프라인 시작",
   "settings.shortcuts.title": "키보드 단축키",
-  "settings.shortcuts.toggleWorkspaceSearch": "워크스페이스 검색 전환"
+  "settings.shortcuts.toggleWorkspaceSearch": "워크스페이스 검색 전환",
+  "settings.providers.effective": "Applied"
 }
