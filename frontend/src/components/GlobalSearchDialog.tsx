@@ -278,19 +278,19 @@ export function GlobalSearchDialog({
       onKeyDown={handleKeyDown}
     >
       <div
-        className="absolute inset-0 bg-black/45 backdrop-blur-xs"
+        className="global-search-backdrop absolute inset-0 backdrop-blur-xs"
         onClick={onClose}
       />
       <section
         role="dialog"
         aria-modal="true"
         aria-label="全局搜索"
-        className="relative flex max-h-[min(640px,calc(100vh-32px))] w-full max-w-xl flex-col overflow-hidden rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[#17181A]/95 text-[var(--ink)] shadow-[0_28px_72px_rgba(0,0,0,0.48),0_2px_8px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl"
+        className="global-search-dialog relative flex max-h-[min(640px,calc(100vh-32px))] w-full max-w-xl flex-col overflow-hidden rounded-[10px] border text-[var(--ink)] backdrop-blur-xl"
       >
-        <div className="flex items-center gap-3 border-b border-[rgba(255,255,255,0.045)] bg-[rgba(255,255,255,0.018)] px-4 py-2.5">
+        <div className="global-search-input-bar flex items-center gap-3 border-b px-4 py-2.5">
           <Search
             strokeWidth={1.75}
-            className="h-4.5 w-4.5 shrink-0 text-[rgba(255,255,255,0.42)]"
+            className="global-search-leading-icon h-4.5 w-4.5 shrink-0"
           />
           <input
             ref={inputRef}
@@ -299,7 +299,7 @@ export function GlobalSearchDialog({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="搜索会话、事项和消息"
-            className="global-search-input min-w-0 flex-1 bg-transparent text-[16px] leading-6 text-[rgba(255,255,255,0.9)] outline-none placeholder:text-[rgba(255,255,255,0.36)]"
+            className="global-search-input min-w-0 flex-1 bg-transparent text-[16px] leading-6 outline-none"
           />
           {query.length > 0 && (
             <button
@@ -320,11 +320,7 @@ export function GlobalSearchDialog({
             aria-label="筛选隔离 worktree"
             title="筛选隔离 worktree"
             onClick={toggleWorktreeMode}
-            className={`flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition ${
-              worktreeModeActive
-                ? "bg-[rgba(255,255,255,0.07)] text-[rgba(255,255,255,0.82)]"
-                : "text-[rgba(255,255,255,0.42)] hover:bg-[rgba(255,255,255,0.045)] hover:text-[rgba(255,255,255,0.72)]"
-            }`}
+            className="global-search-worktree-toggle flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition"
           >
             <FolderGit2 strokeWidth={1.6} className="h-3.5 w-3.5" />
           </button>
@@ -333,7 +329,7 @@ export function GlobalSearchDialog({
         {showResultsPanel && (
           <div
             data-global-search-results-panel="true"
-            className="max-h-[min(520px,calc(100vh-128px))] overflow-y-auto bg-[#17181A] p-1.5"
+            className="global-search-results-panel max-h-[min(520px,calc(100vh-128px))] overflow-y-auto p-1.5"
           >
             {loading ? (
             <div className="space-y-1" aria-label="搜索加载中">
@@ -342,10 +338,10 @@ export function GlobalSearchDialog({
                   key={index}
                   className="flex items-center gap-2.5 rounded-[7px] px-3 py-2"
                 >
-                  <div className="h-3.5 w-3.5 shrink-0 animate-pulse rounded bg-[rgba(255,255,255,0.07)]" />
+                  <div className="global-search-skeleton-mark h-3.5 w-3.5 shrink-0 animate-pulse rounded" />
                   <div className="min-w-0 flex-1 space-y-2">
-                    <div className="h-2.5 w-2/5 animate-pulse rounded bg-[rgba(255,255,255,0.07)]" />
-                    <div className="h-2 w-3/5 animate-pulse rounded bg-[rgba(255,255,255,0.05)]" />
+                    <div className="global-search-skeleton-line h-2.5 w-2/5 animate-pulse rounded" />
+                    <div className="global-search-skeleton-line-muted h-2 w-3/5 animate-pulse rounded" />
                   </div>
                 </div>
               ))}
@@ -354,21 +350,21 @@ export function GlobalSearchDialog({
             <button
               type="button"
               onClick={() => setRetryVersion((version) => version + 1)}
-              className="flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] border border-transparent px-3 py-2 text-left text-[12px] text-[rgba(255,255,255,0.5)] transition hover:border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[rgba(255,255,255,0.86)]"
+              className="global-search-error-row flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] border border-transparent px-3 py-2 text-left text-[12px] transition"
             >
               <RefreshCw
                 strokeWidth={1.75}
-                className="h-3.5 w-3.5 shrink-0 text-[rgba(255,255,255,0.42)]"
+                className="global-search-error-icon h-3.5 w-3.5 shrink-0"
               />
               <span className="min-w-0 flex-1 truncate">
                 搜索失败，点击重试
               </span>
-              <span className="max-w-[40%] shrink-0 truncate text-[11px] text-[rgba(255,255,255,0.4)]">
+              <span className="global-search-error-detail max-w-[40%] shrink-0 truncate text-[11px]">
                 {error}
               </span>
             </button>
           ) : results.length === 0 ? (
-            <div className="flex h-36 items-center justify-center rounded-[7px] text-[13px] text-[rgba(255,255,255,0.42)]">
+            <div className="global-search-empty-state flex h-36 items-center justify-center rounded-[7px] text-[13px]">
               没有匹配结果
             </div>
           ) : (
@@ -382,31 +378,22 @@ export function GlobalSearchDialog({
                     type="button"
                     role="option"
                     aria-selected={active}
+                    data-active={active ? "true" : undefined}
                     onClick={() => openResult(result)}
-                    className={`flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-left transition ${
-                      active
-                        ? "bg-[rgba(255,255,255,0.06)] text-[rgba(255,255,255,0.9)]"
-                        : "text-[rgba(255,255,255,0.58)] hover:bg-[rgba(255,255,255,0.035)] hover:text-[rgba(255,255,255,0.82)]"
-                    }`}
+                    className="global-search-result-row flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-left transition"
                   >
-                    <span
-                      className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center ${
-                        active
-                          ? "text-[rgba(255,255,255,0.72)]"
-                          : "text-[rgba(255,255,255,0.38)]"
-                      }`}
-                    >
+                    <span className="global-search-result-icon flex h-4.5 w-4.5 shrink-0 items-center justify-center">
                       <ResultIcon strokeWidth={1.75} className="h-3.5 w-3.5" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium leading-[17px] text-[#f2f2f2]">
+                      <span className="global-search-result-title block truncate text-[13px] font-medium leading-[17px]">
                         {resultTitle(result)}
                       </span>
-                      <span className="block truncate text-[11px] leading-[15px] text-[rgba(255,255,255,0.4)]">
+                      <span className="global-search-result-snippet block truncate text-[11px] leading-[15px]">
                         {resultSnippet(result)}
                       </span>
                     </span>
-                    <span className="shrink-0 rounded-[4px] bg-[rgba(255,255,255,0.04)] px-1.5 py-0.5 text-[10px] leading-4 text-[rgba(255,255,255,0.42)]">
+                    <span className="global-search-result-meta shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] leading-4">
                       {resultMeta(result)}
                     </span>
                   </button>
