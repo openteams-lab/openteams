@@ -153,6 +153,14 @@ pub struct ProviderInfo {
     #[allow(dead_code)]
     pub name: String,
     #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub env: Vec<String>,
+    #[serde(default)]
+    pub key: Option<String>,
+    #[serde(default)]
+    pub options: Value,
+    #[serde(default)]
     pub models: HashMap<String, Value>,
 }
 

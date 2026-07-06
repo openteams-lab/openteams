@@ -1,4 +1,5 @@
 use std::{
+    collections::{BTreeSet, HashSet},
     io,
     path::{Path, PathBuf},
     sync::Arc,
@@ -37,8 +38,8 @@ mod slash_commands;
 mod types;
 
 use sdk::{
-    LogWriter, RunConfig, build_default_headers, generate_server_password, list_providers,
-    run_session, run_slash_command, wait_for_health,
+    LogWriter, ProviderInfo, ProviderListResponse, RunConfig, build_default_headers,
+    generate_server_password, list_providers, run_session, run_slash_command, wait_for_health,
 };
 use slash_commands::{OpencodeSlashCommand, hardcoded_slash_commands};
 
@@ -150,17 +151,7 @@ impl Opencode {
             let version = wait_for_health(&client, &server.base_url).await?;
             sdk::ensure_expected_version(&version, Self::PACKAGE_VERSION)?;
             let providers = list_providers(&client, &server.base_url, &directory).await?;
-            let mut models = Vec::new();
-
-            for provider in providers.all {
-                for model_id in provider.models.keys() {
-                    models.push(format!("{}/{}", provider.id, model_id));
-                }
-            }
-
-            models.sort();
-            models.dedup();
-            Ok(models)
+            Ok(collect_configured_models(&providers))
         }
         .await;
 
@@ -582,6 +573,67 @@ fn quote_command_part(value: &str) -> String {
     }
 }
 
+fn collect_configured_models(provider_list: &ProviderListResponse) -> Vec<String> {
+    let connected: HashSet<_> = provider_list.connected.iter().map(String::as_str).collect();
+    let mut models = BTreeSet::new();
+
+    for provider in &provider_list.all {
+        if !connected.contains(provider.id.as_str()) || !is_configured_provider(provider) {
+            continue;
+        }
+
+        for model_id in provider.models.keys() {
+            if let Some(model) = model_from_provider(&provider.id, model_id) {
+                models.insert(model);
+            }
+        }
+    }
+
+    models.into_iter().collect()
+}
+
+fn is_configured_provider(provider: &ProviderInfo) -> bool {
+    if provider_has_api_key(provider) {
+        return true;
+    }
+
+    match provider.source.as_deref() {
+        Some("api" | "env" | "custom") => true,
+        // Config-only built-in providers still appear as connected in OpenCode,
+        // but without a key they are not usable. Custom config providers often
+        // have no built-in env metadata, so keep those.
+        Some("config") => provider.env.is_empty(),
+        _ => false,
+    }
+}
+
+fn provider_has_api_key(provider: &ProviderInfo) -> bool {
+    provider.key.as_deref().is_some_and(has_secret_value)
+        || string_option(&provider.options, "apiKey").is_some_and(has_secret_value)
+        || string_option(&provider.options, "api_key").is_some_and(has_secret_value)
+}
+
+fn string_option<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
+    value
+        .as_object()
+        .and_then(|object| object.get(key))
+        .and_then(Value::as_str)
+}
+
+fn has_secret_value(value: &str) -> bool {
+    let trimmed = value.trim();
+    !trimmed.is_empty() && !trimmed.contains("***")
+}
+
+fn model_from_provider(provider_id: &str, model_id: &str) -> Option<String> {
+    let provider_id = provider_id.trim();
+    let model_id = model_id.trim();
+    if provider_id.is_empty() || model_id.is_empty() {
+        return None;
+    }
+    Some(format!("{provider_id}/{model_id}"))
+}
+
 fn format_tail(captured: Vec<String>) -> String {
     captured
         .into_iter()
@@ -875,4 +927,116 @@ fn merge_compaction_config(existing_json: Option<&str>) -> String {
     config.insert("compaction".to_string(), Value::Object(compaction));
 
     serde_json::to_string(&config).unwrap_or_else(|_| r#"{"compaction":{"auto":true}}"#.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use serde_json::{Value, json};
+
+    use super::{
+        collect_configured_models,
+        sdk::{ProviderInfo, ProviderListResponse},
+    };
+
+    fn provider(
+        id: &str,
+        source: Option<&str>,
+        env: &[&str],
+        key: Option<&str>,
+        options: Value,
+        models: &[&str],
+    ) -> ProviderInfo {
+        ProviderInfo {
+            id: id.to_string(),
+            name: id.to_string(),
+            source: source.map(str::to_string),
+            env: env.iter().map(|value| value.to_string()).collect(),
+            key: key.map(str::to_string),
+            options,
+            models: models
+                .iter()
+                .map(|model| (model.to_string(), json!({})))
+                .collect::<HashMap<_, _>>(),
+        }
+    }
+
+    #[test]
+    fn opencode_model_discovery_keeps_only_configured_providers() {
+        let provider_list = ProviderListResponse {
+            all: vec![
+                provider(
+                    "openai",
+                    Some("custom"),
+                    &["OPENAI_API_KEY"],
+                    None,
+                    Value::Null,
+                    &["gpt-5.2-codex"],
+                ),
+                provider(
+                    "openrouter",
+                    Some("config"),
+                    &["OPENROUTER_API_KEY"],
+                    None,
+                    Value::Null,
+                    &["openai/gpt-5.2-codex"],
+                ),
+                provider(
+                    "anthropic",
+                    Some("api"),
+                    &["ANTHROPIC_API_KEY"],
+                    Some("sk-test"),
+                    Value::Null,
+                    &["claude-sonnet-4-5"],
+                ),
+                provider(
+                    "litellm",
+                    Some("config"),
+                    &[],
+                    None,
+                    Value::Null,
+                    &["gpt-5.2-codex"],
+                ),
+                provider(
+                    "dashscope",
+                    Some("config"),
+                    &["DASHSCOPE_API_KEY"],
+                    None,
+                    json!({ "apiKey": "sk-test" }),
+                    &["qwen3-coder-plus"],
+                ),
+                provider(
+                    "gemini",
+                    Some("env"),
+                    &["GEMINI_API_KEY"],
+                    None,
+                    Value::Null,
+                    &["gemini-3-pro"],
+                ),
+            ],
+            default: HashMap::new(),
+            connected: vec![
+                "openrouter".to_string(),
+                "anthropic".to_string(),
+                "litellm".to_string(),
+                "dashscope".to_string(),
+                "gemini".to_string(),
+            ],
+        };
+
+        let models = collect_configured_models(&provider_list);
+
+        assert_eq!(
+            models,
+            vec![
+                "anthropic/claude-sonnet-4-5",
+                "dashscope/qwen3-coder-plus",
+                "gemini/gemini-3-pro",
+                "litellm/gpt-5.2-codex",
+            ]
+        );
+        assert!(!models.iter().any(|model| model.starts_with("openai/")));
+        assert!(!models.iter().any(|model| model.starts_with("openrouter/")));
+    }
 }
