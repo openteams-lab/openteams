@@ -1,16 +1,21 @@
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{fs, path::Path};
 
+    use chrono::Utc;
     use db::models::{
         chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
         chat_skill::{ChatSkill, CreateChatSkill},
     };
+    use sqlx::types::Json;
     use sqlx::SqlitePool;
     use uuid::Uuid;
 
     use super::{
-        discover_global_skills, global_skill_roots, parse_discovered_skill_markdown,
+        check_link_conflict, create_skill_link, discover_global_skills, global_skill_roots,
+        install_skill_files_from_embedded_at_paths, is_openteams_managed_link, LinkConflict,
+        RemoteSkillPackage, uninstall_skill_files_from_global_directory_at_paths,
+        openteams_skill_data_dir, parse_discovered_skill_markdown,
         sync_discovered_global_skills_at_home_dir,
     };
 
@@ -384,6 +389,189 @@ Open the page and inspect it carefully.
             count > 100,
             "Expected at least 100 embedded files, got {}",
             count
+        );
+    }
+
+    fn test_remote_skill(name: &str) -> RemoteSkillPackage {
+        RemoteSkillPackage {
+            id: name.to_string(),
+            name: name.to_string(),
+            description: "Test skill".to_string(),
+            category: None,
+            version: "1.0.0".to_string(),
+            author: None,
+            tags: Vec::new(),
+            compatible_agents: vec!["claude".to_string()],
+            source_url: Some(format!("https://skills.example/{name}")),
+            content: "Test skill content".to_string(),
+            download_count: Some(0),
+        }
+    }
+
+    fn test_chat_skill(name: &str) -> ChatSkill {
+        ChatSkill {
+            id: Uuid::new_v4(),
+            name: name.to_string(),
+            description: "Test skill".to_string(),
+            content: "Test skill content".to_string(),
+            trigger_type: "always".to_string(),
+            trigger_keywords: Json(Vec::new()),
+            enabled: true,
+            source: "registry".to_string(),
+            source_url: Some(format!("https://skills.example/{}", name.replace(' ', "-"))),
+            version: "1.0.0".to_string(),
+            author: None,
+            tags: Json(Vec::new()),
+            category: None,
+            compatible_agents: Json(Vec::new()),
+            download_count: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn embedded_install_writes_central_data_and_agent_link() {
+        let home_dir = tempfile::tempdir().expect("home dir");
+        let app_data = tempfile::tempdir().expect("app data");
+        let skill = test_remote_skill("artifacts-builder");
+        let target_agents = vec!["claude".to_string()];
+
+        let count = install_skill_files_from_embedded_at_paths(
+            &skill,
+            Some(&target_agents),
+            home_dir.path(),
+            app_data.path(),
+        )
+        .await
+        .expect("install embedded skill");
+
+        assert!(count > 0);
+        let central_dir = openteams_skill_data_dir("artifacts-builder", app_data.path());
+        let agent_dir = home_dir
+            .path()
+            .join(".claude")
+            .join("skills")
+            .join("artifacts-builder");
+
+        assert!(central_dir.join("SKILL.md").exists());
+        assert!(agent_dir.join("SKILL.md").exists());
+        assert!(is_openteams_managed_link(&agent_dir, app_data.path()).await);
+    }
+
+    #[tokio::test]
+    async fn embedded_install_skips_user_owned_real_directory() {
+        let home_dir = tempfile::tempdir().expect("home dir");
+        let app_data = tempfile::tempdir().expect("app data");
+        let skill = test_remote_skill("artifacts-builder");
+        let target_agents = vec!["claude".to_string()];
+        let user_dir = home_dir
+            .path()
+            .join(".claude")
+            .join("skills")
+            .join("artifacts-builder");
+        fs::create_dir_all(&user_dir).expect("create user dir");
+        fs::write(user_dir.join("SKILL.md"), "user owned").expect("write user skill");
+
+        install_skill_files_from_embedded_at_paths(
+            &skill,
+            Some(&target_agents),
+            home_dir.path(),
+            app_data.path(),
+        )
+        .await
+        .expect("install embedded skill");
+
+        let central_dir = openteams_skill_data_dir("artifacts-builder", app_data.path());
+        assert!(central_dir.join("SKILL.md").exists());
+        assert_eq!(
+            fs::read_to_string(user_dir.join("SKILL.md")).expect("read user skill"),
+            "user owned"
+        );
+        assert_eq!(
+            check_link_conflict(&user_dir, app_data.path()).await,
+            LinkConflict::UserOwned
+        );
+    }
+
+    #[tokio::test]
+    async fn safe_uninstall_removes_managed_link_and_preserves_user_dir() {
+        let home_dir = tempfile::tempdir().expect("home dir");
+        let app_data = tempfile::tempdir().expect("app data");
+        let central_dir = openteams_skill_data_dir("managed-skill", app_data.path());
+        fs::create_dir_all(&central_dir).expect("create central dir");
+        fs::write(central_dir.join("SKILL.md"), "managed").expect("write central skill");
+
+        let managed_dir = home_dir
+            .path()
+            .join(".claude")
+            .join("skills")
+            .join("managed-skill");
+        create_skill_link(&central_dir, &managed_dir)
+            .await
+            .expect("create managed link");
+
+        let user_dir = home_dir
+            .path()
+            .join(".gemini")
+            .join("skills")
+            .join("managed-skill");
+        fs::create_dir_all(&user_dir).expect("create user dir");
+        fs::write(user_dir.join("SKILL.md"), "user owned").expect("write user skill");
+
+        uninstall_skill_files_from_global_directory_at_paths(
+            &test_chat_skill("managed-skill"),
+            home_dir.path(),
+            app_data.path(),
+        )
+        .await
+        .expect("safe uninstall");
+
+        assert!(!managed_dir.exists());
+        assert!(!central_dir.exists());
+        assert_eq!(
+            fs::read_to_string(user_dir.join("SKILL.md")).expect("read user skill"),
+            "user owned"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn user_owned_symlink_is_not_managed() {
+        let home_dir = tempfile::tempdir().expect("home dir");
+        let app_data = tempfile::tempdir().expect("app data");
+        let target_dir = tempfile::tempdir().expect("user target");
+        let skill_dir = home_dir
+            .path()
+            .join(".claude")
+            .join("skills")
+            .join("user-skill");
+        fs::create_dir_all(skill_dir.parent().expect("skill parent")).expect("create parent");
+        std::os::unix::fs::symlink(target_dir.path(), &skill_dir).expect("create user symlink");
+
+        assert_eq!(
+            check_link_conflict(&skill_dir, app_data.path()).await,
+            LinkConflict::UserOwned
+        );
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn user_owned_junction_is_not_managed() {
+        let home_dir = tempfile::tempdir().expect("home dir");
+        let app_data = tempfile::tempdir().expect("app data");
+        let target_dir = tempfile::tempdir().expect("user target");
+        let skill_dir = home_dir
+            .path()
+            .join(".claude")
+            .join("skills")
+            .join("user-skill");
+        fs::create_dir_all(skill_dir.parent().expect("skill parent")).expect("create parent");
+        junction::create(target_dir.path(), &skill_dir).expect("create user junction");
+
+        assert_eq!(
+            check_link_conflict(&skill_dir, app_data.path()).await,
+            LinkConflict::UserOwned
         );
     }
 }

@@ -207,6 +207,8 @@ async fn prune_stale_session_agent_skill_ids(
                   pty_session_key,
                   agent_session_id,
                   agent_message_id,
+                  project_member_id,
+                  COALESCE(execution_config, '{}') AS execution_config,
                   allowed_skill_ids,
                   created_at,
                   updated_at

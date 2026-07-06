@@ -30,15 +30,8 @@ pub async fn install_skill_from_registry(
     Ok(installed)
 }
 
-/// Install skill files from registry into global user directories:
-/// - ~/.agents/skills/{skill_name}
-/// - ~/.claude/skills/{skill_name}
-/// - ~/.github/skills/{skill_name}
-/// - ~/.cursor/skills/{skill_name}
-/// - ~/.qwen/skills/{skill_name}
-/// - ~/.opencode/skills/{skill_name}
-/// - ~/.gemini/skills/{skill_name}
-/// - ~/.factory/skills/{skill_name}
+/// Install skill files from registry into OpenTeams central app data and link
+/// them into selected native agent skill directories.
 ///
 /// Returns the number of downloaded source files.
 ///
@@ -66,35 +59,46 @@ pub async fn install_skill_files_to_global_directory(
             }
 
             let home_dir = resolve_home_dir()?;
-            let target_roots = filter_skill_roots_by_agents(&home_dir, &skill.name, target_agents);
-
-            for root in &target_roots {
-                tokio::fs::create_dir_all(root).await?;
-            }
-
+            let app_data = openteams_app_data_dir();
+            let slug = slugify_skill_name(&skill.name);
+            let staging_dir = skill_staging_dir(&slug, &app_data);
             let mut files_downloaded = 0;
-            // Download each file
-            for file_info in &download_response.files {
-                let relative_path = sanitize_skill_relative_path(&file_info.path)?;
 
-                // Download the file
-                let content = client
-                    .download_file(&file_info.download_url)
-                    .await
-                    .map_err(|e| SkillInstallError::DownloadFailed(e.to_string()))?;
-
-                for root in &target_roots {
-                    let file_path = root.join(&relative_path);
+            let write_result = async {
+                tokio::fs::create_dir_all(&staging_dir).await?;
+                for file_info in &download_response.files {
+                    let relative_path = sanitize_skill_relative_path(&file_info.path)?;
+                    let content = client
+                        .download_file(&file_info.download_url)
+                        .await
+                        .map_err(|e| SkillInstallError::DownloadFailed(e.to_string()))?;
+                    let file_path = staging_dir.join(&relative_path);
                     if let Some(parent) = file_path.parent() {
                         tokio::fs::create_dir_all(parent).await?;
                     }
                     tokio::fs::write(&file_path, &content)
                         .await
                         .map_err(|e| SkillInstallError::SaveFailed(e.to_string()))?;
+                    files_downloaded += 1;
                 }
-
-                files_downloaded += 1;
+                Ok::<(), SkillInstallError>(())
             }
+            .await;
+
+            if let Err(err) = write_result {
+                let _ = tokio::fs::remove_dir_all(&staging_dir).await;
+                return Err(err);
+            }
+
+            let real_data_dir = replace_skill_data_dir(&slug, &staging_dir, &app_data).await?;
+            link_skill_data_to_agent_roots(
+                &skill.name,
+                &real_data_dir,
+                &home_dir,
+                &app_data,
+                target_agents,
+            )
+            .await?;
 
             Ok(files_downloaded)
         }
@@ -124,26 +128,42 @@ pub async fn uninstall_skill_files_from_global_directory(
     skill: &ChatSkill,
 ) -> Result<(), SkillInstallError> {
     let home_dir = resolve_home_dir()?;
-    let base_roots = global_skill_base_roots(&home_dir);
-    let mut target_dirs = HashSet::new();
+    let app_data = openteams_app_data_dir();
+    uninstall_skill_files_from_global_directory_at_paths(skill, &home_dir, &app_data).await
+}
 
+async fn uninstall_skill_files_from_global_directory_at_paths(
+    skill: &ChatSkill,
+    home_dir: &Path,
+    app_data: &Path,
+) -> Result<(), SkillInstallError> {
+    let base_roots = global_skill_base_roots(home_dir);
     for identifier in skill_uninstall_identifiers(skill) {
         let relative = sanitize_skill_relative_path(&identifier)?;
         for root in &base_roots {
-            target_dirs.insert(root.join(&relative));
+            let target_dir = root.join(&relative);
+            if is_openteams_managed_link(&target_dir, &app_data).await {
+                remove_skill_link(&target_dir).await?;
+            } else {
+                tracing::info!(
+                    path = %target_dir.display(),
+                    "Skipping non-OpenTeams directory during skill uninstall"
+                );
+            }
         }
     }
 
-    for dir in target_dirs {
-        match tokio::fs::remove_dir_all(&dir).await {
+    for identifier in skill_uninstall_identifiers(skill) {
+        let data_dir = openteams_skill_data_dir(&identifier, &app_data);
+        match tokio::fs::remove_dir_all(&data_dir).await {
             Ok(_) => {}
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
             Err(err) => {
-                return Err(SkillInstallError::DeleteFailed(format!(
-                    "{} ({})",
-                    dir.display(),
-                    err
-                )));
+                tracing::warn!(
+                    path = %data_dir.display(),
+                    error = %err,
+                    "Failed to remove central skill data dir"
+                );
             }
         }
     }
@@ -162,6 +182,66 @@ pub async fn uninstall_skill_files_from_global_directory(
                 command_file.display(),
                 err
             )));
+        }
+    }
+
+    Ok(())
+}
+
+fn skill_staging_dir(slug: &str, app_data: &Path) -> PathBuf {
+    app_data
+        .join("skills")
+        .join(".staging")
+        .join(format!("{}-{}", slug, Uuid::new_v4()))
+}
+
+async fn replace_skill_data_dir(
+    slug: &str,
+    staging_dir: &Path,
+    app_data: &Path,
+) -> Result<PathBuf, SkillInstallError> {
+    let real_data_dir = openteams_skill_data_dir(slug, app_data);
+    if let Some(parent) = real_data_dir.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+
+    match tokio::fs::remove_dir_all(&real_data_dir).await {
+        Ok(_) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(SkillInstallError::DeleteFailed(err.to_string())),
+    }
+
+    tokio::fs::rename(staging_dir, &real_data_dir)
+        .await
+        .map_err(|err| SkillInstallError::SaveFailed(err.to_string()))?;
+
+    Ok(real_data_dir)
+}
+
+async fn link_skill_data_to_agent_roots(
+    skill_name: &str,
+    real_data_dir: &Path,
+    home_dir: &Path,
+    app_data: &Path,
+    target_agents: Option<&[String]>,
+) -> Result<(), SkillInstallError> {
+    let target_roots = filter_skill_roots_by_agents(home_dir, skill_name, target_agents);
+
+    for root in &target_roots {
+        match check_link_conflict(root, app_data).await {
+            LinkConflict::Empty => {
+                create_skill_link(real_data_dir, root).await?;
+            }
+            LinkConflict::ManagedLink => {
+                remove_skill_link(root).await?;
+                create_skill_link(real_data_dir, root).await?;
+            }
+            LinkConflict::UserOwned => {
+                tracing::warn!(
+                    path = %root.display(),
+                    "Skipping user-owned skill directory during install"
+                );
+            }
         }
     }
 
@@ -374,6 +454,17 @@ pub async fn install_skill_files_from_embedded(
     skill: &RemoteSkillPackage,
     target_agents: Option<&[String]>,
 ) -> Result<usize, SkillInstallError> {
+    let home_dir = resolve_home_dir()?;
+    let app_data = openteams_app_data_dir();
+    install_skill_files_from_embedded_at_paths(skill, target_agents, &home_dir, &app_data).await
+}
+
+async fn install_skill_files_from_embedded_at_paths(
+    skill: &RemoteSkillPackage,
+    target_agents: Option<&[String]>,
+    home_dir: &Path,
+    app_data: &Path,
+) -> Result<usize, SkillInstallError> {
     let files = get_embedded_skill_files(&skill.name);
 
     if files.is_empty() {
@@ -383,35 +474,41 @@ pub async fn install_skill_files_from_embedded(
         )));
     }
 
-    let home_dir = resolve_home_dir()?;
-    let target_roots = filter_skill_roots_by_agents(&home_dir, &skill.name, target_agents);
-
-    for root in &target_roots {
-        tokio::fs::create_dir_all(root).await?;
-    }
-
+    let slug = slugify_skill_name(&skill.name);
+    let staging_dir = skill_staging_dir(&slug, app_data);
     let mut files_written = 0;
-    for (relative_path, content) in &files {
-        let sanitized = sanitize_skill_relative_path(
-            &relative_path
-                .split('/')
-                .skip(1)
-                .collect::<Vec<_>>()
-                .join("/"),
-        )?;
 
-        for root in &target_roots {
-            let file_path = root.join(&sanitized);
+    let write_result = async {
+        tokio::fs::create_dir_all(&staging_dir).await?;
+        for (relative_path, content) in &files {
+            let sanitized = sanitize_skill_relative_path(
+                &relative_path
+                    .split('/')
+                    .skip(1)
+                    .collect::<Vec<_>>()
+                    .join("/"),
+            )?;
+            let file_path = staging_dir.join(&sanitized);
             if let Some(parent) = file_path.parent() {
                 tokio::fs::create_dir_all(parent).await?;
             }
             tokio::fs::write(&file_path, content)
                 .await
                 .map_err(|e| SkillInstallError::SaveFailed(e.to_string()))?;
+            files_written += 1;
         }
-
-        files_written += 1;
+        Ok::<(), SkillInstallError>(())
     }
+    .await;
+
+    if let Err(err) = write_result {
+        let _ = tokio::fs::remove_dir_all(&staging_dir).await;
+        return Err(err);
+    }
+
+    let real_data_dir = replace_skill_data_dir(&slug, &staging_dir, app_data).await?;
+    link_skill_data_to_agent_roots(&skill.name, &real_data_dir, home_dir, app_data, target_agents)
+        .await?;
 
     tracing::info!(
         skill_name = %skill.name,
