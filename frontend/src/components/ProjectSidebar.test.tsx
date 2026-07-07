@@ -421,7 +421,7 @@ check(
   "renders Search action in the former Inbox slot",
   html.includes("搜索") && html.includes("lucide-search") && !html.includes("Inbox"),
   html,
-check("renders Inbox action", html.includes("Inbox"), html);
+);
 check(
   "replaces top history entry with Bell notification entry",
   inboxBadgeHtml.includes("Open notifications") &&
@@ -433,9 +433,16 @@ check(
   { inboxBadgeHtml, componentSource, inboxPopoverSource },
 );
 check(
-  "keeps right-side Inbox primary action unchanged",
+  "Bell trigger has pointer cursor and darker hover background",
+  componentSource.includes("cursor-pointer items-center justify-center") &&
+    componentSource.includes("hover:bg-[var(--surface-2)]") &&
+    componentSource.includes("triggerClassName={topControlClass}"),
+  componentSource,
+);
+check(
+  "keeps right-side Search primary action available",
   componentSource.includes("const primaryActionIcons") &&
-    componentSource.includes("inbox: Inbox"),
+    componentSource.includes("search: Search"),
   componentSource,
 );
 check("renders New session action", html.includes("New session"), html);
@@ -801,10 +808,13 @@ check(
   inboxPopoverSource.includes("No unread notifications") &&
     inboxPopoverSource.includes("Refresh failed") &&
     inboxPopoverSource.includes("Mark all") &&
-    inboxPopoverSource.includes("inboxActionLabel(item)") &&
-    inboxPopoverSource.includes("worktree_cleanup_failed") &&
-    inboxPopoverSource.includes('return "Retry";') &&
-    inboxPopoverSource.includes("onArchiveItem"),
+    inboxPopoverSource.includes("px-2.5 py-1.5 pr-8 text-left") &&
+    inboxPopoverSource.includes("line-clamp-1") &&
+    inboxPopoverSource.includes("right-2 top-1.5") &&
+    !inboxPopoverSource.includes("-translate-y-1/2") &&
+    inboxPopoverSource.includes("group-hover:opacity-100") &&
+    inboxPopoverSource.includes("<Check") &&
+    !inboxPopoverSource.includes("inboxActionLabel(item)"),
   inboxPopoverSource,
 );
 check(

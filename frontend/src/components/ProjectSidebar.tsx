@@ -145,7 +145,7 @@ const navigationIcons: Record<string, LucideIcon> = {
 };
 
 const topControlClass =
-  "flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-[var(--ink-tertiary)] transition hover:border-[var(--hairline)] hover:bg-[var(--surface-1)] hover:text-[var(--ink)]";
+  "flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent text-[var(--ink-tertiary)] transition hover:border-[var(--hairline)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]";
 
 const sectionLabelClass =
   "px-2 text-[14px] font-medium uppercase tracking-[0.04em] text-[var(--ink-tertiary)]";

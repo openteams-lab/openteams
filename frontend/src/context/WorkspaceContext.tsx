@@ -1601,6 +1601,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   const inboxSoundSettingsSignatureRef = useRef<string | null>(null);
   const inboxSoundPrimedRef = useRef(false);
   const inboxUnreadSoundIdsRef = useRef<Set<string>>(new Set());
+  const inboxAutoReadProjectIdRef = useRef<string | null>(null);
+  const inboxInitialUnreadItemIdsRef = useRef<Set<string>>(new Set());
   const autoMarkedInboxItemIdsRef = useRef<Set<string>>(new Set());
   const workspaceChangesRequestIdRef = useRef(0);
   const initialRefreshStartedRef = useRef(false);
@@ -2206,6 +2208,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       } catch {}
 
       if (previousProjectId !== id) {
+        inboxAutoReadProjectIdRef.current = null;
+        inboxInitialUnreadItemIdsRef.current = new Set();
+        autoMarkedInboxItemIdsRef.current = new Set();
         setSessionsAsync(succeed([]));
         setArchivedSessionsAsync(succeed([]));
         clearSessionScopedState();
@@ -2522,6 +2527,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         inboxNotificationSettingsSignature(configAsync.data);
       inboxSoundPrimedRef.current = false;
       inboxUnreadSoundIdsRef.current = new Set();
+      inboxAutoReadProjectIdRef.current = null;
+      inboxInitialUnreadItemIdsRef.current = new Set();
       setInboxSummaryAsync(succeed(EMPTY_INBOX_SUMMARY));
       setInboxItemsAsync(succeed([]));
       return;
@@ -2567,6 +2574,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         configAsync.data,
         itemsResponse.items,
       );
+      if (inboxAutoReadProjectIdRef.current !== projectId) {
+        inboxAutoReadProjectIdRef.current = projectId;
+        inboxInitialUnreadItemIdsRef.current = new Set(
+          visibleItems.map((item) => item.id),
+        );
+      }
       const unreadItemIds = new Set(visibleItems.map((item) => item.id));
       const newUnreadItems = visibleItems.filter(
         (item) => !inboxUnreadSoundIdsRef.current.has(item.id),
@@ -2654,6 +2667,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           item.read_at === null &&
           item.archived_at === null &&
           isAutoReadableInboxItem(item) &&
+          !inboxInitialUnreadItemIdsRef.current.has(item.id) &&
           !autoMarkedInboxItemIdsRef.current.has(item.id),
       )
       .map((item) => item.id);
