@@ -3445,6 +3445,54 @@ body[data-mode="light"] .workflow-review-notification {
   --workflow-notification-secondary-hover-text: #111827;
 }
 
+.workflow-iteration-feedback-card {
+  --workflow-iteration-bg: rgba(16, 17, 19, 0.95);
+  --workflow-iteration-border: rgba(255, 255, 255, 0.08);
+  --workflow-iteration-border-muted: rgba(255, 255, 255, 0.06);
+  --workflow-iteration-border-hover: rgba(255, 255, 255, 0.14);
+  --workflow-iteration-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+  --workflow-iteration-expanded-shadow: 0 24px 64px rgba(0, 0, 0, 0.34);
+  --workflow-iteration-text: #f2f2f2;
+  --workflow-iteration-muted: #8a8f98;
+  --workflow-iteration-placeholder: #5f6672;
+  --workflow-iteration-divider: rgba(255, 255, 255, 0.08);
+  --workflow-iteration-subtle-bg: rgba(255, 255, 255, 0.03);
+  --workflow-iteration-selected-bg: rgba(255, 255, 255, 0.08);
+  --workflow-iteration-hover-bg: rgba(255, 255, 255, 0.03);
+  --workflow-iteration-field-bg: rgba(255, 255, 255, 0.04);
+  --workflow-iteration-button-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --workflow-iteration-accept-bg: #2a2b32;
+  --workflow-iteration-accept-hover-bg: #31323a;
+  --workflow-iteration-accept-border: rgba(255, 255, 255, 0.05);
+  --workflow-iteration-accept-text: #ffffff;
+  --workflow-iteration-accept-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+body[data-mode="light"] .workflow-iteration-feedback-card {
+  --workflow-iteration-bg: rgba(255, 255, 255, 0.96);
+  --workflow-iteration-border: rgba(15, 23, 42, 0.1);
+  --workflow-iteration-border-muted: rgba(15, 23, 42, 0.08);
+  --workflow-iteration-border-hover: rgba(94, 106, 210, 0.28);
+  --workflow-iteration-shadow: 0 14px 36px rgba(15, 23, 42, 0.12);
+  --workflow-iteration-expanded-shadow: 0 18px 44px rgba(15, 23, 42, 0.14);
+  --workflow-iteration-text: #111827;
+  --workflow-iteration-muted: #647084;
+  --workflow-iteration-placeholder: #9aa3b2;
+  --workflow-iteration-divider: rgba(15, 23, 42, 0.1);
+  --workflow-iteration-subtle-bg: rgba(15, 23, 42, 0.035);
+  --workflow-iteration-selected-bg: rgba(94, 106, 210, 0.11);
+  --workflow-iteration-hover-bg: rgba(15, 23, 42, 0.04);
+  --workflow-iteration-field-bg: rgba(248, 250, 252, 0.96);
+  --workflow-iteration-button-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --workflow-iteration-accept-bg: var(--primary);
+  --workflow-iteration-accept-hover-bg: var(--primary-hover);
+  --workflow-iteration-accept-border: rgba(94, 106, 210, 0.34);
+  --workflow-iteration-accept-text: var(--on-primary);
+  --workflow-iteration-accept-shadow: 0 8px 18px rgba(94, 106, 210, 0.18);
+}
+
 .workflow-card-surface {
   border: 1px solid transparent;
   background: color-mix(in srgb, var(--surface-1) 86%, var(--canvas));
