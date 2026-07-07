@@ -8,6 +8,7 @@ import {
 import type {
   SessionWorktree,
   SessionWorktreeMergeResult,
+  SessionWorktreeStatus,
 } from '@/types';
 
 // Lazy state machine mirror for `chat_session_worktrees`. The backend reducer
@@ -36,6 +37,22 @@ export interface UseSessionWorktreeResult {
   abortMerge: () => Promise<SessionWorktree>;
 }
 
+const WORKTREE_WORKSPACE_STATUSES = new Set<SessionWorktreeStatus>([
+  'creating',
+  'active',
+  'dirty',
+  'merging',
+  'needs_conflict_resolution',
+  'merged',
+]);
+
+const selectedWorktreeWorkspacePath = (
+  worktree: SessionWorktree,
+): string | null =>
+  WORKTREE_WORKSPACE_STATUSES.has(worktree.status)
+    ? worktree.worktree_path
+    : worktree.base_workspace_path;
+
 export function useSessionWorktree({
   sessionId,
   enabled,
@@ -45,6 +62,7 @@ export function useSessionWorktree({
   const [error, setError] = useState<Error | null>(null);
   const requestIdRef = useRef(0);
   const worktreeRef = useRef<SessionWorktree | null>(null);
+  const lastNotifiedWorkspaceRouteRef = useRef<string | null>(null);
 
   const applyWorktree = useCallback((next: SessionWorktree | null) => {
     worktreeRef.current = next;
@@ -231,14 +249,31 @@ export function useSessionWorktree({
     return () => window.clearInterval(interval);
   }, [enabled, refresh, sessionId, worktree]);
 
-  // After a successful merge, the source-control panel must refresh while
-  // staying scoped to the session worktree, matching runner workspace routing.
+  // Worktree creation can happen lazily from the first run, outside this
+  // panel. Notify source-control whenever the effective workspace route
+  // changes so branch/status chips switch from the base workspace to the
+  // session worktree without requiring a manual refresh.
   useEffect(() => {
-    if (!enabled || !sessionId) return;
-    if (worktree?.status === 'merged') {
+    if (!enabled || !sessionId || !worktree) {
+      lastNotifiedWorkspaceRouteRef.current = null;
+      return;
+    }
+
+    const workspacePath = selectedWorktreeWorkspacePath(worktree);
+    if (!workspacePath) return;
+
+    const routeKey = `${worktree.status}:${workspacePath}`;
+    if (lastNotifiedWorkspaceRouteRef.current !== routeKey) {
+      lastNotifiedWorkspaceRouteRef.current = routeKey;
       notifySourceControlRefreshRequested({ sessionId });
     }
-  }, [enabled, sessionId, worktree?.status]);
+  }, [
+    enabled,
+    sessionId,
+    worktree?.base_workspace_path,
+    worktree?.status,
+    worktree?.worktree_path,
+  ]);
 
   return {
     worktree,

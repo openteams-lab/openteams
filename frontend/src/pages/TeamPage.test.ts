@@ -112,6 +112,19 @@ check(
 );
 
 check(
+  "member name field keeps the inherited agent name as placeholder only",
+  source.includes('memberName: member.member_name?.trim() ?? ""') &&
+    source.includes(
+      'selectedAgent?.name ?? t("teamPage.form.memberName")',
+    ) &&
+    configTabsSource.includes('autoComplete="off"') &&
+    !source.includes(
+      'memberName: member.member_name?.trim() || agent?.name?.trim() || ""',
+    ),
+  { source, configTabsSource },
+);
+
+check(
   "skill selection does not reload the installed skills list after save",
   source.includes(".listNative(runnerType)") &&
     source.includes("mcpServersApi\n      .load(runnerType)") &&

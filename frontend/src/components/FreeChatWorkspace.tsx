@@ -2868,20 +2868,20 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
 
         {isRelatedFilesOpen && (
           <div
-            className="group flex cursor-col-resize items-stretch justify-center"
+            className="group relative h-full min-h-0 cursor-col-resize self-stretch"
             role="separator"
             aria-orientation="vertical"
             aria-label={t("relatedFiles.resize")}
             title={t("relatedFiles.resize")}
             onMouseDown={handleRelatedFilesResizeStart}
           >
-            <span className="my-2 w-px rounded-full bg-[var(--hairline)] transition-[width,background-color] group-hover:w-1 group-hover:bg-[var(--hairline-tertiary)] group-active:w-1 group-active:bg-[var(--hairline-tertiary)]" />
+            <span className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[color-mix(in_srgb,var(--hairline)_55%,transparent)] transition-[width,background-color] group-hover:w-1 group-hover:bg-[var(--hairline-tertiary)] group-active:w-1 group-active:bg-[var(--hairline-tertiary)]" />
           </div>
         )}
 
         {isRelatedFilesOpen && (
           <aside
-            className={`main-right-nav-panel-scrollbars-hidden relative flex min-h-0 flex-col overflow-hidden border-l border-[var(--hairline)] ${
+            className={`main-right-nav-panel-scrollbars-hidden relative flex min-h-0 flex-col overflow-hidden ${
               embedded ? "bg-transparent" : "bg-[var(--canvas)]"
             }`}
           >

@@ -523,6 +523,7 @@ function ConfigTab({
               value={memberName}
               onChange={(event) => setMemberName(event.target.value)}
               placeholder={memberNamePlaceholder}
+              autoComplete="off"
               className={inputClassName}
             />
           </SettingRow>

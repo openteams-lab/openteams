@@ -160,6 +160,11 @@ async function getPorts() {
 function copyDevAssets() {
   try {
     if (!fs.existsSync(DEV_ASSETS)) {
+      if (!fs.existsSync(DEV_ASSETS_SEED)) {
+        fs.mkdirSync(DEV_ASSETS, { recursive: true });
+        return;
+      }
+
       // Copy dev_assets_seed to dev_assets
       fs.cpSync(DEV_ASSETS_SEED, DEV_ASSETS, { recursive: true });
 

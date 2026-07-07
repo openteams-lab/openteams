@@ -2267,6 +2267,7 @@ function WorkspaceLayout() {
               activeAppPage === "agents" ||
               activeAppPage === "team" ||
               activeAppPage === "team-templates" ||
+              activeAppPage === "workspace" ||
               activeTab?.kind === "diff" ||
               activeTab?.kind === "sc-diff" ||
               activeTab?.kind === "worktree-conflicts"

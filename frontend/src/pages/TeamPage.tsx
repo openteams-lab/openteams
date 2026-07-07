@@ -266,7 +266,7 @@ const resolveMemberFormState = (
   return {
     allowedSkillIds: member.allowed_skill_ids ?? [],
     isLeader: member.role === "lead",
-    memberName: member.member_name?.trim() || agent?.name?.trim() || "",
+    memberName: member.member_name?.trim() ?? "",
     modelName: config.model_name ?? agent?.model_name ?? "",
     modelVariant: config.model_variant ?? "",
     roleDefinition: agent?.system_prompt ?? "",
