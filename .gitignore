@@ -105,8 +105,8 @@ openteams-cloud/
 .openteams/
 **/.openteams/
 .main_page/
-website/
 .playwright-mcp/
 qa_test/
 .codex-target/
 .market/
+**/.npm-cache/
