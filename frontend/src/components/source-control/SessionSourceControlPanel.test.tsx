@@ -113,6 +113,16 @@ check(
   source,
 );
 
+check(
+  "disables worktree merge when there are no staged changes",
+  source.includes("const worktreeMergeDisabledReason =") &&
+    source.includes('viewModel.mode === "git" && viewModel.stagedPaths.length > 0') &&
+    source.includes('"worktree.reason.noStagedChanges"') &&
+    source.includes('if (action === "merge" && worktreeMergeDisabledReason) return;') &&
+    source.includes("mergeDisabledReason={worktreeMergeDisabledReason}"),
+  source,
+);
+
 {
   const confirmIndex = source.indexOf(
     'title: tr("worktree.confirm.deleteTitle", "Delete worktree?")',

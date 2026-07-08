@@ -211,6 +211,7 @@
   "sidebar.renameFolderFailed": "Folder rename failed",
   "sidebar.roots": "Roots",
   "sidebar.saveProject": "Save project",
+  "sidebar.saveProjectShort": "Save",
   "sidebar.saveFolderName": "Save folder name",
   "sidebar.searchTeams": "Search teams...",
   "sidebar.sessions": "Sessions",
