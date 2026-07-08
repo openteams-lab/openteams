@@ -79,6 +79,39 @@ body {
   margin: 0;
 }
 
+@keyframes inbox-bell-lower-swing {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  14% {
+    transform: translateX(-1.5px);
+  }
+  28% {
+    transform: translateX(1.35px);
+  }
+  42% {
+    transform: translateX(-1px);
+  }
+  56% {
+    transform: translateX(0.7px);
+  }
+  70% {
+    transform: translateX(0);
+  }
+}
+
+.inbox-bell-lower-swing {
+  animation: inbox-bell-lower-swing 1.35s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inbox-bell-lower-swing {
+    animation: none;
+  }
+}
+
 .ot-app-scale-viewport {
   width: 100vw;
   height: 100vh;

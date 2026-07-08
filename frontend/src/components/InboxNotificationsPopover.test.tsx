@@ -28,6 +28,7 @@ const source = readFileSync(
   new URL("./InboxNotificationsPopover.tsx", import.meta.url),
   "utf8",
 );
+const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 const badgeStart = source.indexOf("{unreadCount > 0 && (");
 const badgeEnd = source.indexOf("{inboxBadgeLabel(unreadCount)}", badgeStart);
 const badgeSource =
@@ -95,6 +96,26 @@ check(
 );
 
 check(
+  "highlights Bell trigger bright white and decorates it with a tiny red unread dot",
+  source.includes("text-[#f8fafc] drop-shadow-[0_0_6px_rgba(248,250,252,0.55)]") &&
+    source.includes("-bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-red-500") &&
+    source.includes('aria-hidden="true"'),
+  source,
+);
+
+check(
+  "swings the Bell icon while unread notifications are present",
+  source.includes("[clip-path:inset(0_0_45%_0)]") &&
+    source.includes("inbox-bell-lower-swing") &&
+    source.includes("[clip-path:inset(45%_0_0_0)]") &&
+    styles.includes("@keyframes inbox-bell-lower-swing") &&
+    styles.includes("transform: translateX(-1.5px)") &&
+    styles.includes("will-change: transform") &&
+    styles.includes("@media (prefers-reduced-motion: reduce)"),
+  { source, styles },
+);
+
+check(
   "unread list filters out read and archived items before sorting",
   source.includes(".filter((item) => item.read_at === null && item.archived_at === null)") &&
     source.includes("inboxItemTimeMs(right.created_at) - inboxItemTimeMs(left.created_at)"),
@@ -103,7 +124,7 @@ check(
 
 check(
   "unread list shows severity session title short body and relative time",
-  source.includes("inboxSeverityTextClass") &&
+  source.includes("inboxSeverityPillClass") &&
     source.includes("sessionTitleById.get(item.session_id)") &&
     source.includes("formatInboxRelativeTime(item.created_at)") &&
     source.includes("{item.title}") &&
@@ -112,25 +133,40 @@ check(
 );
 
 check(
-  "supports open mark-read mark-all-read and archive actions",
-  source.includes("openItem(item)") &&
-    source.includes("onMarkItemRead") &&
-    source.includes("onMarkAllRead") &&
-    source.includes("onArchiveItem") &&
-    source.includes('"sidebar.inbox.markAllRead"') &&
-    source.includes('"sidebar.inbox.markRead"') &&
-    source.includes('"Mark all"') &&
-    source.includes('"Mark as read"'),
+  "uses Linear-style popover depth header hierarchy and unread dot",
+  source.includes("border border-white/[0.08]") &&
+    source.includes("shadow-[0_18px_60px_rgba(0,0,0,0.48),0_4px_14px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.08)]") &&
+    source.includes("via-white/[0.18]") &&
+    source.includes("text-[13px] font-medium text-[var(--ink-subtle)]") &&
+    source.includes("border-b border-white/[0.06]") &&
+    source.includes("hover:bg-white/[0.06]") &&
+    source.includes("rounded-[4px] border px-1.5 py-0.5 text-[10px]") &&
+    source.includes("h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--primary)]") &&
+    source.includes("leading-[1.5]"),
   source,
 );
 
 check(
-  "labels workflow and worktree actions by handling target",
-  source.includes('return "Review";') &&
-    source.includes('return "Respond";') &&
-    source.includes('return "Approve";') &&
-    source.includes('return "Resolve";') &&
-    source.includes('return "Retry";'),
+  "supports open mark-read and mark-all-read actions",
+  source.includes("openItem(item)") &&
+    source.includes("onMarkItemRead") &&
+    source.includes("onMarkAllRead") &&
+    source.includes('"sidebar.inbox.markAllRead"') &&
+    source.includes('"sidebar.inbox.markRead"') &&
+    source.includes('"Mark all"'),
+  source,
+);
+
+check(
+  "keeps inbox rows compact with only a hover mark-read icon",
+  source.includes("px-2.5 py-1.5 pr-8 text-left") &&
+    source.includes("line-clamp-1") &&
+    source.includes("right-2 top-1.5") &&
+    !source.includes("-translate-y-1/2") &&
+    source.includes("group-hover:opacity-100") &&
+    source.includes("<Check") &&
+    !source.includes("inboxActionLabel(item)") &&
+    !source.includes("<Archive"),
   source,
 );
 
