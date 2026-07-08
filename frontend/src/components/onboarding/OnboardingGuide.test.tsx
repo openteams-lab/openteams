@@ -172,6 +172,8 @@ check(
   guideSource.includes('const onboardingLightThemeVars =') &&
     guideSource.includes('const isOnboardingLightMode =') &&
     guideSource.includes("filter: 'invert(1) hue-rotate(180deg)'") &&
+    guideSource.includes("lightPreview\n                            ? 'border-black/[0.08] bg-[#f5f6f8]'") &&
+    !guideSource.includes('bg-[#e4e4e7]') &&
     guideSource.includes('style={onboardingInvertedContentStyle}') &&
     appSource.includes('setTheme("light")') &&
     appSource.includes('setTheme("dark")') &&

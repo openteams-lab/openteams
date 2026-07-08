@@ -5,7 +5,7 @@ use serde_json::Value;
 use sqlx::{FromRow, Result, SqlitePool, types::Json};
 use uuid::Uuid;
 
-use super::model_pricing_sync::resolve_canonical_id;
+use super::model_pricing_sync::{resolve_canonical_id, strip_model_id_annotations};
 
 #[derive(Clone, Default)]
 pub struct TokenCostStatsService;
@@ -921,7 +921,7 @@ fn runtime_model_value(token_usage: &Value, agent_model_name: Option<String>) ->
 }
 
 fn normalize_executor_model_id(model_id: &str) -> String {
-    let trimmed = model_id.trim();
+    let trimmed = strip_model_id_annotations(model_id);
     if trimmed.is_empty() {
         "unknown".to_string()
     } else {
@@ -1640,6 +1640,31 @@ mod tests {
     }
 
     #[test]
+    fn strips_square_bracket_annotations_from_runtime_model_ids() {
+        let records = real_usage_records_from_rows(
+            vec![row(
+                "m1",
+                "run-1",
+                "openteams_cli",
+                None,
+                serde_json::json!({
+                    "token_usage": {
+                        "runtime_model_id": "glm-5.2[1m]",
+                        "input_tokens": 100,
+                        "output_tokens": 50,
+                        "is_estimated": false
+                    }
+                }),
+            )],
+            None,
+            None,
+        );
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].model_id, "glm-5.2");
+    }
+
+    #[test]
     fn converts_thread_snapshots_to_deltas() {
         let records = real_usage_records_from_rows(
             vec![
@@ -1776,6 +1801,39 @@ mod tests {
         assert_eq!(models[0].model_name, "z-ai/glm-5.1");
         assert_eq!(models[0].price_source, "openrouter");
         assert!((models[0].estimated_cost - 4.06).abs() < 1e-9);
+    }
+
+    #[test]
+    fn model_usage_uses_price_for_bracket_annotated_model_id() {
+        let records = vec![TokenUsageRecord {
+            date: "2026-06-01".to_string(),
+            session_id: "session-1".to_string(),
+            title: "Session".to_string(),
+            model_id: "z-ai/glm-5.2[1m]".to_string(),
+            input_tokens: 1_000_000,
+            output_tokens: 1_000_000,
+            cache_read_tokens: 0,
+            reasoning_output_tokens: 0,
+            total_tokens: 2_000_000,
+        }];
+        let mut prices = HashMap::new();
+        prices.insert(
+            "glm-5.2".to_string(),
+            EffectivePrice {
+                input_price_per_1m: 1.25,
+                output_price_per_1m: 5.0,
+                cache_read_price_per_1m: None,
+                source: "openrouter".to_string(),
+                cache_source: "missing".to_string(),
+            },
+        );
+
+        let models = model_usage_from_records(records, prices, 5);
+
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].model_id, "z-ai/glm-5.2[1m]");
+        assert_eq!(models[0].price_source, "openrouter");
+        assert!((models[0].estimated_cost - 6.25).abs() < f64::EPSILON);
     }
 
     #[test]

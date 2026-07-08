@@ -502,11 +502,19 @@ fn parse_optional_price_string(value: Option<String>) -> Option<f64> {
     value.and_then(|item| item.parse::<f64>().ok())
 }
 
+/// Strip context/window annotations from runtime model IDs such as `glm-5.2[1m]`.
+pub fn strip_model_id_annotations(model_id: &str) -> &str {
+    model_id
+        .split_once('[')
+        .map_or(model_id, |(base, _)| base)
+        .trim()
+}
+
 /// Resolve a model ID to its canonical form using explicit aliases.
 /// Unknown model IDs are left intact so price lookup can first try the exact
 /// executor-reported model ID before applying prefix-insensitive fallback.
 pub fn resolve_canonical_id(model_id: &str) -> String {
-    let trimmed = model_id.trim();
+    let trimmed = strip_model_id_annotations(model_id);
     let normalized = trimmed.to_ascii_lowercase();
     for (canonical, aliases) in MODEL_ID_ALIASES {
         if *canonical == normalized {
@@ -569,6 +577,16 @@ mod tests {
         assert_eq!(
             resolve_canonical_id("some-unknown-model"),
             "some-unknown-model"
+        );
+    }
+
+    #[test]
+    fn test_resolve_canonical_id_strips_square_bracket_annotations() {
+        assert_eq!(resolve_canonical_id("glm-5.1[1m]"), "glm-5.1");
+        assert_eq!(resolve_canonical_id(" z-ai/glm-5.1[1m] "), "glm-5.1");
+        assert_eq!(
+            resolve_canonical_id("openai/some-new-model[128k]"),
+            "openai/some-new-model"
         );
     }
 

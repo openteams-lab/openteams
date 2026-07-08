@@ -614,9 +614,3 @@ The biggest failure mode is "looks great in dark, ugly in light" or vice versa. 
 - **Linear's actual product UI** uses a richer color-tag palette (red/orange/yellow/green/blue/purple) for issue priorities. openteams **deliberately does not** — monograms carry identity, lavender carries action, success green is the only other meaningful color
 
 ---
-
-## Reference implementation
-
-See `openteams-design-prototypes.html` for working examples of all three prototypes (Workflow mode, Free chat mode, Onboarding + Pro) in both dark and light modes. Toggle at the top-right.
-
-The HTML is the executable spec — when this document and the HTML disagree, the HTML wins. Update both together.
