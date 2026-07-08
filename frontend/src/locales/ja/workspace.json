@@ -179,6 +179,7 @@
   "sidebar.gitignore.none": "なし",
   "sidebar.roots": "ルート",
   "sidebar.saveProject": "プロジェクトを保存",
+  "sidebar.saveProjectShort": "保存",
   "sidebar.searchTeams": "チームを検索...",
   "sidebar.sessions": "セッション",
   "sidebar.show": "表示",

@@ -1261,6 +1261,7 @@ export function ProjectSidebar({
     setEditingProject(draft);
     setProjectName(draft.name);
     setProjectWorkspacePath(draft.defaultWorkspacePath ?? "");
+    setSelectedTeamId(blankTeamId);
     setCreateError(null);
     setWorkspaceGitStatus(null);
     setWorkspaceGitStatusPath("");
@@ -1307,6 +1308,7 @@ export function ProjectSidebar({
   const resetProjectForm = () => {
     setProjectName("");
     setProjectWorkspacePath("");
+    setSelectedTeamId(blankTeamId);
     setEditingProject(null);
     setWorkspaceGitStatus(null);
     setWorkspaceGitStatusPath("");
@@ -1321,6 +1323,7 @@ export function ProjectSidebar({
     setCreateError(null);
     setWorkspaceBrowserOpen(false);
     setEditingProject(null);
+    setSelectedTeamId(blankTeamId);
     setWorkspaceGitStatus(null);
     setWorkspaceGitStatusPath("");
     setWorkspaceGitDetecting(false);
@@ -1713,11 +1716,11 @@ export function ProjectSidebar({
         />
       </div>
 
-      <div className="px-3 py-1.5">
+      <div className="px-2.5 py-1.5">
         <button
           ref={projectSwitcherTriggerRef}
           type="button"
-          className="flex w-full items-center gap-[6px] rounded-sm border border-transparent px-[6px] py-[5px] text-left transition hover:border-[var(--hairline)] hover:bg-[var(--surface-1)]"
+          className={`${sidebarItemClass} cursor-pointer border-transparent hover:border-[var(--hairline)] hover:bg-[var(--surface-1)]`}
           onClick={toggleProjectSwitcher}
           aria-expanded={projectSwitcherOpen}
           aria-label={translate(
@@ -1952,35 +1955,37 @@ export function ProjectSidebar({
                   />
                 </div>
 
-                <div>
-                  <label className={createProjectLabelClass}>
-                    {translate("sidebar.assignTeam", "Assign team")}
-                  </label>
-                  <DropdownSelect
-                    selectionMode="single"
-                    value={selectedTeamId}
-                    onChange={(value) => setSelectedTeamId(value)}
-                    options={teamOptions}
-                    placeholder={translate(
-                      "sidebar.assignTeamPlaceholder",
-                      "Select a team",
-                    )}
-                    searchPlaceholder={translate(
-                      "sidebar.searchTeams",
-                      "Search teams...",
-                    )}
-                    emptyLabel={translate(
-                      "sidebar.noTeamMatch",
-                      "No teams match this search.",
-                    )}
-                    triggerIcon={
-                      <Users className="h-3 w-3 text-[var(--ink-tertiary)]" />
-                    }
-                    triggerClassName="border-[var(--hairline)] bg-[var(--surface-2)] hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)]"
-                    panelClassName="z-[1010] max-w-none"
-                    maxPanelHeightClassName="max-h-[240px]"
-                  />
-                </div>
+                {!editingProject && (
+                  <div>
+                    <label className={createProjectLabelClass}>
+                      {translate("sidebar.assignTeam", "Assign team")}
+                    </label>
+                    <DropdownSelect
+                      selectionMode="single"
+                      value={selectedTeamId}
+                      onChange={(value) => setSelectedTeamId(value)}
+                      options={teamOptions}
+                      placeholder={translate(
+                        "sidebar.assignTeamPlaceholder",
+                        "Select a team",
+                      )}
+                      searchPlaceholder={translate(
+                        "sidebar.searchTeams",
+                        "Search teams...",
+                      )}
+                      emptyLabel={translate(
+                        "sidebar.noTeamMatch",
+                        "No teams match this search.",
+                      )}
+                      triggerIcon={
+                        <Users className="h-3 w-3 text-[var(--ink-tertiary)]" />
+                      }
+                      triggerClassName="border-[var(--hairline)] bg-[var(--surface-2)] hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)]"
+                      panelClassName="z-[1010] max-w-none"
+                      maxPanelHeightClassName="max-h-[240px]"
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <label className={createProjectLabelClass}>
@@ -2219,30 +2224,24 @@ export function ProjectSidebar({
                 {createError && (
                   <div className="text-[13px] text-red-400">{createError}</div>
                 )}
-                <div className="-mx-6 -mb-6 mt-2 flex items-center justify-between border-t border-[var(--hairline)] bg-[var(--surface-2)] px-6 py-3">
-                  <span className="flex items-center gap-1.5 text-[11px] text-[var(--ink-tertiary)]">
-                    <kbd className="rounded-[4px] border border-[var(--hairline-strong)] bg-[var(--surface-1)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--ink-subtle)] shadow-[inset_0_-1px_0_color-mix(in_srgb,var(--ink)_10%,transparent)]">
-                      Esc
-                    </kbd>
-                    {translate("sidebar.cancel", "Cancel")}
-                  </span>
+                <div className="-mx-6 -mb-6 mt-2 flex items-center justify-end border-t border-[var(--hairline)] bg-[var(--surface-2)] px-6 py-3">
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      className="cursor-pointer rounded-md px-2.5 py-1.5 text-[13px] font-medium text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+                      className="h-7 min-w-[56px] cursor-pointer rounded-md border border-[var(--hairline-strong)] bg-[var(--surface-1)] px-3 text-[13px] font-semibold text-[var(--ink-muted)] transition hover:border-[var(--primary)] hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
                       onClick={closeProjectForm}
                     >
-                      {translate("sidebar.cancel", "Cancel")}
+                      {translate("cancel", "Cancel")}
                     </button>
                     <button
                       type="submit"
                       disabled={creatingProject || !projectName.trim()}
-                      className="cursor-pointer rounded-md bg-[var(--primary)] px-3.5 py-1.5 text-[13px] font-semibold text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-4)] disabled:text-[var(--ink-tertiary)]"
+                      className="h-7 min-w-[56px] cursor-pointer rounded-md border border-transparent bg-[var(--primary)] px-3 text-[13px] font-semibold text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-4)] disabled:text-[var(--ink-tertiary)]"
                     >
                       {creatingProject
                         ? translate("sidebar.creatingProject", "Creating...")
                         : editingProject
-                          ? translate("sidebar.saveProject", "Save project")
+                          ? translate("sidebar.saveProjectShort", "Save")
                           : translate(
                               "sidebar.createProject",
                               "Create project",
@@ -2715,7 +2714,7 @@ export function ProjectSidebar({
           }`}
           data-section="Build stats"
         >
-          <div className="flex items-center gap-1 px-2.5 py-2">
+          <div className="flex items-center gap-1 px-[7px] py-2">
             <button
               type="button"
               className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm text-left outline-none transition hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
@@ -2735,7 +2734,7 @@ export function ProjectSidebar({
             </button>
             <button
               type="button"
-              className="flex shrink-0 cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 font-mono text-[10px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+              className="-mr-1 flex shrink-0 cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 font-mono text-[10px] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
               onClick={() => setBuildStatsVisible((visible) => !visible)}
               aria-expanded={buildStatsVisible}
               aria-controls="project-sidebar-build-stats"
@@ -2796,7 +2795,7 @@ export function ProjectSidebar({
           {sessions.length > 0 ? (
             <>
               <div
-                className={`space-y-1 pr-1 ${
+                className={`space-y-1 ${
                   sessionsExpanded ? "h-52 overflow-y-auto" : "overflow-visible"
                 }`}
                 data-sidebar-session-list="true"

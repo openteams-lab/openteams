@@ -211,6 +211,7 @@
   "sidebar.renameFolderFailed": "重命名文件夹失败",
   "sidebar.roots": "根目录",
   "sidebar.saveProject": "保存项目",
+  "sidebar.saveProjectShort": "保存",
   "sidebar.saveFolderName": "保存文件夹名称",
   "sidebar.searchTeams": "搜索团队...",
   "sidebar.sessions": "会话",

@@ -422,7 +422,7 @@ check(
   html.includes("搜索") && html.includes("lucide-search") && !html.includes("Inbox"),
   html,
 );
-check("renders Inbox action", html.includes("Inbox"), html);
+check("does not render legacy Inbox action", !html.includes("Inbox"), html);
 check(
   "replaces top history entry with Bell notification entry",
   inboxBadgeHtml.includes("Open notifications") &&
@@ -434,9 +434,9 @@ check(
   { inboxBadgeHtml, componentSource, inboxPopoverSource },
 );
 check(
-  "keeps right-side Inbox primary action unchanged",
+  "keeps Search primary action icon mapping",
   componentSource.includes("const primaryActionIcons") &&
-    componentSource.includes("inbox: Inbox"),
+    componentSource.includes("search: Search"),
   componentSource,
 );
 check("renders New session action", html.includes("New session"), html);
@@ -559,7 +559,8 @@ check(
 );
 check(
   "keeps collapsed session list height content-sized",
-  html.includes("space-y-1 pr-1 overflow-visible") &&
+  html.includes("space-y-1 overflow-visible") &&
+    !html.includes("space-y-1 pr-1") &&
     !html.includes("h-52 overflow-y-auto"),
   html,
 );
@@ -591,7 +592,7 @@ check(
 check(
   "removes project switcher divider lines",
   !componentSource.includes("border-b border-[var(--hairline)] px-3 py-1.5") &&
-    componentSource.includes('<div className="px-3 py-1.5">'),
+    componentSource.includes('<div className="px-2.5 py-1.5">'),
   componentSource,
 );
 check(
@@ -846,6 +847,7 @@ check(
 check(
   "create project modal uses searchable team select",
   componentSource.includes("<DropdownSelect") &&
+    componentSource.includes("{!editingProject && (") &&
     componentSource.includes('selectionMode="single"') &&
     componentSource.includes('"sidebar.searchTeams"'),
   componentSource,
