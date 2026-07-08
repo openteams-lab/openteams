@@ -365,6 +365,13 @@ export const SessionSourceControlPanel: React.FC<
   const stageLabel = tr("sourceControl.action.stage", "Stage");
   const discardLabel = tr("sourceControl.action.discard", "Discard");
   const commitLabel = tr("sourceControl.action.commit", "Commit");
+  const worktreeMergeDisabledReason =
+    viewModel.mode === "git" && viewModel.stagedPaths.length > 0
+      ? null
+      : tr(
+          "worktree.reason.noStagedChanges",
+          "Stage changes before merging.",
+        );
 
   useEffect(() => {
     if (!enabled || !projectId || !sessionId) {
@@ -410,6 +417,7 @@ export const SessionSourceControlPanel: React.FC<
   const handleWorktreeAction = async (action: SessionWorktreeAction) => {
     if (worktreeBusy) return;
     const actionScopeKey = scopeKeyRef.current;
+    if (action === "merge" && worktreeMergeDisabledReason) return;
     if (action === "discard") {
       const confirmed = await requestConfirm({
         title: tr("worktree.confirm.deleteTitle", "Delete worktree?"),
@@ -739,6 +747,7 @@ export const SessionSourceControlPanel: React.FC<
             worktree={worktree}
             pendingCreate={!worktree && !worktreeLoading}
             busy={worktreeBusy}
+            mergeDisabledReason={worktreeMergeDisabledReason}
             onAction={(action) => void handleWorktreeAction(action)}
             tr={tr}
           />

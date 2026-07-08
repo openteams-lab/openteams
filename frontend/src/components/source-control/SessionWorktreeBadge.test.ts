@@ -53,6 +53,14 @@ check(
 );
 
 check(
+  "merge button can be disabled by staged-change precondition",
+  source.includes("mergeDisabledReason?: string | null") &&
+    source.includes("const mergeDisabled = Boolean(mergeDisabledReason)") &&
+    source.includes("disabled={mergeDisabled}") &&
+    source.includes("title={mergeDisabledReason ?? tr('worktree.action.merge', 'Merge')}"),
+);
+
+check(
   "discard allowed in active, dirty, needs_conflict_resolution, merging, merged",
   source.includes("discard: [") &&
     source.includes("'active'") &&

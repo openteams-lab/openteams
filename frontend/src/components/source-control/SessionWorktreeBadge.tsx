@@ -34,6 +34,7 @@ interface SessionWorktreeBadgeProps {
   // into isolation, but the backend has not needed to create the worktree yet.
   pendingCreate: boolean;
   busy: boolean;
+  mergeDisabledReason?: string | null;
   onAction: (action: SessionWorktreeAction) => void;
   tr: (key: string, fallback: string, replacements?: Record<string, string | number>) => string;
 }
@@ -224,6 +225,7 @@ export const SessionWorktreeBadge: React.FC<SessionWorktreeBadgeProps> = ({
   worktree,
   pendingCreate,
   busy,
+  mergeDisabledReason = null,
   onAction,
   tr,
 }) => {
@@ -240,6 +242,7 @@ export const SessionWorktreeBadge: React.FC<SessionWorktreeBadgeProps> = ({
     isProcessLockedCleanupError(worktree?.cleanup_error);
   const worktreePath = worktree?.worktree_path;
   const canOpenWorkspace = Boolean(worktreePath);
+  const mergeDisabled = Boolean(mergeDisabledReason);
   const title = worktreePath
     ? `${tr(
         'worktree.badge.openHint',
@@ -288,9 +291,10 @@ export const SessionWorktreeBadge: React.FC<SessionWorktreeBadgeProps> = ({
           {can('merge') && (
             <WorktreeActionButton
               label={tr('worktree.action.merge', 'Merge')}
+              title={mergeDisabledReason ?? tr('worktree.action.merge', 'Merge')}
               tone="primary"
               busy={busy}
-              disabled={false}
+              disabled={mergeDisabled}
               icon={<RefreshCw className="h-3.5 w-3.5 shrink-0" aria-hidden />}
               onClick={() => onAction('merge')}
             />

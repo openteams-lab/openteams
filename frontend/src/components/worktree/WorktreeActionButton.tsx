@@ -5,6 +5,7 @@ export type WorktreeActionButtonTone = 'primary' | 'ghost' | 'danger';
 
 interface WorktreeActionButtonProps {
   label: string;
+  title?: string;
   tone: WorktreeActionButtonTone;
   busy: boolean;
   disabled?: boolean;
@@ -23,6 +24,7 @@ const toneClassName: Record<WorktreeActionButtonTone, string> = {
 
 export const WorktreeActionButton: React.FC<WorktreeActionButtonProps> = ({
   label,
+  title,
   tone,
   busy,
   disabled = false,
@@ -34,7 +36,7 @@ export const WorktreeActionButton: React.FC<WorktreeActionButtonProps> = ({
     className={`inline-flex h-6 max-w-full min-w-0 items-center gap-1 rounded-[5px] px-1.5 text-[11px] font-medium leading-none transition disabled:cursor-not-allowed disabled:opacity-40 ${toneClassName[tone]}`}
     disabled={disabled || busy}
     onClick={onClick}
-    title={label}
+    title={title ?? label}
   >
     {busy ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : icon}
     <span className="min-w-0 truncate">{label}</span>
