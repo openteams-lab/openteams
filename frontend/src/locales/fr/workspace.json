@@ -179,6 +179,7 @@
   "sidebar.gitignore.none": "None",
   "sidebar.roots": "Racines",
   "sidebar.saveProject": "Enregistrer le projet",
+  "sidebar.saveProjectShort": "Enregistrer",
   "sidebar.searchTeams": "Rechercher des équipes...",
   "sidebar.sessions": "Sessions",
   "sidebar.show": "Afficher",

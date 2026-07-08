@@ -2224,20 +2224,14 @@ export function ProjectSidebar({
                 {createError && (
                   <div className="text-[13px] text-red-400">{createError}</div>
                 )}
-                <div className="-mx-6 -mb-6 mt-2 flex items-center justify-between border-t border-[var(--hairline)] bg-[var(--surface-2)] px-6 py-3">
-                  <span className="flex items-center gap-1.5 text-[11px] text-[var(--ink-tertiary)]">
-                    <kbd className="rounded-[4px] border border-[var(--hairline-strong)] bg-[var(--surface-1)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--ink-subtle)] shadow-[inset_0_-1px_0_color-mix(in_srgb,var(--ink)_10%,transparent)]">
-                      Esc
-                    </kbd>
-                    {translate("sidebar.cancel", "Cancel")}
-                  </span>
+                <div className="-mx-6 -mb-6 mt-2 flex items-center justify-end border-t border-[var(--hairline)] bg-[var(--surface-2)] px-6 py-3">
                   <div className="flex gap-2">
                     <button
                       type="button"
                       className="cursor-pointer rounded-md px-2.5 py-1.5 text-[13px] font-medium text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
                       onClick={closeProjectForm}
                     >
-                      {translate("sidebar.cancel", "Cancel")}
+                      {translate("cancel", "Cancel")}
                     </button>
                     <button
                       type="submit"
@@ -2247,7 +2241,7 @@ export function ProjectSidebar({
                       {creatingProject
                         ? translate("sidebar.creatingProject", "Creating...")
                         : editingProject
-                          ? translate("sidebar.saveProject", "Save project")
+                          ? translate("sidebar.saveProjectShort", "Save")
                           : translate(
                               "sidebar.createProject",
                               "Create project",
