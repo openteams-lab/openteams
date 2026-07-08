@@ -2228,7 +2228,7 @@ export function ProjectSidebar({
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      className="cursor-pointer rounded-md px-2.5 py-1.5 text-[13px] font-medium text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
+                      className="h-10 min-w-[84px] cursor-pointer rounded-md border border-[var(--hairline-strong)] bg-[var(--surface-1)] px-4 text-[14px] font-semibold text-[var(--ink-muted)] transition hover:border-[var(--primary)] hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
                       onClick={closeProjectForm}
                     >
                       {translate("cancel", "Cancel")}
@@ -2236,7 +2236,7 @@ export function ProjectSidebar({
                     <button
                       type="submit"
                       disabled={creatingProject || !projectName.trim()}
-                      className="cursor-pointer rounded-md bg-[var(--primary)] px-3.5 py-1.5 text-[13px] font-semibold text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-4)] disabled:text-[var(--ink-tertiary)]"
+                      className="h-10 min-w-[84px] cursor-pointer rounded-md border border-transparent bg-[var(--primary)] px-4 text-[14px] font-semibold text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-4)] disabled:text-[var(--ink-tertiary)]"
                     >
                       {creatingProject
                         ? translate("sidebar.creatingProject", "Creating...")
