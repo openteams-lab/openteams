@@ -659,7 +659,7 @@ export const SessionSourceControlPanel: React.FC<
   if (!status && !error) {
     return (
       <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
-        <div className="mb-3 flex items-center gap-2 text-[13px] font-medium text-[var(--ink)]">
+        <div className="mb-3 flex items-center gap-2 text-[14px] font-semibold text-[var(--ink)]">
           {title}
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-[color-mix(in_srgb,var(--hairline)_72%,transparent)] bg-[color-mix(in_srgb,var(--surface-1)_76%,var(--canvas))] px-3 py-3 text-[12px] text-[var(--ink-tertiary)]">
@@ -674,7 +674,7 @@ export const SessionSourceControlPanel: React.FC<
     return (
       <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-[13px] font-medium text-[var(--ink)]">
+          <h2 className="text-[14px] font-semibold text-[var(--ink)]">
             {title}
           </h2>
           <button
@@ -706,7 +706,7 @@ export const SessionSourceControlPanel: React.FC<
       <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-9 shrink-0 items-center justify-between px-3">
         <div className="flex min-w-0 items-center gap-2">
-          <h2 className="truncate text-[13px] font-medium text-[var(--ink)]">
+          <h2 className="truncate text-[14px] font-semibold text-[var(--ink)]">
             {title}
           </h2>
           {viewModel.branch && (
