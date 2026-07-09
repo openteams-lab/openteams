@@ -23,6 +23,11 @@ import {
 } from "../../../shared/types";
 
 type SearchRequest = (params: ChatSearchQuery) => Promise<ChatSearchResponse>;
+type Translate = (
+  key: string,
+  fallback: string,
+  replacements?: Record<string, string | number>,
+) => string;
 
 interface GlobalSearchDialogProps {
   open: boolean;
@@ -30,7 +35,22 @@ interface GlobalSearchDialogProps {
   onClose: () => void;
   onOpenResult: (result: ChatSearchResult) => void;
   search?: SearchRequest;
+  translate?: Translate;
 }
+
+const applyReplacements = (
+  text: string,
+  replacements?: Record<string, string | number>,
+): string => {
+  if (!replacements) return text;
+  return Object.entries(replacements).reduce(
+    (current, [name, value]) => current.replace(`{${name}}`, String(value)),
+    text,
+  );
+};
+
+const defaultTranslate: Translate = (_key, fallback, replacements) =>
+  applyReplacements(fallback, replacements);
 
 export const moveGlobalSearchSelection = (
   currentIndex: number,
@@ -68,29 +88,88 @@ const resultTitle = (result: ChatSearchResult): string => {
   }
 };
 
-const resultSnippet = (result: ChatSearchResult): string => {
+const humanizeEnumLabel = (value: string): string =>
+  value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+const issueStatusTranslationKey = (status: string): string =>
+  status === "open" ? "todo" : status;
+
+const translatedIssueStatus = (
+  status: string,
+  translate: Translate,
+): string =>
+  translate(
+    `issue.status.${issueStatusTranslationKey(status)}`,
+    humanizeEnumLabel(status),
+  );
+
+const translatedIssuePriority = (
+  priority: string,
+  translate: Translate,
+): string =>
+  translate(`issue.priority.${priority}`, humanizeEnumLabel(priority));
+
+const translatedWorktreeStatus = (
+  status: string,
+  translate: Translate,
+): string =>
+  translate(`globalSearch.worktreeStatus.${status}`, humanizeEnumLabel(status));
+
+const resultSnippet = (
+  result: ChatSearchResult,
+  translate: Translate,
+): string => {
   switch (result.type) {
     case "session":
-      return result.snippet ?? "最近更新的会话";
+      return (
+        result.snippet ??
+        translate("globalSearch.sessionFallback", "Recently updated session")
+      );
     case "issue":
-      return result.snippet ?? `${result.status} · ${result.priority}`;
+      return (
+        result.snippet ??
+        translate("globalSearch.issueFallback", "{status} · {priority}", {
+          status: translatedIssueStatus(result.status, translate),
+          priority: translatedIssuePriority(result.priority, translate),
+        })
+      );
     case "message":
-      return `${result.sender_label}: ${result.snippet}`;
+      return translate("globalSearch.messageSnippet", "{sender}: {snippet}", {
+        sender: result.sender_label,
+        snippet: result.snippet,
+      });
     case "worktree":
-      return `${result.branch_name} · ${result.path_summary}`;
+      return translate("globalSearch.worktreeSnippet", "{branch} · {path}", {
+        branch: result.branch_name,
+        path: result.path_summary,
+      });
   }
 };
 
-const resultMeta = (result: ChatSearchResult): string => {
+const resultMeta = (
+  result: ChatSearchResult,
+  translate: Translate,
+): string => {
   switch (result.type) {
     case "session":
-      return "会话";
+      return translate("globalSearch.meta.session", "Session");
     case "issue":
-      return "事项";
+      return translate("globalSearch.meta.issue", "Issue");
     case "message":
-      return "消息";
+      return translate("globalSearch.meta.message", "Message");
     case "worktree":
-      return `Worktree · ${result.status}`;
+      return translate(
+        "globalSearch.meta.worktreeWithStatus",
+        "{label} · {status}",
+        {
+          label: translate("globalSearch.meta.worktree", "Worktree"),
+          status: translatedWorktreeStatus(result.status, translate),
+        },
+      );
   }
 };
 
@@ -107,6 +186,7 @@ export function GlobalSearchDialog({
   onClose,
   onOpenResult,
   search = chatSearchApi.search,
+  translate = defaultTranslate,
 }: GlobalSearchDialogProps) {
   const appScale = useAppScale();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -185,7 +265,12 @@ export function GlobalSearchDialog({
           setResults([]);
           setSelectedIndex(-1);
           setError(
-            err instanceof Error ? err.message : "搜索失败，请稍后重试",
+            err instanceof Error
+              ? err.message
+              : translate(
+                  "globalSearch.errorFallback",
+                  "Search failed. Please try again.",
+                ),
           );
         })
         .finally(() => {
@@ -201,6 +286,7 @@ export function GlobalSearchDialog({
     retryVersion,
     search,
     searchMode,
+    translate,
     worktreeModeActive,
   ]);
 
@@ -284,7 +370,7 @@ export function GlobalSearchDialog({
       <section
         role="dialog"
         aria-modal="true"
-        aria-label="全局搜索"
+        aria-label={translate("globalSearch.dialogLabel", "Global search")}
         className="global-search-dialog relative flex max-h-[min(640px,calc(100vh-32px))] w-full max-w-xl flex-col overflow-hidden rounded-[10px] border text-[var(--ink)] backdrop-blur-xl"
       >
         <div className="global-search-input-bar flex items-center gap-3 border-b px-4 py-2.5">
@@ -298,15 +384,18 @@ export function GlobalSearchDialog({
             autoFocus
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索会话、事项和消息"
+            placeholder={translate(
+              "globalSearch.placeholder",
+              "Search sessions, issues, and messages",
+            )}
             className="global-search-input min-w-0 flex-1 bg-transparent text-[16px] leading-6 outline-none"
           />
           {query.length > 0 && (
             <button
               type="button"
               data-global-search-clear="true"
-              aria-label="Clear search"
-              title="Clear search"
+              aria-label={translate("globalSearch.clear", "Clear search")}
+              title={translate("globalSearch.clear", "Clear search")}
               onClick={clearQuery}
               className="global-search-clear-button flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition"
             >
@@ -317,8 +406,14 @@ export function GlobalSearchDialog({
             type="button"
             data-search-worktree-filter="true"
             aria-pressed={worktreeModeActive}
-            aria-label="筛选隔离 worktree"
-            title="筛选隔离 worktree"
+            aria-label={translate(
+              "globalSearch.worktreeFilter",
+              "Filter isolated worktree",
+            )}
+            title={translate(
+              "globalSearch.worktreeFilter",
+              "Filter isolated worktree",
+            )}
             onClick={toggleWorktreeMode}
             className="global-search-worktree-toggle flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md transition"
           >
@@ -332,74 +427,87 @@ export function GlobalSearchDialog({
             className="global-search-results-panel max-h-[min(520px,calc(100vh-128px))] overflow-y-auto p-1.5"
           >
             {loading ? (
-            <div className="space-y-1" aria-label="搜索加载中">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2.5 rounded-[7px] px-3 py-2"
-                >
-                  <div className="global-search-skeleton-mark h-3.5 w-3.5 shrink-0 animate-pulse rounded" />
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="global-search-skeleton-line h-2.5 w-2/5 animate-pulse rounded" />
-                    <div className="global-search-skeleton-line-muted h-2 w-3/5 animate-pulse rounded" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : error ? (
-            <button
-              type="button"
-              onClick={() => setRetryVersion((version) => version + 1)}
-              className="global-search-error-row flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] border border-transparent px-3 py-2 text-left text-[12px] transition"
-            >
-              <RefreshCw
-                strokeWidth={1.75}
-                className="global-search-error-icon h-3.5 w-3.5 shrink-0"
-              />
-              <span className="min-w-0 flex-1 truncate">
-                搜索失败，点击重试
-              </span>
-              <span className="global-search-error-detail max-w-[40%] shrink-0 truncate text-[11px]">
-                {error}
-              </span>
-            </button>
-          ) : results.length === 0 ? (
-            <div className="global-search-empty-state flex h-36 items-center justify-center rounded-[7px] text-[13px]">
-              没有匹配结果
-            </div>
-          ) : (
-            <div role="listbox" aria-label="搜索结果" className="space-y-1">
-              {results.map((result, index) => {
-                const active = index === selectedIndex;
-                const ResultIcon = resultIcon(result);
-                return (
-                  <button
-                    key={resultKey(result)}
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    data-active={active ? "true" : undefined}
-                    onClick={() => openResult(result)}
-                    className="global-search-result-row flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-left transition"
+              <div
+                className="space-y-1"
+                aria-label={translate("globalSearch.loading", "Search loading")}
+              >
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2.5 rounded-[7px] px-3 py-2"
                   >
-                    <span className="global-search-result-icon flex h-4.5 w-4.5 shrink-0 items-center justify-center">
-                      <ResultIcon strokeWidth={1.75} className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="global-search-result-title block truncate text-[13px] font-medium leading-[17px]">
-                        {resultTitle(result)}
+                    <div className="global-search-skeleton-mark h-3.5 w-3.5 shrink-0 animate-pulse rounded" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="global-search-skeleton-line h-2.5 w-2/5 animate-pulse rounded" />
+                      <div className="global-search-skeleton-line-muted h-2 w-3/5 animate-pulse rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : error ? (
+              <button
+                type="button"
+                onClick={() => setRetryVersion((version) => version + 1)}
+                className="global-search-error-row flex w-full cursor-pointer items-center gap-2.5 rounded-[7px] border border-transparent px-3 py-2 text-left text-[12px] transition"
+              >
+                <RefreshCw
+                  strokeWidth={1.75}
+                  className="global-search-error-icon h-3.5 w-3.5 shrink-0"
+                />
+                <span className="min-w-0 flex-1 truncate">
+                  {translate(
+                    "globalSearch.retry",
+                    "Search failed, click to retry",
+                  )}
+                </span>
+                <span className="global-search-error-detail max-w-[40%] shrink-0 truncate text-[11px]">
+                  {error}
+                </span>
+              </button>
+            ) : results.length === 0 ? (
+              <div className="global-search-empty-state flex h-36 items-center justify-center rounded-[7px] text-[13px]">
+                {translate("globalSearch.empty", "No matching results")}
+              </div>
+            ) : (
+              <div
+                role="listbox"
+                aria-label={translate("globalSearch.results", "Search results")}
+                className="space-y-1"
+              >
+                {results.map((result, index) => {
+                  const active = index === selectedIndex;
+                  const ResultIcon = resultIcon(result);
+                  return (
+                    <button
+                      key={resultKey(result)}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      data-active={active ? "true" : undefined}
+                      onClick={() => openResult(result)}
+                      className="global-search-result-row flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2 text-left transition"
+                    >
+                      <span className="global-search-result-icon flex h-4.5 w-4.5 shrink-0 items-center justify-center">
+                        <ResultIcon
+                          strokeWidth={1.75}
+                          className="h-3.5 w-3.5"
+                        />
                       </span>
-                      <span className="global-search-result-snippet block truncate text-[11px] leading-[15px]">
-                        {resultSnippet(result)}
+                      <span className="min-w-0 flex-1">
+                        <span className="global-search-result-title block truncate text-[13px] font-medium leading-[17px]">
+                          {resultTitle(result)}
+                        </span>
+                        <span className="global-search-result-snippet block truncate text-[11px] leading-[15px]">
+                          {resultSnippet(result, translate)}
+                        </span>
                       </span>
-                    </span>
-                    <span className="global-search-result-meta shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] leading-4">
-                      {resultMeta(result)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                      <span className="global-search-result-meta shrink-0 rounded-[4px] px-1.5 py-0.5 text-[10px] leading-4">
+                        {resultMeta(result, translate)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}

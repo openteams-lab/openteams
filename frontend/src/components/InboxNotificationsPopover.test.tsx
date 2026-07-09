@@ -125,10 +125,21 @@ check(
 check(
   "unread list shows severity session title short body and relative time",
   source.includes("inboxSeverityPillClass") &&
+    source.includes("inboxSeverityLabel(item.severity, translate)") &&
     source.includes("sessionTitleById.get(item.session_id)") &&
-    source.includes("formatInboxRelativeTime(item.created_at)") &&
+    source.includes("formatInboxRelativeTime(item.created_at, translate)") &&
     source.includes("{item.title}") &&
     source.includes("{item.body}"),
+  source,
+);
+
+check(
+  "localizes inbox time and severity labels through sidebar locale keys",
+  source.includes('"sidebar.inbox.time.now"') &&
+    source.includes('"sidebar.inbox.time.minutes"') &&
+    source.includes('"sidebar.inbox.time.hours"') &&
+    source.includes('"sidebar.inbox.time.days"') &&
+    source.includes("`sidebar.inbox.severity.${value}`"),
   source,
 );
 

@@ -675,20 +675,23 @@ function WorkspaceLayout() {
     selectedProjectId,
   ]);
 
-  const translate = (
-    key: string,
-    fallback: string,
-    replacements?: Record<string, string | number>,
-  ) => {
-    const translated = t(key, replacements);
-    const text = translated && translated !== key ? translated : fallback;
-    if (!replacements) return text;
-    return Object.entries(replacements).reduce(
-      (current, [name, value]) =>
-        current.replace(`{${name}}`, String(value)),
-      text,
-    );
-  };
+  const translate = useCallback(
+    (
+      key: string,
+      fallback: string,
+      replacements?: Record<string, string | number>,
+    ) => {
+      const translated = t(key, replacements);
+      const text = translated && translated !== key ? translated : fallback;
+      if (!replacements) return text;
+      return Object.entries(replacements).reduce(
+        (current, [name, value]) =>
+          current.replace(`{${name}}`, String(value)),
+        text,
+      );
+    },
+    [t],
+  );
 
   const overlayForOnboardingState = (
     nextState: OnboardingState,
@@ -2073,6 +2076,7 @@ function WorkspaceLayout() {
           actionLabel={t('onboarding.upgrade.toastAction')}
           onAction={() => openVersionUpdatePage(versionUpdateToast)}
           onClose={() => setVersionUpdateToast(null)}
+          closeAriaLabel={t('toast.dismissNotification')}
           className="min-h-[92px] max-w-[min(430px,calc(100vw-40px))] py-4"
         />
       )}
@@ -2099,6 +2103,7 @@ function WorkspaceLayout() {
         projectId={selectedProjectId}
         onClose={() => setIsGlobalSearchOpen(false)}
         onOpenResult={handleGlobalSearchResultOpen}
+        translate={translate}
       />
 
       {onboardingOverlay && (

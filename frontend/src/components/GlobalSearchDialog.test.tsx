@@ -18,6 +18,11 @@ import {
 } from "../../../shared/types";
 
 type SearchRequest = (params: ChatSearchQuery) => Promise<ChatSearchResponse>;
+type Translate = (
+  key: string,
+  fallback: string,
+  replacements?: Record<string, string | number>,
+) => string;
 
 let failures = 0;
 const check = (label: string, cond: boolean, detail?: unknown) => {
@@ -148,10 +153,12 @@ const renderDialog = async ({
   search,
   onClose = () => undefined,
   onOpenResult = () => undefined,
+  translate,
 }: {
   search: SearchRequest;
   onClose?: () => void;
   onOpenResult?: (result: ChatSearchResult) => void;
+  translate?: Translate;
 }): Promise<void> => {
   if (activeRoot) {
     await act(async () => {
@@ -168,6 +175,7 @@ const renderDialog = async ({
         onClose={onClose}
         onOpenResult={onOpenResult}
         search={search}
+        translate={translate}
       />,
     );
   });
@@ -256,6 +264,12 @@ const main = async () => {
   await wait(20);
 
   check("打开后真实聚焦输入框", document.activeElement === getInput());
+  check(
+    "uses default global search copy when no translator is provided",
+    getInput().placeholder === "Search sessions, issues, and messages" &&
+      getFilterButton().getAttribute("aria-label") ===
+        "Filter isolated worktree",
+  );
   check(
     "空查询不请求接口也不显示结果项",
     searchCalls.length === 0 &&
@@ -397,7 +411,7 @@ const main = async () => {
   await wait(220);
   check(
     "空结果真实显示空状态",
-    document.body.textContent?.includes("没有匹配结果") === true,
+    document.body.textContent?.includes("No matching results") === true,
   );
 
   const clearButton = getClearButton();
@@ -431,10 +445,11 @@ const main = async () => {
   check(
     "失败状态保留输入内容并显示重试行",
     getInput().value === "xy" &&
-      document.body.textContent?.includes("搜索失败，点击重试") === true,
+      document.body.textContent?.includes("Search failed, click to retry") ===
+        true,
   );
   const retryButton = Array.from(document.querySelectorAll("button")).find(
-    (button) => button.textContent?.includes("搜索失败，点击重试"),
+    (button) => button.textContent?.includes("Search failed, click to retry"),
   );
   if (!retryButton) {
     check("错误状态提供可点击重试行", false);
@@ -444,10 +459,39 @@ const main = async () => {
     check(
       "点击重试行真实复用当前输入重新请求",
       retryCalls.at(-1)?.q === "xy" &&
-        document.body.textContent?.includes("没有匹配结果") === true,
+        document.body.textContent?.includes("No matching results") === true,
       retryCalls,
     );
   }
+
+  await renderDialog({
+    search,
+    translate: (key, fallback, replacements) => {
+      const translated: Record<string, string> = {
+        "globalSearch.clear": "CLEAR_TRANSLATED",
+        "globalSearch.dialogLabel": "SEARCH_DIALOG_TRANSLATED",
+        "globalSearch.placeholder": "PLACEHOLDER_TRANSLATED",
+        "globalSearch.worktreeFilter": "WORKTREE_FILTER_TRANSLATED",
+      };
+      let value = translated[key] ?? fallback;
+      if (replacements) {
+        for (const [name, replacement] of Object.entries(replacements)) {
+          value = value.replace(`{${name}}`, String(replacement));
+        }
+      }
+      return value;
+    },
+  });
+  await wait(20);
+  check(
+    "global search control labels come from the active translator",
+    getInput().placeholder === "PLACEHOLDER_TRANSLATED" &&
+      document
+        .querySelector('[role="dialog"]')
+        ?.getAttribute("aria-label") === "SEARCH_DIALOG_TRANSLATED" &&
+      getFilterButton().getAttribute("aria-label") ===
+        "WORKTREE_FILTER_TRANSLATED",
+  );
 
   check(
     "session/message/worktree 结果映射到会话，issue 不误映射",
