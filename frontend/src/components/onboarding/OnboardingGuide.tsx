@@ -2141,7 +2141,7 @@ export function OnboardingGuide({
                         className={cn(
                           'flex h-8 items-center justify-between rounded-[8px] border px-2.5',
                           lightPreview
-                            ? 'border-black/[0.08] bg-[#e4e4e7]'
+                            ? 'border-black/[0.08] bg-[#f5f6f8]'
                             : systemPreview
                               ? 'border-white/[0.08] bg-[#151516]'
                               : 'border-white/[0.08] bg-[#0d0d0e]',

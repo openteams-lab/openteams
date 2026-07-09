@@ -79,14 +79,26 @@ check(
 );
 
 check(
-  'auto-marks only active-session chat message inbox items as read',
+  'auto-marks only non-initial active-session chat message inbox items as read',
   source.includes('isAutoReadableInboxItem') &&
     source.includes('item.session_id === activeSessionId') &&
     source.includes('autoMarkedInboxItemIdsRef') &&
+    source.includes('inboxInitialUnreadItemIdsRef') &&
     source.includes('void markInboxItemsRead(ids).catch') &&
     source.includes("item.kind === 'chat_message'") &&
-    source.includes("item.source_type === 'chat_message'"),
+    source.includes("item.source_type === 'chat_message'") &&
+    source.includes('!inboxInitialUnreadItemIdsRef.current.has(item.id)'),
   source,
+);
+
+check(
+  'keeps Bell unread items from initial page hydration until explicit read',
+  refreshInboxSource.includes('inboxAutoReadProjectIdRef') &&
+    refreshInboxSource.includes('inboxInitialUnreadItemIdsRef.current = new Set') &&
+    refreshInboxSource.includes('visibleItems.map((item) => item.id)') &&
+    source.includes('inboxAutoReadProjectIdRef.current = null') &&
+    source.includes('autoMarkedInboxItemIdsRef.current = new Set()'),
+  { refreshInboxSource, source },
 );
 
 check(

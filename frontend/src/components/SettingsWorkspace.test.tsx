@@ -101,6 +101,8 @@ check(
     settingsSource.includes('cursor-pointer rounded-[8px] border p-2 text-left transition') &&
     settingsSource.includes('flex h-8 items-center justify-between rounded-[8px] border px-2.5') &&
     settingsSource.includes('border-[var(--primary)] bg-white/[0.07]') &&
+    settingsSource.includes("lightPreview\n                                ? 'border-black/[0.08] bg-[#f5f6f8]'") &&
+    !settingsSource.includes('bg-[#e4e4e7]') &&
     settingsSource.includes("lightPreview ? 'text-[#52525b]' : 'text-white'") &&
     settingsSource.includes('settings-row-title mt-1.5 leading-tight') &&
     settingsSource.includes('strokeWidth={1.4}') &&
