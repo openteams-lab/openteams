@@ -359,6 +359,9 @@ const normalizeMentionHandle = (name: string): string => {
     : `@${trimmed.toLowerCase()}`;
 };
 
+const displayChatSenderName = (sender: string): string =>
+  sender.trim().replace(/^@+/, "");
+
 function SessionMemberAvatar({ member }: { member: Member }) {
   return (
     <span
@@ -2370,7 +2373,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                       className="font-semibold text-[var(--ink)]"
                       style={{ fontSize: `${chatMessageFontSize}px` }}
                     >
-                      {msg.isUser ? t("you") : msg.sender}
+                      {msg.isUser ? "you" : displayChatSenderName(msg.sender)}
                     </span>
                     {msg.model && (
                       <span className="rounded-full bg-[var(--surface-3)] border border-[var(--hairline-strong)] px-2 py-0.5 text-[9px] font-mono text-[var(--ink-muted)] shrink-0 select-text">
