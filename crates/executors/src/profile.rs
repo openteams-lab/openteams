@@ -501,7 +501,10 @@ mod tests {
     fn default_profiles_include_supported_codex_models() {
         let profiles = ExecutorConfigs::from_defaults();
 
-        assert_codex_model(&profiles, "DEFAULT", "gpt-5.5");
+        assert_codex_model(&profiles, "DEFAULT", "gpt-5.6-sol");
+        assert_codex_model(&profiles, "GPT_5.6_SOL", "gpt-5.6-sol");
+        assert_codex_model(&profiles, "GPT_5.6_TERRA", "gpt-5.6-terra");
+        assert_codex_model(&profiles, "GPT_5.6_LUNA", "gpt-5.6-luna");
         assert_codex_model(&profiles, "GPT_5.3_CODEX_SPARK", "gpt-5.3-codex-spark");
         assert_codex_model(&profiles, "GPT_5.4", "gpt-5.4");
         assert_codex_model(&profiles, "CODEX_AUTO_REVIEW", "codex-auto-review");

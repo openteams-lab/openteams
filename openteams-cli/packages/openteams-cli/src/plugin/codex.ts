@@ -1,10 +1,12 @@
 import type { Hooks, PluginInput } from "@openteams/plugin"
+import type { Model as SdkModel } from "@openteams/sdk"
 import { Log } from "../util/log"
 import { Installation } from "../installation"
 import { Auth, OAUTH_DUMMY_KEY } from "../auth"
 import os from "os"
 import { ProviderTransform } from "@/provider/transform"
 import { ModelID, ProviderID } from "@/provider/schema"
+import type { Provider as LocalProvider } from "@/provider/provider"
 import { setTimeout as sleep } from "node:timers/promises"
 
 const log = Log.create({ service: "plugin.codex" })
@@ -14,6 +16,123 @@ const ISSUER = "https://auth.openai.com"
 const CODEX_API_ENDPOINT = "https://chatgpt.com/backend-api/codex/responses"
 const OAUTH_PORT = 1455
 const OAUTH_POLLING_SAFETY_MARGIN_MS = 3000
+
+const CODEX_ALLOWED_MODEL_IDS = new Set([
+  "gpt-5.6",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.3-codex",
+  "gpt-5.2",
+  "gpt-5.2-codex",
+  "gpt-5.1",
+  "gpt-5.1-codex",
+  "gpt-5.1-codex-max",
+  "gpt-5.1-codex-mini",
+])
+
+const CODEX_FALLBACK_MODELS = [
+  {
+    id: "gpt-5.6-sol",
+    name: "GPT-5.6 Sol",
+    family: "gpt",
+    release_date: "2026-07-09",
+    cost: { input: 5, output: 30, cache: { read: 0.5, write: 6.25 } },
+  },
+  {
+    id: "gpt-5.6-terra",
+    name: "GPT-5.6 Terra",
+    family: "gpt-mini",
+    release_date: "2026-07-09",
+    cost: { input: 2.5, output: 15, cache: { read: 0.25, write: 3.125 } },
+  },
+  {
+    id: "gpt-5.6-luna",
+    name: "GPT-5.6 Luna",
+    family: "gpt-nano",
+    release_date: "2026-07-09",
+    cost: { input: 1, output: 6, cache: { read: 0.1, write: 1.25 } },
+  },
+  {
+    id: "gpt-5.3-codex",
+    name: "GPT-5.3 Codex",
+    family: "gpt-codex",
+    release_date: "2026-02-05",
+    cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+  },
+] as const
+
+type CodexCatalogModel = SdkModel & {
+  family?: string
+  release_date?: string
+  variants?: Record<string, Record<string, any>>
+  capabilities: SdkModel["capabilities"] & {
+    interleaved?: LocalProvider.Model["capabilities"]["interleaved"]
+  }
+  limit: SdkModel["limit"] & {
+    input?: number
+  }
+}
+
+type CodexModelCatalog = {
+  models: Record<string, CodexCatalogModel>
+}
+
+function createCodexFallbackModel(definition: (typeof CODEX_FALLBACK_MODELS)[number]): CodexCatalogModel {
+  const model: CodexCatalogModel = {
+    id: ModelID.make(definition.id),
+    providerID: ProviderID.openai,
+    api: {
+      id: definition.id,
+      url: "https://chatgpt.com/backend-api/codex",
+      npm: "@ai-sdk/openai",
+    },
+    name: definition.name,
+    family: definition.family,
+    capabilities: {
+      temperature: false,
+      reasoning: true,
+      attachment: true,
+      toolcall: true,
+      input: { text: true, audio: false, image: true, video: false, pdf: false },
+      output: { text: true, audio: false, image: false, video: false, pdf: false },
+      interleaved: false,
+    },
+    cost: { ...definition.cost, cache: { ...definition.cost.cache } },
+    limit: { context: 1_050_000, input: 922_000, output: 128_000 },
+    status: "active",
+    options: {},
+    headers: {},
+    release_date: definition.release_date,
+    variants: {},
+  }
+  model.variants = ProviderTransform.variants(model as LocalProvider.Model)
+  return model
+}
+
+export function applyCodexModelCatalog(provider: CodexModelCatalog) {
+  for (const modelId of Object.keys(provider.models)) {
+    if (modelId.includes("codex")) continue
+    if (CODEX_ALLOWED_MODEL_IDS.has(modelId)) continue
+    delete provider.models[modelId]
+  }
+
+  for (const definition of CODEX_FALLBACK_MODELS) {
+    provider.models[definition.id] ??= createCodexFallbackModel(definition)
+  }
+
+  // Zero out costs for Codex (included with ChatGPT subscription)
+  for (const model of Object.values(provider.models)) {
+    model.cost = {
+      input: 0,
+      output: 0,
+      cache: { read: 0, write: 0 },
+    }
+  }
+}
 
 interface PkceCodes {
   verifier: string
@@ -358,63 +477,7 @@ export async function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
         const auth = await getAuth()
         if (auth.type !== "oauth") return {}
 
-        // Filter models to only allowed Codex models for OAuth
-        const allowedModels = new Set([
-          "gpt-5.1-codex",
-          "gpt-5.1-codex-max",
-          "gpt-5.1-codex-mini",
-          "gpt-5.2",
-          "gpt-5.2-codex",
-          "gpt-5.3-codex",
-          "gpt-5.4",
-          "gpt-5.4-mini",
-        ])
-        for (const modelId of Object.keys(provider.models)) {
-          if (modelId.includes("codex")) continue
-          if (allowedModels.has(modelId)) continue
-          delete provider.models[modelId]
-        }
-
-        if (!provider.models["gpt-5.3-codex"]) {
-          const model = {
-            id: ModelID.make("gpt-5.3-codex"),
-            providerID: ProviderID.openai,
-            api: {
-              id: "gpt-5.3-codex",
-              url: "https://chatgpt.com/backend-api/codex",
-              npm: "@ai-sdk/openai",
-            },
-            name: "GPT-5.3 Codex",
-            capabilities: {
-              temperature: false,
-              reasoning: true,
-              attachment: true,
-              toolcall: true,
-              input: { text: true, audio: false, image: true, video: false, pdf: false },
-              output: { text: true, audio: false, image: false, video: false, pdf: false },
-              interleaved: false,
-            },
-            cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
-            limit: { context: 400_000, input: 272_000, output: 128_000 },
-            status: "active" as const,
-            options: {},
-            headers: {},
-            release_date: "2026-02-05",
-            variants: {} as Record<string, Record<string, any>>,
-            family: "gpt-codex",
-          }
-          model.variants = ProviderTransform.variants(model)
-          provider.models["gpt-5.3-codex"] = model
-        }
-
-        // Zero out costs for Codex (included with ChatGPT subscription)
-        for (const model of Object.values(provider.models)) {
-          model.cost = {
-            input: 0,
-            output: 0,
-            cache: { read: 0, write: 0 },
-          }
-        }
+        applyCodexModelCatalog(provider)
 
         return {
           apiKey: OAUTH_DUMMY_KEY,

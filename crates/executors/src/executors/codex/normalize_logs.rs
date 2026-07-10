@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::{Arc, LazyLock},
 };
@@ -323,6 +323,7 @@ struct LogState {
     assistant: Option<StreamingText>,
     thinking: Option<StreamingText>,
     thinking_comment_filter: EmptyHtmlCommentFilter,
+    streamed_reasoning_items: HashSet<String>,
     commands: HashMap<String, CommandState>,
     mcp_tools: HashMap<String, McpToolState>,
     patches: HashMap<String, PatchState>,
@@ -351,6 +352,7 @@ impl LogState {
             assistant: None,
             thinking: None,
             thinking_comment_filter: EmptyHtmlCommentFilter::default(),
+            streamed_reasoning_items: HashSet::new(),
             commands: HashMap::new(),
             mcp_tools: HashMap::new(),
             patches: HashMap::new(),
@@ -438,6 +440,17 @@ impl LogState {
     fn thinking_append(&mut self, content: String) -> (NormalizedEntry, usize, bool) {
         let content = self.thinking_comment_filter.filter_append(&content);
         self.streaming_text_append(content, StreamingTextKind::Thinking)
+    }
+
+    fn thinking_append_visible(
+        &mut self,
+        content: String,
+    ) -> Option<(NormalizedEntry, usize, bool)> {
+        let content = self.thinking_comment_filter.filter_append(&content);
+        if content.is_empty() {
+            return None;
+        }
+        Some(self.streaming_text_append(content, StreamingTextKind::Thinking))
     }
 
     fn assistant_message(&mut self, content: String) -> (NormalizedEntry, usize, bool) {
@@ -1455,13 +1468,19 @@ fn handle_server_notification(
         }
         ServerNotification::ReasoningSummaryTextDelta(payload) => {
             state.assistant = None;
-            let (entry, index, is_new) = state.thinking_append(payload.delta);
-            upsert_normalized_entry(msg_store, index, entry, is_new);
+            let item_id = payload.item_id;
+            if let Some((entry, index, is_new)) = state.thinking_append_visible(payload.delta) {
+                state.streamed_reasoning_items.insert(item_id);
+                upsert_normalized_entry(msg_store, index, entry, is_new);
+            }
         }
         ServerNotification::ReasoningTextDelta(payload) => {
             state.assistant = None;
-            let (entry, index, is_new) = state.thinking_append(payload.delta);
-            upsert_normalized_entry(msg_store, index, entry, is_new);
+            let item_id = payload.item_id;
+            if let Some((entry, index, is_new)) = state.thinking_append_visible(payload.delta) {
+                state.streamed_reasoning_items.insert(item_id);
+                upsert_normalized_entry(msg_store, index, entry, is_new);
+            }
         }
         ServerNotification::ReasoningSummaryPartAdded(_) => {
             state.assistant = None;
@@ -1909,8 +1928,15 @@ fn handle_v2_item_completed(
             state.assistant = None;
         }
         ThreadItem::Reasoning {
-            summary, content, ..
+            id,
+            summary,
+            content,
+            ..
         } => {
+            if state.streamed_reasoning_items.remove(&id) {
+                state.reset_thinking();
+                return;
+            }
             let text = if summary.is_empty() {
                 content.join("")
             } else {
@@ -2559,6 +2585,87 @@ mod tests {
                     && !entry.content.contains("-->")
             })
             .await
+        );
+    }
+
+    #[test]
+    fn app_server_reasoning_completed_after_streamed_delta_does_not_duplicate_thinking() {
+        let msg_store = std::sync::Arc::new(MsgStore::new());
+        let entry_index = EntryIndexProvider::test_new();
+        let mut state = super::LogState::new(entry_index.clone());
+
+        for notification in [
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "item/reasoning/summaryPartAdded",
+                "params": {
+                    "threadId": "thread-1",
+                    "turnId": "turn-1",
+                    "itemId": "rs-1",
+                    "summaryIndex": 0
+                }
+            }),
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "item/reasoning/summaryTextDelta",
+                "params": {
+                    "threadId": "thread-1",
+                    "turnId": "turn-1",
+                    "itemId": "rs-1",
+                    "delta": "**Confirming JSON output format**\n\n<!--",
+                    "summaryIndex": 0
+                }
+            }),
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "item/reasoning/summaryTextDelta",
+                "params": {
+                    "threadId": "thread-1",
+                    "turnId": "turn-1",
+                    "itemId": "rs-1",
+                    "delta": " -->",
+                    "summaryIndex": 0
+                }
+            }),
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "item/completed",
+                "params": {
+                    "threadId": "thread-1",
+                    "turnId": "turn-1",
+                    "completedAtMs": 0,
+                    "item": {
+                        "type": "reasoning",
+                        "id": "rs-1",
+                        "summary": ["**Confirming JSON output format**\n\n<!-- -->"],
+                        "content": []
+                    }
+                }
+            }),
+        ] {
+            let notification: codex_app_server_protocol::JSONRPCNotification =
+                serde_json::from_value(notification).expect("valid app-server notification");
+            let server_notification =
+                codex_app_server_protocol::ServerNotification::try_from(notification)
+                    .expect("known app-server notification");
+            super::handle_server_notification(
+                server_notification,
+                &mut state,
+                &msg_store,
+                &entry_index,
+                "E:/workspace",
+            );
+        }
+
+        let thinking_entries = normalized_entries_from_history(&msg_store)
+            .into_iter()
+            .filter(|entry| matches!(entry.entry_type, NormalizedEntryType::Thinking))
+            .collect::<Vec<_>>();
+
+        assert_eq!(thinking_entries.len(), 1, "{thinking_entries:#?}");
+        assert_eq!(
+            thinking_entries[0].content,
+            "**Confirming JSON output format**\n\n"
         );
     }
 

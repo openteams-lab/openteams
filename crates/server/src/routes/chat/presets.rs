@@ -1435,7 +1435,7 @@ mod tests {
         let mut row = test_row("backend");
         row.model_name = Some("explicit-model".to_string());
         row.runner_type = "codex".to_string();
-        row.tools_enabled = SqlxJson(json!({ "executor_profile_variant": "GPT_5.5" }));
+        row.tools_enabled = SqlxJson(json!({ "executor_profile_variant": "GPT_5.6_SOL" }));
 
         let response = build_preset_snapshot(
             &session,
@@ -1458,7 +1458,7 @@ mod tests {
         let mut row = test_row("backend");
         row.model_name = None;
         row.runner_type = "codex".to_string();
-        row.tools_enabled = SqlxJson(json!({ "executor_profile_variant": "GPT_5.5" }));
+        row.tools_enabled = SqlxJson(json!({ "executor_profile_variant": "GPT_5.6_SOL" }));
 
         let response = build_preset_snapshot(
             &session,
@@ -1470,7 +1470,7 @@ mod tests {
 
         assert_eq!(
             response.team.members[0].recommended_model.as_deref(),
-            Some("gpt-5.5")
+            Some("gpt-5.6-sol")
         );
     }
 
