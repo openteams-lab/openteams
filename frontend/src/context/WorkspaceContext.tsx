@@ -401,6 +401,36 @@ const filterInboxItemsForEnabledSources = (
 const inboxCountValue = (value: bigint | number): bigint =>
   typeof value === 'bigint' ? value : BigInt(value);
 
+const decrementInboxSummaryEntries = (
+  entries: InboxSummary['unread_by_kind'],
+  decrements: Map<string, number>,
+): InboxSummary['unread_by_kind'] =>
+  entries
+    .map((entry) => {
+      const decrement = decrements.get(entry.key) ?? 0;
+      if (decrement <= 0) return entry;
+      const nextCount = inboxCountValue(entry.count) - BigInt(decrement);
+      return {
+        ...entry,
+        count: nextCount > 0n ? nextCount : 0n,
+      };
+    })
+    .filter((entry) => inboxCountValue(entry.count) > 0n);
+
+const countUnreadInboxItems = (items: InboxItem[]) => {
+  const byKind = new Map<string, number>();
+  const bySeverity = new Map<string, number>();
+  let total = 0;
+  for (const item of items) {
+    if (item.read_at !== null || item.archived_at !== null) continue;
+    total += 1;
+    byKind.set(item.kind, (byKind.get(item.kind) ?? 0) + 1);
+    const severity = String(item.severity);
+    bySeverity.set(severity, (bySeverity.get(severity) ?? 0) + 1);
+  }
+  return { total, byKind, bySeverity };
+};
+
 const filterInboxSummaryForEnabledSources = (
   config: Config | null,
   summary: InboxSummary,
@@ -2607,14 +2637,42 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     }, INBOX_LIGHT_REFRESH_DELAY_MS);
   }, [refreshInbox]);
 
-  const removeInboxItemsFromList = useCallback((itemIds: string[]) => {
-    if (itemIds.length === 0) return;
-    const ids = new Set(itemIds);
-    setInboxItemsAsync((prev) => {
-      const nextItems = prev.data.filter((item) => !ids.has(item.id));
-      return nextItems.length === prev.data.length ? prev : succeed(nextItems);
+  const decrementInboxSummaryForItems = useCallback((items: InboxItem[]) => {
+    const removed = countUnreadInboxItems(items);
+    if (removed.total === 0) return;
+    setInboxSummaryAsync((prev) => {
+      const nextUnreadCount =
+        inboxCountValue(prev.data.unread_count) - BigInt(removed.total);
+      return succeed({
+        ...prev.data,
+        unread_count: nextUnreadCount > 0n ? nextUnreadCount : 0n,
+        unread_by_kind: decrementInboxSummaryEntries(
+          prev.data.unread_by_kind,
+          removed.byKind,
+        ),
+        unread_by_severity: decrementInboxSummaryEntries(
+          prev.data.unread_by_severity,
+          removed.bySeverity,
+        ),
+      });
     });
   }, []);
+
+  const removeInboxItemsFromList = useCallback(
+    (itemIds: string[]) => {
+      if (itemIds.length === 0) return;
+      const ids = new Set(itemIds);
+      const removedItems = inboxItemsAsync.data.filter((item) =>
+        ids.has(item.id),
+      );
+      setInboxItemsAsync((prev) => {
+        const nextItems = prev.data.filter((item) => !ids.has(item.id));
+        return nextItems.length === prev.data.length ? prev : succeed(nextItems);
+      });
+      decrementInboxSummaryForItems(removedItems);
+    },
+    [decrementInboxSummaryForItems, inboxItemsAsync.data],
+  );
 
   const markInboxItemRead = useCallback(
     async (itemId: string): Promise<void> => {

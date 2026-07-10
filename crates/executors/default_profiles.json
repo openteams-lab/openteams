@@ -139,7 +139,28 @@
     "CODEX": {
       "DEFAULT": {
         "CODEX": {
-          "model": "gpt-5.5",
+          "model": "gpt-5.6-sol",
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
+        }
+      },
+      "GPT_5.6_SOL": {
+        "CODEX": {
+          "model": "gpt-5.6-sol",
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
+        }
+      },
+      "GPT_5.6_TERRA": {
+        "CODEX": {
+          "model": "gpt-5.6-terra",
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
+        }
+      },
+      "GPT_5.6_LUNA": {
+        "CODEX": {
+          "model": "gpt-5.6-luna",
           "sandbox": "danger-full-access",
           "model_reasoning_summary": "auto"
         }

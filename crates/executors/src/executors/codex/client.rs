@@ -12,11 +12,11 @@ use async_trait::async_trait;
 use codex_app_server_protocol::{
     ApplyPatchApprovalResponse, ClientInfo, ClientNotification, ClientRequest,
     CommandExecutionApprovalDecision, CommandExecutionRequestApprovalResponse,
-    DynamicToolCallOutputContentItem, DynamicToolCallResponse, ExecCommandApprovalResponse,
-    FileChangeApprovalDecision, FileChangeRequestApprovalResponse, GetAuthStatusParams,
-    GetAuthStatusResponse, GrantedPermissionProfile, InitializeCapabilities, InitializeParams,
-    InitializeResponse, JSONRPCError, JSONRPCErrorError, JSONRPCNotification, JSONRPCRequest,
-    JSONRPCResponse, ListMcpServerStatusParams, ListMcpServerStatusResponse,
+    CurrentTimeReadResponse, DynamicToolCallOutputContentItem, DynamicToolCallResponse,
+    ExecCommandApprovalResponse, FileChangeApprovalDecision, FileChangeRequestApprovalResponse,
+    GetAuthStatusParams, GetAuthStatusResponse, GrantedPermissionProfile, InitializeCapabilities,
+    InitializeParams, InitializeResponse, JSONRPCError, JSONRPCErrorError, JSONRPCNotification,
+    JSONRPCRequest, JSONRPCResponse, ListMcpServerStatusParams, ListMcpServerStatusResponse,
     McpServerElicitationAction, McpServerElicitationRequestResponse, PermissionGrantScope,
     PermissionsRequestApprovalResponse, RequestId, ReviewStartParams, ReviewStartResponse,
     ReviewTarget, ServerNotification, ServerRequest, ThreadCompactStartParams,
@@ -115,6 +115,7 @@ impl AppServerClient {
                 capabilities: Some(InitializeCapabilities {
                     experimental_api: true,
                     request_attestation: false,
+                    mcp_server_openai_form_elicitation: false,
                     opt_out_notification_methods: None,
                 }),
             },
@@ -423,6 +424,20 @@ impl AppServerClient {
                     request_id,
                     -32000,
                     "attestation generation is not supported by this executor",
+                )
+                .await
+            }
+            ServerRequest::CurrentTimeRead { request_id, .. } => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|err| ExecutorError::Io(io::Error::other(err.to_string())))?
+                    .as_secs() as i64;
+                send_server_response(
+                    peer,
+                    request_id,
+                    CurrentTimeReadResponse {
+                        current_time_at: now,
+                    },
                 )
                 .await
             }
@@ -953,24 +968,7 @@ fn request_id(request: &ClientRequest) -> RequestId {
 }
 
 fn thread_item_id(item: &ThreadItem) -> Option<&str> {
-    match item {
-        ThreadItem::UserMessage { id, .. }
-        | ThreadItem::HookPrompt { id, .. }
-        | ThreadItem::AgentMessage { id, .. }
-        | ThreadItem::Reasoning { id, .. }
-        | ThreadItem::CommandExecution { id, .. }
-        | ThreadItem::FileChange { id, .. }
-        | ThreadItem::McpToolCall { id, .. }
-        | ThreadItem::DynamicToolCall { id, .. }
-        | ThreadItem::CollabAgentToolCall { id, .. }
-        | ThreadItem::WebSearch { id, .. }
-        | ThreadItem::ImageView { id, .. }
-        | ThreadItem::ImageGeneration { id, .. }
-        | ThreadItem::Plan { id, .. }
-        | ThreadItem::EnteredReviewMode { id, .. }
-        | ThreadItem::ExitedReviewMode { id, .. }
-        | ThreadItem::ContextCompaction { id, .. } => Some(id.as_str()),
-    }
+    Some(item.id())
 }
 
 async fn send_server_error(

@@ -150,7 +150,7 @@ const translatedHtml = renderToStaticMarkup(
       const translated: Record<string, string> = {
         "sidebar.sessions": "SESSIONS_TRANSLATED",
         "sidebar.more": "MORE_TRANSLATED",
-        "sidebar.projectManagement": "PROJECT_MANAGEMENT_TRANSLATED",
+        "sidebar.projectManagement": "PROJECT_TRANSLATED",
         "sidebar.showMoreSessions": "SHOW_{count}_MORE_TRANSLATED",
       };
       let value = translated[key] ?? key;
@@ -467,7 +467,7 @@ check(
   "renders translated sidebar labels when translator is provided",
   translatedHtml.includes("SESSIONS_TRANSLATED") &&
     translatedHtml.includes("MORE_TRANSLATED") &&
-    translatedHtml.includes("PROJECT_MANAGEMENT_TRANSLATED") &&
+    translatedHtml.includes("PROJECT_TRANSLATED") &&
     translatedHtml.includes(
       `aria-label="SHOW_${hiddenSessionCount}_MORE_TRANSLATED"`,
     ),
@@ -581,6 +581,11 @@ check(
   "uses compact sidebar item spacing",
   html.includes("py-[4px]") && html.includes("px-[7px]"),
   html,
+);
+check(
+  "uses reduced sidebar section title size",
+  componentSource.includes("text-[11px] font-medium uppercase"),
+  componentSource,
 );
 check(
   "uses wider spacing between sidebar sections",
@@ -793,9 +798,10 @@ check(
   appSource,
 );
 check(
-  "keeps actionable inbox items unread while routing to handling views",
-  appSource.includes("shouldKeepInboxItemUnreadOnOpen") &&
-    appSource.includes("inboxKindsKeptUnread") &&
+  "marks routed inbox items read while opening handling views",
+  appSource.includes("let openedTarget = false") &&
+    appSource.includes("openedTarget = true") &&
+    appSource.includes("if (openedTarget)") &&
     appSource.includes("notifyInboxWorkflowFocus") &&
     appSource.includes("isExecutorApprovalInboxItem") &&
     appSource.includes("openWorktreeConflictTab(projectId, sessionId)") &&
@@ -969,8 +975,9 @@ check(
   componentSource,
 );
 check(
-  "renders project management section",
-  html.includes("Project management"),
+  "renders project section",
+  html.includes('data-section="Project"') &&
+    !html.includes("Project management"),
   html,
 );
 check("renders system section", html.includes("System"), html);

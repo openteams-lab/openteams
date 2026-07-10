@@ -22,6 +22,7 @@ export interface NotificationToastProps {
   actionLabel?: string;
   onAction?: () => void;
   onClose?: () => void;
+  closeAriaLabel?: string;
   className?: string;
 }
 
@@ -71,6 +72,7 @@ export function NotificationToast({
   actionLabel,
   onAction,
   onClose,
+  closeAriaLabel = 'Dismiss notification',
   className,
 }: NotificationToastProps) {
   const style = toneStyles[tone];
@@ -123,7 +125,7 @@ export function NotificationToast({
         <button
           type="button"
           className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
-          aria-label="Dismiss notification"
+          aria-label={closeAriaLabel}
           onClick={onClose}
         >
           <X className="h-3.5 w-3.5" />

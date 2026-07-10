@@ -394,6 +394,24 @@ mod tests {
         assert_eq!(codex.model.as_deref(), Some("gpt-5.2-codex"));
         assert!(codex.model_reasoning_effort.is_some());
 
+        let codex_max = with_member_execution_overrides(
+            &agent_from_json(serde_json::json!({ "CODEX": {} })),
+            Some("gpt-5.6-sol"),
+            Some("max"),
+            None,
+        );
+        let CodingAgent::Codex(codex_max) = codex_max else {
+            panic!("expected Codex");
+        };
+        assert_eq!(codex_max.model.as_deref(), Some("gpt-5.6-sol"));
+        assert_eq!(
+            codex_max
+                .model_reasoning_effort
+                .as_ref()
+                .map(|effort| effort.as_ref()),
+            Some("max")
+        );
+
         let droid = with_member_execution_overrides(
             &agent_from_json(serde_json::json!({ "DROID": {} })),
             None,

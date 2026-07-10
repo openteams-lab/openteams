@@ -22,13 +22,14 @@ const line = (
   sequence: number,
   line_type: ChatRunActivityLine["line_type"],
   content: string,
+  agent_name = "codex",
 ): ChatRunActivityLine => ({
   line_id: `line-${sequence}`,
   run_id: "run-1",
   session_id: "session-1",
   session_agent_id: "session-agent-1",
   agent_id: "agent-1",
-  agent_name: "codex",
+  agent_name,
   sequence,
   line_type,
   stream_type: line_type === "error" ? "error" : "thinking",
@@ -127,6 +128,24 @@ console.log("agentActivityFormatter");
 
   check("leaves non-tool lines unchanged", rows[0]?.content === "I am checking the workspace.", rows);
   check("leaves unparsed tool lines unchanged", rows[1]?.content === "Raw tool log without a known prefix", rows);
+}
+
+{
+  const rows = formatAgentActivityLines([
+    line(1, "thinking", "<!-- -->**Planning code inspection**"),
+    line(2, "thinking", "<!--  -->"),
+  ]);
+
+  check("strips Codex empty HTML comment prefixes from thinking lines", rows.length === 1, rows);
+  check("keeps the visible thinking markdown after stripping", rows[0]?.content === "**Planning code inspection**", rows);
+}
+
+{
+  const rows = formatAgentActivityLines([
+    line(1, "thinking", "<!-- -->visible non-codex text", "Claude"),
+  ]);
+
+  check("does not strip empty HTML comments for non-Codex activity lines", rows[0]?.content === "<!-- -->visible non-codex text", rows);
 }
 
 if (failures > 0) {

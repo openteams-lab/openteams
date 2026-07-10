@@ -110,15 +110,6 @@ const workflowLoopReviewNotifyIndex = workflowLoopExecutorSource.indexOf(
   "notify_workflow_user_action",
   workflowLoopReviewWriteIndex,
 );
-const keepUnreadStart = appSource.indexOf("const inboxSourcesKeptUnread");
-const keepUnreadEnd = appSource.indexOf(
-  "const isWorktreeConflictInboxItem",
-  keepUnreadStart,
-);
-const keepUnreadSource =
-  keepUnreadStart >= 0 && keepUnreadEnd > keepUnreadStart
-    ? appSource.slice(keepUnreadStart, keepUnreadEnd)
-    : "";
 const openHandlerStart = appSource.indexOf("const handleInboxItemOpen");
 const openHandlerEnd = appSource.indexOf(
   "const closeWorktreeConflictTab",
@@ -130,22 +121,22 @@ const openHandlerSource =
     : "";
 
 check(
-  "workflow review notifications enter the inbox, route to review focus, and stay unread before handling",
+  "workflow review notifications enter the inbox, route to review focus, and mark read after opening",
   workflowReviewMappingIndex >= 0 &&
     inboxServiceSource.includes('kind: "workflow_review"') &&
     inboxServiceSource.includes('source_type: "workflow_review"') &&
     workflowLoopReviewWriteIndex >= 0 &&
     workflowLoopReviewNotifyIndex > workflowLoopReviewWriteIndex &&
-    keepUnreadSource.includes('"workflow_review"') &&
-    keepUnreadSource.includes('"workflow_final_review"') &&
     openHandlerSource.includes("notifyInboxWorkflowFocus") &&
-    openHandlerSource.includes("if (!shouldKeepInboxItemUnreadOnOpen(item))") &&
+    openHandlerSource.includes("let openedTarget = false") &&
+    openHandlerSource.includes("openedTarget = true") &&
+    openHandlerSource.includes("if (openedTarget)") &&
+    openHandlerSource.includes("void markInboxItemRead(item.id).catch") &&
     workflowCardSource.includes("sourceId && workflowInboxActionIds.has(sourceId)") &&
     inboxNavigationSource.includes("pendingWorkflowFocusTarget = target"),
   {
     inboxServiceSource,
     workflowLoopExecutorSource,
-    keepUnreadSource,
     openHandlerSource,
     workflowCardSource,
     inboxNavigationSource,

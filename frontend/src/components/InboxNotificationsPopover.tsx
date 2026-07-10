@@ -57,16 +57,29 @@ const inboxItemTimeMs = (value: Date | string | null | undefined): number => {
 
 const formatInboxRelativeTime = (
   value: Date | string | null | undefined,
+  translate: Translate,
 ): string => {
   const timestamp = inboxItemTimeMs(value);
   if (!timestamp) return "";
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-  if (elapsedSeconds < 60) return "now";
+  if (elapsedSeconds < 60) {
+    return translate("sidebar.inbox.time.now", "now");
+  }
   const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-  if (elapsedMinutes < 60) return `${elapsedMinutes}m`;
+  if (elapsedMinutes < 60) {
+    return translate("sidebar.inbox.time.minutes", "{count}m", {
+      count: elapsedMinutes,
+    });
+  }
   const elapsedHours = Math.floor(elapsedMinutes / 60);
-  if (elapsedHours < 24) return `${elapsedHours}h`;
-  return `${Math.floor(elapsedHours / 24)}d`;
+  if (elapsedHours < 24) {
+    return translate("sidebar.inbox.time.hours", "{count}h", {
+      count: elapsedHours,
+    });
+  }
+  return translate("sidebar.inbox.time.days", "{count}d", {
+    count: Math.floor(elapsedHours / 24),
+  });
 };
 
 const inboxSeverityPillClass = (severity: InboxItem["severity"]): string => {
@@ -78,6 +91,14 @@ const inboxSeverityPillClass = (severity: InboxItem["severity"]): string => {
     return "border-amber-400/20 bg-amber-400/10 text-amber-300";
   }
   return "border-white/[0.07] bg-white/[0.06] text-[var(--ink-subtle)]";
+};
+
+const inboxSeverityLabel = (
+  severity: InboxItem["severity"],
+  translate: Translate,
+): string => {
+  const value = String(severity);
+  return translate(`sidebar.inbox.severity.${value}`, value);
 };
 
 export function InboxNotificationsPopover({
@@ -327,14 +348,14 @@ export function InboxNotificationsPopover({
                               item.severity,
                             )}`}
                           >
-                            {item.severity}
+                            {inboxSeverityLabel(item.severity, translate)}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--ink-tertiary)]">
                             {sessionTitle ??
                               translate("sidebar.inbox.session", "Session")}
                           </span>
                           <span className="shrink-0 font-mono text-[10px] text-[var(--ink-tertiary)]">
-                            {formatInboxRelativeTime(item.created_at)}
+                            {formatInboxRelativeTime(item.created_at, translate)}
                           </span>
                           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--primary)] shadow-[0_0_0_2px_rgba(94,106,210,0.14)]" />
                         </div>

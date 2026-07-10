@@ -148,7 +148,7 @@ const topControlClass =
   "flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent text-[var(--ink-tertiary)] transition hover:border-[var(--hairline)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]";
 
 const sectionLabelClass =
-  "px-2 text-[14px] font-medium uppercase tracking-[0.04em] text-[var(--ink-tertiary)]";
+  "px-2 text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--ink-tertiary)]";
 
 const sidebarItemClass =
   "flex w-full items-center gap-[6px] rounded-sm border px-[7px] py-[4px] text-left text-[14px] leading-[1.4] transition";
@@ -2935,7 +2935,7 @@ export function ProjectSidebar({
         </SidebarSection>
 
         <SidebarSection
-          title={translate("sidebar.projectManagement", "Project management")}
+          title={translate("sidebar.projectManagement", "Project")}
         >
           {(shellOptions?.projectManagementItems ?? []).map((item) => {
             const label = translate(`sidebar.nav.${item.id}`, item.label);

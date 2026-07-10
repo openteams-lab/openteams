@@ -30,6 +30,17 @@ fn codex_model_cache_paths() -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 
+const CODEX_MODEL_FALLBACKS: &[&str] = &[
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.3-codex-spark",
+    "codex-auto-review",
+];
+
 use async_trait::async_trait;
 use codex_app_server_protocol::{
     AskForApproval as AppServerAskForApproval, ReviewTarget, SandboxMode as AppServerSandboxMode,
@@ -107,6 +118,7 @@ pub enum ReasoningEffort {
     Medium,
     High,
     Xhigh,
+    Max,
 }
 
 /// Model reasoning summary style
@@ -254,6 +266,12 @@ impl StandardCodingAgentExecutor for Codex {
             }
         }
 
+        models.extend(
+            CODEX_MODEL_FALLBACKS
+                .iter()
+                .map(|model| (*model).to_string()),
+        );
+
         if models.is_empty() {
             Ok(None)
         } else {
@@ -352,8 +370,20 @@ impl StandardCodingAgentExecutor for Codex {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::CODEX_MODEL_FALLBACKS;
+
+    #[test]
+    fn codex_model_fallbacks_include_latest_gpt_5_6_models() {
+        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-sol"));
+        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-terra"));
+        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-luna"));
+    }
+}
+
 impl Codex {
-    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.136.0";
+    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.144.1";
 
     pub fn base_command() -> &'static str {
         Self::BASE_COMMAND
@@ -384,7 +414,13 @@ impl Codex {
             }
             None => None,
             Some(AskForApproval::UnlessTrusted) => Some(AppServerAskForApproval::UnlessTrusted),
-            Some(AskForApproval::OnFailure) => Some(AppServerAskForApproval::OnFailure),
+            Some(AskForApproval::OnFailure) => Some(AppServerAskForApproval::Granular {
+                sandbox_approval: true,
+                rules: false,
+                skill_approval: false,
+                request_permissions: false,
+                mcp_elicitations: false,
+            }),
             Some(AskForApproval::OnRequest) => Some(AppServerAskForApproval::OnRequest),
             Some(AskForApproval::Never) => Some(AppServerAskForApproval::Never),
         };

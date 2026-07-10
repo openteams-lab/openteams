@@ -707,7 +707,7 @@ fn version_command_base(executor: &CodingAgent) -> Option<String> {
         }
         CodingAgent::Amp(_) => "npx -y @sourcegraph/amp@0.0.1780464815-g688406".to_string(),
         CodingAgent::Gemini(_) => "npx -y @google/gemini-cli@0.45.0".to_string(),
-        CodingAgent::Codex(_) => "npx -y @openai/codex@0.136.0".to_string(),
+        CodingAgent::Codex(_) => "npx -y @openai/codex@0.144.1".to_string(),
         CodingAgent::Opencode(_) => "npx -y opencode-ai@1.15.13".to_string(),
         CodingAgent::OpenTeamsCli(_) => openteams_cli_binary_base(),
         CodingAgent::CursorAgent(_) => "cursor-agent".to_string(),
@@ -949,7 +949,7 @@ fn reasoning_capability_for_runner(
             options: strings(["low", "medium", "high"]),
         }),
         BaseCodingAgent::Codex => Some(AgentRuntimeReasoningCapability::Effort {
-            options: strings(["low", "medium", "high", "xhigh"]),
+            options: strings(["low", "medium", "high", "xhigh", "max"]),
         }),
         BaseCodingAgent::Droid => Some(AgentRuntimeReasoningCapability::Effort {
             options: strings(["none", "dynamic", "off", "low", "medium", "high"]),

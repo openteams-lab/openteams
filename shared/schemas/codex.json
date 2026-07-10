@@ -62,6 +62,7 @@
         "medium",
         "high",
         "xhigh",
+        "max",
         null
       ]
     },
