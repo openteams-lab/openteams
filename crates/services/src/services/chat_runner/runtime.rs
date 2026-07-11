@@ -1395,6 +1395,26 @@ impl ChatRunner {
                         let activity_lines = activity_state.drain_patch_lines(&patch, true);
                         let first_activity_line =
                             !saw_activity_line && !activity_lines.is_empty();
+                        let assistant_updates_before = assistant_update_count;
+                        // The frontend creates a synthetic row for this delta and replaces it
+                        // when the authoritative activity line arrives. Keep that delivery
+                        // order so the final thinking row is not left duplicated.
+                        Self::process_stream_patch(
+                            patch,
+                            session_id,
+                            session_agent_id,
+                            agent_id,
+                            run_id,
+                            &sender,
+                            &mut last_content,
+                            &mut latest_assistant,
+                            &mut assistant_update_count,
+                            &mut last_token_usage,
+                            &mut error_content,
+                            &mut error_update_count,
+                            &mut error_type,
+                            stream_filter,
+                        );
                         Self::persist_and_emit_activity_lines(
                             &activity_path,
                             &sender,
@@ -1416,23 +1436,6 @@ impl ChatRunner {
                                 )
                                 .await;
                         }
-                        let assistant_updates_before = assistant_update_count;
-                        Self::process_stream_patch(
-                            patch,
-                            session_id,
-                            session_agent_id,
-                            agent_id,
-                            run_id,
-                            &sender,
-                            &mut last_content,
-                            &mut latest_assistant,
-                            &mut assistant_update_count,
-                            &mut last_token_usage,
-                            &mut error_content,
-                            &mut error_update_count,
-                            &mut error_type,
-                            stream_filter,
-                        );
                         if !saw_assistant_delta && assistant_update_count > assistant_updates_before
                         {
                             saw_assistant_delta = true;
@@ -1534,6 +1537,24 @@ impl ChatRunner {
                                         activity_state.drain_patch_lines(&patch, true);
                                     let first_activity_line =
                                         !saw_activity_line && !activity_lines.is_empty();
+                                    let assistant_updates_before = assistant_update_count;
+                                    // Match the main-loop live-delta -> authoritative-line order.
+                                    Self::process_stream_patch(
+                                        patch,
+                                        session_id,
+                                        session_agent_id,
+                                        agent_id,
+                                        run_id,
+                                        &sender,
+                                        &mut last_content,
+                                        &mut latest_assistant,
+                                        &mut assistant_update_count,
+                                        &mut last_token_usage,
+                                        &mut error_content,
+                                        &mut error_update_count,
+                                        &mut error_type,
+                                        stream_filter,
+                                    );
                                     Self::persist_and_emit_activity_lines(
                                         &activity_path,
                                         &sender,
@@ -1558,23 +1579,6 @@ impl ChatRunner {
                                             )
                                             .await;
                                     }
-                                    let assistant_updates_before = assistant_update_count;
-                                    Self::process_stream_patch(
-                                        patch,
-                                        session_id,
-                                        session_agent_id,
-                                        agent_id,
-                                        run_id,
-                                        &sender,
-                                        &mut last_content,
-                                        &mut latest_assistant,
-                                        &mut assistant_update_count,
-                                        &mut last_token_usage,
-                                        &mut error_content,
-                                        &mut error_update_count,
-                                        &mut error_type,
-                                        stream_filter,
-                                    );
                                     if !saw_assistant_delta
                                         && assistant_update_count > assistant_updates_before
                                     {
@@ -3428,6 +3432,80 @@ mod tests {
         assert_eq!(update.content, "Running shell command");
         assert!(error_content.is_empty());
         assert_eq!(assistant_update_count, 0);
+    }
+
+    #[tokio::test]
+    async fn thinking_delta_is_delivered_before_authoritative_activity_line() {
+        let patch = ConversationPatch::add_normalized_entry(
+            0,
+            NormalizedEntry {
+                timestamp: None,
+                entry_type: NormalizedEntryType::Thinking,
+                content: "**Final thinking line**\n".to_string(),
+                metadata: None,
+            },
+        );
+        let session_id = Uuid::new_v4();
+        let session_agent_id = Uuid::new_v4();
+        let agent_id = Uuid::new_v4();
+        let run_id = Uuid::new_v4();
+        let (sender, mut receiver) = broadcast::channel(4);
+        let mut last_content = HashMap::new();
+        let mut latest_assistant = String::new();
+        let mut assistant_update_count = 0;
+        let mut last_token_usage = None;
+        let mut error_content = String::new();
+        let mut error_update_count = 0;
+        let mut error_type = None;
+        let mut activity_state = AgentActivityStreamState::default();
+        let activity_lines = activity_state.drain_patch_lines(&patch, true);
+
+        ChatRunner::process_stream_patch(
+            patch,
+            session_id,
+            session_agent_id,
+            agent_id,
+            run_id,
+            &sender,
+            &mut last_content,
+            &mut latest_assistant,
+            &mut assistant_update_count,
+            &mut last_token_usage,
+            &mut error_content,
+            &mut error_update_count,
+            &mut error_type,
+            StreamPatchFilter::default(),
+        );
+        let temp = tempdir().expect("tempdir");
+        let mut sequence = 0;
+        ChatRunner::persist_and_emit_activity_lines(
+            &temp.path().join(RUN_ACTIVITY_FILE_NAME),
+            &sender,
+            session_id,
+            session_agent_id,
+            agent_id,
+            "codex",
+            run_id,
+            &mut sequence,
+            activity_lines,
+        )
+        .await;
+
+        let first = receiver.recv().await.expect("thinking delta");
+        assert!(matches!(
+            first,
+            ChatStreamEvent::AgentDelta {
+                stream_type: ChatStreamDeltaType::Thinking,
+                ..
+            }
+        ));
+        let second = receiver.recv().await.expect("activity line");
+        assert!(matches!(
+            second,
+            ChatStreamEvent::AgentActivityLine { line }
+                if matches!(line.line_type, ChatRunActivityLineType::Thinking)
+                    && line.content == "**Final thinking line**"
+        ));
     }
 
     #[test]
