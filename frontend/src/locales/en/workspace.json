@@ -207,6 +207,7 @@
   "sidebar.projectPathEmpty": "No path set",
   "sidebar.projectStatus": "Status",
   "sidebar.projectWorkspacePath": "Default workspace path",
+  "sidebar.projectWorkspacePathRequired": "Workspace path is required",
   "sidebar.cancelFolderRename": "Cancel folder rename",
   "sidebar.createFolderFailed": "Folder creation failed",
   "sidebar.folderName": "Folder name",

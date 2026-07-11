@@ -183,6 +183,7 @@
   "sidebar.projectPathEmpty": "Aucun chemin défini",
   "sidebar.projectStatus": "Statut",
   "sidebar.projectWorkspacePath": "Chemin du workspace par défaut",
+  "sidebar.projectWorkspacePathRequired": "Le chemin du workspace est obligatoire",
   "sidebar.readWorkspace": "Lire",
   "sidebar.gitChecking": "Checking Git status...",
   "sidebar.gitDetected": "Git repository detected.",

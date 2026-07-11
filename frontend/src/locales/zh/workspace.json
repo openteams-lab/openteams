@@ -207,6 +207,7 @@
   "sidebar.projectPathEmpty": "未设置路径",
   "sidebar.projectStatus": "状态",
   "sidebar.projectWorkspacePath": "默认工作区路径",
+  "sidebar.projectWorkspacePathRequired": "工作区路径不能为空",
   "sidebar.cancelFolderRename": "取消重命名文件夹",
   "sidebar.createFolderFailed": "创建文件夹失败",
   "sidebar.folderName": "文件夹名称",

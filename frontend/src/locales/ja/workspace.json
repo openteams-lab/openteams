@@ -183,6 +183,7 @@
   "sidebar.projectPathEmpty": "パス未設定",
   "sidebar.projectStatus": "ステータス",
   "sidebar.projectWorkspacePath": "デフォルトワークスペースパス",
+  "sidebar.projectWorkspacePathRequired": "ワークスペースパスは必須です",
   "sidebar.readWorkspace": "読み取り",
   "sidebar.gitChecking": "Git 状態を確認中...",
   "sidebar.gitDetected": "Git リポジトリを検出しました。",

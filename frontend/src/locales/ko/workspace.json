@@ -183,6 +183,7 @@
   "sidebar.projectPathEmpty": "경로 미설정",
   "sidebar.projectStatus": "상태",
   "sidebar.projectWorkspacePath": "기본 워크스페이스 경로",
+  "sidebar.projectWorkspacePathRequired": "워크스페이스 경로는 필수입니다",
   "sidebar.readWorkspace": "읽기",
   "sidebar.gitChecking": "Git 상태 확인 중...",
   "sidebar.gitDetected": "Git 저장소가 감지되었습니다.",

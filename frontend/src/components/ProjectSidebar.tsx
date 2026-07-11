@@ -1537,6 +1537,16 @@ export function ProjectSidebar({
     if (!name || (!editingProject && !onCreateProject)) return;
     const workspacePath = projectWorkspacePath.trim();
 
+    if (!workspacePath) {
+      setCreateError(
+        translate(
+          "sidebar.projectWorkspacePathRequired",
+          "Workspace path is required",
+        ),
+      );
+      return;
+    }
+
     setCreatingProject(true);
     setCreateError(null);
     try {
@@ -1546,7 +1556,7 @@ export function ProjectSidebar({
           name,
           description: editingProject.description,
           status: editingProject.status ?? "active",
-          default_workspace_path: workspacePath || null,
+          default_workspace_path: workspacePath,
           active_repo_id: editingProject.activeRepoId,
         });
       } else {
@@ -1586,7 +1596,7 @@ export function ProjectSidebar({
             repositories: [],
             description: null,
             status: "active",
-            default_workspace_path: workspacePath || null,
+            default_workspace_path: workspacePath,
             active_repo_id: null,
           },
           {
@@ -2003,6 +2013,7 @@ export function ProjectSidebar({
                     <input
                       className={`min-w-0 flex-1 ${createProjectFieldBaseClass} font-mono text-[13px]`}
                       value={projectWorkspacePath}
+                      aria-required="true"
                       onChange={(event) =>
                         setProjectWorkspacePath(event.target.value)
                       }
