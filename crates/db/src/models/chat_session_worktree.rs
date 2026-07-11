@@ -17,6 +17,7 @@ const CHAT_SESSION_WORKTREE_SELECT: &str = r#"
            worktree_path,
            mode,
            status,
+           0 AS has_unmerged_commits,
            merge_target_branch,
            merge_operation,
            conflict_files_json,
@@ -42,6 +43,7 @@ const CHAT_SESSION_WORKTREE_RETURNING: &str = r#"
               worktree_path,
               mode,
               status,
+              0 AS has_unmerged_commits,
               merge_target_branch,
               merge_operation,
               conflict_files_json,
@@ -239,6 +241,11 @@ pub struct SessionWorktree {
     pub worktree_path: String,
     pub mode: SessionWorktreeMode,
     pub status: SessionWorktreeStatus,
+    /// Runtime-only merge availability derived from the branch relationship.
+    /// This is selected as `false` from SQLite and populated by
+    /// `SessionWorktreeService::get_latest_for_session` before returning the
+    /// status read model to callers.
+    pub has_unmerged_commits: bool,
     pub merge_target_branch: Option<String>,
     pub merge_operation: Option<SessionWorktreeMergeOperation>,
     /// JSON array of file paths (relative to the merge target) that are in

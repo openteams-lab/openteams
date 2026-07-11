@@ -1347,6 +1347,7 @@ mod tests {
             worktree_path: "C:/repo-session".to_string(),
             mode: SessionWorktreeMode::Session,
             status,
+            has_unmerged_commits: false,
             merge_target_branch: Some("main".to_string()),
             merge_operation: Some(SessionWorktreeMergeOperation::Merge),
             conflict_files_json: "[]".to_string(),

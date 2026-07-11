@@ -114,13 +114,19 @@ check(
 );
 
 check(
-  "disables worktree merge when there are no staged changes",
+  "disables worktree merge when there are no unmerged worktree commits",
   source.includes("const worktreeMergeDisabledReason =") &&
-    source.includes('viewModel.mode === "git" && viewModel.stagedPaths.length > 0') &&
-    source.includes('"worktree.reason.noStagedChanges"') &&
+    source.includes("worktree?.has_unmerged_commits") &&
+    source.includes('"worktree.reason.noUnmergedCommits"') &&
     source.includes('if (action === "merge" && worktreeMergeDisabledReason) return;') &&
     source.includes("mergeDisabledReason={worktreeMergeDisabledReason}"),
   source,
+);
+
+check(
+  "refreshes worktree merge availability immediately after commit",
+  source.includes("refresh: refreshWorktree") &&
+    source.includes("await refreshWorktree();"),
 );
 
 {

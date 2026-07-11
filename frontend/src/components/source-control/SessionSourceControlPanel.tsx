@@ -281,6 +281,7 @@ export const SessionSourceControlPanel: React.FC<
     worktree,
     loading: worktreeLoading,
     error: worktreeError,
+    refresh: refreshWorktree,
     prepare,
     merge: mergeWorktree,
     discard: discardWorktree,
@@ -366,11 +367,11 @@ export const SessionSourceControlPanel: React.FC<
   const discardLabel = tr("sourceControl.action.discard", "Discard");
   const commitLabel = tr("sourceControl.action.commit", "Commit");
   const worktreeMergeDisabledReason =
-    viewModel.mode === "git" && viewModel.stagedPaths.length > 0
+    worktree?.has_unmerged_commits
       ? null
       : tr(
-          "worktree.reason.noStagedChanges",
-          "Stage changes before merging.",
+          "worktree.reason.noUnmergedCommits",
+          "No new worktree commits to merge.",
         );
 
   useEffect(() => {
@@ -651,6 +652,7 @@ export const SessionSourceControlPanel: React.FC<
           work_item_ids: linkedWorkItemIds,
           expected_head_sha: viewModel.headSha,
         });
+        await refreshWorktree();
         if (!isCurrentScope(commitScopeKey)) return { ok: true, failed: [] };
         setSessionCommits((current) =>
           mergeCommitSummaries([

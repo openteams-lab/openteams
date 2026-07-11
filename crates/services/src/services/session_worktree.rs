@@ -650,16 +650,21 @@ impl SessionWorktreeService {
         else {
             return Ok(None);
         };
-        Ok(Some(self.refresh_merged_worktree_status(row).await?))
+        Ok(Some(self.refresh_merge_availability(row).await?))
     }
 
-    async fn refresh_merged_worktree_status(
+    async fn refresh_merge_availability(
         &self,
-        row: SessionWorktree,
+        mut row: SessionWorktree,
     ) -> Result<SessionWorktree, SessionWorktreeError> {
-        if row.status != SessionWorktreeStatus::Merged
-            || !self.branch_has_commits_not_in_base(&row).await?
-        {
+        let has_unmerged_commits = if row.status.is_active_for_workspace() {
+            self.branch_has_commits_not_in_base(&row).await?
+        } else {
+            false
+        };
+        row.has_unmerged_commits = has_unmerged_commits;
+
+        if row.status != SessionWorktreeStatus::Merged || !has_unmerged_commits {
             if row.status.is_active_for_workspace() {
                 self.sync_session_agent_workspace_paths(row.session_id, &row.worktree_path)
                     .await?;
@@ -667,7 +672,7 @@ impl SessionWorktreeService {
             return Ok(row);
         }
 
-        let dirty = Self::apply_transition(
+        let mut dirty = Self::apply_transition(
             &self.pool,
             row.id,
             row.session_id,
@@ -675,6 +680,7 @@ impl SessionWorktreeService {
             SessionWorktreeStatus::Dirty,
         )
         .await?;
+        dirty.has_unmerged_commits = true;
         self.sync_session_agent_workspace_paths(dirty.session_id, &dirty.worktree_path)
             .await?;
         Ok(dirty)

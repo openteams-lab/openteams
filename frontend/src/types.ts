@@ -918,6 +918,7 @@ export interface SessionWorktree {
   worktree_path: string;
   mode: 'session';
   status: SessionWorktreeStatus;
+  has_unmerged_commits: boolean;
   merge_target_branch: string | null;
   merge_operation: SessionWorktreeMergeOperation | null;
   conflict_files_json: string;

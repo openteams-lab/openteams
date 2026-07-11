@@ -3235,6 +3235,7 @@ mod tests {
             worktree_path: worktree_workspace.to_string(),
             mode: SessionWorktreeMode::Session,
             status,
+            has_unmerged_commits: false,
             merge_target_branch: None,
             merge_operation: None,
             conflict_files_json: "[]".to_string(),

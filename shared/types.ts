@@ -336,7 +336,14 @@ export type ChatRunRetentionSummary = { kind: string | null, finished_at: string
 
 export type ChatRunRetentionInfo = { run_id: string, session_agent_id: string, created_at: string, log_state: ChatRunLogState, artifact_state: ChatRunArtifactState, log_truncated: boolean, log_capture_degraded: boolean, pruned_at: string | null, prune_reason: string | null, retention_summary: ChatRunRetentionSummary | null, };
 
-export type SessionWorktree = { id: string, session_id: string, project_id: string | null, base_workspace_path: string, repo_path: string, base_branch: string, base_commit: string | null, branch_name: string, worktree_path: string, mode: SessionWorktreeMode, status: SessionWorktreeStatus, merge_target_branch: string | null, merge_operation: SessionWorktreeMergeOperation | null,
+export type SessionWorktree = { id: string, session_id: string, project_id: string | null, base_workspace_path: string, repo_path: string, base_branch: string, base_commit: string | null, branch_name: string, worktree_path: string, mode: SessionWorktreeMode, status: SessionWorktreeStatus,
+/**
+ * Runtime-only merge availability derived from the branch relationship.
+ * This is selected as `false` from SQLite and populated by
+ * `SessionWorktreeService::get_latest_for_session` before returning the
+ * status read model to callers.
+ */
+has_unmerged_commits: boolean, merge_target_branch: string | null, merge_operation: SessionWorktreeMergeOperation | null,
 /**
  * JSON array of file paths (relative to the merge target) that are in
  * conflict while `status = needs_conflict_resolution`. Stored as raw

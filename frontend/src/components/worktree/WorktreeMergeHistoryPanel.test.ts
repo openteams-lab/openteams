@@ -32,6 +32,7 @@ const worktree: SessionWorktree = {
   worktree_path: 'E:/repo/.openteams/worktrees/session',
   mode: 'session',
   status: 'merged',
+  has_unmerged_commits: false,
   merge_target_branch: 'main',
   merge_operation: 'merge',
   conflict_files_json: '["src/App.tsx"]',

@@ -53,7 +53,7 @@ check(
 );
 
 check(
-  "merge button can be disabled by staged-change precondition",
+  "merge button can be disabled when no unmerged commits are available",
   source.includes("mergeDisabledReason?: string | null") &&
     source.includes("const mergeDisabled = Boolean(mergeDisabledReason)") &&
     source.includes("disabled={mergeDisabled}") &&

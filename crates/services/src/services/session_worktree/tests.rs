@@ -972,6 +972,13 @@ async fn perform_merge_preserves_session_branch_commit_in_base_history() {
     git(&worktree_path, &["add", "feature.txt"]);
     git(&worktree_path, &["commit", "-m", "session branch commit"]);
 
+    let merge_available = service
+        .get_latest_for_session(session_id)
+        .await
+        .expect("read worktree merge availability")
+        .expect("worktree row");
+    assert!(merge_available.has_unmerged_commits);
+
     service
         .perform_merge(
             session_id,
@@ -1005,6 +1012,7 @@ async fn perform_merge_preserves_session_branch_commit_in_base_history() {
         .expect("refresh merged worktree")
         .expect("worktree row");
     assert_eq!(refreshed.status, SessionWorktreeStatus::Dirty);
+    assert!(refreshed.has_unmerged_commits);
 
     service
         .perform_merge(
