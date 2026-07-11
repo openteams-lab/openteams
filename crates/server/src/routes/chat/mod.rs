@@ -156,10 +156,6 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             get(messages::serve_message_attachment),
         )
         .route(
-            "/team-protocol",
-            get(presets::get_team_protocol).post(presets::update_team_protocol),
-        )
-        .route(
             "/presets/snapshot",
             axum::routing::post(presets::create_preset_snapshot),
         )

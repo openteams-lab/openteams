@@ -385,10 +385,7 @@ impl ChatRunner {
         normalize_workspace_observed_path(preferred, workspace_path)
     }
 
-    fn split_git_diff_by_path(
-        diff: &str,
-        workspace_path: &Path,
-    ) -> BTreeMap<String, String> {
+    fn split_git_diff_by_path(diff: &str, workspace_path: &Path) -> BTreeMap<String, String> {
         let mut patches = BTreeMap::<String, String>::new();
         let mut current_path: Option<String> = None;
         let mut current_patch = String::new();
@@ -2214,28 +2211,6 @@ impl ChatRunner {
                 }
             })
             .collect()
-    }
-
-    #[cfg(test)]
-    pub(super) fn resolve_team_protocol_guidelines(team_protocol: Option<&str>) -> String {
-        let normalized_protocol = team_protocol.map(str::trim).unwrap_or_default();
-        if normalized_protocol.is_empty() {
-            return PresetLoader::load_team_protocol();
-        }
-        normalized_protocol.to_string()
-    }
-
-    pub(super) fn resolve_session_team_protocol(session: Option<&ChatSession>) -> Option<&str> {
-        let session = session?;
-        if !session.team_protocol_enabled {
-            return None;
-        }
-
-        session
-            .team_protocol
-            .as_deref()
-            .map(str::trim)
-            .filter(|protocol| !protocol.is_empty())
     }
 
     pub(super) fn strip_embedded_team_protocol_from_system_prompt(system_prompt: &str) -> String {

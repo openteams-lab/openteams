@@ -300,11 +300,20 @@ impl OpenTeamsCli {
         env: &ExecutionEnv,
     ) -> Result<OpenTeamsCliServer, ExecutorError> {
         let (mut child, server_password) = self.spawn_server_process(current_dir, env).await?;
-        let server_stdout = child.inner().stdout.take().ok_or_else(|| {
-            ExecutorError::Io(std::io::Error::other("OpenTeams CLI server missing stdout"))
-        })?;
+        let Some(server_stdout) = child.inner().stdout.take() else {
+            let _ = workspace_utils::process::kill_process_group(&mut child).await;
+            return Err(ExecutorError::Io(std::io::Error::other(
+                "OpenTeams CLI server missing stdout",
+            )));
+        };
 
-        let base_url = wait_for_server_url(server_stdout, None).await?;
+        let base_url = match wait_for_server_url(server_stdout, None).await {
+            Ok(base_url) => base_url,
+            Err(err) => {
+                let _ = workspace_utils::process::kill_process_group(&mut child).await;
+                return Err(err);
+            }
+        };
         tracing::debug!(
             base_url = %base_url,
             current_dir = %current_dir.display(),
@@ -333,9 +342,12 @@ impl OpenTeamsCli {
         };
 
         let (mut child, server_password) = self.spawn_server_process(current_dir, env).await?;
-        let server_stdout = child.inner().stdout.take().ok_or_else(|| {
-            ExecutorError::Io(std::io::Error::other("OpenTeams CLI server missing stdout"))
-        })?;
+        let Some(server_stdout) = child.inner().stdout.take() else {
+            let _ = workspace_utils::process::kill_process_group(&mut child).await;
+            return Err(ExecutorError::Io(std::io::Error::other(
+                "OpenTeams CLI server missing stdout",
+            )));
+        };
 
         let stdout = create_stdout_pipe_writer(&mut child)?;
         let log_writer = LogWriter::new(stdout);

@@ -263,9 +263,12 @@ impl Opencode {
     ) -> Result<OpencodeServer, ExecutorError> {
         let (mut child, server_password, startup_command) =
             self.spawn_server_process(current_dir, env).await?;
-        let server_stdout = child.inner().stdout.take().ok_or_else(|| {
-            ExecutorError::Io(std::io::Error::other("OpenCode server missing stdout"))
-        })?;
+        let Some(server_stdout) = child.inner().stdout.take() else {
+            let _ = workspace_utils::process::kill_process_group(&mut child).await;
+            return Err(ExecutorError::Io(std::io::Error::other(
+                "OpenCode server missing stdout",
+            )));
+        };
         let (stderr_lines, stderr_task) = collect_server_stderr(child.inner().stderr.take());
 
         let base_url = match wait_for_server_url(server_stdout, None).await {
@@ -278,6 +281,7 @@ impl Opencode {
                 if let Some(task) = stderr_task {
                     task.abort();
                 }
+                let _ = workspace_utils::process::kill_process_group(&mut child).await;
                 return Err(opencode_server_error(err, &startup_command, &server_logs));
             }
         };
@@ -306,9 +310,12 @@ impl Opencode {
 
         let (mut child, server_password, _startup_command) =
             self.spawn_server_process(current_dir, env).await?;
-        let server_stdout = child.inner().stdout.take().ok_or_else(|| {
-            ExecutorError::Io(std::io::Error::other("OpenCode server missing stdout"))
-        })?;
+        let Some(server_stdout) = child.inner().stdout.take() else {
+            let _ = workspace_utils::process::kill_process_group(&mut child).await;
+            return Err(ExecutorError::Io(std::io::Error::other(
+                "OpenCode server missing stdout",
+            )));
+        };
 
         let stdout = create_stdout_pipe_writer(&mut child)?;
         let log_writer = LogWriter::new(stdout);

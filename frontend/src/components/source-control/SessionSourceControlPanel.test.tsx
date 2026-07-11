@@ -186,6 +186,14 @@ check(
 );
 
 check(
+  "stages shared files without a confirmation dialog",
+  source.includes("const handleStageFiles = (files: SourceControlFile[]) =>") &&
+    source.includes('void runOperation(`stage:${paths.join("|")}`') &&
+    !source.includes("getSharedForce(files, stageLabel)"),
+  source,
+);
+
+check(
   "confirms staged shared files before commit",
   source.includes('const stagedSection = findSection(viewModel, "staged")') &&
     source.includes("const stagedFiles = stagedSection?.files ?? []") &&

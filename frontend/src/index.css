@@ -88,6 +88,30 @@ body {
   margin: 0;
 }
 
+.macos-titlebar-drag-region {
+  display: none;
+}
+
+html[data-tauri-platform="macos"] #root {
+  box-sizing: border-box;
+  padding-top: 28px;
+  background: var(--canvas);
+}
+
+html[data-tauri-platform="macos"] .ot-app-scale-viewport {
+  height: calc(100vh - 28px);
+}
+
+html[data-tauri-platform="macos"] .macos-titlebar-drag-region {
+  position: fixed;
+  z-index: 10000;
+  top: 0;
+  right: 0;
+  left: 76px;
+  display: block;
+  height: 28px;
+}
+
 @keyframes inbox-bell-swing {
   0%,
   100% {

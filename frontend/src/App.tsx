@@ -110,7 +110,6 @@ import type {
   SidebarNavigationTarget,
   SidebarPrimaryAction,
   SourceControlDiffArea,
-  UpdateChatSession,
 } from "@/types";
 import { monogramFromName } from "@/lib/mappers";
 
@@ -244,29 +243,10 @@ type CreateProjectOptions = {
   forceMemberWorkspacePath?: boolean;
 };
 
-type PendingProjectSessionProtocol = {
-  projectId: string;
-  teamProtocol: string;
-};
-
 type ChatPresetConfigView = {
   members?: ChatMemberPreset[];
   teams?: ChatTeamPreset[];
 };
-
-const chatSessionUpdatePayload = (
-  patch: Partial<UpdateChatSession>,
-): UpdateChatSession => ({
-  title: null,
-  status: null,
-  summary_text: null,
-  archive_ref: null,
-  last_seen_diff_key: null,
-  team_protocol: null,
-  team_protocol_enabled: null,
-  default_workspace_path: null,
-  ...patch,
-});
 
 const isWorktreeConflictInboxItem = (item: InboxItem): boolean =>
   item.kind === "worktree_conflict" ||
@@ -361,6 +341,8 @@ const clampSidebarWidth = (width: number) =>
 const clampAppScale = (scale: number) =>
   Math.min(maxAppScale, Math.max(minAppScale, scale));
 
+const macosTitlebarHeight = 28;
+
 type AppScaleState = {
   enabled: boolean;
   scale: number;
@@ -385,7 +367,11 @@ const getAppScaleState = (): AppScaleState => {
   }
 
   const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
+  const viewportHeight =
+    window.innerHeight -
+    (document.documentElement.dataset.tauriPlatform === "macos"
+      ? macosTitlebarHeight
+      : 0);
   const enabled = viewportWidth >= minScaledViewportWidth;
   const rawScale = Math.min(
     viewportWidth / appDesignWidth,
@@ -535,8 +521,6 @@ function WorkspaceLayout() {
   const [createSessionMembers, setCreateSessionMembers] = useState<Member[]>(
     [],
   );
-  const [pendingProjectSessionProtocol, setPendingProjectSessionProtocol] =
-    useState<PendingProjectSessionProtocol | null>(null);
   const [createSessionWorkspaceLookup, setCreateSessionWorkspaceLookup] =
     useState<CreateSessionWorkspaceLookup>({
       workflowWorkspacePath: null,
@@ -1602,10 +1586,6 @@ function WorkspaceLayout() {
         },
       );
       let sessionForUi = backendSession;
-      const pendingTeamProtocol =
-        pendingProjectSessionProtocol?.projectId === selectedProjectId
-          ? pendingProjectSessionProtocol.teamProtocol
-          : null;
 
       if (options.taskMode === 'workflow') {
         await chatSessionsApi
@@ -1618,40 +1598,13 @@ function WorkspaceLayout() {
             summary_text: null,
             archive_ref: null,
             last_seen_diff_key: null,
-            team_protocol: null,
-            team_protocol_enabled: null,
             default_workspace_path: null,
             chat_input_mode: 'workflow',
-            ...(pendingTeamProtocol
-              ? {
-                  team_protocol: pendingTeamProtocol,
-                  team_protocol_enabled: true,
-                }
-              : {}),
           })
           .then((updatedSession) => {
             sessionForUi = updatedSession;
           })
           .catch(() => undefined);
-      } else if (pendingTeamProtocol) {
-        await chatSessionsApi
-          .update(
-            backendSession.id,
-            chatSessionUpdatePayload({
-              team_protocol: pendingTeamProtocol,
-              team_protocol_enabled: true,
-            }),
-          )
-          .then((updatedSession) => {
-            sessionForUi = updatedSession;
-          })
-          .catch(() => undefined);
-      }
-
-      if (pendingTeamProtocol) {
-        setPendingProjectSessionProtocol((current) =>
-          current?.projectId === selectedProjectId ? null : current,
-        );
       }
 
       const nextChatInputMode =
@@ -1854,14 +1807,17 @@ function WorkspaceLayout() {
         teamSetupFailed = true;
       }
     }
-    setPendingProjectSessionProtocol(
-      selectedTeamProtocol
-        ? {
-            projectId: project.id,
-            teamProtocol: selectedTeamProtocol,
-          }
-        : null,
-    );
+    if (selectedTeamProtocol) {
+      try {
+        await projectApi.updateTeamProtocol(project.id, {
+          content: selectedTeamProtocol,
+          enabled: true,
+        });
+      } catch (err) {
+        teamSetupFailed = true;
+        console.error("Failed to save project team protocol", err);
+      }
+    }
     const createdProjectToast = teamSetupFailed
       ? translate(
           "toast.projectCreatedTeamSetupFailed",
@@ -2266,10 +2222,13 @@ function WorkspaceLayout() {
 
 export default function App() {
   return (
-    <AppScaleFrame>
-      <WorkspaceProvider>
-        <WorkspaceLayout />
-      </WorkspaceProvider>
-    </AppScaleFrame>
+    <>
+      <div className="macos-titlebar-drag-region" data-tauri-drag-region />
+      <AppScaleFrame>
+        <WorkspaceProvider>
+          <WorkspaceLayout />
+        </WorkspaceProvider>
+      </AppScaleFrame>
+    </>
   );
 }

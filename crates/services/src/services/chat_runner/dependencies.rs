@@ -1,20 +1,18 @@
-#[cfg(test)]
-use crate::services::config::preset_loader::PresetLoader;
 use crate::services::{
+    agent_activity_stream::{AgentActivityEntryLine, AgentActivityStreamState},
     analytics::AnalyticsService,
     analytics_events::{AnalyticsProjector, DomainEvent},
-    agent_activity_stream::{AgentActivityEntryLine, AgentActivityStreamState},
     chat::{self, ChatServiceError, is_workflow_chat_input_mode},
     config::{self, UiLanguage},
     native_skills::{
         NativeSkillError, auto_allow_builtin_skills, ensure_builtin_skills_installed,
         list_native_skills_for_runner,
     },
+    workflow_analytics,
+    workflow_runtime::resolve_lead_agent,
     workspace_change_capture::{
         WorkspaceChangeBaseline, capture_workspace_change_baseline, capture_workspace_change_delta,
     },
-    workflow_analytics,
-    workflow_runtime::resolve_lead_agent,
 };
 
 const OPENTEAMS_HOME_DIR: &str = ".openteams";

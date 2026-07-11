@@ -219,6 +219,18 @@ pub enum ControlEvent {
 /// reaches `session.idle`, fail the run instead of waiting forever.
 const SESSION_RETRY_LIMIT_BEFORE_FAIL: u64 = 6;
 
+/// Local executor traffic must never inherit user/system proxy settings. A proxy may accept the
+/// loopback connection without forwarding it, leaving the run stuck before session creation.
+const LOCAL_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const LOCAL_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+const HEALTH_REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
+
+fn local_client_builder() -> reqwest::ClientBuilder {
+    reqwest::Client::builder()
+        .no_proxy()
+        .connect_timeout(LOCAL_CONNECT_TIMEOUT)
+}
+
 /// If the local executor server stops emitting any session activity while a request is still
 /// pending, fail the run so the session agent state does not stay stuck on `running` forever.
 const REQUEST_ACTIVITY_TIMEOUT: Duration = Duration::from_secs(3600);
@@ -228,7 +240,7 @@ pub async fn run_session(
     log_writer: LogWriter,
     cancel: CancellationToken,
 ) -> Result<(), ExecutorError> {
-    let client = reqwest::Client::builder()
+    let client = local_client_builder()
         .default_headers(build_default_headers(
             &config.directory,
             &config.server_password,
@@ -245,7 +257,7 @@ pub(super) async fn discover_commands(
     expected_version: &str,
 ) -> Result<Vec<CommandInfo>, ExecutorError> {
     let directory = directory.to_string_lossy();
-    let client = reqwest::Client::builder()
+    let client = local_client_builder()
         .default_headers(build_default_headers(&directory, &server.server_password))
         .build()
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -261,7 +273,7 @@ pub async fn run_slash_command(
     command: slash_commands::OpencodeSlashCommand,
     cancel: CancellationToken,
 ) -> Result<(), ExecutorError> {
-    let client = reqwest::Client::builder()
+    let client = local_client_builder()
         .default_headers(build_default_headers(
             &config.directory,
             &config.server_password,
@@ -553,7 +565,11 @@ pub async fn wait_for_health(
             ))));
         }
 
-        let resp = client.get(format!("{base_url}/global/health")).send().await;
+        let resp = client
+            .get(format!("{base_url}/global/health"))
+            .timeout(HEALTH_REQUEST_TIMEOUT)
+            .send()
+            .await;
         match resp {
             Ok(resp) => {
                 if !resp.status().is_success() {
@@ -596,6 +612,7 @@ pub async fn create_session(
         .post(format!("{base_url}/session"))
         .query(&[("directory", directory)])
         .json(&serde_json::json!({}))
+        .timeout(LOCAL_REQUEST_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -624,6 +641,7 @@ pub async fn fork_session(
         .post(format!("{base_url}/session/{session_id}/fork"))
         .query(&[("directory", directory)])
         .json(&serde_json::json!({}))
+        .timeout(LOCAL_REQUEST_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -694,6 +712,7 @@ async fn prompt(
         .post(format!("{base_url}/session/{session_id}/message"))
         .query(&[("directory", directory)])
         .json(&req)
+        .timeout(REQUEST_ACTIVITY_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -796,6 +815,7 @@ pub async fn session_command(
         .post(format!("{base_url}/session/{session_id}/command"))
         .query(&[("directory", directory)])
         .json(&req)
+        .timeout(REQUEST_ACTIVITY_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -867,6 +887,7 @@ pub async fn session_summarize(
         .post(format!("{base_url}/session/{session_id}/summarize"))
         .query(&[("directory", directory)])
         .json(&req)
+        .timeout(REQUEST_ACTIVITY_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -890,6 +911,7 @@ pub async fn list_commands(
     let resp = client
         .get(format!("{base_url}/command"))
         .query(&[("directory", directory)])
+        .timeout(LOCAL_REQUEST_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -911,6 +933,7 @@ pub async fn list_agents(
     let resp = client
         .get(format!("{base_url}/agent"))
         .query(&[("directory", directory)])
+        .timeout(LOCAL_REQUEST_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -932,6 +955,7 @@ pub async fn config_get(
     let resp = client
         .get(format!("{base_url}/config"))
         .query(&[("directory", directory)])
+        .timeout(LOCAL_REQUEST_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -953,6 +977,7 @@ pub async fn list_config_providers(
     let resp = client
         .get(format!("{base_url}/config/providers"))
         .query(&[("directory", directory)])
+        .timeout(LOCAL_REQUEST_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -974,6 +999,7 @@ pub async fn list_providers(
     let resp = client
         .get(format!("{base_url}/provider"))
         .query(&[("directory", directory)])
+        .timeout(LOCAL_REQUEST_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -995,6 +1021,7 @@ pub async fn mcp_status(
     let resp = client
         .get(format!("{base_url}/mcp"))
         .query(&[("directory", directory)])
+        .timeout(LOCAL_REQUEST_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -1016,6 +1043,7 @@ pub async fn lsp_status(
     let resp = client
         .get(format!("{base_url}/lsp"))
         .query(&[("directory", directory)])
+        .timeout(LOCAL_REQUEST_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -1037,6 +1065,7 @@ pub async fn formatter_status(
     let resp = client
         .get(format!("{base_url}/formatter"))
         .query(&[("directory", directory)])
+        .timeout(LOCAL_REQUEST_TIMEOUT)
         .send()
         .await
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
@@ -1154,9 +1183,14 @@ pub async fn connect_event_stream(
         req = req.header("Last-Event-ID", last_event_id);
     }
 
-    let resp = req
-        .send()
+    let resp = tokio::time::timeout(LOCAL_REQUEST_TIMEOUT, req.send())
         .await
+        .map_err(|_| {
+            ExecutorError::Io(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "OpenCode event stream connection timed out",
+            ))
+        })?
         .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
 
     if !resp.status().is_success() {
@@ -1541,6 +1575,7 @@ async fn process_event_stream(
                         .post(format!("{base_url}/permission/{request_id}/reply"))
                         .query(&[("directory", directory.as_str())])
                         .json(&payload)
+                        .timeout(LOCAL_REQUEST_TIMEOUT)
                         .send()
                         .await;
                 });

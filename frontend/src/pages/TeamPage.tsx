@@ -677,7 +677,7 @@ export function TeamPage() {
   }, [teamProtocolDirty, teamProtocolSuccess]);
 
   useEffect(() => {
-    if (!activeSessionId) {
+    if (!selectedProjectId) {
       setTeamProtocolContent("");
       setOriginalTeamProtocolContent("");
       setTeamProtocolEnabled(false);
@@ -691,8 +691,8 @@ export function TeamPage() {
     setTeamProtocolLoading(true);
     setTeamProtocolError(null);
     setTeamProtocolSuccess(false);
-    void chatSessionsApi
-      .getTeamProtocol(activeSessionId)
+    void projectApi
+      .getTeamProtocol(selectedProjectId)
       .then((protocol) => {
         if (cancelled) return;
         setTeamProtocolContent(protocol.content);
@@ -714,7 +714,7 @@ export function TeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeSessionId, t]);
+  }, [selectedProjectId, t]);
 
   useEffect(() => {
     if (!memberFormState || !selectedMember) {
@@ -1048,13 +1048,13 @@ export function TeamPage() {
   };
 
   const saveTeamProtocol = async () => {
-    if (!activeSessionId) return;
+    if (!selectedProjectId) return;
     setTeamProtocolSaving(true);
     setTeamProtocolError(null);
     setTeamProtocolSuccess(false);
     try {
       const content = teamProtocolContent;
-      const saved = await chatSessionsApi.updateTeamProtocol(activeSessionId, {
+      const saved = await projectApi.updateTeamProtocol(selectedProjectId, {
         content,
         enabled: teamProtocolEnabled || content.trim().length > 0,
       });
@@ -1157,7 +1157,7 @@ export function TeamPage() {
     }
 
     if (
-      !activeSessionId ||
+      !selectedProjectId ||
       !teamProtocolDirty ||
       teamProtocolLoading ||
       teamProtocolSaving ||
@@ -1178,7 +1178,7 @@ export function TeamPage() {
       }
     };
   }, [
-    activeSessionId,
+    selectedProjectId,
     teamProtocolContent,
     teamProtocolDirty,
     teamProtocolError,
@@ -1462,11 +1462,12 @@ export function TeamPage() {
               teamProtocolError={teamProtocolError}
               teamProtocolLoading={teamProtocolLoading}
               teamProtocolSaving={teamProtocolSaving}
-              teamProtocolSessionAvailable={!!activeSessionId}
+              teamProtocolAvailable={!!selectedProjectId}
               teamProtocolSuccess={teamProtocolSuccess}
               workspacePath={workspacePath}
               onMcpServersChange={handleMcpServersChange}
               onTeamProtocolChange={handleTeamProtocolChange}
+              onTeamProtocolSave={() => void saveTeamProtocol()}
               onToggleMcpServer={toggleMcpServer}
               setAllowedSkillIds={setAllowedSkillIds}
               setIsLeader={setIsLeader}

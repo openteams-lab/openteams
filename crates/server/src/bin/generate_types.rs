@@ -411,7 +411,7 @@ fn generate_types_content() -> String {
         server::routes::config::CustomProviderProbeRequest::decl(),
         server::routes::config::CustomProviderProbeStatus::decl(),
         server::routes::config::CustomProviderProbeResponse::decl(),
-        server::routes::chat::presets::TeamProtocolConfig::decl(),
+        server::routes::projects::TeamProtocolConfig::decl(),
         server::routes::chat::presets::TeamPresetMemberSummary::decl(),
         server::routes::chat::presets::TeamPresetSummary::decl(),
         server::routes::chat::presets::TeamPresetListResponse::decl(),

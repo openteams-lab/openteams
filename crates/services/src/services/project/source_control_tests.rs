@@ -695,7 +695,7 @@ async fn git_workspace_reports_external_staged_paths() {
 }
 
 #[tokio::test]
-async fn shared_file_blocks_stage_unless_forced() {
+async fn shared_file_can_be_staged_without_confirmation() {
     let pool = setup_pool().await;
     let (_tempdir, repo_path) = setup_git_workspace();
     let project = seed_project(&pool, &repo_path).await;
@@ -704,7 +704,7 @@ async fn shared_file_blocks_stage_unless_forced() {
         seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
     fs::write(repo_path.join("tracked.txt"), "shared update\n").expect("modify tracked");
 
-    let blocked = SourceControlService::new()
+    let response = SourceControlService::new()
         .stage(
             &pool,
             project.id,
@@ -716,31 +716,52 @@ async fn shared_file_blocks_stage_unless_forced() {
             },
         )
         .await
-        .expect("blocked response");
+        .expect("stage response");
 
-    assert!(!blocked.ok);
-    assert_eq!(
-        blocked.failed[0].code,
-        SourceControlOperationFailureCode::SharedFile
-    );
+    assert!(response.ok);
+    let (_, staged) = git_status_paths(operation_status(&response));
+    assert_eq!(staged, vec!["tracked.txt"]);
+}
 
-    let forced = SourceControlService::new()
-        .stage(
+#[tokio::test]
+async fn shared_file_commit_requires_confirmation() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+    let session_id = seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
+    let _other_session =
+        seed_session_with_paths(&pool, project.id, &repo_path, &["tracked.txt"]).await;
+    fs::write(repo_path.join("tracked.txt"), "shared update\n").expect("modify tracked");
+    git_add(&repo_path, "tracked.txt");
+
+    let error = SourceControlService::new()
+        .commit(
             &pool,
             project.id,
-            SourceControlStageRequest {
+            SourceControlCommitRequest {
                 session_id,
                 workspace_id: None,
-                paths: vec!["tracked.txt".to_string()],
-                force_shared: Some(true),
+                message: "shared update".to_string(),
+                expected_staged_paths: vec!["tracked.txt".to_string()],
+                force_shared: None,
+                work_item_ids: None,
+                expected_head_sha: None,
             },
         )
         .await
-        .expect("forced response");
+        .expect_err("shared commit should require confirmation");
 
-    assert!(forced.ok);
-    let (_, staged) = git_status_paths(operation_status(&forced));
-    assert_eq!(staged, vec!["tracked.txt"]);
+    let SourceControlError::Commit(payload) = error else {
+        panic!("expected structured commit error");
+    };
+    assert_eq!(
+        payload.code,
+        SourceControlCommitErrorCode::SharedFileRequiresConfirmation
+    );
+    assert_eq!(
+        payload.conflicting_paths,
+        Some(vec!["tracked.txt".to_string()])
+    );
 }
 
 #[tokio::test]

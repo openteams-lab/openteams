@@ -80,6 +80,16 @@ type TranslateFn = (
   replacements?: Record<string, string | number>,
 ) => string;
 
+const translateWithFallback = (
+  t: TranslateFn,
+  key: string,
+  fallback: string,
+  replacements?: Record<string, string | number>,
+): string => {
+  const translated = t(key, replacements);
+  return translated && translated !== key ? translated : fallback;
+};
+
 type WorkflowStepForm = {
   title: string;
   description: string;
@@ -138,9 +148,16 @@ const createUniqueTemplateId = (): string =>
     .toString(36)
     .slice(2, 8)}`;
 
-const blankMember = (index: number): MemberForm => ({
+const blankMember = (index: number, t?: TranslateFn): MemberForm => ({
   id: index === 0 ? "lead" : `member_${index + 1}`,
-  name: index === 0 ? "Lead" : `Member ${index + 1}`,
+  name:
+    index === 0
+      ? t
+        ? translateWithFallback(t, "teamTemplates.members.defaultLeadName", "Lead")
+        : "Lead"
+      : t
+        ? translateWithFallback(t, "teamTemplates.members.defaultMemberName", "Member {count}", { count: index + 1 })
+        : `Member ${index + 1}`,
   description: "",
   runnerType: "",
   recommendedModel: "",
@@ -149,7 +166,7 @@ const blankMember = (index: number): MemberForm => ({
   toolsEnabledText: emptyToolsEnabledText,
 });
 
-const blankForm = (): TeamPresetForm => ({
+const blankForm = (t?: TranslateFn): TeamPresetForm => ({
   id: createUniqueTemplateId(),
   name: "",
   description: "",
@@ -157,7 +174,7 @@ const blankForm = (): TeamPresetForm => ({
   workflowSteps: [],
   teamProtocol: "",
   enabled: true,
-  members: [blankMember(0)],
+  members: [blankMember(0, t)],
 });
 
 const detailToForm = (detail: ChatTeamPreset): TeamPresetForm => ({
@@ -231,19 +248,30 @@ const formToPayload = (
 
 const validateTeamPresetForm = (
   form: TeamPresetForm,
+  t?: TranslateFn,
 ): { issue: FormValidationIssue; payload?: never } | {
   issue?: never;
   payload: CreateTeamPresetRequest | UpdateTeamPresetRequest;
 } => {
   if (!form.name.trim()) {
     return {
-      issue: { fieldKey: "team:name", message: "Team name is required." },
+      issue: {
+        fieldKey: "team:name",
+        message: t
+          ? translateWithFallback(t, "teamTemplates.validation.nameRequired", "Team name is required.")
+          : "Team name is required.",
+      },
     };
   }
 
   if (form.members.length === 0) {
     return {
-      issue: { fieldKey: "team:members", message: "At least one member is required." },
+      issue: {
+        fieldKey: "team:members",
+        message: t
+          ? translateWithFallback(t, "teamTemplates.validation.memberRequired", "At least one member is required.")
+          : "At least one member is required.",
+      },
     };
   }
 
@@ -255,7 +283,9 @@ const validateTeamPresetForm = (
         issue: {
           fieldKey: `member:${member.id}:name`,
           memberId: member.id,
-          message: "Member name is required.",
+          message: t
+            ? translateWithFallback(t, "teamTemplates.validation.memberNameRequired", "Member name is required.")
+            : "Member name is required.",
         },
       };
     }
@@ -264,7 +294,9 @@ const validateTeamPresetForm = (
         issue: {
           fieldKey: `member:${member.id}:id`,
           memberId: member.id,
-          message: "Member IDs must be unique.",
+          message: t
+            ? translateWithFallback(t, "teamTemplates.validation.memberIdUnique", "Member IDs must be unique.")
+            : "Member IDs must be unique.",
         },
       };
     }
@@ -279,7 +311,9 @@ const validateTeamPresetForm = (
     return {
       issue: {
         fieldKey: "team:lead_member_id",
-        message: "Lead member must reference an existing member.",
+        message: t
+          ? translateWithFallback(t, "teamTemplates.validation.leadInvalid", "Lead member must reference an existing member.")
+          : "Lead member must reference an existing member.",
       },
     };
   }
@@ -292,7 +326,9 @@ const validateTeamPresetForm = (
         issue: {
           fieldKey: `member:${member.id}:tools_enabled`,
           memberId: member.id,
-          message: "Invalid JSON format. Please check your syntax.",
+          message: t
+            ? translateWithFallback(t, "teamTemplates.validation.invalidJson", "Invalid JSON format. Please check your syntax.")
+            : "Invalid JSON format. Please check your syntax.",
         },
       };
     }
@@ -304,6 +340,7 @@ const validateTeamPresetForm = (
 const validateMemberToolsEnabled = (
   form: TeamPresetForm,
   memberId: string,
+  t?: TranslateFn,
 ): FormValidationIssue | null => {
   const member = form.members.find((item) => item.id === memberId);
   if (!member) return null;
@@ -315,7 +352,9 @@ const validateMemberToolsEnabled = (
     return {
       fieldKey: `member:${member.id}:tools_enabled`,
       memberId: member.id,
-      message: "Invalid JSON format. Please check your syntax.",
+      message: t
+        ? translateWithFallback(t, "teamTemplates.validation.invalidJson", "Invalid JSON format. Please check your syntax.")
+        : "Invalid JSON format. Please check your syntax.",
     };
   }
 };
@@ -331,8 +370,6 @@ export const teamTemplateSessionUpdatePayload = (
   summary_text: null,
   archive_ref: null,
   last_seen_diff_key: null,
-  team_protocol: null,
-  team_protocol_enabled: null,
   default_workspace_path: null,
   ...patch,
 });
@@ -385,7 +422,7 @@ const resolveProjectActiveTemplate = (
   );
 };
 
-type ScenarioCategory = "开发" | "设计" | "科研" | "调研";
+type ScenarioCategory = "development" | "design" | "research" | "discovery";
 
 type WorkflowStepPreview = {
   title: string;
@@ -409,6 +446,9 @@ const interactiveSurfaceClassName =
 const quietButtonClassName =
   `inline-flex items-center justify-center rounded-[4px] ${hairlineSurfaceClassName} text-[var(--team-template-title)] ${interactiveSurfaceClassName}`;
 
+const brandPrimaryButtonClassName =
+  "inline-flex items-center justify-center border border-[var(--primary)] bg-[var(--primary)] font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_1px_2px_rgba(0,0,0,0.24)] transition-all duration-150 ease-out hover:-translate-y-px hover:border-[var(--primary-hover)] hover:bg-[var(--primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--team-template-canvas)] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60";
+
 const activeSurfaceClassName =
   "border border-[var(--team-template-border)] bg-[var(--team-template-active-surface)] shadow-[inset_0_1px_0_var(--team-template-top-highlight-strong)]";
 
@@ -419,70 +459,70 @@ const recommendedBadgeClassName =
   "inline-flex text-[var(--team-template-muted)] transition-colors duration-150 group-hover:text-[var(--team-template-accent)]";
 
 const categoryDotClassName: Record<ScenarioCategory, string> = {
-  开发: "bg-[#4DAAFB]",
-  设计: "bg-[#FF8A65]",
-  科研: "bg-[#5DE4A7]",
-  调研: "bg-[#C4A7FF]",
+  development: "bg-[#4DAAFB]",
+  design: "bg-[#FF8A65]",
+  research: "bg-[#5DE4A7]",
+  discovery: "bg-[#C4A7FF]",
 };
 
 const defaultTemplatePresentation: TeamTemplatePresentation = {
-  categories: ["开发"],
+  categories: ["development"],
   workflow: [
     {
-      title: "目标澄清",
-      description: "确认输入、约束和交付标准。",
+      title: "Clarify goals",
+      description: "Confirm inputs, constraints, and delivery criteria.",
     },
     {
-      title: "分工执行",
-      description: "成员按角色推进任务并同步状态。",
+      title: "Execute by role",
+      description: "Team members advance the work by role and share status.",
     },
     {
-      title: "复审交付",
-      description: "汇总结果、检查风险并形成交付物。",
+      title: "Review delivery",
+      description: "Consolidate results, check risks, and prepare deliverables.",
     },
   ],
 };
 
 const templatePresentationById: Record<string, TeamTemplatePresentation> = {
   "advanced-release-command": {
-    categories: ["开发"],
+    categories: ["development"],
     workflow: [
       {
-        title: "版本范围",
-        description: "确认变更、风险和发布窗口。",
+        title: "Release scope",
+        description: "Confirm changes, risks, and the release window.",
       },
       {
-        title: "质量校验",
-        description: "执行 QA、回归检查和阻塞项整理。",
+        title: "Quality checks",
+        description: "Run QA, regression checks, and blocker triage.",
       },
       {
-        title: "发布叙事",
-        description: "生成 release notes 与用户沟通材料。",
+        title: "Release narrative",
+        description: "Prepare release notes and user communications.",
       },
       {
-        title: "上线复盘",
-        description: "跟踪信号、缺陷和后续行动。",
+        title: "Launch review",
+        description: "Track signals, defects, and follow-up actions.",
       },
     ],
   },
   "advanced-growth-ops": {
-    categories: ["调研"],
+    categories: ["discovery"],
     workflow: [
       {
-        title: "假设收集",
-        description: "梳理实验目标、用户洞察和核心指标。",
+        title: "Collect hypotheses",
+        description: "Frame experiment goals, user insights, and core metrics.",
       },
       {
-        title: "实验设计",
-        description: "确定变量、样本和成功判定方式。",
+        title: "Design experiment",
+        description: "Define variables, samples, and success criteria.",
       },
       {
-        title: "数据解读",
-        description: "分析漏斗变化和显著性风险。",
+        title: "Interpret data",
+        description: "Analyze funnel changes and significance risks.",
       },
       {
-        title: "决策建议",
-        description: "沉淀结论并规划下一轮动作。",
+        title: "Recommend decisions",
+        description: "Capture conclusions and plan the next actions.",
       },
     ],
   },
@@ -491,14 +531,37 @@ const templatePresentationById: Record<string, TeamTemplatePresentation> = {
 const getTemplatePresentation = (teamId: string): TeamTemplatePresentation =>
   templatePresentationById[teamId] ?? defaultTemplatePresentation;
 
+const localizeTemplatePresentation = (
+  teamId: string,
+  t: TranslateFn,
+): TeamTemplatePresentation => {
+  const presentation = getTemplatePresentation(teamId);
+  const workflowKey = templatePresentationById[teamId] ? teamId : "default";
+  return {
+    ...presentation,
+    workflow: presentation.workflow.map((step, index) => ({
+      title: translateWithFallback(
+        t,
+        `teamTemplates.workflow.${workflowKey}.${index + 1}.title`,
+        step.title,
+      ),
+      description: translateWithFallback(
+        t,
+        `teamTemplates.workflow.${workflowKey}.${index + 1}.description`,
+        step.description,
+      ),
+    })),
+  };
+};
+
 const getCategoryIcon = (category?: ScenarioCategory): typeof Box => {
   switch (category) {
-    case "开发":
+    case "development":
       return Terminal;
-    case "设计":
+    case "design":
       return PenTool;
-    case "科研":
-    case "调研":
+    case "research":
+    case "discovery":
       return Telescope;
     default:
       return Box;
@@ -659,6 +722,74 @@ const mockTeamTemplateDetails: Record<string, ChatTeamPreset> = {
   },
 };
 
+const localizeAdvancedTemplateSummary = (
+  template: TeamPresetSummary,
+  t: TranslateFn,
+): TeamPresetSummary => {
+  const prefix = `teamTemplates.recommended.${template.id}`;
+  return {
+    ...template,
+    name: translateWithFallback(t, `${prefix}.name`, template.name),
+    description: translateWithFallback(
+      t,
+      `${prefix}.description`,
+      template.description ?? "",
+    ),
+    members: template.members.map((member) => ({
+      ...member,
+      name: translateWithFallback(
+        t,
+        `${prefix}.member.${member.id}.name`,
+        member.name,
+      ),
+      description: translateWithFallback(
+        t,
+        `${prefix}.member.${member.id}.description`,
+        member.description ?? "",
+      ),
+    })),
+  };
+};
+
+const localizeAdvancedTemplateDetail = (
+  detail: ChatTeamPreset,
+  t: TranslateFn,
+): ChatTeamPreset => {
+  const prefix = `teamTemplates.recommended.${detail.id}`;
+  return {
+    ...detail,
+    name: translateWithFallback(t, `${prefix}.name`, detail.name),
+    description: translateWithFallback(
+      t,
+      `${prefix}.description`,
+      detail.description,
+    ),
+    team_protocol: translateWithFallback(
+      t,
+      `${prefix}.protocol`,
+      detail.team_protocol,
+    ),
+    members: detail.members.map((member) => ({
+      ...member,
+      name: translateWithFallback(
+        t,
+        `${prefix}.member.${member.id}.name`,
+        member.name,
+      ),
+      description: translateWithFallback(
+        t,
+        `${prefix}.member.${member.id}.description`,
+        member.description ?? "",
+      ),
+      system_prompt: translateWithFallback(
+        t,
+        `${prefix}.member.${member.id}.description`,
+        member.system_prompt ?? "",
+      ),
+    })),
+  };
+};
+
 function TeamTemplatesHeader({
   onCreate,
   t,
@@ -671,7 +802,7 @@ function TeamTemplatesHeader({
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--team-template-border)] bg-transparent px-6 shadow-[inset_0_-1px_0_rgba(255,255,255,0.02)]">
       <nav
-        aria-label="Breadcrumb"
+        aria-label={translateWithFallback(t, "teamTemplates.breadcrumb", "Breadcrumb")}
         className="flex min-w-0 items-center gap-1.5"
       >
         <span
@@ -698,7 +829,7 @@ function TeamTemplatesHeader({
         className={`${quietButtonClassName} h-[28px] gap-1.5 px-3 text-[12px] font-medium hover:text-white`}
       >
         <Plus aria-hidden="true" className="h-3.5 w-3.5 -ml-0.5" strokeWidth={1.5} />
-        新建模板
+        {translateWithFallback(t, "teamTemplates.new", "New template")}
         <kbd className="ml-1 rounded border border-[var(--team-template-border)] px-1.5 py-px font-mono text-[10px] font-medium text-[var(--team-template-aux)]">
           N
         </kbd>
@@ -881,10 +1012,12 @@ function AutoGrowingTextarea({
 function WorkflowStepDescriptionTextarea({
   disabled,
   onChange,
+  placeholder,
   value,
 }: {
   disabled?: boolean;
   onChange: (value: string) => void;
+  placeholder: string;
   value: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -902,7 +1035,7 @@ function WorkflowStepDescriptionTextarea({
       disabled={disabled}
       value={value}
       rows={1}
-      placeholder="Add a step description..."
+      placeholder={placeholder}
       onChange={(event) => onChange(event.target.value)}
       className="team-template-workflow-step-description -mx-1 mt-0.5 min-h-6 w-full resize-none overflow-hidden rounded-[3px] border-0 bg-transparent px-1 py-0.5 text-[12px] leading-[1.45] text-[var(--team-template-member-description)] outline-none transition-colors duration-150 placeholder:text-[var(--team-template-aux)] hover:bg-white/[0.035] focus:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-60"
     />
@@ -984,7 +1117,13 @@ function MarkdownEditableField({
   );
 }
 
-function ScenarioBadges({ categories }: { categories: ScenarioCategory[] }) {
+function ScenarioBadges({
+  categories,
+  t,
+}: {
+  categories: ScenarioCategory[];
+  t: TranslateFn;
+}) {
   const visibleCategories = categories.slice(0, 1);
 
   return (
@@ -998,16 +1137,21 @@ function ScenarioBadges({ categories }: { categories: ScenarioCategory[] }) {
           <span
             className={`h-1 w-1 rounded-full ${categoryDotClassName[category]}`}
           />
-          {category}
+          {translateWithFallback(
+            t,
+            `teamTemplates.category.${category}`,
+            category,
+          )}
         </span>
       ))}
     </div>
   );
 }
 
-function RecommendedBadge() {
+function RecommendedBadge({ t }: { t: TranslateFn }) {
+  const label = translateWithFallback(t, "teamTemplates.recommendedBadge", "Recommended");
   return (
-    <span className={recommendedBadgeClassName} aria-label="热门" title="热门">
+    <span className={recommendedBadgeClassName} aria-label={label} title={label}>
       <Flame aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.2} />
     </span>
   );
@@ -1102,7 +1246,7 @@ const getMemberRoleKey = (member: ChatMemberPreset): string => {
   return normalized || "agent";
 };
 
-const memberFallbackValue = "未配置";
+const memberFallbackValue = "Not configured";
 
 const formatMemberValue = (
   value?: string | null,
@@ -1181,7 +1325,7 @@ const formDirtySnapshot = (form: TeamPresetForm): string =>
     })),
   });
 
-const nextMemberDraft = (members: MemberForm[]): MemberForm => {
+const nextMemberDraft = (members: MemberForm[], t?: TranslateFn): MemberForm => {
   const usedIds = new Set(members.map((member) => member.id));
   let index = members.length + 1;
   let id = `member_${index}`;
@@ -1190,9 +1334,11 @@ const nextMemberDraft = (members: MemberForm[]): MemberForm => {
     id = `member_${index}`;
   }
   return {
-    ...blankMember(index - 1),
+    ...blankMember(index - 1, t),
     id,
-    name: `Member ${index}`,
+    name: t
+      ? translateWithFallback(t, "teamTemplates.members.defaultMemberName", "Member {count}", { count: index })
+      : `Member ${index}`,
   };
 };
 
@@ -1288,6 +1434,7 @@ function TemplateMemberInfoPage({
   member,
   onMemberChange,
   runtimes = [],
+  t,
 }: {
   disabled?: boolean;
   editable?: boolean;
@@ -1302,11 +1449,12 @@ function TemplateMemberInfoPage({
     options?: DraftCommitOptions,
   ) => void;
   runtimes?: AgentRuntimeStatus[];
+  t: TranslateFn;
 }) {
   const roleKey = getMemberRoleKey(member);
   const roleDescription = formatMemberValue(
     member.description,
-    "暂无职责描述。",
+    translateWithFallback(t, "teamTemplates.member.noDescription", "No role description."),
   );
   const systemPrompt = formatMemberValue(
     member.system_prompt,
@@ -1331,17 +1479,17 @@ function TemplateMemberInfoPage({
     const options: DropdownSelectOption[] = [
       {
         id: defaultRunnerOptionId,
-        label: "默认执行器",
-        description: "使用首个可用执行器",
+        label: translateWithFallback(t, "teamTemplates.member.defaultRuntime", "Default runtime"),
+        description: translateWithFallback(t, "teamTemplates.member.defaultRuntimeDesc", "Use the first available runtime"),
       },
       ...availableRuntimes.map((runtime) => ({
         id: runtime.runner_type,
         label: getRunnerLabel(runtime.runner_type),
         description:
           runtime.discovered_models.length > 0
-            ? `${runtime.discovered_models.length} 个可用模型`
-            : "未发现模型",
-        group: "可用执行器",
+            ? translateWithFallback(t, "teamTemplates.member.availableModels", "{count} available models", { count: runtime.discovered_models.length })
+            : translateWithFallback(t, "teamTemplates.member.noModels", "No models found"),
+        group: translateWithFallback(t, "teamTemplates.member.availableRuntimes", "Available runtimes"),
       })),
     ];
 
@@ -1352,13 +1500,13 @@ function TemplateMemberInfoPage({
       options.push({
         id: currentRunnerType,
         label: getRunnerLabel(currentRunnerType),
-        description: "当前配置值，执行器当前不可用",
-        group: "当前配置",
+        description: translateWithFallback(t, "teamTemplates.member.runtimeUnavailable", "Current value; runtime is unavailable"),
+        group: translateWithFallback(t, "teamTemplates.member.currentConfig", "Current configuration"),
       });
     }
 
     return options;
-  }, [availableRuntimes, currentRunnerType]);
+  }, [availableRuntimes, currentRunnerType, t]);
   const runtimeForModels = useMemo(
     () =>
       currentRunnerType
@@ -1394,7 +1542,7 @@ function TemplateMemberInfoPage({
         if (cancelled) return;
         setRuntimeSkills([]);
         setRuntimeSkillsError(
-          errorText(error, "无法加载当前执行器的技能。"),
+          errorText(error, translateWithFallback(t, "teamTemplates.member.skillsLoadError", "Could not load skills for this runtime.")),
         );
       })
       .finally(() => {
@@ -1404,15 +1552,15 @@ function TemplateMemberInfoPage({
     return () => {
       cancelled = true;
     };
-  }, [editable, effectiveRunnerType]);
+  }, [editable, effectiveRunnerType, t]);
   const modelOptions = useMemo<DropdownSelectOption[]>(() => {
     const options: DropdownSelectOption[] = [
       {
         id: defaultModelOptionId,
-        label: "默认模型",
+        label: translateWithFallback(t, "teamTemplates.member.defaultModel", "Default model"),
         description: runtimeForModels
-          ? `跟随 ${getRunnerLabel(runtimeForModels.runner_type)} 配置`
-          : "选择执行器后使用默认模型",
+          ? translateWithFallback(t, "teamTemplates.member.followRuntime", "Follow {runtime} configuration", { runtime: getRunnerLabel(runtimeForModels.runner_type) })
+          : translateWithFallback(t, "teamTemplates.member.selectRuntimeForModel", "Select a runtime to use its default model"),
       },
     ];
     const modelNames = [
@@ -1429,7 +1577,7 @@ function TemplateMemberInfoPage({
         description: runtimeForModels
           ? getRunnerLabel(runtimeForModels.runner_type)
           : undefined,
-        group: "可用模型",
+        group: translateWithFallback(t, "teamTemplates.member.availableModelGroup", "Available models"),
       });
     }
 
@@ -1440,20 +1588,20 @@ function TemplateMemberInfoPage({
       options.push({
         id: currentModel,
         label: currentModel,
-        description: "当前配置值，未在执行器模型列表中找到",
-        group: "当前配置",
+        description: translateWithFallback(t, "teamTemplates.member.modelUnavailable", "Current value; not found in the runtime model list"),
+        group: translateWithFallback(t, "teamTemplates.member.currentConfig", "Current configuration"),
       });
     }
 
     return options;
-  }, [currentModel, runtimeForModels]);
+  }, [currentModel, runtimeForModels, t]);
   const skillOptions = useMemo<DropdownSelectOption[]>(() => {
     const options: DropdownSelectOption[] = runtimeSkills.map((skill) => ({
       id: skill.id,
       label: skill.name,
       description: skill.description || skill.id,
-      group: skill.category ?? "已安装技能",
-      hint: skill.enabled ? undefined : "Disabled",
+      group: skill.category ?? translateWithFallback(t, "teamTemplates.member.installedSkills", "Installed skills"),
+      hint: skill.enabled ? undefined : translateWithFallback(t, "teamTemplates.member.disabled", "Disabled"),
     }));
     const knownSkillIds = new Set(options.map((option) => option.id));
     for (const skillId of selectedSkillIds) {
@@ -1465,17 +1613,17 @@ function TemplateMemberInfoPage({
           id: skillId,
           label: installedSkill?.name ?? skillId,
           description: installedSkill
-            ? "当前已选，但不属于当前执行器"
-            : "当前已选，未在已安装技能中找到",
-          group: "当前配置",
+            ? translateWithFallback(t, "teamTemplates.member.skillWrongRuntime", "Selected, but not available for this runtime")
+            : translateWithFallback(t, "teamTemplates.member.skillMissing", "Selected, but not found among installed skills"),
+          group: translateWithFallback(t, "teamTemplates.member.currentConfig", "Current configuration"),
         });
       }
     }
     return options;
-  }, [installedSkills, runtimeSkills, selectedSkillIds]);
+  }, [installedSkills, runtimeSkills, selectedSkillIds, t]);
   const skillPlaceholder = effectiveRunnerType
-    ? `选择 ${getRunnerLabel(effectiveRunnerType)} 技能`
-    : "选择执行器后配置技能";
+    ? translateWithFallback(t, "teamTemplates.member.selectRuntimeSkills", "Select {runtime} skills", { runtime: getRunnerLabel(effectiveRunnerType) })
+    : translateWithFallback(t, "teamTemplates.member.selectRuntimeForSkills", "Select a runtime to configure skills");
 
   if (editable && formMember) {
     return (
@@ -1506,19 +1654,19 @@ function TemplateMemberInfoPage({
         </header>
 
         <div className="team-template-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pt-3">
-          <MemberInfoSection meta="MEMBER" title="成员信息">
+          <MemberInfoSection meta="MEMBER" title={translateWithFallback(t, "teamTemplates.member.info", "Member information")}>
             <div>
               <FormInput
                 disabled={disabled}
                 error={fieldErrors[`member:${memberKey}:name`]}
-                label="成员名"
+                label={translateWithFallback(t, "teamTemplates.member.name", "Member name")}
                 value={formMember.name}
                 variant="inline"
                 onChange={(name) => onMemberChange?.({ name })}
               />
               <FormTextarea
                 disabled={disabled}
-                label="成员描述"
+                label={translateWithFallback(t, "teamTemplates.member.description", "Member description")}
                 rows={1}
                 value={formMember.description}
                 variant="inline"
@@ -1527,18 +1675,18 @@ function TemplateMemberInfoPage({
             </div>
           </MemberInfoSection>
 
-          <MemberInfoSection meta="MODEL" title="模型配置">
+          <MemberInfoSection meta="MODEL" title={translateWithFallback(t, "teamTemplates.member.modelConfig", "Model configuration")}>
             <div>
               <div className="team-template-compact-field grid grid-cols-[72px_minmax(0,1fr)] items-start gap-2 border-b border-[var(--team-template-border)] py-1.5">
                 <span className="pt-1 font-mono text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--team-template-aux)]">
-                  执行器
+                  {translateWithFallback(t, "teamTemplates.member.runtime", "Runtime")}
                 </span>
                 <DropdownSelect
                   value={currentRunnerType || defaultRunnerOptionId}
                   options={runtimeOptions}
-                  placeholder="选择执行器"
-                  searchPlaceholder="搜索执行器..."
-                  emptyLabel="暂无可用执行器"
+                  placeholder={translateWithFallback(t, "teamTemplates.member.selectRuntime", "Select runtime")}
+                  searchPlaceholder={translateWithFallback(t, "teamTemplates.member.searchRuntimes", "Search runtimes...")}
+                  emptyLabel={translateWithFallback(t, "teamTemplates.member.noRuntimes", "No runtimes available")}
                   disabled={disabled}
                   className="w-full [&>button]:h-7 [&>button]:rounded-[3px] [&>button]:border-transparent [&>button]:bg-transparent [&>button]:px-1 [&>button]:py-0 [&>button]:text-[13px] [&>button]:shadow-none [&>button:hover]:bg-white/[0.035]"
                   maxPanelHeightClassName="max-h-[180px]"
@@ -1553,14 +1701,14 @@ function TemplateMemberInfoPage({
               </div>
               <div className="team-template-compact-field grid grid-cols-[72px_minmax(0,1fr)] items-start gap-2 border-b border-[var(--team-template-border)] py-1.5 last:border-b-0">
                 <span className="pt-1 font-mono text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--team-template-aux)]">
-                  模型
+                  {translateWithFallback(t, "teamTemplates.member.model", "Model")}
                 </span>
                 <DropdownSelect
                   value={currentModel || defaultModelOptionId}
                   options={modelOptions}
-                  placeholder="选择模型"
-                  searchPlaceholder="搜索模型..."
-                  emptyLabel="暂无可用模型"
+                  placeholder={translateWithFallback(t, "teamTemplates.member.selectModel", "Select model")}
+                  searchPlaceholder={translateWithFallback(t, "teamTemplates.member.searchModels", "Search models...")}
+                  emptyLabel={translateWithFallback(t, "teamTemplates.member.noAvailableModels", "No models available")}
                   disabled={disabled || modelOptions.length === 0}
                   className="w-full [&>button]:h-7 [&>button]:rounded-[3px] [&>button]:border-transparent [&>button]:bg-transparent [&>button]:px-1 [&>button]:py-0 [&>button]:text-[13px] [&>button]:shadow-none [&>button:hover]:bg-white/[0.035]"
                   maxPanelHeightClassName="max-h-[180px]"
@@ -1575,12 +1723,12 @@ function TemplateMemberInfoPage({
             </div>
           </MemberInfoSection>
 
-          <MemberInfoSection meta="ROLE" title="职责设定">
+          <MemberInfoSection meta="ROLE" title={translateWithFallback(t, "teamTemplates.member.role", "Role instructions")}>
             <MarkdownEditableField
               compact
               disabled={disabled}
               editable
-              placeholder="填写成员职责设定..."
+              placeholder={translateWithFallback(t, "teamTemplates.member.rolePlaceholder", "Describe this member's responsibilities...")}
               rows={4}
               value={formMember.systemPrompt}
               onCommit={(systemPrompt) =>
@@ -1589,17 +1737,17 @@ function TemplateMemberInfoPage({
             />
           </MemberInfoSection>
 
-          <MemberInfoSection meta="SKILLS" title="技能配置">
+          <MemberInfoSection meta="SKILLS" title={translateWithFallback(t, "teamTemplates.member.skills", "Skills configuration")}>
             <DropdownSelect
               selectionMode="multiple"
               values={selectedSkillIds}
               options={skillOptions}
               placeholder={skillPlaceholder}
-              searchPlaceholder="搜索技能..."
+              searchPlaceholder={translateWithFallback(t, "teamTemplates.member.searchSkills", "Search skills...")}
               emptyLabel={
                 runtimeSkillsLoading
-                  ? "正在加载技能..."
-                  : runtimeSkillsError || "当前执行器暂无可用技能"
+                  ? translateWithFallback(t, "teamTemplates.member.loadingSkills", "Loading skills...")
+                  : runtimeSkillsError || translateWithFallback(t, "teamTemplates.member.noRuntimeSkills", "No skills available for this runtime")
               }
               disabled={disabled || runtimeSkillsLoading || skillOptions.length === 0}
               className="w-full [&>button]:min-h-7 [&>button]:rounded-[3px] [&>button]:border-transparent [&>button]:bg-transparent [&>button]:px-1 [&>button]:py-1 [&>button]:text-[13px] [&>button]:shadow-none [&>button:hover]:bg-white/[0.035]"
@@ -1607,7 +1755,7 @@ function TemplateMemberInfoPage({
               formatValueLabel={(selectedOptions) => {
                 if (selectedOptions.length === 0) return skillPlaceholder;
                 if (selectedOptions.length === 1) return selectedOptions[0].label;
-                return `${selectedOptions.length} 个技能`;
+                return translateWithFallback(t, "teamTemplates.member.skillCount", "{count} skills", { count: selectedOptions.length });
               }}
               onChange={(values) =>
                 onMemberChange?.({ selectedSkillIdsText: values.join(", ") })
@@ -1615,7 +1763,7 @@ function TemplateMemberInfoPage({
             />
           </MemberInfoSection>
 
-          <MemberInfoSection meta="MCP" title="MCP 配置">
+          <MemberInfoSection meta="MCP" title={translateWithFallback(t, "teamTemplates.member.mcp", "MCP configuration")}>
             <label className="relative block">
               <span
                 aria-hidden="true"
@@ -1689,26 +1837,26 @@ function TemplateMemberInfoPage({
       </header>
 
       <div className="team-template-scrollbar min-h-0 flex-1 space-y-7 overflow-y-auto pt-4">
-        <MemberInfoSection meta="MODEL" title="模型配置">
+        <MemberInfoSection meta="MODEL" title={translateWithFallback(t, "teamTemplates.member.modelConfig", "Model configuration")}>
           <div>
             <MemberInfoField
               label="Runtime"
-              value={formatMemberValue(member.runner_type, "默认运行时")}
+              value={formatMemberValue(member.runner_type, translateWithFallback(t, "teamTemplates.member.defaultRuntime", "Default runtime"))}
             />
             <MemberInfoField
               label="Model"
-              value={formatMemberValue(member.recommended_model, "默认模型")}
+              value={formatMemberValue(member.recommended_model, translateWithFallback(t, "teamTemplates.member.defaultModel", "Default model"))}
             />
           </div>
         </MemberInfoSection>
 
-        <MemberInfoSection meta="ROLE" title="职责设定">
+        <MemberInfoSection meta="ROLE" title={translateWithFallback(t, "teamTemplates.member.role", "Role instructions")}>
           <div className="team-template-role-markdown mt-3 max-h-[220px] overflow-auto text-[12px] leading-[1.55] text-[var(--team-template-member-description)] ot-scroll-area-styled">
             <AgentMarkdown content={systemPrompt} fontSize={12} />
           </div>
         </MemberInfoSection>
 
-        <MemberInfoSection meta="SKILLS" title="技能配置">
+        <MemberInfoSection meta="SKILLS" title={translateWithFallback(t, "teamTemplates.member.skills", "Skills configuration")}>
           {member.selected_skill_ids.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {member.selected_skill_ids.map((skillId) => (
@@ -1722,19 +1870,19 @@ function TemplateMemberInfoPage({
             </div>
           ) : (
             <p className="text-[12px] text-[var(--team-template-member-description)]">
-              暂未选择技能。
+              {translateWithFallback(t, "teamTemplates.member.noSkillsSelected", "No skills selected.")}
             </p>
           )}
         </MemberInfoSection>
 
-        <MemberInfoSection meta="MCP" title="MCP 配置">
+        <MemberInfoSection meta="MCP" title={translateWithFallback(t, "teamTemplates.member.mcp", "MCP configuration")}>
           {mcpConfig ? (
             <pre className="max-h-[220px] overflow-auto font-mono text-[11px] leading-relaxed text-[var(--team-template-code-text)] ot-scroll-area-styled">
               {mcpConfig}
             </pre>
           ) : (
             <p className="text-[12px] text-[var(--team-template-member-description)]">
-              暂未配置 MCP。
+              {translateWithFallback(t, "teamTemplates.member.noMcp", "No MCP configuration.")}
             </p>
           )}
         </MemberInfoSection>
@@ -1772,11 +1920,13 @@ function WorkflowPreview({
   editable = false,
   onStepsChange,
   steps,
+  t,
 }: {
   disabled?: boolean;
   editable?: boolean;
   onStepsChange?: (steps: WorkflowStepForm[]) => void;
   steps: WorkflowStepPreview[];
+  t: TranslateFn;
 }) {
   const stepCountLabel = String(steps.length).padStart(2, "0");
   const [litDotCount, setLitDotCount] = useState(0);
@@ -1816,7 +1966,7 @@ function WorkflowPreview({
     >
       <div className="mb-3 flex min-h-7 items-center justify-between gap-3">
         <h2 className="text-[12px] font-medium tracking-[0.02em] text-[var(--team-template-muted)]">
-          工作流程
+          {translateWithFallback(t, "teamTemplates.workflow.title", "Workflow")}
         </h2>
         <span className="inline-flex items-center gap-1.5 font-mono text-[9px] font-medium text-[var(--team-template-aux)] tabular-nums">
           <Workflow aria-hidden="true" className="h-3 w-3" strokeWidth={1.2} />
@@ -1828,7 +1978,7 @@ function WorkflowPreview({
         <div className="team-template-deboxed-workflow relative space-y-1 border-l border-[var(--team-template-border)] pl-4">
           {editableSteps.length === 0 && (
             <p className="rounded-[4px] border border-dashed border-[var(--team-template-border)] px-3 py-4 text-[12px] text-[var(--team-template-muted)]">
-              No workflow steps defined.
+              {translateWithFallback(t, "teamTemplates.workflow.empty", "No workflow steps defined.")}
             </p>
           )}
           {editableSteps.map((step, index) => (
@@ -1847,7 +1997,7 @@ function WorkflowPreview({
                 <input
                   disabled={disabled}
                   value={step.title}
-                  placeholder="Step title"
+                  placeholder={translateWithFallback(t, "teamTemplates.workflow.stepTitle", "Step title")}
                   onChange={(event) =>
                     updateStep(index, { title: event.target.value })
                   }
@@ -1855,6 +2005,7 @@ function WorkflowPreview({
                 />
                 <WorkflowStepDescriptionTextarea
                   disabled={disabled}
+                  placeholder={translateWithFallback(t, "teamTemplates.workflow.stepDescription", "Add a step description...")}
                   value={step.description}
                   onChange={(description) => updateStep(index, { description })}
                 />
@@ -1868,7 +2019,7 @@ function WorkflowPreview({
                   )
                 }
                 className="pointer-events-none flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--team-template-muted)] opacity-0 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 group-hover:pointer-events-auto group-hover:opacity-100 focus:pointer-events-auto focus:opacity-100 disabled:opacity-40"
-                aria-label="Remove workflow step"
+                aria-label={translateWithFallback(t, "teamTemplates.workflow.removeStep", "Remove workflow step")}
               >
                 <Trash2 aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.4} />
               </button>
@@ -1883,14 +2034,14 @@ function WorkflowPreview({
             className={`${quietButtonClassName} mt-2 h-7 gap-1.5 px-2.5 text-[11px] font-medium disabled:opacity-50`}
           >
             <Plus aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.4} />
-            Add Step
+            {translateWithFallback(t, "teamTemplates.workflow.addStep", "Add step")}
           </button>
         </div>
       ) : (
       <div>
         {steps.length === 0 ? (
           <p className="rounded-md border border-dashed border-[var(--team-template-border)] px-3 py-4 text-[12px] text-[var(--team-template-muted)]">
-            No workflow steps defined.
+            {translateWithFallback(t, "teamTemplates.workflow.empty", "No workflow steps defined.")}
           </p>
         ) : (
         <ol className="space-y-3">
@@ -1907,7 +2058,9 @@ function WorkflowPreview({
               >
                 <div className="relative flex w-2.5 shrink-0 justify-center pt-[5px]">
                   <span
-                    aria-label={isProgressStep ? "进行中" : "已完成"}
+                    aria-label={isProgressStep
+                      ? translateWithFallback(t, "teamTemplates.workflow.inProgress", "In progress")
+                      : translateWithFallback(t, "teamTemplates.workflow.completed", "Completed")}
                     className={[
                       "team-template-workflow-dot relative z-10 shrink-0 rounded-full transition-colors duration-150",
                       dotLit ? "team-template-workflow-dot-lit" : "",
@@ -1976,6 +2129,7 @@ function TemplateDetailView({
   onRetryDetail,
   onSave,
   onUseTemplate,
+  t,
 }: {
   canEdit: boolean;
   canUseTemplate: boolean;
@@ -2004,6 +2158,7 @@ function TemplateDetailView({
   onRetryDetail: () => void;
   onSave?: () => void;
   onUseTemplate: () => void;
+  t: TranslateFn;
 }) {
   const [readonlySelectedMemberId, setReadonlySelectedMemberId] = useState<
     string | null
@@ -2079,23 +2234,23 @@ function TemplateDetailView({
     return (
       <div className="mx-auto w-full max-w-[1280px] p-6 pt-24 text-center md:p-8 lg:p-10">
         <h2 className="text-[16px] font-medium text-[var(--team-template-title)]">
-          Could not load template details
+          {translateWithFallback(t, "teamTemplates.detail.loadError", "Could not load template details")}
         </h2>
         <p className="mt-2 text-[14px] text-[var(--team-template-muted)]">
-          {detailError || "Unknown error occurred."}
+          {detailError || translateWithFallback(t, "teamTemplates.unknownError", "Unknown error occurred.")}
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <button
             onClick={onBack}
             className={`${quietButtonClassName} px-4 py-2 text-[13px] font-medium`}
           >
-            Back to list
+            {translateWithFallback(t, "teamTemplates.backToList", "Back to list")}
           </button>
           <button
             onClick={onRetryDetail}
             className="rounded-md border border-white/10 bg-[#ededed] px-4 py-2 text-[13px] font-medium text-[#08090a] transition-all duration-150 hover:-translate-y-px hover:bg-white"
           >
-            Retry
+            {translateWithFallback(t, "teamTemplates.retry", "Retry")}
           </button>
         </div>
       </div>
@@ -2104,7 +2259,7 @@ function TemplateDetailView({
 
   if (!viewDetail) return null;
 
-  const presentation = getTemplatePresentation(viewDetail.id);
+  const presentation = localizeTemplatePresentation(viewDetail.id, t);
   const DetailCategoryIcon = getTemplateIcon(
     viewDetail.id,
     viewDetail.name,
@@ -2165,7 +2320,7 @@ function TemplateDetailView({
 
   const addCustomMember = () => {
     if (!form) return;
-    const nextMember = nextMemberDraft(form.members);
+    const nextMember = nextMemberDraft(form.members, t);
     const nextForm = {
       ...form,
       leadMemberId: form.leadMemberId || nextMember.id,
@@ -2205,7 +2360,9 @@ function TemplateDetailView({
         className="mb-5 flex items-center gap-2 text-[12px] font-medium text-[var(--team-template-muted)] transition-colors duration-150 hover:text-[var(--team-template-title)]"
       >
         <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.2} />{" "}
-        {isEditing ? "退出" : "返回模板"}
+        {isEditing
+          ? translateWithFallback(t, "teamTemplates.exit", "Exit")
+          : translateWithFallback(t, "teamTemplates.back", "Back to templates")}
       </button>
 
       <header
@@ -2233,7 +2390,7 @@ function TemplateDetailView({
                   <input
                     disabled={controlsDisabled}
                     value={form.name}
-                    placeholder="Untitled template"
+                    placeholder={translateWithFallback(t, "teamTemplates.untitled", "Untitled template")}
                     onChange={(event) =>
                       onFormChange?.({ ...form, name: event.target.value })
                     }
@@ -2251,7 +2408,7 @@ function TemplateDetailView({
                   )}
                   <AutoGrowingTextarea
                     disabled={controlsDisabled}
-                    placeholder="Add a description..."
+                    placeholder={translateWithFallback(t, "teamTemplates.descriptionPlaceholder", "Add a description...")}
                     value={form.description}
                     onChange={(description) =>
                       onFormChange?.({ ...form, description })
@@ -2264,13 +2421,13 @@ function TemplateDetailView({
                     <h1 className="truncate text-[20px] font-semibold leading-tight text-[var(--team-template-title)]">
                       {viewDetail.name}
                     </h1>
-                    {viewDetail.is_builtin && <RecommendedBadge />}
+                    {viewDetail.is_builtin && <RecommendedBadge t={t} />}
                   </div>
                   <div className="mt-2">
-                    <ScenarioBadges categories={presentation.categories} />
+                    <ScenarioBadges categories={presentation.categories} t={t} />
                   </div>
                   <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-[var(--team-template-muted)]">
-                    {viewDetail.description || "No description provided for this template."}
+                    {viewDetail.description || translateWithFallback(t, "teamTemplates.noDescription", "No description provided for this template.")}
                   </p>
                 </>
               )}
@@ -2302,10 +2459,12 @@ function TemplateDetailView({
                       type="button"
                       disabled={controlsDisabled}
                       onClick={onSave ?? (() => undefined)}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-[4px] border border-white/10 bg-[#ededed] px-3.5 text-[12px] font-medium text-[#08090a] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-all duration-150 ease-out hover:bg-white disabled:opacity-60"
+                      className={`${brandPrimaryButtonClassName} h-8 gap-1.5 rounded-[4px] px-3.5 text-[12px]`}
                     >
                       <Save aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      {saving ? "Saving..." : "Create"}
+                      {saving
+                        ? translateWithFallback(t, "teamTemplates.saving", "Saving...")
+                        : translateWithFallback(t, "teamTemplates.create", "Create")}
                     </button>
                   )}
                   {editorMode === "edit" && (
@@ -2315,7 +2474,7 @@ function TemplateDetailView({
                         disabled={controlsDisabled}
                         onClick={() => setMoreMenuOpen((open) => !open)}
                         className="flex h-7 w-7 items-center justify-center rounded-[4px] text-[var(--team-template-aux)] transition-colors duration-150 hover:bg-[var(--team-template-row-hover)] hover:text-[var(--team-template-title)] disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label="More actions"
+                        aria-label={translateWithFallback(t, "teamTemplates.moreActions", "More actions")}
                         aria-expanded={moreMenuOpen}
                       >
                         <MoreHorizontal aria-hidden="true" className="h-4 w-4" strokeWidth={1.6} />
@@ -2332,7 +2491,9 @@ function TemplateDetailView({
                             className="flex h-8 w-full items-center gap-2 rounded-[6px] px-2.5 text-left text-[12px] font-medium text-red-300/90 transition-colors duration-150 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <Trash2 aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.4} />
-                            {deleting ? "Deleting..." : "Delete template"}
+                            {deleting
+                              ? translateWithFallback(t, "teamTemplates.deleting", "Deleting...")
+                              : translateWithFallback(t, "teamTemplates.deleteTemplate", "Delete template")}
                           </button>
                         </div>
                       )}
@@ -2350,7 +2511,7 @@ function TemplateDetailView({
                   className="inline-flex h-8 items-center justify-center gap-1.5 bg-transparent px-2 text-[12px] font-medium text-[var(--team-template-muted)] transition-colors duration-150 hover:text-[var(--team-template-title)] disabled:opacity-50"
                 >
                   <Pencil aria-hidden="true" className="h-3.5 w-3.5 text-[var(--team-template-muted)]" strokeWidth={1.2} />
-                  编辑
+                  {translateWithFallback(t, "teamTemplates.edit", "Edit")}
                 </button>
                 <button
                   type="button"
@@ -2359,7 +2520,9 @@ function TemplateDetailView({
                   className={`${dangerGhostButtonClassName} h-8 gap-1.5 px-3 text-[12px] font-medium`}
                 >
                   <Trash2 aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.2} />
-                  {deleting ? "Deleting..." : "Delete"}
+                  {deleting
+                    ? translateWithFallback(t, "teamTemplates.deleting", "Deleting...")
+                    : translateWithFallback(t, "teamTemplates.delete", "Delete")}
                 </button>
               </>
             )}
@@ -2368,10 +2531,12 @@ function TemplateDetailView({
                 type="button"
                 onClick={onUseTemplate}
                 disabled={usingTemplate || deleting}
-                className="inline-flex h-8 items-center gap-2 rounded-[6px] border border-white/20 bg-[#f4f4f5] px-3 text-[12px] font-semibold text-[#08090a] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(0,0,0,0.08),0_1px_0_rgba(0,0,0,0.35),0_2px_0_rgba(0,0,0,0.16)] transition-all duration-150 ease-out hover:-translate-y-px hover:bg-white"
+                className={`${brandPrimaryButtonClassName} h-8 gap-2 rounded-[6px] px-3 text-[12px]`}
               >
-                {usingTemplate ? "应用中..." : "使用模板"}
-                <kbd className="rounded-[3px] border border-black/10 bg-black/[0.035] px-1.5 py-px font-mono text-[9px] font-semibold leading-none text-black/55">
+                {usingTemplate
+                  ? translateWithFallback(t, "teamTemplates.applying", "Applying...")
+                  : translateWithFallback(t, "teamTemplates.use", "Use template")}
+                <kbd className="rounded-[3px] border border-white/25 bg-white/10 px-1.5 py-px font-mono text-[9px] font-semibold leading-none text-white/75">
                   ⌘ Enter
                 </kbd>
               </button>
@@ -2390,6 +2555,7 @@ function TemplateDetailView({
           disabled={controlsDisabled}
           editable={isEditing}
           steps={workflowSteps}
+          t={t}
           onStepsChange={(workflowSteps) => {
             if (form) commitFormChange({ ...form, workflowSteps });
           }}
@@ -2402,7 +2568,7 @@ function TemplateDetailView({
         >
           <header className="mb-2 flex min-h-7 items-center justify-between gap-3">
             <h2 className="text-[12px] font-medium tracking-[0.02em] text-[var(--team-template-muted)]">
-              成员信息
+              {translateWithFallback(t, "teamTemplates.members.title", "Members")}
             </h2>
             <div className="flex items-center gap-2">
               <span className="font-mono text-[9px] font-medium text-[var(--team-template-aux)] tabular-nums">
@@ -2416,7 +2582,7 @@ function TemplateDetailView({
                   className={`${quietButtonClassName} h-7 gap-1.5 px-2.5 text-[11px] font-medium disabled:opacity-50`}
                 >
                   <Plus aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.4} />
-                  Add Member
+                  {translateWithFallback(t, "teamTemplates.members.add", "Add member")}
                 </button>
               )}
             </div>
@@ -2425,7 +2591,7 @@ function TemplateDetailView({
           <div>
               {viewDetail.members.length === 0 && (
                 <p className="rounded-[4px] border border-dashed border-[var(--team-template-border)] px-3 py-4 text-[12px] text-[var(--team-template-muted)]">
-                  No members added yet.
+                  {translateWithFallback(t, "teamTemplates.members.empty", "No members added yet.")}
                 </p>
               )}
               {viewDetail.members.map((member, index) => {
@@ -2435,7 +2601,7 @@ function TemplateDetailView({
                 const description =
                   member.description ||
                   member.system_prompt ||
-                  "No role description.";
+                  translateWithFallback(t, "teamTemplates.member.noDescription", "No role description.");
 
                 const rowClassName = [
                   "team-template-member-row group grid min-h-[38px] w-full grid-cols-1 gap-1 border-b border-[var(--team-template-border)] px-1.5 py-1.5 text-left text-[13px] transition-colors duration-150 last:border-b-0 md:grid-cols-[minmax(140px,0.72fr)_minmax(0,1fr)_auto] md:items-center md:gap-2",
@@ -2461,7 +2627,7 @@ function TemplateDetailView({
                           }}
                           onClick={(event) => event.stopPropagation()}
                           className="h-3.5 w-3.5 shrink-0 border-[var(--team-template-border-strong)] bg-[var(--team-template-field-surface)] text-[var(--primary)] focus:ring-[var(--primary)] disabled:opacity-60"
-                          aria-label="Set lead member"
+                          aria-label={translateWithFallback(t, "teamTemplates.members.setLead", "Set lead member")}
                         />
                       ) : null}
                       <span
@@ -2473,7 +2639,7 @@ function TemplateDetailView({
                       {isLead && (
                         <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--team-template-muted)]">
                           <span className="h-1 w-1 rounded-full bg-current opacity-70" />
-                          Lead
+                          {translateWithFallback(t, "teamTemplates.members.lead", "Lead")}
                         </span>
                       )}
                     </span>
@@ -2492,7 +2658,7 @@ function TemplateDetailView({
                           title={member.selected_skill_ids.join(", ")}
                         >
                           <span className="h-1 w-1 rounded-full bg-current opacity-60" />
-                          {member.selected_skill_ids.length} skills
+                          {translateWithFallback(t, "teamTemplates.member.skillCount", "{count} skills", { count: member.selected_skill_ids.length })}
                         </span>
                       )}
                       {isEditing ? (
@@ -2504,7 +2670,7 @@ function TemplateDetailView({
                             removeFormMember(member.id);
                           }}
                           className="pointer-events-none flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--team-template-muted)] opacity-0 transition-all duration-150 hover:bg-red-500/10 hover:text-red-300 group-hover:pointer-events-auto group-hover:opacity-100 focus:pointer-events-auto focus:opacity-100 disabled:opacity-40"
-                          aria-label="Remove member"
+                          aria-label={translateWithFallback(t, "teamTemplates.members.remove", "Remove member")}
                         >
                           <Trash2 aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.4} />
                         </button>
@@ -2550,7 +2716,7 @@ function TemplateDetailView({
         <section className="mt-12 border-t border-[var(--team-template-border)] pt-6">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-[12px] font-medium tracking-[0.02em] text-[var(--team-template-muted)]">
-              协作协议
+              {translateWithFallback(t, "teamTemplates.protocol.title", "Collaboration protocol")}
             </h2>
             <span className="font-mono text-[9px] font-medium text-[var(--team-template-aux)]">
               TEAM PROTOCOL
@@ -2561,7 +2727,7 @@ function TemplateDetailView({
               <MarkdownEditableField
                 disabled={controlsDisabled}
                 editable
-                placeholder="填写团队协作协议..."
+                placeholder={translateWithFallback(t, "teamTemplates.protocol.placeholder", "Describe how the team should collaborate...")}
                 rows={7}
                 value={form.teamProtocol}
                 onCommit={(teamProtocol) => {
@@ -2590,6 +2756,7 @@ function TemplateDetailView({
             member={selectedMember}
             onMemberChange={updateSelectedFormMember}
             runtimes={runtimes}
+            t={t}
           />
         )}
       </aside>
@@ -2602,11 +2769,13 @@ function UnsavedEditorExitDialog({
   onCancel,
   onDiscard,
   onSave,
+  t,
 }: {
   saving: boolean;
   onCancel: () => void;
   onDiscard: () => void;
   onSave: () => void;
+  t: TranslateFn;
 }) {
   return (
     <div
@@ -2625,10 +2794,10 @@ function UnsavedEditorExitDialog({
               id="unsaved-template-title"
               className="text-[15px] font-semibold text-[var(--team-template-title)]"
             >
-              保存修改后退出？
+              {translateWithFallback(t, "teamTemplates.unsaved.title", "Save changes before exiting?")}
             </h2>
             <p className="mt-1 text-[13px] leading-relaxed text-[var(--team-template-muted)]">
-              当前模板有未保存的修改。可以先保存，或丢弃修改直接退出编辑状态。
+              {translateWithFallback(t, "teamTemplates.unsaved.description", "This template has unsaved changes. Save them first, or discard them and exit editing.")}
             </p>
           </div>
           <button
@@ -2636,8 +2805,8 @@ function UnsavedEditorExitDialog({
             onClick={onCancel}
             disabled={saving}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] text-[var(--team-template-muted)] transition hover:bg-[var(--team-template-row-hover)] hover:text-[var(--team-template-title)] disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="继续编辑"
-            title="继续编辑"
+            aria-label={translateWithFallback(t, "teamTemplates.unsaved.continue", "Continue editing")}
+            title={translateWithFallback(t, "teamTemplates.unsaved.continue", "Continue editing")}
           >
             <X aria-hidden="true" className="h-3.5 w-3.5" />
           </button>
@@ -2650,7 +2819,7 @@ function UnsavedEditorExitDialog({
             disabled={saving}
             className={`${dangerGhostButtonClassName} h-8 px-3 text-[12px] font-medium disabled:cursor-not-allowed`}
           >
-            丢弃修改
+            {translateWithFallback(t, "teamTemplates.unsaved.discard", "Discard changes")}
           </button>
           <button
             type="button"
@@ -2658,7 +2827,7 @@ function UnsavedEditorExitDialog({
             disabled={saving}
             className={`${quietButtonClassName} h-8 px-3 text-[12px] font-medium disabled:cursor-not-allowed disabled:opacity-60`}
           >
-            继续编辑
+            {translateWithFallback(t, "teamTemplates.unsaved.continue", "Continue editing")}
           </button>
           <button
             type="button"
@@ -2666,7 +2835,9 @@ function UnsavedEditorExitDialog({
             disabled={saving}
             className="inline-flex h-8 items-center justify-center rounded-[6px] border border-white/20 bg-[#f4f4f5] px-3 text-[12px] font-semibold text-[#08090a] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(0,0,0,0.08),0_1px_0_rgba(0,0,0,0.35),0_2px_0_rgba(0,0,0,0.16)] transition-all duration-150 ease-out hover:-translate-y-px hover:bg-white disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-70"
           >
-            {saving ? "保存中..." : "保存并退出"}
+            {saving
+              ? translateWithFallback(t, "teamTemplates.saving", "Saving...")
+              : translateWithFallback(t, "teamTemplates.unsaved.saveAndExit", "Save and exit")}
           </button>
         </div>
       </div>
@@ -2679,11 +2850,13 @@ function UseTeamTemplateDialog({
   detail,
   onCancel,
   onConfirm,
+  t,
 }: {
   applying: boolean;
   detail: ChatTeamPreset;
   onCancel: () => void;
   onConfirm: () => void;
+  t: TranslateFn;
 }) {
   return (
     <div
@@ -2702,10 +2875,10 @@ function UseTeamTemplateDialog({
               id="use-team-template-title"
               className="text-[15px] font-semibold text-[var(--team-template-title)]"
             >
-              确认使用模板
+              {translateWithFallback(t, "teamTemplates.useDialog.title", "Use this template?")}
             </h2>
             <p className="mt-1 text-[13px] leading-relaxed text-[var(--team-template-muted)]">
-              使用此模板替换掉当前团队成员，并同步团队协议。
+              {translateWithFallback(t, "teamTemplates.useDialog.description", "This replaces the current team members and syncs the team protocol.")}
             </p>
             <p className="mt-3 truncate rounded-[7px] border border-[var(--team-template-border)] px-3 py-2 text-[12px] font-medium text-[var(--team-template-title)]">
               {detail.name}
@@ -2716,8 +2889,8 @@ function UseTeamTemplateDialog({
             onClick={onCancel}
             disabled={applying}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] text-[var(--team-template-muted)] transition hover:bg-[var(--team-template-row-hover)] hover:text-[var(--team-template-title)] disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="取消"
-            title="取消"
+            aria-label={translateWithFallback(t, "teamTemplates.cancel", "Cancel")}
+            title={translateWithFallback(t, "teamTemplates.cancel", "Cancel")}
           >
             <X aria-hidden="true" className="h-3.5 w-3.5" />
           </button>
@@ -2730,7 +2903,7 @@ function UseTeamTemplateDialog({
             disabled={applying}
             className={`${quietButtonClassName} h-8 px-3 text-[12px] font-medium disabled:cursor-not-allowed disabled:opacity-60`}
           >
-            取消
+            {translateWithFallback(t, "teamTemplates.cancel", "Cancel")}
           </button>
           <button
             type="button"
@@ -2738,7 +2911,9 @@ function UseTeamTemplateDialog({
             disabled={applying}
             className="inline-flex h-8 items-center justify-center rounded-[6px] border border-white/20 bg-[#f4f4f5] px-3 text-[12px] font-semibold text-[#08090a] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(0,0,0,0.08),0_1px_0_rgba(0,0,0,0.35),0_2px_0_rgba(0,0,0,0.16)] transition-all duration-150 ease-out hover:-translate-y-px hover:bg-white disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-70"
           >
-            {applying ? "替换中..." : "确认替换"}
+            {applying
+              ? translateWithFallback(t, "teamTemplates.replacing", "Replacing...")
+              : translateWithFallback(t, "teamTemplates.confirmReplace", "Confirm replacement")}
           </button>
         </div>
       </div>
@@ -2749,11 +2924,13 @@ function UseTeamTemplateDialog({
 function TemplateCard({
   template,
   onClick,
+  t,
 }: {
   template: TeamPresetSummary;
   onClick: () => void;
+  t: TranslateFn;
 }) {
-  const presentation = getTemplatePresentation(template.id);
+  const presentation = localizeTemplatePresentation(template.id, t);
   const CategoryIcon = getTemplateIcon(
     template.id,
     template.name,
@@ -2767,7 +2944,7 @@ function TemplateCard({
     >
       {template.is_builtin && (
         <div className="absolute right-3 top-3">
-          <RecommendedBadge />
+          <RecommendedBadge t={t} />
         </div>
       )}
 
@@ -2792,10 +2969,10 @@ function TemplateCard({
 
       <div className="mt-auto flex items-center justify-between gap-3 pt-0.5">
         <div className="flex min-w-0 items-center gap-2">
-          <ScenarioBadges categories={presentation.categories} />
+          <ScenarioBadges categories={presentation.categories} t={t} />
           <AgentAvatarGroup template={template} />
           <span className="min-w-0 font-mono text-[11px] font-medium text-[var(--team-template-aux)] tabular-nums">
-            {template.member_count} 成员
+            {translateWithFallback(t, "teamTemplates.memberCount", "{count} members", { count: template.member_count })}
           </span>
         </div>
         <span className="shrink-0 font-mono text-[10px] font-medium text-[var(--team-template-aux)] tabular-nums">
@@ -2826,7 +3003,7 @@ export function TeamTemplatesPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode>(null);
-  const [form, setForm] = useState<TeamPresetForm>(blankForm);
+  const [form, setForm] = useState<TeamPresetForm>(() => blankForm(t));
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showExitPrompt, setShowExitPrompt] = useState(false);
@@ -2852,11 +3029,11 @@ export function TeamTemplatesPage() {
       const response = await teamPresetsApi.list();
       setTemplates(response.teams);
     } catch (error) {
-      setLoadError(errorText(error, "Failed to load templates."));
+      setLoadError(errorText(error, translateWithFallback(t, "teamTemplates.loadError", "Failed to load templates.")));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const loadDetail = useCallback(async (teamId: string) => {
     setDetailLoading(true);
@@ -2864,17 +3041,17 @@ export function TeamTemplatesPage() {
     try {
       const mockDetail = mockTeamTemplateDetails[teamId];
       if (mockDetail) {
-        setSelectedDetail(mockDetail);
+        setSelectedDetail(localizeAdvancedTemplateDetail(mockDetail, t));
         return;
       }
       const detail = await teamPresetsApi.get(teamId);
       setSelectedDetail(detail);
     } catch (error) {
-      setDetailError(errorText(error, "Failed to load template details."));
+      setDetailError(errorText(error, translateWithFallback(t, "teamTemplates.detail.loadError", "Failed to load template details.")));
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadTemplates();
@@ -2934,6 +3111,10 @@ export function TeamTemplatesPage() {
   }, [selectedProjectId]);
 
   const myTeamTemplates = useMemo(() => templates, [templates]);
+  const localizedAdvancedTeamTemplates = useMemo(
+    () => advancedTeamTemplates.map((template) => localizeAdvancedTemplateSummary(template, t)),
+    [t],
+  );
   const selectedDetailForView =
     selectedDetail?.id === selectedId ? selectedDetail : null;
   const detailViewLoading = Boolean(
@@ -2951,8 +3132,8 @@ export function TeamTemplatesPage() {
     if (editorMode === "edit") {
       return selectedDetailForView ? detailToForm(selectedDetailForView) : null;
     }
-    return blankForm();
-  }, [editorMode, selectedDetailForView]);
+    return blankForm(t);
+  }, [editorMode, selectedDetailForView, t]);
   const hasUnsavedEditorChanges = Boolean(
     editorMode &&
       editorBaselineForm &&
@@ -2961,8 +3142,8 @@ export function TeamTemplatesPage() {
   const editorSaveStatus =
     editorMode === "edit"
       ? saving || hasUnsavedEditorChanges
-        ? "Saving..."
-        : "Saved"
+        ? translateWithFallback(t, "teamTemplates.saving", "Saving...")
+        : translateWithFallback(t, "teamTemplates.saved", "Saved")
       : null;
 
   const openTemplateDetail = (teamId: string) => {
@@ -2972,7 +3153,7 @@ export function TeamTemplatesPage() {
   };
 
   const startCreate = () => {
-    const draft = blankForm();
+    const draft = blankForm(t);
     setForm(draft);
     setFormError(null);
     setFieldErrors({});
@@ -2998,7 +3179,7 @@ export function TeamTemplatesPage() {
   const saveTemplate = async (): Promise<boolean> => {
     setFormError(null);
     setFieldErrors({});
-    const validation = validateTeamPresetForm(form);
+    const validation = validateTeamPresetForm(form, t);
     if (validation.issue) {
       setFormError(validation.issue.message);
       if (validation.issue.fieldKey) {
@@ -3023,7 +3204,7 @@ export function TeamTemplatesPage() {
       setShowExitPrompt(false);
       return true;
     } catch (error) {
-      const errorMessage = errorText(error, "Failed to save template.");
+      const errorMessage = errorText(error, translateWithFallback(t, "teamTemplates.saveError", "Failed to save template."));
       setFormError(errorMessage);
       return false;
     } finally {
@@ -3056,7 +3237,7 @@ export function TeamTemplatesPage() {
   const autoSaveTemplate = useCallback(
     async (draft: TeamPresetForm) => {
       if (editorMode !== "edit" || saving) return;
-      const validation = validateTeamPresetForm(draft);
+      const validation = validateTeamPresetForm(draft, t);
       if (validation.issue) {
         setFormError(validation.issue.message);
         if (validation.issue.fieldKey) {
@@ -3076,12 +3257,12 @@ export function TeamTemplatesPage() {
         setSelectedDetail(saved);
         await loadTemplates();
       } catch (error) {
-        setFormError(errorText(error, "Failed to save template."));
+        setFormError(errorText(error, translateWithFallback(t, "teamTemplates.saveError", "Failed to save template.")));
       } finally {
         setSaving(false);
       }
     },
-    [editorMode, loadTemplates, saving],
+    [editorMode, loadTemplates, saving, t],
   );
 
   useEffect(() => {
@@ -3110,7 +3291,7 @@ export function TeamTemplatesPage() {
 
   const validateMemberToolsOnBlur = useCallback(
     (draft: TeamPresetForm, memberId: string) => {
-      const issue = validateMemberToolsEnabled(draft, memberId);
+      const issue = validateMemberToolsEnabled(draft, memberId, t);
       if (issue) {
         setFormError(issue.message);
         if (issue.fieldKey) {
@@ -3128,7 +3309,7 @@ export function TeamTemplatesPage() {
         return next;
       });
       setFormError((current) =>
-        current === "Invalid JSON format. Please check your syntax."
+        current === translateWithFallback(t, "teamTemplates.validation.invalidJson", "Invalid JSON format. Please check your syntax.")
           ? null
           : current,
       );
@@ -3137,7 +3318,7 @@ export function TeamTemplatesPage() {
         void autoSaveTemplate(draft);
       }
     },
-    [autoSaveTemplate, editorMode],
+    [autoSaveTemplate, editorMode, t],
   );
 
   const deleteSelected = async () => {
@@ -3145,7 +3326,7 @@ export function TeamTemplatesPage() {
       return;
     }
     const confirmed = window.confirm(
-      `Delete "${selectedDetailForView.name}"? This removes the custom template and any private members only used by it.`,
+      translateWithFallback(t, "teamTemplates.deleteConfirm", `Delete "${selectedDetailForView.name}"? This removes the custom template and any private members only used by it.`, { name: selectedDetailForView.name }),
     );
     if (!confirmed) return;
 
@@ -3160,7 +3341,7 @@ export function TeamTemplatesPage() {
       setSelectedId(null);
       await loadTemplates();
     } catch (error) {
-      setDetailError(errorText(error, "Failed to delete template."));
+      setDetailError(errorText(error, translateWithFallback(t, "teamTemplates.deleteError", "Failed to delete template.")));
     } finally {
       setDeleting(false);
     }
@@ -3231,7 +3412,7 @@ export function TeamTemplatesPage() {
     if (!detail || applyingTemplate) return;
 
     if (!selectedProjectId) {
-      showToast("请先选择项目后再使用模板。", "warning");
+      showToast(translateWithFallback(t, "teamTemplates.selectProject", "Select a project before using a template."), "warning");
       return;
     }
 
@@ -3254,7 +3435,7 @@ export function TeamTemplatesPage() {
         runtimeResponse.runners,
       );
       if (memberSpecs.length === 0) {
-        throw new Error("模板没有可用成员，未替换当前团队。");
+        throw new Error(translateWithFallback(t, "teamTemplates.noUsableMembers", "The template has no usable members, so the current team was not replaced."));
       }
 
       const existingAgentMembers = existingMembers.filter(isAgentProjectMember);
@@ -3303,13 +3484,15 @@ export function TeamTemplatesPage() {
         null;
       const teamProtocol = detail.team_protocol.trim();
       const sessionPatch: Partial<UpdateChatSession> = {
-        team_protocol: teamProtocol,
-        team_protocol_enabled: teamProtocol.length > 0,
       };
       if (leadAgentId) {
         sessionPatch.lead_agent_id = leadAgentId;
       }
 
+      await projectApi.updateTeamProtocol(projectId, {
+        content: teamProtocol,
+        enabled: teamProtocol.length > 0,
+      });
       await Promise.all(
         sessions.map((session) =>
           chatSessionsApi.update(
@@ -3323,24 +3506,24 @@ export function TeamTemplatesPage() {
       setProjectTemplateMembersLoaded(true);
       await Promise.all([refreshMembers(), refreshSessions()]);
       setApplyTargetDetail(null);
-      showToast(`已使用「${detail.name}」替换当前团队成员。`, "success");
+      showToast(translateWithFallback(t, "teamTemplates.applySuccess", `Replaced the current team with "${detail.name}".`, { name: detail.name }), "success");
     } catch (error) {
-      showToast(errorText(error, "使用模板失败。"), "error");
+      showToast(errorText(error, translateWithFallback(t, "teamTemplates.applyError", "Failed to apply template.")), "error");
     } finally {
       setApplyingTemplate(false);
     }
   };
 
   const templateCandidates = useMemo(
-    () => [...templates, ...advancedTeamTemplates],
-    [templates],
+    () => [...templates, ...localizedAdvancedTeamTemplates],
+    [localizedAdvancedTeamTemplates, templates],
   );
   const currentActiveTemplate = useMemo(
     () => resolveProjectActiveTemplate(projectTemplateMembers, templateCandidates),
     [projectTemplateMembers, templateCandidates],
   );
   const currentActivePresentation = currentActiveTemplate
-    ? getTemplatePresentation(currentActiveTemplate.id)
+    ? localizeTemplatePresentation(currentActiveTemplate.id, t)
     : null;
   const CurrentActiveIcon = getTemplateIcon(
     currentActiveTemplate?.id ?? "",
@@ -3362,7 +3545,7 @@ export function TeamTemplatesPage() {
         {!loading && loadError && (
           <div className="flex h-full w-full flex-col items-center justify-center p-8 text-center">
             <h2 className="text-[15px] font-medium text-[var(--team-template-title)]">
-              Could not load templates
+              {translateWithFallback(t, "teamTemplates.loadTitle", "Could not load templates")}
             </h2>
             <p className="mt-2 text-[14px] text-[var(--team-template-muted)]">
               {loadError}
@@ -3372,7 +3555,7 @@ export function TeamTemplatesPage() {
               onClick={() => void loadTemplates()}
               className={`${quietButtonClassName} mt-6 h-9 px-4 text-[13px] font-medium`}
             >
-              Retry
+              {translateWithFallback(t, "teamTemplates.retry", "Retry")}
             </button>
           </div>
         )}
@@ -3395,6 +3578,7 @@ export function TeamTemplatesPage() {
             saveStatus={editorSaveStatus}
             selectedEditableMemberId={editorSelectedMemberId}
             usingTemplate={false}
+            t={t}
             onAutoSave={(draft) => void autoSaveTemplate(draft)}
             onBack={requestExitEditor}
             onCancel={requestExitEditor}
@@ -3428,6 +3612,7 @@ export function TeamTemplatesPage() {
             installedSkills={skills}
             runtimes={runtimes}
             usingTemplate={applyingTemplate}
+            t={t}
             onBack={() => setSelectedId(null)}
             onDelete={() => void deleteSelected()}
             onEdit={startEdit}
@@ -3456,7 +3641,7 @@ export function TeamTemplatesPage() {
                     <div className="flex min-w-0 flex-1 flex-col">
                       <div className="flex items-center">
                         <span className="font-mono text-[11px] font-medium text-[var(--team-template-aux)]">
-                          当前激活模板
+                          {translateWithFallback(t, "teamTemplates.currentActive", "Current active template")}
                         </span>
                       </div>
                       <h3 className="whitespace-normal break-words text-[13px] font-semibold leading-snug text-[var(--team-template-title)]">
@@ -3475,14 +3660,14 @@ export function TeamTemplatesPage() {
                   <div className="hidden min-w-[150px] flex-col md:flex">
                     <div className="flex items-center justify-between gap-2 font-mono text-[10px] text-[var(--team-template-aux)]">
                       <span>{getTemplateVersionLabel(currentActiveTemplate)}</span>
-                      <span>Updated recently</span>
+                      <span>{translateWithFallback(t, "teamTemplates.updatedRecently", "Updated recently")}</span>
                     </div>
                   </div>
                   <div className="hidden lg:flex">
                     <AgentAvatarGroup template={currentActiveTemplate} />
                   </div>
                   <button className={`${quietButtonClassName} h-7 gap-1.5 px-2.5 text-[12px] font-medium`}>
-                    配置
+                    {translateWithFallback(t, "teamTemplates.configure", "Configure")}
                     <kbd className="rounded border border-[var(--team-template-border)] px-1.5 py-px font-mono text-[10px] font-medium text-[var(--team-template-aux)]">
                       C
                     </kbd>
@@ -3493,7 +3678,7 @@ export function TeamTemplatesPage() {
 
             <section className="mb-12">
               <h2 className="mb-5 text-xs font-medium text-[var(--team-template-muted)]">
-                我的团队模板 (<span className="font-mono text-[13px] tabular-nums text-[var(--team-template-title)]">{myTeamTemplates.length}</span>)
+                {translateWithFallback(t, "teamTemplates.section.mineLabel", "My team templates")} (<span className="font-mono text-[13px] tabular-nums text-[var(--team-template-title)]">{myTeamTemplates.length}</span>)
               </h2>
               {myTeamTemplates.length === 0 ? (
                 <button
@@ -3505,10 +3690,10 @@ export function TeamTemplatesPage() {
                     <Plus className="h-6 w-6" strokeWidth={1.5} />
                   </div>
                   <h3 className="mt-4 text-sm font-medium text-[var(--team-template-title)]">
-                    创建自定义模板
+                    {translateWithFallback(t, "teamTemplates.empty.create", "Create a custom template")}
                   </h3>
                   <p className="mt-1 text-xs text-[var(--team-template-muted)]">
-                    Create a customized team configuration for your specific workflows.
+                    {translateWithFallback(t, "teamTemplates.empty.description", "Create a customized team configuration for your specific workflows.")}
                   </p>
                 </button>
               ) : (
@@ -3517,6 +3702,7 @@ export function TeamTemplatesPage() {
                     <TemplateCard
                       key={template.id}
                       template={template}
+                      t={t}
                       onClick={() => openTemplateDetail(template.id)}
                     />
                   ))}
@@ -3526,13 +3712,14 @@ export function TeamTemplatesPage() {
 
             <section>
               <h2 className="mb-5 text-xs font-medium text-[var(--team-template-muted)]">
-                更多推荐模板
+                {translateWithFallback(t, "teamTemplates.section.recommended", "More recommended templates")}
               </h2>
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                {advancedTeamTemplates.map((template) => (
+                {localizedAdvancedTeamTemplates.map((template) => (
                   <TemplateCard
                     key={template.id}
                     template={template}
+                    t={t}
                     onClick={() => {
                       openTemplateDetail(template.id);
                     }}
@@ -3552,6 +3739,7 @@ export function TeamTemplatesPage() {
               }
             }}
             onConfirm={() => void applyTemplateToProject()}
+            t={t}
           />
         )}
         {showExitPrompt && (
@@ -3560,6 +3748,7 @@ export function TeamTemplatesPage() {
             onCancel={() => setShowExitPrompt(false)}
             onDiscard={closeEditor}
             onSave={() => void saveAndExitEditor()}
+            t={t}
           />
         )}
       </main>

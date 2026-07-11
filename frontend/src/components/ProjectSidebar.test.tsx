@@ -142,7 +142,9 @@ const migratedProjectHtml = renderToStaticMarkup(
 const translatedHtml = renderToStaticMarkup(
   <ProjectSidebar
     shellOptions={mockShellOptions}
-    sessions={mockWorkspaceBootstrap.sessions}
+    sessions={mockWorkspaceBootstrap.sessions.map((session, index) =>
+      index === 0 ? { ...session, title: "Default Session" } : session,
+    )}
     activeSessionId={mockWorkspaceBootstrap.defaults.activeSessionId}
     activePage="workspace"
     weeklyCost={mockWorkspaceBootstrap.defaults.weeklyCost}
@@ -151,7 +153,9 @@ const translatedHtml = renderToStaticMarkup(
         "sidebar.sessions": "SESSIONS_TRANSLATED",
         "sidebar.more": "MORE_TRANSLATED",
         "sidebar.projectManagement": "PROJECT_TRANSLATED",
+        "sidebar.primary.search": "SEARCH_TRANSLATED",
         "sidebar.showMoreSessions": "SHOW_{count}_MORE_TRANSLATED",
+        "createSession.defaultTitle": "DEFAULT_SESSION_TRANSLATED",
       };
       let value = translated[key] ?? key;
       if (replacements) {
@@ -419,7 +423,7 @@ check(
 );
 check(
   "renders Search action in the former Inbox slot",
-  html.includes("搜索") && html.includes("lucide-search") && !html.includes("Inbox"),
+  html.includes("Search") && html.includes("lucide-search") && !html.includes("Inbox"),
   html,
 );
 check(
@@ -468,6 +472,8 @@ check(
   translatedHtml.includes("SESSIONS_TRANSLATED") &&
     translatedHtml.includes("MORE_TRANSLATED") &&
     translatedHtml.includes("PROJECT_TRANSLATED") &&
+    translatedHtml.includes("SEARCH_TRANSLATED") &&
+    translatedHtml.includes("DEFAULT_SESSION_TRANSLATED") &&
     translatedHtml.includes(
       `aria-label="SHOW_${hiddenSessionCount}_MORE_TRANSLATED"`,
     ),

@@ -138,8 +138,8 @@ check(
 
 check('loads templates through the real API adapter', source.includes('teamPresetsApi.list()'));
 check('loads template details on selection', source.includes('teamPresetsApi.get('));
-check('groups backend templates under my team templates', source.includes('myTeamTemplates') && source.includes('我的团队模板'));
-check('renders advanced team templates from mock data', source.includes('advancedTeamTemplates') && source.includes('更多推荐模板'));
+check('groups backend templates under my team templates', source.includes('myTeamTemplates') && source.includes('teamTemplates.section.mineLabel'));
+check('renders advanced team templates from mock data', source.includes('advancedTeamTemplates') && source.includes('teamTemplates.section.recommended'));
 check('keeps the detail page in the Linear-style pipeline layout', source.includes('team-template-workflow-preview') && source.includes('PIPELINE /') && source.includes('MEMBERS /'));
 check('shows recoverable loading errors', source.includes('loadError') && source.includes('loadTemplates()'));
 check('shows an empty my-template state', source.includes('myTeamTemplates.length === 0'));
@@ -147,7 +147,7 @@ check('keeps built-in templates read-only', source.includes('selectedDetail.is_b
 check('supports create, update, and delete flows', source.includes('teamPresetsApi.create') && source.includes('teamPresetsApi.update') && source.includes('teamPresetsApi.delete'));
 check('confirms deletion before mutating', source.includes('window.confirm'));
 check('preserves form input on save failure', source.includes('setFormError(errorMessage') && source.includes('return;'));
-check('confirms unsaved editor exit before leaving edit mode', source.includes('UnsavedEditorExitDialog') && source.includes('hasUnsavedEditorChanges') && source.includes('保存并退出') && source.includes('丢弃修改') && source.includes('{isEditing ? "退出" : "返回模板"}'));
+check('confirms unsaved editor exit before leaving edit mode', source.includes('UnsavedEditorExitDialog') && source.includes('hasUnsavedEditorChanges') && source.includes('teamTemplates.unsaved.saveAndExit') && source.includes('teamTemplates.unsaved.discard') && source.includes('teamTemplates.exit') && source.includes('teamTemplates.back'));
 check('auto-generates template ids and hides low-value toggles in the editor', source.includes('createUniqueTemplateId') && !source.includes('label="模板 ID"') && !source.includes('Enabled in picker'));
 check('uses content-as-ui document header in edit mode', source.includes('team-template-document-head') && source.includes('team-template-document-title') && source.includes('team-template-document-description') && source.includes('absolute right-0 top-0') && !source.includes('label="团队名"') && !source.includes('label="描述"'));
 check('uses edit-mode auto-save with a subtle saved status', source.includes('editorSaveStatus') && source.includes('autoSaveTemplate(form)') && source.includes('Saved') && source.includes('window.setTimeout'));
@@ -156,6 +156,7 @@ check('shows member skills and role prompt details', source.includes('selected_s
 check('uses shared DropdownSelect for member runtime and model picking', source.includes('DropdownSelect') && source.includes('runtimeOptions') && source.includes('modelOptions') && source.includes('setRuntimes(response.runners)'));
 check('uses shared DropdownSelect for runtime-specific skill picking', source.includes('selectionMode="multiple"') && source.includes('listNative(effectiveRunnerType)') && source.includes('runtimeSkills') && source.includes('skillPlaceholder') && !source.includes('技能 ID（逗号分隔）'));
 check('keeps Linear visual refinement hooks', source.includes('team-template-card') && source.includes('team-template-member-row') && source.includes('team-template-field'));
+check('uses the brand theme for create and use-template actions', source.includes('brandPrimaryButtonClassName') && source.includes('bg-[var(--primary)]') && source.includes('hover:bg-[var(--primary-hover)]'));
 check('uses aggregate draft workflow steps', source.includes('workflowSteps') && source.includes('normalizeWorkflowSteps'));
 check('supports editable markdown fields rendered with AgentMarkdown', source.includes('function MarkdownEditableField') && source.includes('<AgentMarkdown content={value}'));
 check('edits member tool JSON through toolsEnabledText', source.includes('toolsEnabledText') && source.includes('parseToolsEnabled'));

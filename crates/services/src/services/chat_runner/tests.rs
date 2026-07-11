@@ -138,8 +138,6 @@ async fn setup_chat_runner_db() -> DBService {
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,
-                team_protocol TEXT DEFAULT '',
-                team_protocol_enabled INTEGER DEFAULT 0,
                 default_workspace_path TEXT,
                 chat_input_mode TEXT,
                 project_id BLOB,
@@ -760,11 +758,7 @@ async fn resolve_workspace_path_for_active_isolated_session_ignores_stale_agent_
     .expect("insert active worktree row");
 
     let resolved = runner
-        .resolve_workspace_path_for_agent(
-            session_id,
-            agent_id,
-            Some(base_workspace.to_string()),
-        )
+        .resolve_workspace_path_for_agent(session_id, agent_id, Some(base_workspace.to_string()))
         .await
         .expect("resolve workspace");
 
@@ -1974,12 +1968,16 @@ fn build_exact_markdown_prompt_includes_routed_message_intent_meaning() {
 fn build_exact_markdown_prompt_declares_active_workspace_as_project_repo() {
     let agent = test_agent("worker", "");
     let message = test_message("@worker inspect the repo", json!({}));
-    let workspace_path = Path::new(r"C:\Users\Admin\AppData\Local\Temp\openteams-dev\worktrees\sessions\34a8ed29");
+    let workspace_path =
+        Path::new(r"C:\Users\Admin\AppData\Local\Temp\openteams-dev\worktrees\sessions\34a8ed29");
 
     let prompt = ChatRunner::build_exact_markdown_prompt(
         &agent,
         &message,
-        &workspace_path.join(".openteams").join("context").join("demo"),
+        &workspace_path
+            .join(".openteams")
+            .join("context")
+            .join("demo"),
         workspace_path,
         &[],
         None,
@@ -1996,7 +1994,11 @@ fn build_exact_markdown_prompt_declares_active_workspace_as_project_repo() {
     assert!(prompt.contains("## Workspace"));
     assert!(prompt.contains("Active workspace path"));
     assert!(prompt.contains("Treat this active workspace path as the project repository"));
-    assert!(prompt.contains(r"C:\Users\Admin\AppData\Local\Temp\openteams-dev\worktrees\sessions\34a8ed29"));
+    assert!(
+        prompt.contains(
+            r"C:\Users\Admin\AppData\Local\Temp\openteams-dev\worktrees\sessions\34a8ed29"
+        )
+    );
 }
 
 #[tokio::test]
@@ -2082,7 +2084,10 @@ async fn prompt_after_worktree_discard_declares_base_workspace() {
     let prompt = ChatRunner::build_exact_markdown_prompt(
         &agent,
         &message,
-        &workspace_path.join(".openteams").join("context").join("demo"),
+        &workspace_path
+            .join(".openteams")
+            .join("context")
+            .join("demo"),
         workspace_path,
         &[],
         None,
@@ -2190,7 +2195,10 @@ fn artifact_path_extraction_supports_json_path_lists() {
         Path::new(r"E:\workspace\projectSS\MainPage2"),
     );
 
-    assert_eq!(paths, vec!["docs/report.md".to_string(), "src/app.ts".to_string()]);
+    assert_eq!(
+        paths,
+        vec!["docs/report.md".to_string(), "src/app.ts".to_string()]
+    );
 }
 
 #[test]
@@ -2464,13 +2472,6 @@ fn strip_embedded_team_protocol_from_system_prompt_removes_legacy_embedded_block
     );
 }
 
-#[test]
-fn resolve_team_protocol_guidelines_falls_back_when_empty() {
-    let prompt = ChatRunner::resolve_team_protocol_guidelines(Some(" "));
-
-    assert_eq!(prompt, "no team collaboration protocol");
-}
-
 #[tokio::test]
 async fn capture_untracked_files_allows_user_openteams_files_but_skips_runtime_artifacts() {
     let tempdir = tempfile::tempdir().expect("create tempdir");
@@ -2636,10 +2637,8 @@ async fn capture_git_diff_records_only_paths_changed_since_run_baseline() {
     git.initialize_repo_with_main_branch(&repo_path)
         .expect("init repo");
 
-    std::fs::write(repo_path.join("other_session.txt"), "base\n")
-        .expect("write other file");
-    std::fs::write(repo_path.join("current_session.txt"), "base\n")
-        .expect("write current file");
+    std::fs::write(repo_path.join("other_session.txt"), "base\n").expect("write other file");
+    std::fs::write(repo_path.join("current_session.txt"), "base\n").expect("write current file");
     git.commit(&repo_path, "baseline").expect("commit baseline");
 
     std::fs::write(repo_path.join("other_session.txt"), "other dirty\n")
@@ -2710,86 +2709,4 @@ async fn capture_untracked_files_can_be_filtered_against_run_baseline() {
         .collect::<Vec<_>>();
 
     assert_eq!(filtered, vec!["current_session_new.txt".to_string()]);
-}
-
-#[test]
-fn resolve_session_team_protocol_returns_enabled_session_content_only() {
-    let now = Utc::now();
-    let session = ChatSession {
-        id: Uuid::new_v4(),
-        title: Some("demo".to_string()),
-        status: ChatSessionStatus::Active,
-        lead_agent_id: None,
-        summary_text: None,
-        archive_ref: None,
-        last_seen_diff_key: None,
-        team_protocol: Some("  Follow the team protocol.  ".to_string()),
-        team_protocol_enabled: true,
-        default_workspace_path: None,
-        chat_input_mode: None,
-        project_id: None,
-        pinned_at: None,
-        created_at: now,
-        updated_at: now,
-        archived_at: None,
-        worktree_mode: Default::default(),
-    };
-
-    assert_eq!(
-        ChatRunner::resolve_session_team_protocol(Some(&session)),
-        Some("Follow the team protocol.")
-    );
-}
-
-#[test]
-fn resolve_session_team_protocol_ignores_disabled_or_empty_session_content() {
-    let now = Utc::now();
-    let disabled_session = ChatSession {
-        id: Uuid::new_v4(),
-        title: Some("demo".to_string()),
-        status: ChatSessionStatus::Active,
-        lead_agent_id: None,
-        summary_text: None,
-        archive_ref: None,
-        last_seen_diff_key: None,
-        team_protocol: Some("Follow the team protocol.".to_string()),
-        team_protocol_enabled: false,
-        default_workspace_path: None,
-        chat_input_mode: None,
-        project_id: None,
-        pinned_at: None,
-        created_at: now,
-        updated_at: now,
-        archived_at: None,
-        worktree_mode: Default::default(),
-    };
-    let empty_session = ChatSession {
-        id: Uuid::new_v4(),
-        title: Some("demo".to_string()),
-        status: ChatSessionStatus::Active,
-        lead_agent_id: None,
-        summary_text: None,
-        archive_ref: None,
-        last_seen_diff_key: None,
-        team_protocol: Some("   ".to_string()),
-        team_protocol_enabled: true,
-        default_workspace_path: None,
-        chat_input_mode: None,
-        project_id: None,
-        pinned_at: None,
-        created_at: now,
-        updated_at: now,
-        archived_at: None,
-        worktree_mode: Default::default(),
-    };
-
-    assert_eq!(
-        ChatRunner::resolve_session_team_protocol(Some(&disabled_session)),
-        None
-    );
-    assert_eq!(
-        ChatRunner::resolve_session_team_protocol(Some(&empty_session)),
-        None
-    );
-    assert_eq!(ChatRunner::resolve_session_team_protocol(None), None);
 }

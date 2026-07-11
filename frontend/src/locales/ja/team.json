@@ -109,7 +109,7 @@
   "teamPage.teamProtocol.desc": "このセッションのチーム全体で共有するガイドラインを設定します",
   "teamPage.teamProtocol.error": "チームプロトコルエラー: {error}",
   "teamPage.teamProtocol.loading": "チームプロトコルを読み込んでいます...",
-  "teamPage.teamProtocol.noSession": "チームプロトコルを編集する前に、チャットセッションを選択または作成してください",
+  "teamPage.teamProtocol.noProject": "チームプロトコルを編集する前に、プロジェクトを選択または作成してください",
   "teamPage.teamProtocol.placeholder": "共有ルール、連携方針、引き継ぎの期待値、レビュー基準を記述します。",
   "teamPage.teamProtocol.title": "チームプロトコル",
   "teamPage.tabs.config": "設定",

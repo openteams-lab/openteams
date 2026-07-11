@@ -3,11 +3,12 @@ mod tests {
     use std::{path::Path, process::Command};
 
     use chrono::Utc;
+    use command_group::AsyncCommandGroup;
     use db::models::{
         chat_agent::ChatAgent,
         chat_session::{ChatSession, ChatSessionStatus, ChatSessionWorktreeMode},
-        member_execution_config::MemberExecutionConfig,
         chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
+        member_execution_config::MemberExecutionConfig,
         workflow_plan::WorkflowPlan,
         workflow_plan_revision::WorkflowPlanRevision,
         workflow_step_edge::WorkflowStepEdge,
@@ -102,8 +103,6 @@ mod tests {
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
-            team_protocol: None,
-            team_protocol_enabled: false,
             default_workspace_path,
             chat_input_mode: None,
             project_id: None,
@@ -808,12 +807,15 @@ mod tests {
             r"C:\Users\Admin\AppData\Local\Temp\openteams-dev\worktrees\sessions\34a8ed29",
         );
 
-        let prompt = build_workspace_scoped_workflow_prompt("Run the workflow step.", workspace_path);
+        let prompt =
+            build_workspace_scoped_workflow_prompt("Run the workflow step.", workspace_path);
 
         assert!(prompt.contains("## Workspace"));
         assert!(prompt.contains("Active workspace path"));
         assert!(prompt.contains("Treat this active workspace path as the project repository"));
-        assert!(prompt.contains(r"C:\Users\Admin\AppData\Local\Temp\openteams-dev\worktrees\sessions\34a8ed29"));
+        assert!(prompt.contains(
+            r"C:\Users\Admin\AppData\Local\Temp\openteams-dev\worktrees\sessions\34a8ed29"
+        ));
         assert!(prompt.ends_with("Run the workflow step."));
     }
 
@@ -1190,6 +1192,31 @@ mod tests {
         register_running_step(step_id, next_token.clone());
         assert!(!next_token.is_cancelled());
         clear_running_step(step_id);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn container_cancel_terminates_executor_without_native_cancel_token() {
+        let mut command = tokio::process::Command::new("sh");
+        command.args(["-lc", "sleep 30"]);
+        let child = command.group_spawn().expect("spawn workflow executor");
+        let mut spawned = SpawnedChild::from(child);
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+
+        let status = wait_for_process_exit_or_cancel(&mut spawned, "test-agent", &cancel)
+            .await
+            .expect("cancel workflow executor");
+
+        assert!(status.is_none());
+        assert!(
+            spawned
+                .child
+                .inner()
+                .try_wait()
+                .expect("read child status")
+                .is_some()
+        );
     }
 
     #[test]

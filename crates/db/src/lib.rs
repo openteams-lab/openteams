@@ -1537,6 +1537,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn migrations_replace_session_protocol_columns_with_project_team_protocols() {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("create sqlite memory pool");
+        run_migrations(&pool).await.expect("run migrations");
+
+        let rows = sqlx::query("PRAGMA table_info(chat_sessions)")
+            .fetch_all(&pool)
+            .await
+            .expect("read chat_sessions columns");
+        let column_names = rows
+            .iter()
+            .map(|row| row.get::<String, _>("name"))
+            .collect::<Vec<_>>();
+
+        assert!(!column_names.iter().any(|name| name == "team_protocol"));
+        assert!(
+            !column_names
+                .iter()
+                .any(|name| name == "team_protocol_enabled")
+        );
+        let project_protocol_table: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'project_team_protocols'",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("check project team protocol table");
+        assert_eq!(project_protocol_table, 1);
+    }
+
+    #[tokio::test]
     async fn migrations_create_project_centric_backend_schema() {
         let pool = SqlitePool::connect("sqlite::memory:")
             .await
