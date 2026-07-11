@@ -117,7 +117,8 @@ console.log("agentActivityFormatter");
   ]);
 
   check("merges tool completion lines with result previews", rows.length === 1, rows);
-  check("keeps the completed tool result preview", rows[0]?.detail === "ApplyPatch: patch applied", rows);
+  check("keeps the completed tool target visible", rows[0]?.detail === "ApplyPatch", rows);
+  check("separates the completed tool result for disclosure", rows[0]?.resultDetail === "patch applied", rows);
 }
 
 {

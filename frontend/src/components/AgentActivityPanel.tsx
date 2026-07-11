@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import {
   Activity,
+  ChevronRight,
   ClipboardList,
   FilePenLine,
   FileText,
@@ -218,9 +219,11 @@ const ToolLineItem: React.FC<{
 }> = ({ line }) => {
   const ToolIcon = line.toolKind ? toolIconByKind[line.toolKind] : Wrench;
 
-  return (
+  const row = (
     <div className="wf-log-task-row">
-      <span className="wf-log-task-status" />
+      <span className="wf-log-task-status">
+        {line.resultDetail && <ChevronRight className="wf-log-task-chevron" />}
+      </span>
       <span className="wf-log-task-tool-icon">
         <ToolIcon className="w-3 h-3" />
       </span>
@@ -231,6 +234,15 @@ const ToolLineItem: React.FC<{
         </span>
       )}
     </div>
+  );
+
+  if (!line.resultDetail) return row;
+
+  return (
+    <details className="wf-log-task-disclosure">
+      <summary>{row}</summary>
+      <pre className="wf-log-task-result">{line.resultDetail}</pre>
+    </details>
   );
 };
 

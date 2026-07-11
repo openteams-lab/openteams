@@ -27,6 +27,7 @@ export interface AgentActivityDisplayRow {
   content: string;
   title: string;
   detail?: string;
+  resultDetail?: string;
   toolKind?: AgentActivityToolKind;
   toolStatus?: AgentActivityToolStatus;
   sourceLineIds: string[];
@@ -305,12 +306,21 @@ const applyParsedToolToRow = (
   translate?: AgentActivityTranslator,
 ): AgentActivityDisplayRow => {
   const title = labelForToolActivity(parsed.kind, parsed.status, translate);
+  const existingDetail = row.detail?.trim();
+  const resultPrefix = existingDetail ? `${existingDetail}:` : undefined;
+  const hasResultDetail =
+    resultPrefix !== undefined && parsed.detail.startsWith(resultPrefix);
+  const detail = hasResultDetail ? existingDetail : parsed.detail;
+  const resultDetail = hasResultDetail
+    ? parsed.detail.slice(resultPrefix.length).trim()
+    : undefined;
   return {
     ...row,
     line_type: "tool",
     content: contentForRow(title, parsed.detail),
     title,
-    detail: parsed.detail || undefined,
+    detail: detail || undefined,
+    resultDetail: resultDetail || undefined,
     toolKind: parsed.kind,
     toolStatus: parsed.status,
     sourceLineIds: [...row.sourceLineIds, line.line_id],

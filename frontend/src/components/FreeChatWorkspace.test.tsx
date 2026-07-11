@@ -584,6 +584,8 @@ check(
     activityPanelSource.includes("wf-log-task-content-text") &&
     activityPanelSource.includes('line_type === "tool"') &&
     activityPanelSource.includes("isToolRunning") &&
+    activityPanelSource.includes('className="wf-log-task-disclosure"') &&
+    activityPanelSource.includes("line.resultDetail") &&
     activityPanelSource.includes("agent-activity-scrollbar max-h-[480px] pr-1") &&
     !activityPanelSource.includes("border border"),
   activityPanelSource,

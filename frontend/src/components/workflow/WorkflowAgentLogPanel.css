@@ -109,6 +109,38 @@ body[data-mode="light"] .workflow-window-root .wf-log-group + .wf-log-group {
   white-space: normal;
 }
 
+.wf-log-task-disclosure > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.wf-log-task-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.wf-log-task-chevron {
+  width: 10px;
+  height: 10px;
+  color: var(--ink-tertiary, #62666d);
+  transition: transform 120ms ease;
+}
+
+.wf-log-task-disclosure[open] .wf-log-task-chevron {
+  transform: rotate(90deg);
+}
+
+.wf-log-task-result {
+  margin: 2px 0 4px 34px;
+  padding: 6px 8px;
+  border-left: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  color: var(--ink-muted, #a1a5ad);
+  font: inherit;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* Status column (fixed width for vertical alignment) */
 .wf-log-task-status {
   display: flex;
