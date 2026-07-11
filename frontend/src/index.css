@@ -94,27 +94,29 @@ body {
     transform: rotate(0deg);
   }
   10% {
-    transform: rotate(-5deg);
+    transform: rotate(-12deg);
   }
   20% {
-    transform: rotate(5deg);
+    transform: rotate(12deg);
   }
   30% {
-    transform: rotate(-4deg);
+    transform: rotate(-10deg);
   }
   40% {
-    transform: rotate(4deg);
+    transform: rotate(10deg);
   }
   50% {
-    transform: rotate(-2deg);
+    transform: rotate(-7deg);
   }
   60% {
-    transform: rotate(2deg);
+    transform: rotate(7deg);
   }
 }
 
 .inbox-bell-swing {
   animation: inbox-bell-swing 4s ease-in-out 1;
+  display: block;
+  transform-box: fill-box;
   transform-origin: center center;
   will-change: transform;
 }
@@ -128,12 +130,6 @@ body {
 .inbox-bell-unread-badge {
   color: var(--inbox-bell-unread-badge-text);
   filter: var(--inbox-bell-unread-badge-filter);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .inbox-bell-swing {
-    animation: none;
-  }
 }
 
 .ot-app-scale-viewport {
