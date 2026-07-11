@@ -184,11 +184,20 @@ pub(crate) fn tool_activity_content(
             let change_summary = file_change_summary(changes);
             format!("{status_label} file edit: {path}{change_summary}")
         }
-        ActionType::CommandRun { command, .. } => {
-            format!(
+        ActionType::CommandRun { command, result } => {
+            let mut line = format!(
                 "{status_label} command: {}",
                 truncate_activity_line(command)
-            )
+            );
+            if let Some(preview) = result
+                .as_ref()
+                .and_then(|result| result.output.as_deref())
+                .and_then(activity_result_preview)
+            {
+                line.push_str(": ");
+                line.push_str(&preview);
+            }
+            line
         }
         ActionType::Tool {
             tool_name: inner_tool_name,
@@ -324,7 +333,11 @@ fn tool_result_preview(result: &Option<ToolResult>) -> Option<String> {
         serde_json::Value::String(value) => value.clone(),
         value => value.to_string(),
     };
-    let preview = preview
+    activity_result_preview(&preview)
+}
+
+fn activity_result_preview(result: &str) -> Option<String> {
+    let preview = result
         .lines()
         .map(str::trim)
         .find(|line| !line.is_empty())?;
@@ -409,6 +422,33 @@ mod tests {
         assert_eq!(
             lines[0].content,
             "Started command: cargo test -p services chat_runner"
+        );
+    }
+
+    #[test]
+    fn chat_runner_command_result_includes_a_collapsible_preview() {
+        let entry = NormalizedEntry {
+            timestamp: None,
+            entry_type: NormalizedEntryType::ToolUse {
+                tool_name: "shell".to_string(),
+                action_type: ActionType::CommandRun {
+                    command: "pnpm test".to_string(),
+                    result: Some(executors::logs::CommandRunResult {
+                        exit_status: None,
+                        output: Some("\nAll tests passed\nmore output".to_string()),
+                    }),
+                },
+                status: ToolStatus::Success,
+            },
+            content: String::new(),
+            metadata: None,
+        };
+
+        let line = activity_line_for_entry(&entry, true).expect("command result line");
+
+        assert_eq!(
+            line.content,
+            "Completed command: pnpm test: All tests passed"
         );
     }
 }

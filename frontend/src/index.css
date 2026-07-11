@@ -79,35 +79,39 @@ body {
   margin: 0;
 }
 
-@keyframes inbox-bell-lower-swing {
+@keyframes inbox-bell-swing {
   0%,
   100% {
-    transform: translateX(0);
+    transform: rotate(0deg);
   }
-  14% {
-    transform: translateX(-1.5px);
+  10% {
+    transform: rotate(-5deg);
   }
-  28% {
-    transform: translateX(1.35px);
+  20% {
+    transform: rotate(5deg);
   }
-  42% {
-    transform: translateX(-1px);
+  30% {
+    transform: rotate(-4deg);
   }
-  56% {
-    transform: translateX(0.7px);
+  40% {
+    transform: rotate(4deg);
   }
-  70% {
-    transform: translateX(0);
+  50% {
+    transform: rotate(-2deg);
+  }
+  60% {
+    transform: rotate(2deg);
   }
 }
 
-.inbox-bell-lower-swing {
-  animation: inbox-bell-lower-swing 1.35s ease-in-out infinite;
+.inbox-bell-swing {
+  animation: inbox-bell-swing 4s ease-in-out 1;
+  transform-origin: center center;
   will-change: transform;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .inbox-bell-lower-swing {
+  .inbox-bell-swing {
     animation: none;
   }
 }
