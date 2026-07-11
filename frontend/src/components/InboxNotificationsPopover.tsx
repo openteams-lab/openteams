@@ -258,7 +258,7 @@ export function InboxNotificationsPopover({
             <Bell className="h-3.5 w-3.5 transition" />
           )}
           {unreadCount > 0 && (
-            <span className="pointer-events-none absolute -right-1 -top-1.5 font-mono text-[10px] font-semibold leading-none tabular-nums text-[#f3f4f6] drop-shadow-[0_1px_1px_rgba(0,0,0,0.75)]">
+            <span className="inbox-bell-unread-badge pointer-events-none absolute -right-1 -top-1.5 font-mono text-[10px] font-semibold leading-none tabular-nums">
               {inboxBadgeLabel(unreadCount)}
             </span>
           )}

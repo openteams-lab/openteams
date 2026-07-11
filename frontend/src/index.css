@@ -28,6 +28,10 @@
   --success: #27a644;
   --mono-bg: #18191a;
   --mono-border: #34343a;
+  --inbox-bell-unread-icon: #f8fafc;
+  --inbox-bell-unread-filter: drop-shadow(0 0 6px rgba(248, 250, 252, 0.55));
+  --inbox-bell-unread-badge-text: #f3f4f6;
+  --inbox-bell-unread-badge-filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.75));
 }
 
 body[data-mode="light"] {
@@ -52,6 +56,11 @@ body[data-mode="light"] {
   --success: #1b8c35;
   --mono-bg: #f0f1f4;
   --mono-border: #d8dce3;
+  --inbox-bell-unread-icon: #1f2937;
+  --inbox-bell-unread-filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.85))
+    drop-shadow(0 0 3px rgba(15, 23, 42, 0.22));
+  --inbox-bell-unread-badge-text: #111827;
+  --inbox-bell-unread-badge-filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.95));
 }
 
 body[data-mode="light"] .diff-view-tab {
@@ -108,6 +117,17 @@ body {
   animation: inbox-bell-swing 4s ease-in-out 1;
   transform-origin: center center;
   will-change: transform;
+}
+
+.inbox-bell-unread-icon {
+  color: var(--inbox-bell-unread-icon);
+  filter: var(--inbox-bell-unread-filter);
+  stroke-width: 2.35;
+}
+
+.inbox-bell-unread-badge {
+  color: var(--inbox-bell-unread-badge-text);
+  filter: var(--inbox-bell-unread-badge-filter);
 }
 
 @media (prefers-reduced-motion: reduce) {
