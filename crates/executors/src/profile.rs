@@ -1,6 +1,7 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
+    path::Path,
     str::FromStr,
     sync::{LazyLock, RwLock},
 };
@@ -233,6 +234,16 @@ impl ExecutorConfigs {
             Ok(mut user_overrides) => {
                 // tracing::info!("Loaded user profile overrides from profiles.json");
                 user_overrides.canonicalise();
+                if user_overrides.migrate_opencode_model_overrides(&defaults) {
+                    match Self::write_profiles_file(&profiles_path, &user_overrides) {
+                        Ok(()) => tracing::info!(
+                            "Removed stale OpenCode model entries from user profiles.json"
+                        ),
+                        Err(err) => tracing::warn!(
+                            "Failed to persist OpenCode profiles.json migration: {err}"
+                        ),
+                    }
+                }
                 Self::merge_with_defaults(defaults, user_overrides)
             }
             Err(e) => {
@@ -243,6 +254,67 @@ impl ExecutorConfigs {
                 defaults
             }
         }
+    }
+
+    fn migrate_opencode_model_overrides(&mut self, defaults: &Self) -> bool {
+        let Some(default_profile) = defaults.executors.get(&BaseCodingAgent::Opencode) else {
+            return false;
+        };
+        let allowed_models = default_profile
+            .configurations
+            .values()
+            .filter_map(|config| match config {
+                CodingAgent::Opencode(config) => config.model.clone(),
+                _ => None,
+            })
+            .collect::<HashSet<_>>();
+        let Some(user_profile) = self.executors.get_mut(&BaseCodingAgent::Opencode) else {
+            return false;
+        };
+
+        let mut changed = false;
+        let mut stale_variants = Vec::new();
+        for (variant, config) in &mut user_profile.configurations {
+            let CodingAgent::Opencode(user_config) = config else {
+                continue;
+            };
+
+            if let Some(CodingAgent::Opencode(default_config)) =
+                default_profile.configurations.get(variant)
+            {
+                if user_config.model != default_config.model {
+                    user_config.model.clone_from(&default_config.model);
+                    changed = true;
+                }
+                continue;
+            }
+
+            if user_config
+                .model
+                .as_ref()
+                .is_some_and(|model| !allowed_models.contains(model))
+            {
+                stale_variants.push(variant.clone());
+            }
+        }
+
+        for variant in stale_variants {
+            user_profile.configurations.remove(&variant);
+            changed = true;
+        }
+
+        if user_profile.configurations.is_empty() {
+            self.executors.remove(&BaseCodingAgent::Opencode);
+            changed = true;
+        }
+
+        changed
+    }
+
+    fn write_profiles_file(path: &Path, profiles: &Self) -> Result<(), ProfileError> {
+        let content = serde_json::to_string_pretty(profiles)?;
+        fs::write(path, content)?;
+        Ok(())
     }
 
     /// Save user profile overrides to file (only saves what differs from defaults)
@@ -522,6 +594,84 @@ mod tests {
                 "codex {variant} profile should not exist"
             );
         }
+    }
+
+    #[test]
+    fn default_profiles_limit_opencode_to_free_models() {
+        let profiles = ExecutorConfigs::from_defaults();
+        let opencode = profiles
+            .executors
+            .get(&BaseCodingAgent::Opencode)
+            .expect("opencode profiles should exist");
+        let mut models = opencode
+            .configurations
+            .values()
+            .filter_map(|config| match config {
+                CodingAgent::Opencode(config) => config.model.clone(),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        models.sort();
+        models.dedup();
+
+        assert_eq!(
+            models,
+            vec![
+                "opencode/glm-5-free",
+                "opencode/kimi-k2.5-free",
+                "opencode/minimax-m2.5-free",
+            ]
+        );
+    }
+
+    #[test]
+    fn opencode_user_profile_migration_removes_stale_models() {
+        let defaults = ExecutorConfigs::from_defaults();
+        let mut profiles: ExecutorConfigs = serde_json::from_value(serde_json::json!({
+            "executors": {
+                "OPENCODE": {
+                    "DEFAULT": { "OPENCODE": { "model": "openai/gpt-5" } },
+                    "legacy/model": { "OPENCODE": { "model": "legacy/model" } },
+                    "custom-no-model": { "OPENCODE": { "auto_approve": false } },
+                    "opencode/glm-5-free": {
+                        "OPENCODE": { "model": "opencode/glm-5-free" }
+                    }
+                }
+            }
+        }))
+        .expect("user profiles should deserialize");
+
+        assert!(profiles.migrate_opencode_model_overrides(&defaults));
+        let opencode = profiles
+            .executors
+            .get(&BaseCodingAgent::Opencode)
+            .expect("opencode overrides should remain");
+        assert!(!opencode.configurations.contains_key("legacy/model"));
+        assert!(opencode.configurations.contains_key("custom-no-model"));
+        assert!(opencode.configurations.contains_key("opencode/glm-5-free"));
+        match opencode.configurations.get("DEFAULT") {
+            Some(CodingAgent::Opencode(config)) => {
+                assert_eq!(config.model.as_deref(), Some("opencode/glm-5-free"));
+            }
+            other => panic!("expected OpenCode DEFAULT override, got {other:?}"),
+        }
+        assert!(!profiles.migrate_opencode_model_overrides(&defaults));
+    }
+
+    #[test]
+    fn opencode_user_profile_migration_drops_empty_executor_override() {
+        let defaults = ExecutorConfigs::from_defaults();
+        let mut profiles: ExecutorConfigs = serde_json::from_value(serde_json::json!({
+            "executors": {
+                "OPENCODE": {
+                    "legacy/model": { "OPENCODE": { "model": "legacy/model" } }
+                }
+            }
+        }))
+        .expect("user profiles should deserialize");
+
+        assert!(profiles.migrate_opencode_model_overrides(&defaults));
+        assert!(!profiles.executors.contains_key(&BaseCodingAgent::Opencode));
     }
 
     #[test]

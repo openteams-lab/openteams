@@ -38,8 +38,8 @@ mod slash_commands;
 mod types;
 
 use sdk::{
-    LogWriter, ProviderInfo, ProviderListResponse, RunConfig, build_default_headers,
-    generate_server_password, list_providers, run_session, run_slash_command, wait_for_health,
+    LogWriter, ProviderListResponse, RunConfig, build_default_headers, generate_server_password,
+    list_providers, run_session, run_slash_command, wait_for_health,
 };
 use slash_commands::{OpencodeSlashCommand, hardcoded_slash_commands};
 
@@ -140,6 +140,7 @@ impl Opencode {
         current_dir: &Path,
         env: &ExecutionEnv,
     ) -> Result<Vec<String>, ExecutorError> {
+        let configured_provider_ids = user_opencode_auth_provider_ids();
         let server = self.spawn_server(current_dir, env).await?;
         let directory = current_dir.to_string_lossy().to_string();
 
@@ -151,7 +152,10 @@ impl Opencode {
             let version = wait_for_health(&client, &server.base_url).await?;
             sdk::ensure_expected_version(&version, Self::PACKAGE_VERSION)?;
             let providers = list_providers(&client, &server.base_url, &directory).await?;
-            Ok(collect_configured_models(&providers))
+            Ok(collect_discoverable_models(
+                &providers,
+                &configured_provider_ids,
+            ))
         }
         .await;
 
@@ -436,35 +440,90 @@ fn workspace_runtime_key(current_dir: &Path) -> String {
 }
 
 fn mirror_user_opencode_auth(isolated_opencode_data_dir: &Path) -> io::Result<()> {
-    let Some(source_auth) = user_opencode_auth_path() else {
-        return Ok(());
-    };
-    if !source_auth.exists() {
-        return Ok(());
-    }
-
     let target_auth = isolated_opencode_data_dir.join("auth.json");
+    let Some(source_auth) = user_opencode_auth_path().filter(|path| path.is_file()) else {
+        return remove_file_if_present(&target_auth);
+    };
     if source_auth == target_auth {
         return Ok(());
     }
 
-    let _ = std::fs::remove_file(&target_auth);
+    remove_file_if_present(&target_auth)?;
     symlink_or_copy_file(&source_auth, &target_auth)
 }
 
 fn user_opencode_auth_path() -> Option<PathBuf> {
-    #[cfg(not(windows))]
-    {
-        let base_dirs = xdg::BaseDirectories::with_prefix("opencode");
-        base_dirs.get_data_home().map(|data| data.join("auth.json"))
+    opencode_auth_path(
+        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from),
+        dirs::home_dir(),
+    )
+}
+
+fn opencode_auth_path(
+    xdg_data_home: Option<PathBuf>,
+    home_dir: Option<PathBuf>,
+) -> Option<PathBuf> {
+    // OpenCode 1.17.8 uses xdg-basedir on every platform, including Windows.
+    // Its fallback is ~/.local/share rather than %LOCALAPPDATA%.
+    xdg_data_home
+        .or_else(|| home_dir.map(|home| home.join(".local").join("share")))
+        .map(|data| data.join("opencode").join("auth.json"))
+}
+
+fn remove_file_if_present(path: &Path) -> io::Result<()> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err),
     }
-    #[cfg(windows)]
-    {
-        std::env::var("XDG_DATA_HOME")
-            .ok()
-            .map(PathBuf::from)
-            .or_else(|| dirs::data_local_dir())
-            .map(|data| data.join("opencode").join("auth.json"))
+}
+
+fn user_opencode_auth_provider_ids() -> HashSet<String> {
+    let Some(path) = user_opencode_auth_path() else {
+        return HashSet::new();
+    };
+    let content = match std::fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return HashSet::new(),
+        Err(err) => {
+            tracing::warn!(path = %path.display(), "Failed to read OpenCode auth store: {err}");
+            return HashSet::new();
+        }
+    };
+
+    match serde_json::from_str::<Value>(&content) {
+        Ok(value) => opencode_auth_provider_ids(&value),
+        Err(err) => {
+            tracing::warn!(path = %path.display(), "Failed to parse OpenCode auth store: {err}");
+            HashSet::new()
+        }
+    }
+}
+
+fn opencode_auth_provider_ids(value: &Value) -> HashSet<String> {
+    value
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter_map(|(provider_id, auth)| valid_opencode_auth(auth).then(|| provider_id.clone()))
+        .collect()
+}
+
+fn valid_opencode_auth(value: &Value) -> bool {
+    let Some(auth) = value.as_object() else {
+        return false;
+    };
+    let has_value = |key: &str| {
+        auth.get(key)
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.trim().is_empty())
+    };
+
+    match auth.get("type").and_then(Value::as_str) {
+        Some("api") => has_value("key"),
+        Some("oauth") => has_value("access") || has_value("refresh"),
+        Some("wellknown") => has_value("key") && has_value("token"),
+        _ => false,
     }
 }
 
@@ -573,56 +632,36 @@ fn quote_command_part(value: &str) -> String {
     }
 }
 
-fn collect_configured_models(provider_list: &ProviderListResponse) -> Vec<String> {
+fn collect_discoverable_models(
+    provider_list: &ProviderListResponse,
+    configured_provider_ids: &HashSet<String>,
+) -> Vec<String> {
     let connected: HashSet<_> = provider_list.connected.iter().map(String::as_str).collect();
     let mut models = BTreeSet::new();
 
     for provider in &provider_list.all {
-        if !connected.contains(provider.id.as_str()) || !is_configured_provider(provider) {
+        if !connected.contains(provider.id.as_str())
+            || !configured_provider_ids.contains(provider.id.as_str())
+        {
             continue;
         }
 
-        for model_id in provider.models.keys() {
-            if let Some(model) = model_from_provider(&provider.id, model_id) {
-                models.insert(model);
-            }
-        }
+        insert_provider_models(&mut models, &provider.id, provider.models.keys());
     }
 
     models.into_iter().collect()
 }
 
-fn is_configured_provider(provider: &ProviderInfo) -> bool {
-    if provider_has_api_key(provider) {
-        return true;
+fn insert_provider_models<'a>(
+    models: &mut BTreeSet<String>,
+    provider_id: &str,
+    model_ids: impl Iterator<Item = &'a String>,
+) {
+    for model_id in model_ids {
+        if let Some(model) = model_from_provider(provider_id, model_id) {
+            models.insert(model);
+        }
     }
-
-    match provider.source.as_deref() {
-        Some("api" | "env" | "custom") => true,
-        // Config-only built-in providers still appear as connected in OpenCode,
-        // but without a key they are not usable. Custom config providers often
-        // have no built-in env metadata, so keep those.
-        Some("config") => provider.env.is_empty(),
-        _ => false,
-    }
-}
-
-fn provider_has_api_key(provider: &ProviderInfo) -> bool {
-    provider.key.as_deref().is_some_and(has_secret_value)
-        || string_option(&provider.options, "apiKey").is_some_and(has_secret_value)
-        || string_option(&provider.options, "api_key").is_some_and(has_secret_value)
-}
-
-fn string_option<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
-    value
-        .as_object()
-        .and_then(|object| object.get(key))
-        .and_then(Value::as_str)
-}
-
-fn has_secret_value(value: &str) -> bool {
-    let trimmed = value.trim();
-    !trimmed.is_empty() && !trimmed.contains("***")
 }
 
 fn model_from_provider(provider_id: &str, model_id: &str) -> Option<String> {
@@ -931,30 +970,22 @@ fn merge_compaction_config(existing_json: Option<&str>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{
+        collections::{HashMap, HashSet},
+        path::PathBuf,
+    };
 
-    use serde_json::{Value, json};
+    use serde_json::json;
 
     use super::{
-        collect_configured_models,
+        collect_discoverable_models, opencode_auth_path, opencode_auth_provider_ids,
         sdk::{ProviderInfo, ProviderListResponse},
     };
 
-    fn provider(
-        id: &str,
-        source: Option<&str>,
-        env: &[&str],
-        key: Option<&str>,
-        options: Value,
-        models: &[&str],
-    ) -> ProviderInfo {
+    fn provider(id: &str, models: &[&str]) -> ProviderInfo {
         ProviderInfo {
             id: id.to_string(),
             name: id.to_string(),
-            source: source.map(str::to_string),
-            env: env.iter().map(|value| value.to_string()).collect(),
-            key: key.map(str::to_string),
-            options,
             models: models
                 .iter()
                 .map(|model| (model.to_string(), json!({})))
@@ -963,69 +994,48 @@ mod tests {
     }
 
     #[test]
-    fn opencode_model_discovery_keeps_only_configured_providers() {
+    fn opencode_model_discovery_keeps_only_configured_provider_models() {
         let provider_list = ProviderListResponse {
             all: vec![
                 provider(
-                    "openai",
-                    Some("custom"),
-                    &["OPENAI_API_KEY"],
-                    None,
-                    Value::Null,
-                    &["gpt-5.2-codex"],
+                    "opencode",
+                    &["kimi-k2-free", "qwen3-coder-free", "gpt-5", "free-model"],
                 ),
-                provider(
-                    "openrouter",
-                    Some("config"),
-                    &["OPENROUTER_API_KEY"],
-                    None,
-                    Value::Null,
-                    &["openai/gpt-5.2-codex"],
-                ),
-                provider(
-                    "anthropic",
-                    Some("api"),
-                    &["ANTHROPIC_API_KEY"],
-                    Some("sk-test"),
-                    Value::Null,
-                    &["claude-sonnet-4-5"],
-                ),
-                provider(
-                    "litellm",
-                    Some("config"),
-                    &[],
-                    None,
-                    Value::Null,
-                    &["gpt-5.2-codex"],
-                ),
-                provider(
-                    "dashscope",
-                    Some("config"),
-                    &["DASHSCOPE_API_KEY"],
-                    None,
-                    json!({ "apiKey": "sk-test" }),
-                    &["qwen3-coder-plus"],
-                ),
-                provider(
-                    "gemini",
-                    Some("env"),
-                    &["GEMINI_API_KEY"],
-                    None,
-                    Value::Null,
-                    &["gemini-3-pro"],
-                ),
+                provider("openai", &["gpt-5.2-codex"]),
+                provider("openrouter", &["openai/gpt-5.2-codex"]),
+                provider("amazon-bedrock", &["claude-sonnet-4-5"]),
+                provider("anthropic", &["claude-sonnet-4-5"]),
+                provider("github-copilot", &["gpt-5-mini"]),
+                provider("groq", &["llama-4"]),
+                provider("litellm", &["gpt-5.2-codex"]),
+                provider("dashscope", &["qwen3-coder-plus"]),
+                provider("zai-coding-plan", &["glm-5"]),
+                provider("gemini", &["gemini-3-pro"]),
             ],
             default: HashMap::new(),
             connected: vec![
-                "openrouter".to_string(),
+                "amazon-bedrock".to_string(),
                 "anthropic".to_string(),
-                "litellm".to_string(),
+                "github-copilot".to_string(),
                 "dashscope".to_string(),
                 "gemini".to_string(),
+                "groq".to_string(),
+                "litellm".to_string(),
+                "opencode".to_string(),
+                "openai".to_string(),
+                "zai-coding-plan".to_string(),
             ],
         };
+        let configured_provider_ids = HashSet::from([
+            "anthropic".to_string(),
+            "github-copilot".to_string(),
+            "dashscope".to_string(),
+            "gemini".to_string(),
+            "litellm".to_string(),
+            "zai-coding-plan".to_string(),
+        ]);
 
-        let models = collect_configured_models(&provider_list);
+        let models = collect_discoverable_models(&provider_list, &configured_provider_ids);
 
         assert_eq!(
             models,
@@ -1033,10 +1043,83 @@ mod tests {
                 "anthropic/claude-sonnet-4-5",
                 "dashscope/qwen3-coder-plus",
                 "gemini/gemini-3-pro",
+                "github-copilot/gpt-5-mini",
                 "litellm/gpt-5.2-codex",
+                "zai-coding-plan/glm-5",
             ]
         );
-        assert!(!models.iter().any(|model| model.starts_with("openai/")));
+        assert!(!models.iter().any(|model| model.starts_with("groq/")));
+        assert!(
+            !models
+                .iter()
+                .any(|model| model.starts_with("amazon-bedrock/"))
+        );
         assert!(!models.iter().any(|model| model.starts_with("openrouter/")));
+        assert!(!models.iter().any(|model| model.starts_with("opencode/")));
+        assert!(!models.iter().any(|model| model.starts_with("openai/")));
+    }
+
+    #[test]
+    fn opencode_model_discovery_includes_paid_models_with_a_user_key() {
+        let provider_list = ProviderListResponse {
+            all: vec![provider("opencode", &["kimi-k2-free", "gpt-5"])],
+            default: HashMap::new(),
+            connected: vec!["opencode".to_string()],
+        };
+
+        assert_eq!(
+            collect_discoverable_models(&provider_list, &HashSet::from(["opencode".to_string()]),),
+            vec!["opencode/gpt-5", "opencode/kimi-k2-free"]
+        );
+    }
+
+    #[test]
+    fn opencode_auth_store_selects_only_valid_credentials() {
+        let value = json!({
+            "zai-coding-plan": { "type": "api", "key": "zai-key" },
+            "github-copilot": {
+                "type": "oauth",
+                "access": "access-token",
+                "refresh": "refresh-token",
+                "expires": 1
+            },
+            "well-known": { "type": "wellknown", "key": "key", "token": "token" },
+            "empty": { "type": "api", "key": " " },
+            "malformed": { "key": "secret" }
+        });
+
+        assert_eq!(
+            opencode_auth_provider_ids(&value),
+            HashSet::from([
+                "github-copilot".to_string(),
+                "well-known".to_string(),
+                "zai-coding-plan".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    fn opencode_auth_path_matches_xdg_basedir_on_windows_and_unix() {
+        assert_eq!(
+            opencode_auth_path(None, Some(PathBuf::from("home"))),
+            Some(
+                PathBuf::from("home")
+                    .join(".local")
+                    .join("share")
+                    .join("opencode")
+                    .join("auth.json")
+            )
+        );
+        assert_eq!(
+            opencode_auth_path(
+                Some(PathBuf::from("custom-data")),
+                Some(PathBuf::from("home"))
+            ),
+            Some(
+                PathBuf::from("custom-data")
+                    .join("opencode")
+                    .join("auth.json")
+            )
+        );
     }
 }
