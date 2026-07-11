@@ -40,6 +40,8 @@ interface AgentActivityPanelProps {
   state?: ActivityLoadState;
   labels: AgentActivityPanelLabels;
   translate?: AgentActivityTranslator;
+  variant?: "inline" | "panel";
+  stripEmptyHtmlCommentPrefixes?: boolean;
 }
 
 const AGENT_ACTIVITY_AUTO_SCROLL_IDLE_MS = 30000;
@@ -268,10 +270,15 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
   state = "idle",
   labels,
   translate,
+  variant = "inline",
+  stripEmptyHtmlCommentPrefixes = false,
 }) => {
   const displayRows = useMemo(
-    () => formatAgentActivityLines(lines, translate),
-    [lines, translate],
+    () =>
+      formatAgentActivityLines(lines, translate, {
+        stripEmptyHtmlCommentPrefixes,
+      }),
+    [lines, stripEmptyHtmlCommentPrefixes, translate],
   );
 
   // Filter: hide tool calls that are still running
@@ -294,7 +301,68 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
   const showEmpty =
     !showLoading && !showPruned && !showError && visibleRows.length === 0;
 
-  if (showEmpty) return null;
+  if (showEmpty && variant === "inline") return null;
+
+  if (variant === "panel") {
+    if (showLoading) {
+      return (
+        <div className="wf-log-panel wf-log-panel--empty">
+          <span className="wf-log-spinner" />
+          <span className="wf-log-panel-message">{labels.loading}</span>
+        </div>
+      );
+    }
+
+    if (showPruned) {
+      return (
+        <div className="wf-log-panel wf-log-panel--empty">
+          <span className="wf-log-panel-message">{labels.cleaned}</span>
+        </div>
+      );
+    }
+
+    if (showError) {
+      return (
+        <div className="wf-log-panel wf-log-panel--empty">
+          <span className="wf-log-panel-message wf-log-panel-message--error">
+            {labels.error}
+          </span>
+        </div>
+      );
+    }
+
+    if (showEmpty) {
+      return (
+        <div className="wf-log-panel wf-log-panel--empty">
+          <span className="wf-log-panel-message">{labels.empty}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        ref={scrollRef}
+        className="wf-log-panel"
+        {...scrollHandlers}
+      >
+        <div className="wf-log-group-tasks">
+          {visibleRows.map((line) =>
+            isToolCallLine(line) ? (
+              <ToolLineItem
+                key={line.row_id}
+                line={line}
+              />
+            ) : (
+              <ContentLineItem
+                key={line.row_id}
+                line={line}
+              />
+            ),
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="wf-log-panel-inline">

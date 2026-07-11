@@ -27,6 +27,10 @@
   color: var(--ink-tertiary, #62666d);
 }
 
+.wf-log-panel-message--error {
+  color: #e5484d;
+}
+
 /* Scrollbar */
 .wf-log-panel::-webkit-scrollbar {
   width: 6px;

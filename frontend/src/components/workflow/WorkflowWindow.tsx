@@ -969,7 +969,8 @@ function InspectorCard({
   const streamEntries = useMemo(
     () =>
       transcriptEntries.filter((entry) =>
-        isWorkflowRuntimeThinkingEntry(entry)
+        isWorkflowRuntimeThinkingEntry(entry) ||
+        isWorkflowRuntimeErrorEntry(entry)
       ),
     [transcriptEntries]
   );
@@ -994,6 +995,7 @@ function InspectorCard({
                 key: `${entry.id}-${index}`,
                 timestamp: formatWorkflowLogTimestamp(entry.created_at),
                 content: line,
+                entryType: entry.entry_type,
               }));
             if (lines.length === 0) return groups;
             if (existing) {
@@ -1006,7 +1008,7 @@ function InspectorCard({
               });
             }
             return groups;
-          }, new Map<string, { key: string; agentName: string; lines: Array<{ key: string; timestamp: string; content: string }> }>())
+          }, new Map<string, { key: string; agentName: string; lines: Array<{ key: string; timestamp: string; content: string; entryType?: string }> }>())
           .values()
       ),
     [agentName, step.id, streamEntries, t]
