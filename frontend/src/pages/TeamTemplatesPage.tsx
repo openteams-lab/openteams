@@ -3252,6 +3252,8 @@ export function TeamTemplatesPage() {
         detail,
         workspacePath,
         runtimeResponse.runners,
+      ).map((spec) =>
+        workspacePath ? { ...spec, workspacePath } : spec,
       );
       if (memberSpecs.length === 0) {
         throw new Error("模板没有可用成员，未替换当前团队。");
