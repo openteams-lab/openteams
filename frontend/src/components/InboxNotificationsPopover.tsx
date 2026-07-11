@@ -251,14 +251,14 @@ export function InboxNotificationsPopover({
         <span className="relative inline-flex h-3.5 w-3.5 items-center justify-center">
           {unreadCount > 0 ? (
             <span className="relative h-3.5 w-3.5">
-              <Bell className="absolute inset-0 h-3.5 w-3.5 text-[#f8fafc] drop-shadow-[0_0_6px_rgba(248,250,252,0.55)] [clip-path:inset(0_0_45%_0)]" />
-              <Bell className="inbox-bell-lower-swing absolute inset-0 h-3.5 w-3.5 text-[#f8fafc] drop-shadow-[0_0_6px_rgba(248,250,252,0.55)] [clip-path:inset(45%_0_0_0)]" />
+              <Bell className="inbox-bell-unread-icon absolute inset-0 h-3.5 w-3.5 [clip-path:inset(0_0_45%_0)]" />
+              <Bell className="inbox-bell-unread-icon inbox-bell-lower-swing absolute inset-0 h-3.5 w-3.5 [clip-path:inset(45%_0_0_0)]" />
             </span>
           ) : (
             <Bell className="h-3.5 w-3.5 transition" />
           )}
           {unreadCount > 0 && (
-            <span className="pointer-events-none absolute -right-1 -top-1.5 font-mono text-[10px] font-semibold leading-none tabular-nums text-[#f3f4f6] drop-shadow-[0_1px_1px_rgba(0,0,0,0.75)]">
+            <span className="inbox-bell-unread-badge pointer-events-none absolute -right-1 -top-1.5 font-mono text-[10px] font-semibold leading-none tabular-nums">
               {inboxBadgeLabel(unreadCount)}
             </span>
           )}
