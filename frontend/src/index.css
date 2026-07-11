@@ -3411,9 +3411,13 @@ body[data-mode="light"] .chat-markdown-copy-button[data-copied="true"] {
     transparent
   );
   --workflow-board-bg: var(--canvas);
-  --workflow-loop-bg: color-mix(in srgb, var(--surface-1) 76%, transparent);
+  --workflow-loop-bg: #171b24;
   --workflow-loop-shadow: none;
-  --workflow-edge-color: var(--hairline-strong);
+  --workflow-edge-color: color-mix(
+    in srgb,
+    var(--ink-tertiary) 58%,
+    transparent
+  );
   --workflow-edge-hover-color: var(--primary);
   color: var(--ink);
   font-family: var(--font-sans);
@@ -3707,7 +3711,7 @@ body[data-mode="light"] .workflow-window-root [class~="bg-[#18181B]"] {
 
 /* Graph board grid background */
 .workflow-graph-board {
-  background-color: var(--surface-2) !important;
+  background-color: #111419 !important;
   background-image: none !important;
   background-size: 48px 48px !important;
   background-position: -1px -1px !important;
@@ -3717,8 +3721,8 @@ body[data-mode="light"] .workflow-window-root [class~="bg-[#18181B]"] {
 
 /* Workflow node styles applied via data attribute */
 .workflow-graph-board [data-workflow-node] {
-  background: #18181A !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: #1a1d23 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-left: none !important;
   border-radius: 8px !important;
   box-shadow: none !important;
@@ -3726,50 +3730,50 @@ body[data-mode="light"] .workflow-window-root [class~="bg-[#18181B]"] {
 }
 
 .workflow-graph-board [data-workflow-node]:hover {
-  background: #1C1C1E !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: #20242c !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
   transform: none !important;
 }
 
 /* Status: Pending — dim, low priority */
 .workflow-graph-board .wf-node-pending {
-  background: #18181A !important;
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  background: #181b21 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow: none !important;
 }
 
 /* Status: Ready */
 .workflow-graph-board .wf-node-ready {
-  background: #18181A !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: #1a1d23 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
   box-shadow: none !important;
 }
 
 /* Status: Running — slightly brighter border + left accent line */
 .workflow-graph-board .wf-node-running {
-  background: #18181A !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  box-shadow: inset 2px 0 0 #5E6AD2, 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+  background: #1c2030 !important;
+  border: 1px solid rgba(139, 170, 247, 0.32) !important;
+  box-shadow: inset 2px 0 0 #6e8de8, 0 1px 3px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* Status: Completed — same background, no emphasis */
 .workflow-graph-board .wf-node-completed {
-  background: #18181A !important;
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  background: #181b21 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow: none !important;
 }
 
 /* Status: Interrupted/Failed — left red accent line */
 .workflow-graph-board .wf-node-interrupted {
-  background: #18181A !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: #20191d !important;
+  border: 1px solid rgba(229, 72, 77, 0.24) !important;
   box-shadow: inset 2px 0 0 #E5484D !important;
 }
 
 /* Status: Waiting (review/input) — left purple accent line */
 .workflow-graph-board .wf-node-waiting {
-  background: #18181A !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background: #1c1b2a !important;
+  border: 1px solid rgba(167, 139, 250, 0.24) !important;
   box-shadow: inset 2px 0 0 #8B5CF6 !important;
 }
 
@@ -3825,16 +3829,16 @@ body[data-mode="light"] .workflow-window-root [class~="bg-[#18181B]"] {
 /* Loop containers */
 .workflow-graph-board [class*="border-dashed"][style] {
   border-width: 1px !important;
-  border-color: color-mix(in srgb, var(--hairline-strong) 70%, transparent) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
   border-radius: 12px !important;
-  background-color: color-mix(in srgb, var(--surface-1) 74%, transparent) !important;
+  background-color: var(--workflow-loop-bg) !important;
   box-shadow: none !important;
 }
 
 .workflow-graph-board [class*="-top-3"][class*="rounded-full"] {
   border-radius: 8px !important;
-  background: var(--surface-1) !important;
-  border: 1px solid var(--hairline) !important;
+  background: #1b1f27 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
   box-shadow: none !important;
 }
 
@@ -3855,7 +3859,17 @@ body[data-mode="light"] .workflow-window-root [class~="bg-[#18181B]"] {
 
 /* ===== Light mode: Workflow Graph Nodes ===== */
 body[data-mode="light"] .workflow-graph-board {
+  --workflow-loop-bg: color-mix(in srgb, var(--surface-3) 78%, var(--hairline));
   background-color: var(--surface-2) !important;
+}
+
+body[data-mode="light"] .workflow-graph-board [class*="border-dashed"][style] {
+  border-color: color-mix(in srgb, var(--hairline-strong) 70%, transparent) !important;
+}
+
+body[data-mode="light"] .workflow-graph-board [class*="-top-3"][class*="rounded-full"] {
+  background: var(--surface-1) !important;
+  border: 1px solid var(--hairline) !important;
 }
 
 body[data-mode="light"] .workflow-graph-board [data-workflow-node] {
@@ -3974,9 +3988,9 @@ body[data-mode="light"] .workflow-graph-board > .absolute.bottom-4.right-4 butto
 }
 
 .workflow-graph-board.workflow-card-graph-board {
-  background-color: #111214 !important;
+  background-color: #101318 !important;
   background-image: radial-gradient(
-    rgba(255, 255, 255, 0.09) 1px,
+    rgba(255, 255, 255, 0.1) 1px,
     transparent 1px
   ) !important;
   background-size: 18px 18px !important;
