@@ -114,7 +114,11 @@ interface ProjectSidebarProps {
   onDeleteSession?: (sessionId: string) => Promise<void>;
   onCreateProject?: (
     data: CreateProjectRequest,
-    options?: { teamId?: string; openSessionComposer?: boolean },
+    options?: {
+      teamId?: string;
+      openSessionComposer?: boolean;
+      forceMemberWorkspacePath?: boolean;
+    },
   ) => Promise<unknown>;
   onUpdateProject?: (projectId: string, data: UpdateProject) => Promise<void>;
   onDeleteProject?: (projectId: string) => Promise<void>;
@@ -1588,6 +1592,7 @@ export function ProjectSidebar({
           {
             teamId: selectedTeamId || blankTeamId,
             openSessionComposer: true,
+            forceMemberWorkspacePath: true,
           },
         );
       }
