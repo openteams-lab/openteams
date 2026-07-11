@@ -19,6 +19,11 @@ test('desktop:dev prepares the sidecar before launching tauri dev', () => {
 
   assert.match(
     desktopDev,
+    /desktop:sync-icons/,
+    'desktop:dev should sync desktop icons before invoking tauri dev'
+  );
+  assert.match(
+    desktopDev,
     /prepare-sidecar\.js --debug/,
     'desktop:dev should prepare the debug sidecar before invoking tauri dev'
   );
@@ -36,6 +41,16 @@ test('desktop:dev skips cli sidecar build and uses the dev-specific tauri config
     desktopDev,
     /tauri dev --config src-tauri\/tauri\.dev\.conf\.json/,
     'desktop:dev should launch tauri dev with the debug-only config override'
+  );
+});
+
+test('tauri build syncs desktop icons from the shared frontend logo', () => {
+  const beforeBuildCommand = tauriConfig.build.beforeBuildCommand;
+
+  assert.match(
+    beforeBuildCommand,
+    /sync-icons\.js/,
+    'beforeBuildCommand should sync desktop icons before bundling'
   );
 });
 

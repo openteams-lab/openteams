@@ -6,7 +6,7 @@ pub mod session;
 pub mod slash_commands;
 use std::{
     collections::{BTreeSet, HashMap},
-    env,
+    env, fs,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -40,6 +40,16 @@ const CODEX_MODEL_FALLBACKS: &[&str] = &[
     "gpt-5.3-codex-spark",
     "codex-auto-review",
 ];
+
+const NPM_CONFIG_CACHE: &str = "NPM_CONFIG_CACHE";
+const NPM_CONFIG_LOGLEVEL: &str = "NPM_CONFIG_LOGLEVEL";
+const NPM_CONFIG_INCLUDE: &str = "NPM_CONFIG_INCLUDE";
+const NPM_CONFIG_OMIT: &str = "NPM_CONFIG_OMIT";
+const NPM_CONFIG_OPTIONAL: &str = "NPM_CONFIG_OPTIONAL";
+const NPM_CONFIG_AUDIT: &str = "NPM_CONFIG_AUDIT";
+const NPM_CONFIG_FUND: &str = "NPM_CONFIG_FUND";
+const NPM_CONFIG_UPDATE_NOTIFIER: &str = "NPM_CONFIG_UPDATE_NOTIFIER";
+const NO_UPDATE_NOTIFIER: &str = "NO_UPDATE_NOTIFIER";
 
 use async_trait::async_trait;
 use codex_app_server_protocol::{
@@ -78,6 +88,67 @@ use crate::{
     skill_config::NativeSkillConfigBackend,
     stdout_dup::create_stdout_pipe_writer,
 };
+
+fn codex_npm_cache_dir_for_home(home: &Path) -> PathBuf {
+    home.join(".openteams")
+        .join("cache")
+        .join("npm")
+        .join("codex")
+}
+
+fn codex_npm_cache_dir() -> Option<PathBuf> {
+    dirs::home_dir().map(|home| codex_npm_cache_dir_for_home(&home))
+}
+
+fn codex_npm_cache_env_value() -> Option<String> {
+    let cache_dir = codex_npm_cache_dir()?;
+    if let Err(err) = fs::create_dir_all(&cache_dir) {
+        tracing::warn!(
+            cache_dir = %cache_dir.display(),
+            "Failed to create Codex npm cache directory: {err}"
+        );
+        return None;
+    }
+    Some(cache_dir.to_string_lossy().to_string())
+}
+
+fn codex_npx_static_env_vars() -> Vec<(&'static str, String)> {
+    vec![
+        (NPM_CONFIG_LOGLEVEL, "error".to_string()),
+        (NPM_CONFIG_INCLUDE, "optional".to_string()),
+        (NPM_CONFIG_OMIT, String::new()),
+        (NPM_CONFIG_OPTIONAL, String::new()),
+        (NPM_CONFIG_AUDIT, "false".to_string()),
+        (NPM_CONFIG_FUND, "false".to_string()),
+        (NPM_CONFIG_UPDATE_NOTIFIER, "false".to_string()),
+        (NO_UPDATE_NOTIFIER, "1".to_string()),
+    ]
+}
+
+fn codex_npx_env_vars() -> Vec<(&'static str, String)> {
+    let mut vars = codex_npx_static_env_vars();
+
+    if let Some(cache_dir) = codex_npm_cache_env_value() {
+        vars.push((NPM_CONFIG_CACHE, cache_dir));
+    }
+
+    vars
+}
+
+pub fn apply_codex_npx_env(command: &mut Command) {
+    for (key, value) in codex_npx_env_vars() {
+        command.env(key, value);
+    }
+}
+
+fn cmd_with_codex_npx_settings(cmd: &CmdOverrides) -> CmdOverrides {
+    let mut cmd = cmd.clone();
+    let env = cmd.env.get_or_insert_with(HashMap::new);
+    for (key, value) in codex_npx_env_vars() {
+        env.insert(key.to_string(), value);
+    }
+    cmd
+}
 
 /// Sandbox policy modes for Codex
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS, JsonSchema, AsRefStr)]
@@ -228,6 +299,7 @@ impl StandardCodingAgentExecutor for Codex {
         current_dir: &Path,
         env: &ExecutionEnv,
     ) -> Result<Option<Vec<String>>, ExecutorError> {
+        let codex_cmd = cmd_with_codex_npx_settings(&self.cmd);
         let config_paths = runner_config_paths([
             self.default_mcp_config_path(),
             codex_home().map(|home| home.join("config.json")),
@@ -236,10 +308,10 @@ impl StandardCodingAgentExecutor for Codex {
         if let Some(discovered) = discover_from_sources(
             current_dir,
             env,
-            &self.cmd,
+            &codex_cmd,
             self.model.as_deref(),
             config_paths,
-            cli_model_commands(Self::BASE_COMMAND, &self.cmd),
+            cli_model_commands(Self::BASE_COMMAND, &codex_cmd),
             &[ProviderKind::OpenAiCompatible],
         )
         .await?
@@ -372,13 +444,46 @@ impl StandardCodingAgentExecutor for Codex {
 
 #[cfg(test)]
 mod tests {
-    use super::CODEX_MODEL_FALLBACKS;
+    use std::{collections::HashMap, path::Path};
+
+    use super::{
+        CODEX_MODEL_FALLBACKS, NPM_CONFIG_INCLUDE, NPM_CONFIG_LOGLEVEL, NPM_CONFIG_OMIT,
+        NPM_CONFIG_OPTIONAL, codex_npm_cache_dir_for_home, codex_npx_static_env_vars,
+    };
 
     #[test]
     fn codex_model_fallbacks_include_latest_gpt_5_6_models() {
         assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-sol"));
         assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-terra"));
         assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-luna"));
+    }
+
+    #[test]
+    fn codex_npm_cache_uses_openteams_cache_dir() {
+        assert_eq!(
+            codex_npm_cache_dir_for_home(Path::new("/Users/example")),
+            Path::new("/Users/example")
+                .join(".openteams")
+                .join("cache")
+                .join("npm")
+                .join("codex")
+        );
+    }
+
+    #[test]
+    fn codex_npx_env_includes_optional_dependencies() {
+        let vars: HashMap<_, _> = codex_npx_static_env_vars().into_iter().collect();
+
+        assert_eq!(
+            vars.get(NPM_CONFIG_LOGLEVEL).map(String::as_str),
+            Some("error")
+        );
+        assert_eq!(
+            vars.get(NPM_CONFIG_INCLUDE).map(String::as_str),
+            Some("optional")
+        );
+        assert_eq!(vars.get(NPM_CONFIG_OMIT).map(String::as_str), Some(""));
+        assert_eq!(vars.get(NPM_CONFIG_OPTIONAL).map(String::as_str), Some(""));
     }
 }
 
@@ -597,7 +702,6 @@ impl Codex {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .current_dir(current_dir)
-            .env("NPM_CONFIG_LOGLEVEL", "error")
             .env("NODE_NO_WARNINGS", "1")
             .env("NO_COLOR", "1")
             .env("RUST_LOG", "error")
@@ -606,6 +710,7 @@ impl Codex {
         env.clone()
             .with_profile(&self.cmd)
             .apply_to_command(&mut process);
+        apply_codex_npx_env(&mut process);
 
         let mut child = process.group_spawn()?;
 

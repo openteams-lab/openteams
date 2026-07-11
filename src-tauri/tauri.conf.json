@@ -1,6 +1,6 @@
 {
   "build": {
-    "beforeBuildCommand": "pnpm -C frontend build && node scripts/desktop/prepare-sidecar.js --release",
+    "beforeBuildCommand": "node scripts/desktop/sync-icons.js && pnpm -C frontend build && node scripts/desktop/prepare-sidecar.js --release",
     "devPath": "../frontend/dist",
     "distDir": "../frontend/dist",
     "withGlobalTauri": true

@@ -677,6 +677,10 @@ async fn detect_cli_version(executor: &CodingAgent, env: &ExecutionEnv) -> Optio
         env.apply_to_command(&mut command);
     }
 
+    if matches!(executor, CodingAgent::Codex(_)) {
+        executors::executors::codex::apply_codex_npx_env(&mut command);
+    }
+
     let output = timeout(Duration::from_secs(12), command.output())
         .await
         .ok()?
