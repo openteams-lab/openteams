@@ -13,7 +13,10 @@ use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use executors::{
     command::{CmdOverrides, CommandBuilder},
     env::ExecutionEnv,
-    executors::{AvailabilityInfo, BaseCodingAgent, CodingAgent, StandardCodingAgentExecutor},
+    executors::{
+        AvailabilityInfo, BaseCodingAgent, CodingAgent, StandardCodingAgentExecutor,
+        opencode::Opencode,
+    },
     model_sync::with_model,
     profile::{ExecutorConfig, ExecutorConfigs, ProfileError, canonical_variant_key},
 };
@@ -677,10 +680,6 @@ async fn detect_cli_version(executor: &CodingAgent, env: &ExecutionEnv) -> Optio
         env.apply_to_command(&mut command);
     }
 
-    if matches!(executor, CodingAgent::Codex(_)) {
-        executors::executors::codex::apply_codex_npx_env(&mut command);
-    }
-
     let output = timeout(Duration::from_secs(12), command.output())
         .await
         .ok()?
@@ -712,7 +711,9 @@ fn version_command_base(executor: &CodingAgent) -> Option<String> {
         CodingAgent::Amp(_) => "npx -y @sourcegraph/amp@0.0.1780464815-g688406".to_string(),
         CodingAgent::Gemini(_) => "npx -y @google/gemini-cli@0.45.0".to_string(),
         CodingAgent::Codex(_) => "npx -y @openai/codex@0.144.1".to_string(),
-        CodingAgent::Opencode(_) => "npx -y opencode-ai@1.15.13".to_string(),
+        CodingAgent::Opencode(_) => {
+            format!("npx -y opencode-ai@{}", Opencode::PACKAGE_VERSION)
+        }
         CodingAgent::OpenTeamsCli(_) => openteams_cli_binary_base(),
         CodingAgent::CursorAgent(_) => "cursor-agent".to_string(),
         CodingAgent::QwenCode(_) => "npx -y @qwen-code/qwen-code@0.17.0".to_string(),

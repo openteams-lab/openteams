@@ -21,6 +21,7 @@ const tauriCli = path.join(
   'cli',
   'tauri.js'
 );
+const desktopLogoScale = 1.05;
 
 function commandExists(command) {
   const lookup = process.platform === 'win32' ? 'where' : 'which';
@@ -138,15 +139,57 @@ function renderSourcePng(inputSvg, outputPng) {
   );
 }
 
+function readSvgNumberAttribute(markup, name) {
+  const match = markup.match(new RegExp(`\\s${name}="([^"]+)"`));
+  if (!match) {
+    throw new Error(`Missing ${name} attribute in desktop icon source image.`);
+  }
+
+  const value = Number.parseFloat(match[1]);
+  if (!Number.isFinite(value)) {
+    throw new Error(`Invalid ${name} attribute in desktop icon source image.`);
+  }
+
+  return value;
+}
+
+function extractSourceLogoImage() {
+  const source = fs.readFileSync(sourceSvg, 'utf8');
+  const imageMatch = source.match(/<image\b[^>]*>/);
+  if (!imageMatch) {
+    throw new Error(`Missing logo image layer in ${sourceSvg}`);
+  }
+
+  const imageMarkup = imageMatch[0];
+  const hrefMatch = imageMarkup.match(/\shref="([^"]+)"/);
+  if (!hrefMatch) {
+    throw new Error(`Missing href on logo image layer in ${sourceSvg}`);
+  }
+
+  return {
+    href: hrefMatch[1],
+    x: readSvgNumberAttribute(imageMarkup, 'x'),
+    y: readSvgNumberAttribute(imageMarkup, 'y'),
+    width: readSvgNumberAttribute(imageMarkup, 'width'),
+    height: readSvgNumberAttribute(imageMarkup, 'height'),
+  };
+}
+
 function createDesktopSourceSvg(outputSvg) {
-  const source = fs.readFileSync(sourceSvg);
-  const encodedSource = source.toString('base64');
+  const logo = extractSourceLogoImage();
+  const sourceToDesktopScale = 1024 / 512;
+  const width = logo.width * sourceToDesktopScale * desktopLogoScale;
+  const height = logo.height * sourceToDesktopScale * desktopLogoScale;
+  const originalCenterX = (logo.x + logo.width / 2) * sourceToDesktopScale;
+  const originalCenterY = (logo.y + logo.height / 2) * sourceToDesktopScale;
+  const x = originalCenterX - width / 2;
+  const y = originalCenterY - height / 2;
 
   fs.writeFileSync(
     outputSvg,
     `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <rect width="1024" height="1024" fill="#FFFFFF"/>
-  <image width="1024" height="1024" href="data:image/svg+xml;base64,${encodedSource}"/>
+  <image x="${x}" y="${y}" width="${width}" height="${height}" href="${logo.href}"/>
 </svg>
 `
   );

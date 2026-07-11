@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
 use derivative::Derivative;
 use futures::StreamExt;
+use jsonc_parser::ParseOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -37,10 +38,7 @@ mod sdk;
 mod slash_commands;
 mod types;
 
-use sdk::{
-    LogWriter, ProviderListResponse, RunConfig, build_default_headers, generate_server_password,
-    list_providers, run_session, run_slash_command, wait_for_health,
-};
+use sdk::{LogWriter, RunConfig, generate_server_password, run_session, run_slash_command};
 use slash_commands::{OpencodeSlashCommand, hardcoded_slash_commands};
 
 #[derive(Derivative, Clone, Serialize, Deserialize, TS, JsonSchema)]
@@ -68,14 +66,12 @@ pub struct Opencode {
     pub approvals: Option<Arc<dyn ExecutorApprovalService>>,
 }
 
-/// Represents a spawned OpenCode server with its base URL
+/// Represents a spawned OpenCode server used by agent and slash-command execution.
 struct OpencodeServer {
     #[allow(unused)]
     child: Option<AsyncGroupChild>,
     base_url: String,
     server_password: ServerPassword,
-    startup_command: String,
-    stderr_lines: Arc<tokio::sync::Mutex<Vec<String>>>,
     stderr_task: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -84,7 +80,6 @@ impl Drop for OpencodeServer {
         if let Some(task) = self.stderr_task.take() {
             task.abort();
         }
-        // kill the process properly using the kill helper as the native kill_on_drop doesn't work reliably causing orphaned processes and memory leaks
         if let Some(mut child) = self.child.take() {
             tokio::spawn(async move {
                 let _ = workspace_utils::process::kill_process_group(&mut child).await;
@@ -93,30 +88,13 @@ impl Drop for OpencodeServer {
     }
 }
 
-impl OpencodeServer {
-    async fn stderr_tail(&self) -> String {
-        let lines = self.stderr_lines.lock().await;
-        format_server_log_tail(&lines)
-    }
-
-    async fn shutdown(mut self) {
-        if let Some(mut child) = self.child.take() {
-            if let Err(err) = workspace_utils::process::kill_process_group(&mut child).await {
-                tracing::warn!("Failed to stop OpenCode discovery server: {}", err);
-            }
-        }
-        if let Some(task) = self.stderr_task.take() {
-            let _ = tokio::time::timeout(Duration::from_millis(800), task).await;
-        }
-    }
-}
-
 type ServerPassword = String;
 const MAX_SERVER_LOG_LINES: usize = 200;
+const MODEL_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(30);
 
 impl Opencode {
-    const PACKAGE_VERSION: &'static str = "1.17.8";
-    const BASE_COMMAND: &'static str = "npx -y opencode-ai@1.17.8";
+    pub const PACKAGE_VERSION: &'static str = "1.17.18";
+    const BASE_COMMAND: &'static str = "npx -y opencode-ai@1.17.18";
 
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
         let builder = CommandBuilder::new(Self::BASE_COMMAND)
@@ -140,45 +118,100 @@ impl Opencode {
         current_dir: &Path,
         env: &ExecutionEnv,
     ) -> Result<Vec<String>, ExecutorError> {
-        let configured_provider_ids = user_opencode_auth_provider_ids();
-        let server = self.spawn_server(current_dir, env).await?;
-        let directory = current_dir.to_string_lossy().to_string();
+        let configured_provider_ids = user_opencode_configured_provider_ids(current_dir);
+        self.list_models_via_cli(current_dir, env, &configured_provider_ids)
+            .await
+    }
 
-        let result = async {
-            let client = reqwest::Client::builder()
-                .default_headers(build_default_headers(&directory, &server.server_password))
-                .build()
-                .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
-            let version = wait_for_health(&client, &server.base_url).await?;
-            sdk::ensure_expected_version(&version, Self::PACKAGE_VERSION)?;
-            let providers = list_providers(&client, &server.base_url, &directory).await?;
-            Ok(collect_discoverable_models(
-                &providers,
-                &configured_provider_ids,
-            ))
-        }
-        .await;
+    async fn list_models_via_cli(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+        configured_provider_ids: &HashSet<String>,
+    ) -> Result<Vec<String>, ExecutorError> {
+        let mut provider_ids = BTreeSet::new();
+        provider_ids.insert("opencode".to_string());
+        provider_ids.extend(configured_provider_ids.iter().cloned());
 
-        let result = match result {
-            Ok(models) => Ok(models),
-            Err(err) => {
-                let server_logs = server.stderr_tail().await;
-                tracing::error!(
-                    error = %err,
-                    opencode_startup_command = %server.startup_command,
-                    opencode_server_logs = %server_logs,
-                    "OpenCode model discovery failed"
-                );
-                Err(opencode_server_error(
-                    err,
-                    &server.startup_command,
-                    &server_logs,
-                ))
+        let mut models = BTreeSet::new();
+        let mut errors = Vec::new();
+        for provider_id in provider_ids {
+            let include_paid = configured_provider_ids.contains(provider_id.as_str());
+            match self
+                .run_models_command(current_dir, env, &provider_id)
+                .await
+            {
+                Ok(output) => {
+                    models.extend(parse_models_command_output(&output, include_paid));
+                }
+                Err(err) => {
+                    errors.push(format!("{provider_id}: {err}"));
+                }
             }
-        };
+        }
 
-        server.shutdown().await;
-        result
+        if models.is_empty() && !errors.is_empty() {
+            return Err(ExecutorError::Io(io::Error::other(format!(
+                "OpenCode CLI model discovery failed: {}",
+                errors.join("; ")
+            ))));
+        }
+
+        Ok(models.into_iter().collect())
+    }
+
+    async fn run_models_command(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+        provider_id: &str,
+    ) -> Result<String, ExecutorError> {
+        let command_parts = apply_overrides(
+            CommandBuilder::new(Self::BASE_COMMAND).extend_params([
+                "models",
+                provider_id,
+                "--verbose",
+            ]),
+            &self.cmd,
+        )?
+        .build_initial()?;
+        let (program_path, args) = command_parts.into_resolved().await?;
+        let mut command = Command::new(program_path);
+        command
+            .kill_on_drop(true)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .current_dir(current_dir)
+            .env("NPM_CONFIG_LOGLEVEL", "error")
+            .env("NODE_NO_WARNINGS", "1")
+            .env("NO_COLOR", "1")
+            .args(&args);
+
+        env.clone()
+            .with_profile(&self.cmd)
+            .apply_to_command(&mut command);
+        apply_isolated_opencode_env(&mut command, current_dir, Self::PACKAGE_VERSION)?;
+
+        let output = tokio::time::timeout(MODEL_DISCOVERY_TIMEOUT, command.output())
+            .await
+            .map_err(|_| {
+                ExecutorError::Io(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    format!("OpenCode CLI model discovery timed out for provider {provider_id}"),
+                ))
+            })?
+            .map_err(ExecutorError::Io)?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(ExecutorError::Io(io::Error::other(format!(
+                "OpenCode CLI model discovery failed for provider {provider_id}: {}",
+                stderr.trim()
+            ))));
+        }
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
     /// Common boilerplate for spawning an OpenCode server process.
@@ -222,7 +255,7 @@ impl Opencode {
         Ok((child, server_password, startup_command))
     }
 
-    /// Handles process spawning, waiting for the server URL
+    /// Handles process spawning and waits for the server URL used by slash commands.
     async fn spawn_server(
         &self,
         current_dir: &Path,
@@ -253,8 +286,6 @@ impl Opencode {
             child: Some(child),
             base_url,
             server_password,
-            startup_command,
-            stderr_lines,
             stderr_task,
         })
     }
@@ -470,12 +501,75 @@ fn opencode_auth_path(
         .map(|data| data.join("opencode").join("auth.json"))
 }
 
+fn user_opencode_config_paths(current_dir: &Path) -> Vec<PathBuf> {
+    opencode_config_paths(
+        std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
+        dirs::home_dir(),
+        Some(current_dir.to_path_buf()),
+    )
+}
+
+fn opencode_config_paths(
+    xdg_config_home: Option<PathBuf>,
+    home_dir: Option<PathBuf>,
+    current_dir: Option<PathBuf>,
+) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    let config_home =
+        xdg_config_home.or_else(|| home_dir.as_ref().map(|home| home.join(".config")));
+    if let Some(config_home) = config_home {
+        let config_dir = config_home.join("opencode");
+        paths.extend([
+            config_dir.join("config.json"),
+            config_dir.join("opencode.json"),
+            config_dir.join("opencode.jsonc"),
+        ]);
+    }
+
+    if let Some(home) = home_dir.as_ref() {
+        let legacy_dir = home.join(".opencode");
+        paths.extend([
+            legacy_dir.join("opencode.json"),
+            legacy_dir.join("opencode.jsonc"),
+        ]);
+    }
+
+    if let Some(current_dir) = current_dir {
+        let current_dir = std::fs::canonicalize(&current_dir).unwrap_or(current_dir);
+        let stop_dir = home_dir.and_then(|home| std::fs::canonicalize(home).ok());
+        for dir in current_dir.ancestors() {
+            paths.extend([dir.join("opencode.jsonc"), dir.join("opencode.json")]);
+            let local_config_dir = dir.join(".opencode");
+            paths.extend([
+                local_config_dir.join("opencode.json"),
+                local_config_dir.join("opencode.jsonc"),
+            ]);
+
+            if stop_dir.as_deref().is_some_and(|stop| stop == dir) {
+                break;
+            }
+        }
+    }
+
+    let mut seen = HashSet::new();
+    paths
+        .into_iter()
+        .filter(|path| seen.insert(path.clone()))
+        .collect()
+}
+
 fn remove_file_if_present(path: &Path) -> io::Result<()> {
     match std::fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(err) => Err(err),
     }
+}
+
+fn user_opencode_configured_provider_ids(current_dir: &Path) -> HashSet<String> {
+    let mut ids = user_opencode_auth_provider_ids();
+    ids.extend(user_opencode_config_provider_ids(current_dir));
+    ids
 }
 
 fn user_opencode_auth_provider_ids() -> HashSet<String> {
@@ -498,6 +592,17 @@ fn user_opencode_auth_provider_ids() -> HashSet<String> {
             HashSet::new()
         }
     }
+}
+
+fn user_opencode_config_provider_ids(current_dir: &Path) -> HashSet<String> {
+    let mut ids = HashSet::new();
+    for path in user_opencode_config_paths(current_dir) {
+        let Some(value) = read_opencode_config_value(&path) else {
+            continue;
+        };
+        ids.extend(opencode_config_provider_ids(&value));
+    }
+    ids
 }
 
 fn opencode_auth_provider_ids(value: &Value) -> HashSet<String> {
@@ -525,6 +630,46 @@ fn valid_opencode_auth(value: &Value) -> bool {
         Some("wellknown") => has_value("key") && has_value("token"),
         _ => false,
     }
+}
+
+fn read_opencode_config_value(path: &Path) -> Option<Value> {
+    let content = match std::fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return None,
+        Err(err) => {
+            tracing::warn!(path = %path.display(), "Failed to read OpenCode config: {err}");
+            return None;
+        }
+    };
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return Some(Value::Object(Default::default()));
+    }
+
+    if let Ok(Some(value)) = jsonc_parser::parse_to_serde_value(trimmed, &ParseOptions::default()) {
+        return Some(value);
+    }
+
+    match serde_json::from_str::<Value>(trimmed) {
+        Ok(value) => Some(value),
+        Err(err) => {
+            tracing::warn!(path = %path.display(), "Failed to parse OpenCode config: {err}");
+            None
+        }
+    }
+}
+
+fn opencode_config_provider_ids(value: &Value) -> HashSet<String> {
+    value
+        .get("provider")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|providers| providers.keys())
+        .filter_map(|provider_id| {
+            let provider_id = provider_id.trim();
+            (!provider_id.is_empty()).then(|| provider_id.to_string())
+        })
+        .collect()
 }
 
 fn symlink_or_copy_file(source: &Path, target: &Path) -> io::Result<()> {
@@ -632,45 +777,67 @@ fn quote_command_part(value: &str) -> String {
     }
 }
 
-fn collect_discoverable_models(
-    provider_list: &ProviderListResponse,
-    configured_provider_ids: &HashSet<String>,
-) -> Vec<String> {
-    let connected: HashSet<_> = provider_list.connected.iter().map(String::as_str).collect();
-    let mut models = BTreeSet::new();
+fn opencode_model_is_free(info: &Value) -> bool {
+    let Some(cost) = info.get("cost").and_then(Value::as_object) else {
+        return false;
+    };
+    number_value(cost.get("input")) == Some(0.0) && number_value(cost.get("output")) == Some(0.0)
+}
 
-    for provider in &provider_list.all {
-        if !connected.contains(provider.id.as_str())
-            || !configured_provider_ids.contains(provider.id.as_str())
-        {
+fn number_value(value: Option<&Value>) -> Option<f64> {
+    match value? {
+        Value::Number(number) => number.as_f64(),
+        _ => None,
+    }
+}
+
+fn parse_models_command_output(output: &str, include_paid: bool) -> Vec<String> {
+    let lines = output.lines().collect::<Vec<_>>();
+    let mut models = BTreeSet::new();
+    let mut index = 0;
+
+    while index < lines.len() {
+        let model_name = lines[index].trim();
+        index += 1;
+
+        if model_name.is_empty() || !model_name.contains('/') || model_name.starts_with('{') {
             continue;
         }
 
-        insert_provider_models(&mut models, &provider.id, provider.models.keys());
+        while index < lines.len() && lines[index].trim().is_empty() {
+            index += 1;
+        }
+
+        if index >= lines.len() || !lines[index].trim_start().starts_with('{') {
+            if include_paid {
+                models.insert(model_name.to_string());
+            }
+            continue;
+        }
+
+        let mut json_block = String::new();
+        let mut parsed_info = None;
+        while index < lines.len() {
+            json_block.push_str(lines[index]);
+            json_block.push('\n');
+            index += 1;
+
+            match serde_json::from_str::<Value>(&json_block) {
+                Ok(value) => {
+                    parsed_info = Some(value);
+                    break;
+                }
+                Err(err) if err.is_eof() => continue,
+                Err(_) => break,
+            }
+        }
+
+        if include_paid || parsed_info.as_ref().is_some_and(opencode_model_is_free) {
+            models.insert(model_name.to_string());
+        }
     }
 
     models.into_iter().collect()
-}
-
-fn insert_provider_models<'a>(
-    models: &mut BTreeSet<String>,
-    provider_id: &str,
-    model_ids: impl Iterator<Item = &'a String>,
-) {
-    for model_id in model_ids {
-        if let Some(model) = model_from_provider(provider_id, model_id) {
-            models.insert(model);
-        }
-    }
-}
-
-fn model_from_provider(provider_id: &str, model_id: &str) -> Option<String> {
-    let provider_id = provider_id.trim();
-    let model_id = model_id.trim();
-    if provider_id.is_empty() || model_id.is_empty() {
-        return None;
-    }
-    Some(format!("{provider_id}/{model_id}"))
 }
 
 fn format_tail(captured: Vec<String>) -> String {
@@ -970,106 +1137,71 @@ fn merge_compaction_config(existing_json: Option<&str>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{HashMap, HashSet},
-        path::PathBuf,
-    };
+    use std::{collections::HashSet, path::PathBuf};
 
     use serde_json::json;
 
     use super::{
-        collect_discoverable_models, opencode_auth_path, opencode_auth_provider_ids,
-        sdk::{ProviderInfo, ProviderListResponse},
+        opencode_auth_path, opencode_auth_provider_ids, opencode_config_paths,
+        opencode_config_provider_ids, parse_models_command_output,
     };
 
-    fn provider(id: &str, models: &[&str]) -> ProviderInfo {
-        ProviderInfo {
-            id: id.to_string(),
-            name: id.to_string(),
-            models: models
-                .iter()
-                .map(|model| (model.to_string(), json!({})))
-                .collect::<HashMap<_, _>>(),
-        }
+    #[test]
+    fn opencode_models_command_parser_filters_free_models() {
+        let output = r#"
+opencode/hy3-free
+{
+  "id": "hy3-free",
+  "providerID": "opencode",
+  "cost": {
+    "input": 0,
+    "output": 0
+  }
+}
+opencode/gpt-5
+{
+  "id": "gpt-5",
+  "providerID": "opencode",
+  "cost": {
+    "input": 1.25,
+    "output": 10
+  }
+}
+opencode/missing-cost-free
+{
+  "id": "missing-cost-free",
+  "providerID": "opencode"
+}
+"#;
+
+        assert_eq!(
+            parse_models_command_output(output, false),
+            vec!["opencode/hy3-free"]
+        );
     }
 
     #[test]
-    fn opencode_model_discovery_keeps_only_configured_provider_models() {
-        let provider_list = ProviderListResponse {
-            all: vec![
-                provider(
-                    "opencode",
-                    &["kimi-k2-free", "qwen3-coder-free", "gpt-5", "free-model"],
-                ),
-                provider("openai", &["gpt-5.2-codex"]),
-                provider("openrouter", &["openai/gpt-5.2-codex"]),
-                provider("amazon-bedrock", &["claude-sonnet-4-5"]),
-                provider("anthropic", &["claude-sonnet-4-5"]),
-                provider("github-copilot", &["gpt-5-mini"]),
-                provider("groq", &["llama-4"]),
-                provider("litellm", &["gpt-5.2-codex"]),
-                provider("dashscope", &["qwen3-coder-plus"]),
-                provider("zai-coding-plan", &["glm-5"]),
-                provider("gemini", &["gemini-3-pro"]),
-            ],
-            default: HashMap::new(),
-            connected: vec![
-                "amazon-bedrock".to_string(),
-                "anthropic".to_string(),
-                "github-copilot".to_string(),
-                "dashscope".to_string(),
-                "gemini".to_string(),
-                "groq".to_string(),
-                "litellm".to_string(),
-                "opencode".to_string(),
-                "openai".to_string(),
-                "zai-coding-plan".to_string(),
-            ],
-        };
-        let configured_provider_ids = HashSet::from([
-            "anthropic".to_string(),
-            "github-copilot".to_string(),
-            "dashscope".to_string(),
-            "gemini".to_string(),
-            "litellm".to_string(),
-            "zai-coding-plan".to_string(),
-        ]);
-
-        let models = collect_discoverable_models(&provider_list, &configured_provider_ids);
+    fn opencode_models_command_parser_keeps_configured_provider_models() {
+        let output = r#"
+CPA/claude-opus-4-7
+{
+  "id": "claude-opus-4-7",
+  "providerID": "CPA",
+  "cost": {
+    "input": 5,
+    "output": 25
+  }
+}
+CPA/gpt-5.3-codex
+{
+  "id": "gpt-5.3-codex",
+  "providerID": "CPA"
+}
+"#;
 
         assert_eq!(
-            models,
-            vec![
-                "anthropic/claude-sonnet-4-5",
-                "dashscope/qwen3-coder-plus",
-                "gemini/gemini-3-pro",
-                "github-copilot/gpt-5-mini",
-                "litellm/gpt-5.2-codex",
-                "zai-coding-plan/glm-5",
-            ]
-        );
-        assert!(!models.iter().any(|model| model.starts_with("groq/")));
-        assert!(
-            !models
-                .iter()
-                .any(|model| model.starts_with("amazon-bedrock/"))
-        );
-        assert!(!models.iter().any(|model| model.starts_with("openrouter/")));
-        assert!(!models.iter().any(|model| model.starts_with("opencode/")));
-        assert!(!models.iter().any(|model| model.starts_with("openai/")));
-    }
-
-    #[test]
-    fn opencode_model_discovery_includes_paid_models_with_a_user_key() {
-        let provider_list = ProviderListResponse {
-            all: vec![provider("opencode", &["kimi-k2-free", "gpt-5"])],
-            default: HashMap::new(),
-            connected: vec!["opencode".to_string()],
-        };
-
-        assert_eq!(
-            collect_discoverable_models(&provider_list, &HashSet::from(["opencode".to_string()]),),
-            vec!["opencode/gpt-5", "opencode/kimi-k2-free"]
+            parse_models_command_output(output, true),
+            vec!["CPA/claude-opus-4-7", "CPA/gpt-5.3-codex"]
         );
     }
 
@@ -1099,6 +1231,27 @@ mod tests {
     }
 
     #[test]
+    fn opencode_config_provider_ids_reads_custom_provider_keys() {
+        let value = json!({
+            "provider": {
+                "CPA": {
+                    "name": "CPA",
+                    "options": { "apiKey": "secret" },
+                    "models": {
+                        "gpt-5.3-codex": {}
+                    }
+                },
+                "zai-coding-plan": {}
+            }
+        });
+
+        assert_eq!(
+            opencode_config_provider_ids(&value),
+            HashSet::from(["CPA".to_string(), "zai-coding-plan".to_string()])
+        );
+    }
+
+    #[test]
     fn opencode_auth_path_matches_xdg_basedir_on_windows_and_unix() {
         assert_eq!(
             opencode_auth_path(None, Some(PathBuf::from("home"))),
@@ -1120,6 +1273,52 @@ mod tests {
                     .join("opencode")
                     .join("auth.json")
             )
+        );
+    }
+
+    #[test]
+    fn opencode_config_paths_match_xdg_config_locations() {
+        assert_eq!(
+            opencode_config_paths(None, Some(PathBuf::from("home")), None),
+            vec![
+                PathBuf::from("home")
+                    .join(".config")
+                    .join("opencode")
+                    .join("config.json"),
+                PathBuf::from("home")
+                    .join(".config")
+                    .join("opencode")
+                    .join("opencode.json"),
+                PathBuf::from("home")
+                    .join(".config")
+                    .join("opencode")
+                    .join("opencode.jsonc"),
+                PathBuf::from("home")
+                    .join(".opencode")
+                    .join("opencode.json"),
+                PathBuf::from("home")
+                    .join(".opencode")
+                    .join("opencode.jsonc"),
+            ]
+        );
+        assert_eq!(
+            opencode_config_paths(
+                Some(PathBuf::from("custom-config")),
+                Some(PathBuf::from("home")),
+                Some(PathBuf::from("project"))
+            )[0],
+            PathBuf::from("custom-config")
+                .join("opencode")
+                .join("config.json")
+        );
+        assert!(
+            opencode_config_paths(
+                None,
+                Some(PathBuf::from("home")),
+                Some(PathBuf::from("project"))
+            )
+            .iter()
+            .any(|path| path.ends_with(PathBuf::from(".opencode").join("opencode.json")))
         );
     }
 }

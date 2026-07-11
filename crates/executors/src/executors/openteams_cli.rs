@@ -36,11 +36,7 @@ mod sdk;
 mod slash_commands;
 mod types;
 
-use sdk::{
-    ConfigProvidersResponse, LogWriter, ProviderListResponse, RunConfig, build_default_headers,
-    config_get, generate_server_password, list_config_providers, list_providers, run_session,
-    run_slash_command, wait_for_health,
-};
+use sdk::{LogWriter, RunConfig, generate_server_password, run_session, run_slash_command};
 use slash_commands::{OpenTeamsCliSlashCommand, hardcoded_slash_commands};
 
 const FREE_MODEL_PROVIDER_ID: &str = "opencode";
@@ -90,19 +86,10 @@ impl Drop for OpenTeamsCliServer {
     }
 }
 
-impl OpenTeamsCliServer {
-    async fn shutdown(mut self) {
-        if let Some(mut child) = self.child.take() {
-            if let Err(err) = workspace_utils::process::kill_process_group(&mut child).await {
-                tracing::warn!("Failed to stop OpenTeams CLI discovery server: {}", err);
-            }
-        }
-    }
-}
-
 type ServerPassword = String;
 pub(crate) const SERVER_USERNAME: &str = "openteams-cli";
 pub(crate) const DIRECTORY_HEADER: &str = "x-openteams-directory";
+const MODEL_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(30);
 
 impl OpenTeamsCli {
     const BINARY_NAME: &'static str = "openteams-cli";
@@ -177,8 +164,8 @@ impl OpenTeamsCli {
         None
     }
 
-    fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
-        let base_command = match Self::find_binary() {
+    fn resolve_base_command() -> String {
+        match Self::find_binary() {
             Some(path) => {
                 let s = path.to_string_lossy().to_string();
                 // Quote the path if it contains spaces so that
@@ -190,7 +177,11 @@ impl OpenTeamsCli {
                 }
             }
             None => Self::NPX_FALLBACK.to_string(),
-        };
+        }
+    }
+
+    fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
+        let base_command = Self::resolve_base_command();
         let builder = CommandBuilder::new(&base_command).extend_params([
             "serve",
             "--hostname",
@@ -211,32 +202,57 @@ impl OpenTeamsCli {
         env: &ExecutionEnv,
     ) -> Result<Vec<String>, ExecutorError> {
         let env = setup_builtin_provider_env(env);
-        let server = self.spawn_server(current_dir, &env).await?;
-        let directory = current_dir.to_string_lossy().to_string();
+        let output = self.run_models_command(current_dir, &env).await?;
+        Ok(parse_models_command_output(&output))
+    }
 
-        let result = async {
-            let client = reqwest::Client::builder()
-                .default_headers(build_default_headers(&directory, &server.server_password))
-                .build()
-                .map_err(|err| ExecutorError::Io(io::Error::other(err)))?;
-            wait_for_health(&client, &server.base_url).await?;
-            let providers = list_providers(&client, &server.base_url, &directory).await?;
-            let config_providers =
-                list_config_providers(&client, &server.base_url, &directory).await?;
-            let config_model = config_get(&client, &server.base_url, &directory)
-                .await
-                .ok()
-                .and_then(|config| config.model);
-            Ok(collect_discoverable_models(
-                &providers,
-                &config_providers,
-                config_model.as_deref(),
-            ))
+    async fn run_models_command(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<String, ExecutorError> {
+        let base_command = Self::resolve_base_command();
+        let command_parts = apply_overrides(
+            CommandBuilder::new(&base_command).extend_params(["models", "--verbose"]),
+            &self.cmd,
+        )?
+        .build_initial()?;
+        let (program_path, args) = command_parts.into_resolved().await?;
+        let mut command = Command::new(program_path);
+        command
+            .kill_on_drop(true)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .current_dir(current_dir)
+            .env("NPM_CONFIG_LOGLEVEL", "error")
+            .env("NODE_NO_WARNINGS", "1")
+            .env("NO_COLOR", "1")
+            .args(&args);
+
+        env.clone()
+            .with_profile(&self.cmd)
+            .apply_to_command(&mut command);
+
+        let output = tokio::time::timeout(MODEL_DISCOVERY_TIMEOUT, command.output())
+            .await
+            .map_err(|_| {
+                ExecutorError::Io(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "OpenTeams CLI model discovery timed out",
+                ))
+            })?
+            .map_err(ExecutorError::Io)?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(ExecutorError::Io(io::Error::other(format!(
+                "OpenTeams CLI model discovery failed: {}",
+                stderr.trim()
+            ))));
         }
-        .await;
 
-        server.shutdown().await;
-        result
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
     async fn spawn_server_process(
@@ -604,73 +620,70 @@ fn default_to_true() -> bool {
     true
 }
 
-fn collect_discoverable_models(
-    provider_list: &ProviderListResponse,
-    config_providers: &ConfigProvidersResponse,
-    config_model: Option<&str>,
-) -> Vec<String> {
+fn parse_models_command_output(output: &str) -> Vec<String> {
+    let lines = output.lines().collect::<Vec<_>>();
     let mut models = BTreeSet::new();
+    let mut index = 0;
 
-    for provider in &provider_list.all {
-        if provider.id == FREE_MODEL_PROVIDER_ID {
-            insert_provider_models(
-                &mut models,
-                &provider.id,
-                provider
-                    .models
-                    .keys()
-                    .filter(|model_id| is_opencode_free_model(model_id)),
-            );
-        }
-    }
+    while index < lines.len() {
+        let model_name = lines[index].trim();
+        index += 1;
 
-    for (provider_id, model_id) in &config_providers.default {
-        if provider_id == FREE_MODEL_PROVIDER_ID && !is_opencode_free_model(model_id) {
+        let Some((provider_id, _)) = model_name.split_once('/') else {
+            continue;
+        };
+        if provider_id.trim().is_empty() {
             continue;
         }
-        if let Some(model) = model_from_provider(provider_id, model_id) {
-            models.insert(model);
-        }
-    }
 
-    if let Some(model) = config_model.and_then(configured_model_id) {
-        models.insert(model);
+        while index < lines.len() && lines[index].trim().is_empty() {
+            index += 1;
+        }
+
+        if index >= lines.len() || !lines[index].trim_start().starts_with('{') {
+            if provider_id != FREE_MODEL_PROVIDER_ID {
+                models.insert(model_name.to_string());
+            }
+            continue;
+        }
+
+        let mut json_block = String::new();
+        let mut parsed_info = None;
+        while index < lines.len() {
+            json_block.push_str(lines[index]);
+            json_block.push('\n');
+            index += 1;
+
+            match serde_json::from_str::<Value>(&json_block) {
+                Ok(value) => {
+                    parsed_info = Some(value);
+                    break;
+                }
+                Err(err) if err.is_eof() => continue,
+                Err(_) => break,
+            }
+        }
+
+        if provider_id != FREE_MODEL_PROVIDER_ID || parsed_info.as_ref().is_some_and(model_is_free)
+        {
+            models.insert(model_name.to_string());
+        }
     }
 
     models.into_iter().collect()
 }
 
-fn is_opencode_free_model(model_id: &str) -> bool {
-    model_id.trim().ends_with("-free")
+fn model_is_free(info: &Value) -> bool {
+    let Some(cost) = info.get("cost").and_then(Value::as_object) else {
+        return false;
+    };
+    number_value(cost.get("input")) == Some(0.0) && number_value(cost.get("output")) == Some(0.0)
 }
 
-fn insert_provider_models<'a>(
-    models: &mut BTreeSet<String>,
-    provider_id: &str,
-    model_ids: impl Iterator<Item = &'a String>,
-) {
-    for model_id in model_ids {
-        if let Some(model) = model_from_provider(provider_id, model_id) {
-            models.insert(model);
-        }
-    }
-}
-
-fn model_from_provider(provider_id: &str, model_id: &str) -> Option<String> {
-    let provider_id = provider_id.trim();
-    let model_id = model_id.trim();
-    if provider_id.is_empty() || model_id.is_empty() {
-        return None;
-    }
-    Some(format!("{provider_id}/{model_id}"))
-}
-
-fn configured_model_id(model_id: &str) -> Option<String> {
-    let model_id = model_id.trim();
-    if model_id.is_empty() {
-        None
-    } else {
-        Some(model_id.to_string())
+fn number_value(value: Option<&Value>) -> Option<f64> {
+    match value? {
+        Value::Number(number) => number.as_f64(),
+        _ => None,
     }
 }
 
@@ -772,72 +785,46 @@ fn merge_builtin_provider_config(existing_json: Option<&str>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use serde_json::json;
 
-    use super::{
-        collect_discoverable_models, merge_builtin_provider_config,
-        sdk::{ConfigProvidersResponse, ProviderInfo, ProviderListResponse},
-    };
-
-    fn provider(id: &str, models: &[&str]) -> ProviderInfo {
-        ProviderInfo {
-            id: id.to_string(),
-            name: id.to_string(),
-            models: models
-                .iter()
-                .map(|model| (model.to_string(), json!({})))
-                .collect(),
-        }
-    }
+    use super::{merge_builtin_provider_config, parse_models_command_output};
 
     #[test]
     fn openteams_cli_model_discovery_filters_to_free_and_configured_models() {
-        let provider_list = ProviderListResponse {
-            all: vec![
-                provider(
-                    "opencode",
-                    &["qwen3-coder-free", "kimi-k2-free", "free-model", "gpt-5"],
-                ),
-                provider("openrouter", &["paid-model"]),
-                provider("github-models", &["openai/gpt-4"]),
-            ],
-            default: HashMap::new(),
-            connected: vec![],
-        };
-        let config_providers = ConfigProvidersResponse {
-            providers: vec![
-                provider("cpa", &["gpt-5.2-codex"]),
-                provider("zAI", &["glm-5"]),
-            ],
-            default: HashMap::from([
-                ("cpa".to_string(), "sonnet".to_string()),
-                ("github-models".to_string(), "openai/gpt-4".to_string()),
-            ]),
-        };
+        let output = r#"
+opencode/hy3-free
+{
+  "cost": { "input": 0, "output": 0 }
+}
+opencode/gpt-5
+{
+  "cost": { "input": 1.25, "output": 10 }
+}
+CPA/claude-opus-4-7
+{
+  "cost": { "input": 5, "output": 25 }
+}
+CPA/gpt-5.3-codex
+{
+  "providerID": "CPA"
+}
+github-models/openai/gpt-4
+{
+  "providerID": "github-models"
+}
+"#;
 
-        let models = collect_discoverable_models(
-            &provider_list,
-            &config_providers,
-            Some("LiteLLM/gpt-5.2-codex"),
-        );
-
+        let models = parse_models_command_output(output);
         assert_eq!(
             models,
             vec![
-                "LiteLLM/gpt-5.2-codex",
-                "cpa/sonnet",
+                "CPA/claude-opus-4-7",
+                "CPA/gpt-5.3-codex",
                 "github-models/openai/gpt-4",
-                "opencode/kimi-k2-free",
-                "opencode/qwen3-coder-free",
+                "opencode/hy3-free",
             ]
         );
-        assert!(!models.iter().any(|model| model.starts_with("openrouter/")));
-        assert!(!models.contains(&"opencode/free-model".to_string()));
         assert!(!models.contains(&"opencode/gpt-5".to_string()));
-        assert!(!models.contains(&"cpa/gpt-5.2-codex".to_string()));
-        assert!(!models.contains(&"zAI/glm-5".to_string()));
     }
 
     #[test]
