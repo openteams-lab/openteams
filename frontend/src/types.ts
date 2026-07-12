@@ -852,8 +852,6 @@ export interface BackendChatSession {
   summary_text: string | null;
   archive_ref: string | null;
   last_seen_diff_key: string | null;
-  team_protocol: string | null;
-  team_protocol_enabled: boolean;
   default_workspace_path: string | null;
   chat_input_mode: string | null;
   project_id: string | null;
@@ -877,8 +875,6 @@ export interface UpdateChatSession {
   summary_text: string | null;
   archive_ref: string | null;
   last_seen_diff_key: string | null;
-  team_protocol: string | null;
-  team_protocol_enabled: boolean | null;
   default_workspace_path: string | null;
   chat_input_mode?: string | null;
   worktree_mode?: ChatSessionWorktreeMode;

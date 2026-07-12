@@ -35,7 +35,8 @@
     "build:npx": "bash ./local-build.sh",
     "build:npx:alias": "cd npx/openteams-web-npx && pnpm pack",
     "prepack": "pnpm run build:npx",
-    "desktop:dev": "pnpm -C frontend build && node scripts/desktop/prepare-sidecar.js --debug --skip-cli && pnpm tauri dev --config src-tauri/tauri.dev.conf.json",
+    "desktop:sync-icons": "node scripts/desktop/sync-icons.js",
+    "desktop:dev": "pnpm run desktop:sync-icons && pnpm -C frontend build && node scripts/desktop/prepare-sidecar.js --debug --skip-cli && pnpm tauri dev --config src-tauri/tauri.dev.conf.json",
     "desktop:build": "pnpm tauri build",
     "desktop:prepare-sidecar": "node scripts/desktop/prepare-sidecar.js --release"
   },

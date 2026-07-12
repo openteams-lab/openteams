@@ -109,7 +109,7 @@
   "teamPage.teamProtocol.desc": "Set shared guidelines that apply to the whole team in this session.",
   "teamPage.teamProtocol.error": "Team protocol error: {error}",
   "teamPage.teamProtocol.loading": "Loading team protocol...",
-  "teamPage.teamProtocol.noSession": "Select or create a chat session before editing the team protocol.",
+  "teamPage.teamProtocol.noProject": "Select or create a project before editing the team protocol.",
   "teamPage.teamProtocol.placeholder": "Describe shared team rules, collaboration norms, handoff expectations, and review standards.",
   "teamPage.teamProtocol.title": "Team protocol",
   "teamPage.tabs.config": "Settings",

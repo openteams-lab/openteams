@@ -29,6 +29,7 @@ pub mod project_member;
 pub mod project_path;
 pub mod project_repo;
 pub mod project_stats;
+pub mod project_team_protocol;
 pub mod project_work_item;
 pub mod project_work_item_comment;
 pub mod project_work_item_execution_link;

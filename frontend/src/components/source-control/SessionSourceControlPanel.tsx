@@ -363,7 +363,6 @@ export const SessionSourceControlPanel: React.FC<
   ) => translateSourceControl(t, key, fallback, replacements);
   const title = tr("sourceControl.title", "File Changes");
   const refreshLabel = tr("sourceControl.refresh", "Refresh source control");
-  const stageLabel = tr("sourceControl.action.stage", "Stage");
   const discardLabel = tr("sourceControl.action.discard", "Discard");
   const commitLabel = tr("sourceControl.action.commit", "Commit");
   const worktreeMergeDisabledReason =
@@ -549,21 +548,14 @@ export const SessionSourceControlPanel: React.FC<
 
   const handleStageFiles = (files: SourceControlFile[]) => {
     if (files.length === 0) return;
-    const operationScopeKey = scopeKeyRef.current;
-    void (async () => {
-      const forceShared = await getSharedForce(files, stageLabel);
-      if (!isCurrentScope(operationScopeKey)) return;
-      if (forceShared === null) return;
-      const paths = sourceControlVisiblePaths(files);
-      await runOperation(`stage:${paths.join("|")}`, () =>
-        stage({
-          workspace_id: viewModel.workspaceId,
-          paths,
-          force_shared: forceShared || undefined,
-        }),
-        { trackPending: false },
-      );
-    })();
+    const paths = sourceControlVisiblePaths(files);
+    void runOperation(`stage:${paths.join("|")}`, () =>
+      stage({
+        workspace_id: viewModel.workspaceId,
+        paths,
+      }),
+      { trackPending: false },
+    );
   };
 
   const handleUnstageFiles = (files: SourceControlFile[]) => {

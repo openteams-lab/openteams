@@ -402,10 +402,11 @@ async fn run_workflow_agent_prompt_inner(
         }
     };
 
-    // Register the cancel token so interrupt_step can terminate this process.
-    if let Some(cancel) = spawned.cancel.clone() {
-        register_running_step(step_id, cancel);
-    }
+    // Every executor gets a container-owned cancellation token, even when the executor does not
+    // expose a graceful-cancel token of its own. This keeps workflow interrupt/stop capable of
+    // reaching and terminating every spawned process.
+    let run_cancel = spawned.cancel.clone().unwrap_or_default();
+    register_running_step(step_id, run_cancel.clone());
 
     let msg_store = Arc::new(MsgStore::new());
     spawn_log_forwarders(&mut spawned.child, msg_store.clone())?;
@@ -436,7 +437,7 @@ async fn run_workflow_agent_prompt_inner(
     let mut status = None;
 
     if let Some(exit_signal) = spawned.exit_signal.take() {
-        match wait_for_executor_exit_or_cancel(exit_signal, spawned.cancel.clone()).await {
+        match wait_for_executor_exit_or_cancel(exit_signal, Some(run_cancel.clone())).await {
             Ok(ExecutorWaitEvent::Exit(Ok(ExecutorExitResult::Success))) => {}
             Ok(ExecutorWaitEvent::Exit(Ok(ExecutorExitResult::Failure))) => {
                 // Check if this failure was caused by an interrupt cancellation.
@@ -453,7 +454,12 @@ async fn run_workflow_agent_prompt_inner(
                 failed_by_signal = true
             }
             Ok(ExecutorWaitEvent::Exit(Err(_))) => {
-                status = Some(wait_for_process_exit(&mut spawned, &agent.name).await?);
+                match wait_for_process_exit_or_cancel(&mut spawned, &agent.name, &run_cancel)
+                    .await?
+                {
+                    Some(exit_status) => status = Some(exit_status),
+                    None => interrupted = true,
+                }
             }
             Ok(ExecutorWaitEvent::CancelRequested) => {
                 interrupted = true;
@@ -514,7 +520,18 @@ async fn run_workflow_agent_prompt_inner(
             }
         }
     } else {
-        status = Some(wait_for_process_exit(&mut spawned, &agent.name).await?);
+        match wait_for_process_exit_or_cancel(&mut spawned, &agent.name, &run_cancel).await? {
+            Some(exit_status) => status = Some(exit_status),
+            None => interrupted = true,
+        }
+    }
+
+    // Cancellation wins races with an executor's terminal signal. An executor may acknowledge
+    // its native cancel by reporting success, but the user-requested workflow outcome is still
+    // interrupted and the process group must be reaped.
+    if run_cancel.is_cancelled() || STEP_CANCEL_REQUESTS.contains(&step_id) {
+        interrupted = true;
+        terminate_child(&mut spawned).await;
     }
 
     // Unregister from the running steps map.
@@ -527,10 +544,7 @@ async fn run_workflow_agent_prompt_inner(
         terminate_child(&mut spawned).await;
         let history = msg_store.get_history();
         let latest_assistant = extract_latest_assistant_from_history(&history).unwrap_or_default();
-        let message = format!(
-            "workflow step 被中断：{}",
-            agent.name
-        );
+        let message = format!("workflow step 被中断：{}", agent.name);
         finish_workflow_runtime_run_record(
             db,
             session,
@@ -548,8 +562,7 @@ async fn run_workflow_agent_prompt_inner(
 
     if failed_by_signal {
         let history = msg_store.get_history();
-        let message =
-            workflow_executor_failure_message(&agent.name, "workflow 执行失败", &history);
+        let message = workflow_executor_failure_message(&agent.name, "workflow 执行失败", &history);
         let latest_assistant = extract_latest_assistant_from_history(&history).unwrap_or_default();
         finish_workflow_runtime_run_record(
             db,
@@ -574,10 +587,7 @@ async fn run_workflow_agent_prompt_inner(
             let history = msg_store.get_history();
             let latest_assistant =
                 extract_latest_assistant_from_history(&history).unwrap_or_default();
-            let message = format!(
-                "workflow step 被中断：{}",
-                agent.name
-            );
+            let message = format!("workflow step 被中断：{}", agent.name);
             finish_workflow_runtime_run_record(
                 db,
                 session,
@@ -593,8 +603,7 @@ async fn run_workflow_agent_prompt_inner(
             return Err(WorkflowRuntimeError::Interrupted(message));
         }
         let history = msg_store.get_history();
-        let message =
-            workflow_executor_failure_message(&agent.name, "workflow 执行失败", &history);
+        let message = workflow_executor_failure_message(&agent.name, "workflow 执行失败", &history);
         let latest_assistant = extract_latest_assistant_from_history(&history).unwrap_or_default();
         finish_workflow_runtime_run_record(
             db,
@@ -1208,13 +1217,31 @@ async fn wait_for_executor_exit_or_cancel(
     .await
 }
 
-async fn wait_for_process_exit(
+async fn wait_for_process_exit_or_cancel(
     spawned: &mut SpawnedChild,
     agent_name: &str,
-) -> Result<std::process::ExitStatus, WorkflowRuntimeError> {
-    match time::timeout(WORKFLOW_EXECUTION_TIMEOUT, spawned.child.wait()).await {
-        Ok(Ok(status)) => Ok(status),
-        Ok(Err(err)) => Err(WorkflowRuntimeError::Io(err)),
+    cancel: &CancellationToken,
+) -> Result<Option<std::process::ExitStatus>, WorkflowRuntimeError> {
+    enum ProcessWaitEvent {
+        Exited(std::io::Result<std::process::ExitStatus>),
+        CancelRequested,
+    }
+
+    let event = time::timeout(WORKFLOW_EXECUTION_TIMEOUT, async {
+        tokio::select! {
+            status = spawned.child.wait() => ProcessWaitEvent::Exited(status),
+            _ = cancel.cancelled() => ProcessWaitEvent::CancelRequested,
+        }
+    })
+    .await;
+
+    match event {
+        Ok(ProcessWaitEvent::Exited(Ok(status))) => Ok(Some(status)),
+        Ok(ProcessWaitEvent::Exited(Err(err))) => Err(WorkflowRuntimeError::Io(err)),
+        Ok(ProcessWaitEvent::CancelRequested) => {
+            terminate_child(spawned).await;
+            Ok(None)
+        }
         Err(_) => {
             terminate_child(spawned).await;
             Err(WorkflowRuntimeError::Validation(format!(
@@ -1229,8 +1256,7 @@ async fn terminate_child(spawned: &mut SpawnedChild) {
     if let Some(cancel) = spawned.cancel.take() {
         cancel.cancel();
     }
-    let _ = spawned.child.kill().await;
-    let _ = time::timeout(WORKFLOW_KILL_WAIT_TIMEOUT, spawned.child.wait()).await;
+    let _ = process::kill_process_group(&mut spawned.child).await;
 }
 
 fn extract_latest_assistant_from_history(history: &[LogMsg]) -> Option<String> {

@@ -1,13 +1,13 @@
 {
   "build": {
-    "beforeBuildCommand": "pnpm -C frontend build && node scripts/desktop/prepare-sidecar.js --release",
+    "beforeBuildCommand": "node scripts/desktop/sync-icons.js && pnpm -C frontend build && node scripts/desktop/prepare-sidecar.js --release",
     "devPath": "../frontend/dist",
     "distDir": "../frontend/dist",
     "withGlobalTauri": true
   },
   "package": {
     "productName": "openteams",
-    "version": "0.3.8"
+    "version": "0.4.7"
   },
   "tauri": {
     "allowlist": {
@@ -60,7 +60,7 @@
       "endpoints": [
         "https://github.com/openteams-lab/openteams/releases/latest/download/latest.json"
       ],
-      "pubkey": ""
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQxQTYzMkEzNTFBQzg4QjEKUldTeGlLeFJvekttMGRJbXJNbVN0c28xbXdhcFROdTd5TlFOZUJFa0l5NVFheTJJTGRsTXRKM2cK"
     },
     "windows": [
       {
@@ -69,7 +69,9 @@
         "height": 1080,
         "minWidth": 1024,
         "minHeight": 640,
-        "resizable": true
+        "resizable": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
       }
     ],
     "security": {

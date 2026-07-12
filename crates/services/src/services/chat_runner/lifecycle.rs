@@ -602,7 +602,10 @@ impl ChatRunner {
                 continue;
             }
 
-            if let Err(err) = self.run_agent_for_mention(session_id, &mention, message).await {
+            if let Err(err) = self
+                .run_agent_for_mention(session_id, &mention, message)
+                .await
+            {
                 tracing::warn!(
                     error = %err,
                     mention = mention,
@@ -1409,15 +1412,16 @@ impl ChatRunner {
             .map_err(|err| ChatRunnerError::Io(std::io::Error::other(err.to_string())))?
             .model_name;
         let run_id = Uuid::new_v4();
-        let startup_timing =
-            Arc::new(startup_timing::RunStartupTiming::new(startup_timing::RunStartupIdentity {
+        let startup_timing = Arc::new(startup_timing::RunStartupTiming::new(
+            startup_timing::RunStartupIdentity {
                 session_id,
                 session_agent_id,
                 agent_id,
                 run_id,
                 source_message_id: source_message.id,
                 runner_type: agent.runner_type.clone(),
-            }));
+            },
+        ));
         startup_timing.mark(startup_timing::StartupMilestoneName::RunScheduled, None);
 
         let mut session_agent = if session_agent.state != ChatSessionAgentState::Running {
@@ -1579,9 +1583,8 @@ impl ChatRunner {
             let run_dir =
                 run_records_dir.join(Self::run_records_prefix(session_agent_id, run_index));
             fs::create_dir_all(&run_dir).await?;
-            startup_timing.set_artifact_path(
-                run_dir.join(startup_timing::STARTUP_TIMING_FILE_NAME),
-            );
+            startup_timing
+                .set_artifact_path(run_dir.join(startup_timing::STARTUP_TIMING_FILE_NAME));
             startup_timing
                 .mark_and_persist(
                     startup_timing::StartupMilestoneName::RunDirectoryReady,
@@ -1655,6 +1658,17 @@ impl ChatRunner {
                 Some(format!("member_count={}", session_agents.len())),
             );
             let session = ChatSession::find_by_id(&self.db.pool, session_id).await?;
+            let team_protocol =
+                if let Some(project_id) = session.as_ref().and_then(|session| session.project_id) {
+                    db::models::project_team_protocol::ProjectTeamProtocol::find_by_project(
+                        &self.db.pool,
+                        project_id,
+                    )
+                    .await?
+                    .and_then(|protocol| protocol.content_if_enabled().map(str::to_string))
+                } else {
+                    None
+                };
 
             // Resolve builtin + user-configured skills for this agent.
             let prompt_context = if is_workflow_chat_input_mode(&source_message.meta.0) {
@@ -1685,7 +1699,7 @@ impl ChatRunner {
                 reference_context.as_ref(),
                 &agent_skills,
                 prompt_language,
-                Self::resolve_session_team_protocol(session.as_ref()),
+                team_protocol.as_deref(),
             );
             startup_timing.mark(
                 startup_timing::StartupMilestoneName::PromptBuilt,
@@ -1713,10 +1727,7 @@ impl ChatRunner {
                 run_id,
             )
             .await?;
-            startup_timing.mark(
-                startup_timing::StartupMilestoneName::ChatRunCreated,
-                None,
-            );
+            startup_timing.mark(startup_timing::StartupMilestoneName::ChatRunCreated, None);
 
             // Track this dispatch only after the chat_run row exists. `chat_message_queue.run_id`
             // has a real FK to `chat_runs(id)`, so binding earlier fails under foreign_keys=ON.
@@ -1733,10 +1744,7 @@ impl ChatRunner {
                     run_id,
                 )
                 .await?;
-            startup_timing.mark(
-                startup_timing::StartupMilestoneName::QueueBoundToRun,
-                None,
-            );
+            startup_timing.mark(startup_timing::StartupMilestoneName::QueueBoundToRun, None);
             self.emit_member_queue_update(session_id, session_agent_id)
                 .await;
 
@@ -1814,10 +1822,7 @@ impl ChatRunner {
                 )
                 .await?,
             ));
-            startup_timing.mark(
-                startup_timing::StartupMilestoneName::RawLogSpoolReady,
-                None,
-            );
+            startup_timing.mark(startup_timing::StartupMilestoneName::RawLogSpoolReady, None);
 
             self.analytics_projector()
                 .project_or_warn(DomainEvent::AgentRunStarted {

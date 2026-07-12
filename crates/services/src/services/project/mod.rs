@@ -148,8 +148,6 @@ mod tests {
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,
-                team_protocol TEXT,
-                team_protocol_enabled BOOLEAN NOT NULL DEFAULT 0,
                 default_workspace_path TEXT,
                 chat_input_mode TEXT,
                 project_id BLOB,

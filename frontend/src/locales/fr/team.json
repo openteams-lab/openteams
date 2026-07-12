@@ -109,7 +109,7 @@
   "teamPage.teamProtocol.desc": "Définissez les règles partagées suivies par toute l'équipe dans cette session",
   "teamPage.teamProtocol.error": "Erreur de protocole d'équipe : {error}",
   "teamPage.teamProtocol.loading": "Chargement du protocole d'équipe...",
-  "teamPage.teamProtocol.noSession": "Sélectionnez ou créez une session de chat avant de modifier le protocole d'équipe",
+  "teamPage.teamProtocol.noProject": "Sélectionnez ou créez un projet avant de modifier le protocole d'équipe",
   "teamPage.teamProtocol.placeholder": "Décrivez les règles communes, les normes de collaboration, les attentes de transmission et les standards de revue.",
   "teamPage.teamProtocol.title": "Protocole d'équipe",
   "teamPage.tabs.config": "Paramètres",

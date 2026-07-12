@@ -712,25 +712,6 @@ export const chatSessionsApi = {
     );
     return handleApiResponse<BackendChatSession>(r);
   },
-  getTeamProtocol: async (sessionId: string): Promise<TeamProtocolConfig> => {
-    const r = await makeRequest(
-      `/api/chat/sessions/${encodeURIComponent(sessionId)}/team-protocol`,
-    );
-    return handleApiResponse<TeamProtocolConfig>(r);
-  },
-  updateTeamProtocol: async (
-    sessionId: string,
-    data: TeamProtocolConfig,
-  ): Promise<TeamProtocolConfig> => {
-    const r = await makeRequest(
-      `/api/chat/sessions/${encodeURIComponent(sessionId)}/team-protocol`,
-      {
-        method: "POST",
-        body: jsonBody(data),
-      },
-    );
-    return handleApiResponse<TeamProtocolConfig>(r);
-  },
   getWorkspaces: async (
     sessionId: string,
   ): Promise<SessionWorkspacesResponse> => {
@@ -1645,6 +1626,22 @@ export const projectApi = {
       `/api/projects/${encodeURIComponent(projectId)}/sessions`,
     );
     return handleApiResponse<BackendChatSession[]>(r);
+  },
+  getTeamProtocol: async (projectId: string): Promise<TeamProtocolConfig> => {
+    const r = await makeRequest(
+      `/api/projects/${encodeURIComponent(projectId)}/team-protocol`,
+    );
+    return handleApiResponse<TeamProtocolConfig>(r);
+  },
+  updateTeamProtocol: async (
+    projectId: string,
+    data: TeamProtocolConfig,
+  ): Promise<TeamProtocolConfig> => {
+    const r = await makeRequest(
+      `/api/projects/${encodeURIComponent(projectId)}/team-protocol`,
+      { method: "PUT", body: jsonBody(data) },
+    );
+    return handleApiResponse<TeamProtocolConfig>(r);
   },
   createSession: async (
     projectId: string,

@@ -14,7 +14,6 @@ import {
   RefreshCw,
   Server,
   Settings,
-  UserRoundCog,
   X,
 } from "lucide-react";
 import { AgentMarkdown } from "@/components/AgentMarkdown";
@@ -78,12 +77,13 @@ type TeamConfigTabsProps = {
   teamProtocolError: string | null;
   teamProtocolLoading: boolean;
   teamProtocolSaving: boolean;
-  teamProtocolSessionAvailable: boolean;
+  teamProtocolAvailable: boolean;
   teamProtocolSuccess: boolean;
   t: TranslateFn;
   workspacePath: string;
   onMcpServersChange: (value: string) => void;
   onTeamProtocolChange: (value: string) => void;
+  onTeamProtocolSave: () => void;
   onToggleMcpServer: (serverKey: string) => void;
   setAllowedSkillIds: (ids: string[]) => void;
   setIsLeader: (value: boolean | ((current: boolean) => boolean)) => void;
@@ -187,22 +187,6 @@ function SkillSettingBlock({
 
 const inputClassName =
   "h-10 w-full rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-3)] px-3 font-mono text-[13px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-tertiary)] focus:ring-2 focus:ring-[var(--primary-focus)]/50";
-
-function EmptyMemberState({ t }: { t: TranslateFn }) {
-  return (
-    <div className="flex min-h-full flex-col items-center justify-center p-12 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-[8px] border border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-tertiary)]">
-        <UserRoundCog className="h-7 w-7" />
-      </div>
-      <h3 className="mt-5 text-[16px] font-medium text-[var(--ink)]">
-        {t("teamPage.empty.noMemberTitle")}
-      </h3>
-      <p className="mt-2 max-w-[320px] text-[14px] leading-relaxed text-[var(--ink-subtle)]">
-        {t("teamPage.empty.noMemberDesc")}
-      </p>
-    </div>
-  );
-}
 
 function SkillsSection({
   allowedSkillIds,
@@ -486,7 +470,7 @@ function ConfigTab({
   | "teamProtocolError"
   | "teamProtocolLoading"
   | "teamProtocolSaving"
-  | "teamProtocolSessionAvailable"
+  | "teamProtocolAvailable"
   | "teamProtocolSuccess"
   | "onTeamProtocolChange"
   | "memberDirty"
@@ -846,19 +830,25 @@ function McpConfigTab({
 
 function TeamProtocolTab({
   onTeamProtocolChange,
+  onTeamProtocolSave,
   t,
   teamProtocolContent,
+  teamProtocolDirty,
   teamProtocolError,
   teamProtocolLoading,
-  teamProtocolSessionAvailable,
+  teamProtocolSaving,
+  teamProtocolAvailable,
 }: Pick<
   TeamConfigTabsProps,
   | "onTeamProtocolChange"
+  | "onTeamProtocolSave"
   | "t"
   | "teamProtocolContent"
+  | "teamProtocolDirty"
   | "teamProtocolError"
   | "teamProtocolLoading"
-  | "teamProtocolSessionAvailable"
+  | "teamProtocolSaving"
+  | "teamProtocolAvailable"
 >) {
   return (
     <div className="space-y-6">
@@ -868,9 +858,9 @@ function TeamProtocolTab({
         </div>
       )}
 
-      {!teamProtocolSessionAvailable && (
+      {!teamProtocolAvailable && (
         <div className="rounded-[8px] border border-amber-500/30 bg-amber-500/10 p-4 text-[14px] leading-[1.5] text-amber-300">
-          {t("teamPage.teamProtocol.noSession")}
+          {t("teamPage.teamProtocol.noProject")}
         </div>
       )}
 
@@ -886,11 +876,29 @@ function TeamProtocolTab({
               : teamProtocolContent
           }
           onChange={(event) => onTeamProtocolChange(event.target.value)}
-          disabled={teamProtocolLoading || !teamProtocolSessionAvailable}
+          disabled={teamProtocolLoading || !teamProtocolAvailable}
           spellCheck={false}
           placeholder={t("teamPage.teamProtocol.placeholder")}
           className="block h-full min-h-[480px] w-full resize-none overflow-y-auto rounded-[12px] border-0 bg-[var(--surface-3)] px-5 py-5 font-mono text-[14px] leading-relaxed text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-muted)] placeholder:opacity-100 focus:ring-2 focus:ring-[var(--primary-focus)]/50 disabled:opacity-70"
         />
+        <div className="flex items-center justify-end border-t border-[var(--hairline)] px-5 py-4">
+          <button
+            type="button"
+            onClick={onTeamProtocolSave}
+            disabled={
+              !teamProtocolDirty ||
+              teamProtocolLoading ||
+              teamProtocolSaving ||
+              !teamProtocolAvailable
+            }
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-[8px] bg-[var(--primary)] px-4 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {teamProtocolSaving && (
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            )}
+            {t("teamPage.action.saveTeamProtocol")}
+          </button>
+        </div>
       </ConfigSection>
     </div>
   );
@@ -899,6 +907,7 @@ function TeamProtocolTab({
 export function TeamConfigTabs(props: TeamConfigTabsProps) {
   const [activeTab, setActiveTab] = useState<MemberConfigTab>("config");
   const { selectedMember, t } = props;
+  const effectiveActiveTab = selectedMember ? activeTab : "teamProtocol";
   const dirtyNotice =
     props.teamProtocolDirty
       ? t("teamPage.notice.unsavedTeamProtocol")
@@ -931,8 +940,8 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
       : savedNotice
         ? "saved"
         : null;
-  const tabItems = useMemo(
-    () => [
+  const tabItems = useMemo(() => {
+    const memberTabs = [
       {
         id: "config" as const,
         label: t("teamPage.tabs.config"),
@@ -944,16 +953,14 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
         icon: FolderGit2,
       },
       { id: "mcp" as const, label: t("teamPage.tabs.mcp"), icon: Server },
-      {
-        id: "teamProtocol" as const,
-        label: t("teamPage.tabs.teamProtocol"),
-        icon: FileText,
-      },
-    ],
-    [t],
-  );
-
-  if (!selectedMember) return <EmptyMemberState t={t} />;
+    ];
+    const protocolTab = {
+      id: "teamProtocol" as const,
+      label: t("teamPage.tabs.teamProtocol"),
+      icon: FileText,
+    };
+    return selectedMember ? [...memberTabs, protocolTab] : [protocolTab];
+  }, [selectedMember, t]);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--surface-2)]">
@@ -961,7 +968,7 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
         <div className="flex min-w-0 items-center gap-1">
           {tabItems.map((item) => {
             const Icon = item.icon;
-            const active = activeTab === item.id;
+            const active = effectiveActiveTab === item.id;
             return (
               <button
                 key={item.id}
@@ -1010,9 +1017,9 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 ot-scroll-area-styled">
-        {activeTab === "config" ? (
+        {effectiveActiveTab === "config" ? (
           <ConfigTab {...props} />
-        ) : activeTab === "skills" ? (
+        ) : effectiveActiveTab === "skills" ? (
           <SkillsTab
             allowedSkillIds={props.allowedSkillIds}
             skillLookup={props.skillLookup}
@@ -1022,7 +1029,7 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
             setAllowedSkillIds={props.setAllowedSkillIds}
             t={t}
           />
-        ) : activeTab === "mcp" ? (
+        ) : effectiveActiveTab === "mcp" ? (
           <McpConfigTab
             configuredMcpServerKeys={props.configuredMcpServerKeys}
             mcpConfig={props.mcpConfig}
@@ -1037,12 +1044,13 @@ export function TeamConfigTabs(props: TeamConfigTabsProps) {
         ) : (
           <TeamProtocolTab
             teamProtocolContent={props.teamProtocolContent}
+            teamProtocolDirty={props.teamProtocolDirty}
             teamProtocolError={props.teamProtocolError}
             teamProtocolLoading={props.teamProtocolLoading}
-            teamProtocolSessionAvailable={
-              props.teamProtocolSessionAvailable
-            }
+            teamProtocolSaving={props.teamProtocolSaving}
+            teamProtocolAvailable={props.teamProtocolAvailable}
             onTeamProtocolChange={props.onTeamProtocolChange}
+            onTeamProtocolSave={props.onTeamProtocolSave}
             t={t}
           />
         )}

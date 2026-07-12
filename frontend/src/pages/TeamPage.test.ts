@@ -112,6 +112,31 @@ check(
 );
 
 check(
+  "team protocol loads and saves against the selected project",
+  source.includes("projectApi\n      .getTeamProtocol(selectedProjectId)") &&
+    source.includes("projectApi.updateTeamProtocol(selectedProjectId") &&
+    !source.includes("chatSessionsApi.getTeamProtocol(") &&
+    !source.includes("teamProtocolSessionId") &&
+    configTabsSource.includes("onTeamProtocolSave") &&
+    configTabsSource.includes('t("teamPage.action.saveTeamProtocol")'),
+  { source, configTabsSource },
+);
+
+check(
+  "team protocol remains available when the project has no selected member",
+  configTabsSource.includes(
+    'const effectiveActiveTab = selectedMember ? activeTab : "teamProtocol"',
+  ) &&
+    configTabsSource.includes(
+      "return selectedMember ? [...memberTabs, protocolTab] : [protocolTab]",
+    ) &&
+    !configTabsSource.includes(
+      "if (!selectedMember) return <EmptyMemberState t={t} />",
+    ),
+  { configTabsSource },
+);
+
+check(
   "member name field keeps the inherited agent name as placeholder only",
   source.includes('memberName: member.member_name?.trim() ?? ""') &&
     source.includes(

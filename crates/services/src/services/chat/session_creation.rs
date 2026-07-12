@@ -21,8 +21,6 @@ pub async fn create_session_with_project_members(
                   summary_text,
                   archive_ref,
                   last_seen_diff_key,
-                  team_protocol,
-                  team_protocol_enabled,
                   default_workspace_path,
                   chat_input_mode,
                   project_id,
@@ -80,8 +78,9 @@ pub async fn create_session_with_project_members(
         };
         let allowed_skill_ids: sqlx::types::Json<Vec<String>> =
             member.try_get("allowed_skill_ids")?;
-        let execution_config: sqlx::types::Json<db::models::member_execution_config::MemberExecutionConfig> =
-            member.try_get("execution_config")?;
+        let execution_config: sqlx::types::Json<
+            db::models::member_execution_config::MemberExecutionConfig,
+        > = member.try_get("execution_config")?;
 
         sqlx::query(
             r#"
@@ -139,8 +138,6 @@ mod session_creation_tests {
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,
-                team_protocol TEXT,
-                team_protocol_enabled BOOLEAN NOT NULL DEFAULT 0,
                 default_workspace_path TEXT,
                 chat_input_mode TEXT,
                 project_id BLOB,
@@ -301,7 +298,11 @@ mod session_creation_tests {
             Some("gpt-5.2-codex")
         );
         assert_eq!(
-            session_agents[0].execution_config.0.thinking_effort.as_deref(),
+            session_agents[0]
+                .execution_config
+                .0
+                .thinking_effort
+                .as_deref(),
             Some("high")
         );
 
@@ -319,16 +320,7 @@ mod session_creation_tests {
         let pool = setup_pool().await;
         let project_id = Uuid::new_v4();
         let agent_id = Uuid::new_v4();
-        insert_project_member(
-            &pool,
-            project_id,
-            agent_id,
-            true,
-            None,
-            r#"[]"#,
-            r#"{}"#,
-        )
-        .await;
+        insert_project_member(&pool, project_id, agent_id, true, None, r#"[]"#, r#"{}"#).await;
 
         let session = create_session_with_project_members(
             &pool,

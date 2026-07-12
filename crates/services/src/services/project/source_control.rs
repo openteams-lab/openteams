@@ -586,11 +586,11 @@ impl SourceControlService {
                 pool,
                 &context,
                 paths,
-                request.force_shared.unwrap_or(false),
+                false,
                 |workspace_path, path| {
                     git_with_paths(workspace_path, &["add"], &[path.to_string()])
                 },
-                true,
+                false,
             )
             .await?;
         if !succeeded.is_empty() {
@@ -852,6 +852,23 @@ impl SourceControlService {
         }
 
         let committed_paths = real_staged;
+        if !force_shared {
+            let shared_target_paths = committed_paths.iter().cloned().collect::<BTreeSet<_>>();
+            let shared_paths = collect_shared_paths(pool, &context, &shared_target_paths).await?;
+            let mut shared_paths = shared_paths
+                .into_iter()
+                .filter_map(|(path, sessions)| (!sessions.is_empty()).then_some(path))
+                .collect::<Vec<_>>();
+            shared_paths.sort();
+            if !shared_paths.is_empty() {
+                return Err(commit_error(
+                    SourceControlCommitErrorCode::SharedFileRequiresConfirmation,
+                    "The staged files include changes shared with another active session.",
+                    Some(shared_paths),
+                    None,
+                ));
+            }
+        }
         let (additions, deletions) =
             diff_totals_for_paths(&context.workspace_path, &committed_paths, GitArea::Staged);
         let work_item_ids = resolve_commit_work_item_ids(

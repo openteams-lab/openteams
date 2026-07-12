@@ -104,14 +104,17 @@ check(
 );
 
 check(
-  "swings the Bell icon while unread notifications are present",
-  source.includes("[clip-path:inset(0_0_45%_0)]") &&
-    source.includes("inbox-bell-lower-swing") &&
-    source.includes("[clip-path:inset(45%_0_0_0)]") &&
-    styles.includes("@keyframes inbox-bell-lower-swing") &&
-    styles.includes("transform: translateX(-1.5px)") &&
-    styles.includes("will-change: transform") &&
-    styles.includes("@media (prefers-reduced-motion: reduce)"),
+  "swings the Bell icon briefly around its center while unread notifications are present",
+  source.includes("key={sortedItems[0]?.id ?? unreadCount}") &&
+    source.includes("inbox-bell-unread-icon inbox-bell-swing h-3.5 w-3.5") &&
+    !source.includes("inbox-bell-lower-swing") &&
+    styles.includes("@keyframes inbox-bell-swing") &&
+    styles.includes("animation: inbox-bell-swing 4s ease-in-out 1") &&
+    styles.includes("transform: rotate(-12deg)") &&
+    styles.includes("transform: rotate(12deg)") &&
+    styles.includes("transform-box: fill-box") &&
+    styles.includes("transform-origin: center center") &&
+    styles.includes("will-change: transform"),
   { source, styles },
 );
 

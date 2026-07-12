@@ -41,8 +41,6 @@ pub struct ChatSession {
     pub summary_text: Option<String>,
     pub archive_ref: Option<String>,
     pub last_seen_diff_key: Option<String>,
-    pub team_protocol: Option<String>,
-    pub team_protocol_enabled: bool,
     pub default_workspace_path: Option<String>,
     pub chat_input_mode: Option<String>,
     pub project_id: Option<Uuid>,
@@ -77,8 +75,6 @@ pub struct UpdateChatSession {
     pub summary_text: Option<String>,
     pub archive_ref: Option<String>,
     pub last_seen_diff_key: Option<String>,
-    pub team_protocol: Option<String>,
-    pub team_protocol_enabled: Option<bool>,
     pub default_workspace_path: Option<String>,
     #[serde(
         default,
@@ -115,8 +111,6 @@ impl ChatSession {
                           summary_text,
                           archive_ref,
                           last_seen_diff_key,
-                          team_protocol,
-                          team_protocol_enabled,
                           default_workspace_path,
                           chat_input_mode,
                           project_id,
@@ -144,8 +138,6 @@ impl ChatSession {
                           summary_text,
                           archive_ref,
                           last_seen_diff_key,
-                          team_protocol,
-                          team_protocol_enabled,
                           default_workspace_path,
                           chat_input_mode,
                           project_id,
@@ -176,8 +168,6 @@ impl ChatSession {
                       summary_text,
                       archive_ref,
                       last_seen_diff_key,
-                      team_protocol,
-                      team_protocol_enabled,
                       default_workspace_path,
                       chat_input_mode,
                       project_id,
@@ -206,8 +196,6 @@ impl ChatSession {
                       summary_text,
                       archive_ref,
                       last_seen_diff_key,
-                      team_protocol,
-                      team_protocol_enabled,
                       default_workspace_path,
                       chat_input_mode,
                       project_id,
@@ -244,8 +232,6 @@ impl ChatSession {
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
-                         team_protocol,
-                         team_protocol_enabled,
                          default_workspace_path,
                          chat_input_mode,
                          project_id,
@@ -286,10 +272,6 @@ impl ChatSession {
             .last_seen_diff_key
             .clone()
             .or(existing.last_seen_diff_key);
-        let team_protocol = data.team_protocol.clone().or(existing.team_protocol);
-        let team_protocol_enabled = data
-            .team_protocol_enabled
-            .unwrap_or(existing.team_protocol_enabled);
         let default_workspace_path = data
             .default_workspace_path
             .clone()
@@ -314,12 +296,10 @@ impl ChatSession {
                    summary_text = $5,
                    archive_ref = $6,
                    last_seen_diff_key = $7,
-                   team_protocol = $8,
-                   team_protocol_enabled = $9,
-                   archived_at = $10,
-                   default_workspace_path = $11,
-                   chat_input_mode = $12,
-                   worktree_mode = $13,
+                   archived_at = $8,
+                   default_workspace_path = $9,
+                   chat_input_mode = $10,
+                   worktree_mode = $11,
                    updated_at = datetime('now', 'subsec')
                WHERE id = $1
                RETURNING id,
@@ -329,8 +309,6 @@ impl ChatSession {
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
-                         team_protocol,
-                         team_protocol_enabled,
                          default_workspace_path,
                          chat_input_mode,
                          project_id,
@@ -347,8 +325,6 @@ impl ChatSession {
         .bind(summary_text)
         .bind(archive_ref)
         .bind(last_seen_diff_key)
-        .bind(team_protocol)
-        .bind(team_protocol_enabled)
         .bind(archived_at)
         .bind(default_workspace_path)
         .bind(chat_input_mode)
@@ -375,8 +351,6 @@ impl ChatSession {
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
-                         team_protocol,
-                         team_protocol_enabled,
                          default_workspace_path,
                          chat_input_mode,
                          project_id,
@@ -453,8 +427,6 @@ mod tests {
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,
-                team_protocol TEXT,
-                team_protocol_enabled BOOLEAN NOT NULL DEFAULT 0,
                 default_workspace_path TEXT,
                 chat_input_mode TEXT,
                 project_id BLOB,

@@ -109,7 +109,7 @@
   "teamPage.teamProtocol.desc": "设置当前会话中全体团队成员遵循的协作准则",
   "teamPage.teamProtocol.error": "团队协议错误：{error}",
   "teamPage.teamProtocol.loading": "正在加载团队协议...",
-  "teamPage.teamProtocol.noSession": "请先选择或创建聊天会话，再编辑团队协议",
+  "teamPage.teamProtocol.noProject": "请先选择或创建项目，再编辑团队协议",
   "teamPage.teamProtocol.placeholder": "描述团队共同遵循的协作规则、交接方式、评审标准和沟通准则",
   "teamPage.teamProtocol.title": "团队协议",
   "teamPage.tabs.config": "设置",

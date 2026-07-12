@@ -123,6 +123,16 @@ console.log("agentActivityFormatter");
 
 {
   const rows = formatAgentActivityLines([
+    line(1, "tool", "Started command: pnpm test"),
+    line(2, "tool", "Completed command: pnpm test: All tests passed"),
+  ]);
+
+  check("keeps the completed command visible", rows[0]?.detail === "pnpm test", rows);
+  check("separates command output for disclosure", rows[0]?.resultDetail === "All tests passed", rows);
+}
+
+{
+  const rows = formatAgentActivityLines([
     line(1, "thinking", "I am checking the workspace."),
     line(2, "tool", "Raw tool log without a known prefix"),
   ]);

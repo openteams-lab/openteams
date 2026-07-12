@@ -6,7 +6,7 @@ use axum::{
     response::Json as ResponseJson,
     routing::get,
 };
-use db::models::chat_session::{ChatSession, UpdateChatSession};
+use db::models::{chat_session::ChatSession, project_team_protocol::ProjectTeamProtocol};
 use deployment::Deployment;
 use executors::{
     executors::{BaseCodingAgent, CodingAgent},
@@ -26,13 +26,6 @@ use utils::{assets::config_path, response::ApiResponse, text::sanitize_member_ha
 use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError};
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub struct TeamProtocolConfig {
-    pub content: String,
-    pub enabled: bool,
-}
 
 #[derive(Debug, Clone, Deserialize, TS)]
 #[ts(export)]
@@ -158,54 +151,6 @@ struct SessionPresetMemberRow {
     allowed_skill_ids: SqlxJson<Vec<String>>,
 }
 
-pub async fn get_team_protocol(
-    Extension(session): Extension<ChatSession>,
-) -> Result<ResponseJson<ApiResponse<TeamProtocolConfig>>, ApiError> {
-    let content = session.team_protocol.unwrap_or_default();
-    let enabled = session.team_protocol_enabled;
-    Ok(ResponseJson(ApiResponse::success(TeamProtocolConfig {
-        content,
-        enabled,
-    })))
-}
-
-pub async fn update_team_protocol(
-    Extension(session): Extension<ChatSession>,
-    State(deployment): State<DeploymentImpl>,
-    Json(payload): Json<TeamProtocolConfig>,
-) -> Result<ResponseJson<ApiResponse<TeamProtocolConfig>>, ApiError> {
-    let content = if payload.enabled {
-        payload.content.clone()
-    } else {
-        String::new()
-    };
-    let effective = TeamProtocolConfig {
-        enabled: !content.trim().is_empty(),
-        content: content.clone(),
-    };
-
-    ChatSession::update(
-        &deployment.db().pool,
-        session.id,
-        &UpdateChatSession {
-            title: None,
-            status: None,
-            lead_agent_id: None,
-            summary_text: None,
-            archive_ref: None,
-            last_seen_diff_key: None,
-            team_protocol: Some(content),
-            team_protocol_enabled: Some(effective.enabled),
-            default_workspace_path: None,
-            chat_input_mode: None,
-            worktree_mode: None,
-        },
-    )
-    .await?;
-
-    Ok(ResponseJson(ApiResponse::success(effective)))
-}
-
 pub fn team_presets_router() -> Router<DeploymentImpl> {
     Router::new()
         .route("/", get(list_team_presets).post(create_team_preset))
@@ -297,10 +242,23 @@ pub async fn create_preset_snapshot(
     let requested_overwrite_strategy = payload
         .overwrite_strategy
         .unwrap_or(PresetSnapshotOverwriteStrategy::FailIfExists);
+    let team_protocol = if let Some(project_id) = session.project_id {
+        ProjectTeamProtocol::find_by_project(&deployment.db().pool, project_id)
+            .await?
+            .and_then(|protocol| protocol.content_if_enabled().map(str::to_string))
+    } else {
+        None
+    };
 
     let mut config_guard = deployment.config().write().await;
     let mut next_config = config_guard.clone();
-    let response = build_preset_snapshot(&session, rows, payload, &mut next_config.chat_presets)?;
+    let response = build_preset_snapshot(
+        &session,
+        team_protocol.as_deref(),
+        rows,
+        payload,
+        &mut next_config.chat_presets,
+    )?;
 
     save_config_to_file_atomic(&next_config, &config_path()).await?;
     *config_guard = next_config;
@@ -649,6 +607,7 @@ fn normalize_required_string(value: &str, label: &str) -> Result<String, ApiErro
 
 fn build_preset_snapshot(
     session: &ChatSession,
+    team_protocol: Option<&str>,
     rows: Vec<SessionPresetMemberRow>,
     payload: CreatePresetSnapshotRequest,
     presets: &mut ChatPresetsConfig,
@@ -712,17 +671,11 @@ fn build_preset_snapshot(
             .map(|member| member.id.clone())
     });
 
-    let team_protocol = if session.team_protocol_enabled {
-        session
-            .team_protocol
-            .as_deref()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .unwrap_or_default()
-            .to_string()
-    } else {
-        String::new()
-    };
+    let team_protocol = team_protocol
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or_default()
+        .to_string();
     let team = ChatTeamPreset {
         id: team_id,
         name: team_name,
@@ -914,7 +867,7 @@ mod tests {
 
     use super::*;
 
-    fn test_session(team_protocol_enabled: bool) -> ChatSession {
+    fn test_session() -> ChatSession {
         ChatSession {
             id: Uuid::new_v4(),
             title: Some("Delivery Team".to_string()),
@@ -923,8 +876,6 @@ mod tests {
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
-            team_protocol: Some("Follow the team protocol.".to_string()),
-            team_protocol_enabled,
             default_workspace_path: Some("/workspace/default".to_string()),
             chat_input_mode: None,
             project_id: None,
@@ -1307,11 +1258,12 @@ mod tests {
 
     #[test]
     fn build_preset_snapshot_creates_custom_members_and_team() {
-        let session = test_session(true);
+        let session = test_session();
         let mut presets = test_presets();
 
         let response = build_preset_snapshot(
             &session,
+            Some("Follow the team protocol."),
             vec![test_row("backend"), test_row("frontend")],
             snapshot_request("delivery", PresetSnapshotOverwriteStrategy::FailIfExists),
             &mut presets,
@@ -1346,11 +1298,12 @@ mod tests {
 
     #[test]
     fn build_preset_snapshot_keeps_blank_team_description_empty() {
-        let session = test_session(true);
+        let session = test_session();
         let mut presets = test_presets();
 
         let response = build_preset_snapshot(
             &session,
+            Some("Follow the team protocol."),
             vec![test_row("backend")],
             snapshot_request_without_description("delivery"),
             &mut presets,
@@ -1362,11 +1315,12 @@ mod tests {
 
     #[test]
     fn build_preset_snapshot_deduplicates_member_names_and_ids() {
-        let session = test_session(true);
+        let session = test_session();
         let mut presets = test_presets();
 
         let response = build_preset_snapshot(
             &session,
+            Some("Follow the team protocol."),
             vec![test_row("Backend Engineer"), test_row("backend   engineer")],
             snapshot_request("delivery", PresetSnapshotOverwriteStrategy::FailIfExists),
             &mut presets,
@@ -1402,11 +1356,12 @@ mod tests {
 
     #[test]
     fn build_preset_snapshot_falls_back_for_blank_member_names() {
-        let session = test_session(true);
+        let session = test_session();
         let mut presets = test_presets();
 
         let response = build_preset_snapshot(
             &session,
+            Some("Follow the team protocol."),
             vec![test_row("   "), test_row("\t")],
             snapshot_request("delivery", PresetSnapshotOverwriteStrategy::FailIfExists),
             &mut presets,
@@ -1430,7 +1385,7 @@ mod tests {
 
     #[test]
     fn build_preset_snapshot_prefers_agent_model_name_over_profile_variant() {
-        let session = test_session(true);
+        let session = test_session();
         let mut presets = test_presets();
         let mut row = test_row("backend");
         row.model_name = Some("explicit-model".to_string());
@@ -1439,6 +1394,7 @@ mod tests {
 
         let response = build_preset_snapshot(
             &session,
+            Some("Follow the team protocol."),
             vec![row],
             snapshot_request("delivery", PresetSnapshotOverwriteStrategy::FailIfExists),
             &mut presets,
@@ -1453,7 +1409,7 @@ mod tests {
 
     #[test]
     fn build_preset_snapshot_uses_selected_profile_model_when_agent_model_missing() {
-        let session = test_session(true);
+        let session = test_session();
         let mut presets = test_presets();
         let mut row = test_row("backend");
         row.model_name = None;
@@ -1462,6 +1418,7 @@ mod tests {
 
         let response = build_preset_snapshot(
             &session,
+            Some("Follow the team protocol."),
             vec![row],
             snapshot_request("delivery", PresetSnapshotOverwriteStrategy::FailIfExists),
             &mut presets,
@@ -1476,11 +1433,12 @@ mod tests {
 
     #[test]
     fn build_preset_snapshot_rejects_no_members() {
-        let session = test_session(true);
+        let session = test_session();
         let mut presets = test_presets();
 
         let error = build_preset_snapshot(
             &session,
+            Some("Follow the team protocol."),
             vec![],
             snapshot_request("delivery", PresetSnapshotOverwriteStrategy::FailIfExists),
             &mut presets,
@@ -1492,7 +1450,7 @@ mod tests {
 
     #[test]
     fn build_preset_snapshot_rejects_builtin_team_overwrite() {
-        let session = test_session(true);
+        let session = test_session();
         let mut presets = test_presets();
         presets.teams.push(ChatTeamPreset {
             id: "delivery".to_string(),
@@ -1508,6 +1466,7 @@ mod tests {
 
         let error = build_preset_snapshot(
             &session,
+            Some("Follow the team protocol."),
             vec![test_row("backend")],
             snapshot_request("delivery", PresetSnapshotOverwriteStrategy::OverwriteCustom),
             &mut presets,
@@ -1519,7 +1478,7 @@ mod tests {
 
     #[test]
     fn build_preset_snapshot_overwrites_custom_team_and_members() {
-        let session = test_session(true);
+        let session = test_session();
         let mut presets = test_presets();
         presets.teams.push(ChatTeamPreset {
             id: "delivery".to_string(),
@@ -1547,6 +1506,7 @@ mod tests {
 
         let response = build_preset_snapshot(
             &session,
+            Some("Follow the team protocol."),
             vec![test_row("backend")],
             snapshot_request("delivery", PresetSnapshotOverwriteStrategy::OverwriteCustom),
             &mut presets,
@@ -1564,12 +1524,13 @@ mod tests {
     }
 
     #[test]
-    fn build_preset_snapshot_omits_disabled_team_protocol() {
-        let session = test_session(false);
+    fn build_preset_snapshot_omits_missing_project_team_protocol() {
+        let session = test_session();
         let mut presets = test_presets();
 
         let response = build_preset_snapshot(
             &session,
+            None,
             vec![test_row("backend")],
             snapshot_request("delivery", PresetSnapshotOverwriteStrategy::FailIfExists),
             &mut presets,

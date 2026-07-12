@@ -88,30 +88,60 @@ body {
   margin: 0;
 }
 
-@keyframes inbox-bell-lower-swing {
+.macos-titlebar-drag-region {
+  display: none;
+}
+
+html[data-tauri-platform="macos"] #root {
+  box-sizing: border-box;
+  padding-top: 28px;
+  background: var(--canvas);
+}
+
+html[data-tauri-platform="macos"] .ot-app-scale-viewport {
+  height: calc(100vh - 28px);
+}
+
+html[data-tauri-platform="macos"] .macos-titlebar-drag-region {
+  position: fixed;
+  z-index: 10000;
+  top: 0;
+  right: 0;
+  left: 76px;
+  display: block;
+  height: 28px;
+}
+
+@keyframes inbox-bell-swing {
   0%,
   100% {
-    transform: translateX(0);
+    transform: rotate(0deg);
   }
-  14% {
-    transform: translateX(-1.5px);
+  10% {
+    transform: rotate(-12deg);
   }
-  28% {
-    transform: translateX(1.35px);
+  20% {
+    transform: rotate(12deg);
   }
-  42% {
-    transform: translateX(-1px);
+  30% {
+    transform: rotate(-10deg);
   }
-  56% {
-    transform: translateX(0.7px);
+  40% {
+    transform: rotate(10deg);
   }
-  70% {
-    transform: translateX(0);
+  50% {
+    transform: rotate(-7deg);
+  }
+  60% {
+    transform: rotate(7deg);
   }
 }
 
-.inbox-bell-lower-swing {
-  animation: inbox-bell-lower-swing 1.35s ease-in-out infinite;
+.inbox-bell-swing {
+  animation: inbox-bell-swing 4s ease-in-out 1;
+  display: block;
+  transform-box: fill-box;
+  transform-origin: center center;
   will-change: transform;
 }
 
@@ -124,12 +154,6 @@ body {
 .inbox-bell-unread-badge {
   color: var(--inbox-bell-unread-badge-text);
   filter: var(--inbox-bell-unread-badge-filter);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .inbox-bell-lower-swing {
-    animation: none;
-  }
 }
 
 .ot-app-scale-viewport {

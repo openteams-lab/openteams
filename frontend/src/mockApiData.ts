@@ -519,9 +519,9 @@ export const mockShellOptions: ShellOptionsMock = {
   primaryActions: [
     {
       id: 'search',
-      label: '搜索',
+      label: 'Search',
       icon: 'search',
-      helper: '搜索当前项目的会话、事项、消息和隔离 worktree。',
+      helper: 'Search sessions, issues, messages, and isolated worktrees in the current project.',
     },
     {
       id: 'new-session',

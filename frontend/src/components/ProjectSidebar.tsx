@@ -160,6 +160,15 @@ const sidebarItemClass =
 const visibleSessionLimit = 6;
 const blankTeamId = "blank_team";
 
+const localizedDefaultSessionTitles = new Set([
+  "Default Session",
+  "默认会话",
+  "デフォルトセッション",
+  "기본 세션",
+  "Session par défaut",
+  "Sesión predeterminada",
+]);
+
 const hasRunningSessionActivity = (session: Session): boolean =>
   Boolean(session.hasRunningAgent) || hasRunningWorkflowActivity(session);
 
@@ -2817,6 +2826,14 @@ export function ProjectSidebar({
                 data-sidebar-session-list="true"
               >
                 {visibleSessions.map((session) => {
+                  const displayTitle = localizedDefaultSessionTitles.has(
+                    session.title,
+                  )
+                    ? translate(
+                        "createSession.defaultTitle",
+                        "Default Session",
+                      )
+                    : session.title;
                   const active =
                     activePage === "workspace" &&
                     session.id === activeSessionId;
@@ -2847,36 +2864,36 @@ export function ProjectSidebar({
                         ? CircleDot
                         : Box;
                   const sessionLabel = workflowReviewing
-                    ? `${session.title} - ${translate(
+                    ? `${displayTitle} - ${translate(
                         "sidebar.sessionReviewing",
                         "reviewing",
                       )}`
                     : isRunning
-                    ? `${session.title} - ${translate(
+                    ? `${displayTitle} - ${translate(
                         "sidebar.sessionRunning",
                         "agent running",
                       )}`
                     : hasPendingWorkflowReview
-                    ? `${session.title} - ${translate(
+                    ? `${displayTitle} - ${translate(
                         "sidebar.sessionWaitingReview",
                         "waiting for review",
                       )}`
                     : hasPendingWorkflowInput
-                    ? `${session.title} - ${translate(
+                    ? `${displayTitle} - ${translate(
                         "sidebar.sessionNeedsInput",
                         "waiting for input",
                       )}`
                     : hasWorkflowError
-                    ? `${session.title} - ${translate(
+                    ? `${displayTitle} - ${translate(
                         "sidebar.sessionWorkflowError",
                         "workflow needs attention",
                       )}`
                     : hasUnreadAgentCompletion
-                    ? `${session.title} - ${translate(
+                    ? `${displayTitle} - ${translate(
                         "sidebar.sessionAgentCompleted",
                         "agent completed",
                       )}`
-                    : session.title;
+                    : displayTitle;
                   return (
                     <button
                       key={session.id}
@@ -2909,7 +2926,7 @@ export function ProjectSidebar({
                         }`}
                       />
                       <span className="min-w-0 flex-1 truncate">
-                        {session.title}
+                        {displayTitle}
                       </span>
                       {pinned && (
                         <Pin className="h-3 w-3 shrink-0 text-[var(--primary)]" />

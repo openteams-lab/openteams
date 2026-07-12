@@ -14,6 +14,7 @@ use db::models::{
     project_path::ProjectPath,
     project_repo::CreateProjectRepo,
     project_stats::ProjectStats,
+    project_team_protocol::ProjectTeamProtocol,
     repo::Repo,
 };
 use deployment::Deployment;
@@ -36,6 +37,13 @@ use utils::response::ApiResponse;
 use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError};
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TeamProtocolConfig {
+    pub content: String,
+    pub enabled: bool,
+}
 
 #[derive(Debug, Deserialize, TS)]
 pub struct CreateProjectRequest {
@@ -177,6 +185,10 @@ pub fn router() -> Router<DeploymentImpl> {
             "/projects/{project_id}/sessions",
             get(list_project_sessions).post(create_project_session),
         )
+        .route(
+            "/projects/{project_id}/team-protocol",
+            get(get_project_team_protocol).put(update_project_team_protocol),
+        )
         .route("/projects/{project_id}/repos", get(list_project_repos))
         .route("/projects/{project_id}/stats", get(get_project_stats))
 }
@@ -193,6 +205,41 @@ async fn ensure_project_exists(
     }
 
     Ok(())
+}
+
+pub async fn get_project_team_protocol(
+    State(deployment): State<DeploymentImpl>,
+    Path(project_id): Path<Uuid>,
+) -> Result<ResponseJson<ApiResponse<TeamProtocolConfig>>, ApiError> {
+    ensure_project_exists(&deployment, project_id).await?;
+    let protocol = ProjectTeamProtocol::find_by_project(&deployment.db().pool, project_id).await?;
+    Ok(ResponseJson(ApiResponse::success(TeamProtocolConfig {
+        content: protocol
+            .as_ref()
+            .map(|value| value.content.clone())
+            .unwrap_or_default(),
+        enabled: protocol.is_some_and(|value| value.enabled),
+    })))
+}
+
+pub async fn update_project_team_protocol(
+    State(deployment): State<DeploymentImpl>,
+    Path(project_id): Path<Uuid>,
+    Json(payload): Json<TeamProtocolConfig>,
+) -> Result<ResponseJson<ApiResponse<TeamProtocolConfig>>, ApiError> {
+    ensure_project_exists(&deployment, project_id).await?;
+    let content = if payload.enabled {
+        payload.content.trim().to_string()
+    } else {
+        String::new()
+    };
+    let enabled = !content.is_empty();
+    let protocol =
+        ProjectTeamProtocol::upsert(&deployment.db().pool, project_id, content, enabled).await?;
+    Ok(ResponseJson(ApiResponse::success(TeamProtocolConfig {
+        content: protocol.content,
+        enabled: protocol.enabled,
+    })))
 }
 
 async fn ensure_member_belongs_to_project(

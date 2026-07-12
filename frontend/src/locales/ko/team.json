@@ -109,7 +109,7 @@
   "teamPage.teamProtocol.desc": "이 세션에서 팀 전체가 따를 공유 지침을 설정합니다",
   "teamPage.teamProtocol.error": "팀 프로토콜 오류: {error}",
   "teamPage.teamProtocol.loading": "팀 프로토콜을 불러오는 중...",
-  "teamPage.teamProtocol.noSession": "팀 프로토콜을 편집하기 전에 채팅 세션을 선택하거나 생성하세요",
+  "teamPage.teamProtocol.noProject": "팀 프로토콜을 편집하기 전에 프로젝트를 선택하거나 생성하세요",
   "teamPage.teamProtocol.placeholder": "공유 규칙, 협업 방식, 인수인계 기대치, 리뷰 기준을 설명하세요.",
   "teamPage.teamProtocol.title": "팀 프로토콜",
   "teamPage.tabs.config": "설정",

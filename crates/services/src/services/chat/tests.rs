@@ -13,17 +13,16 @@ mod tests {
     use sqlx::SqlitePool;
     use uuid::Uuid;
 
-    use crate::services::{project::ProjectService, repo::RepoService};
-
     use super::{
         CompressionType, SimplifiedMessage, all_agents_running, build_message_analytics_metrics,
         compress_messages_if_needed, create_message, create_session_with_project_members,
         effective_agent_name, is_protocol_notice_history_message, is_workflow_chat_input_mode,
         limit_summary_input_messages, member_name_overrides_for_session, normalized_member_name,
         parse_agent_send_mentions, parse_mentions, parse_user_message_mentions,
-        prioritize_summary_agents,
-        select_messages_to_compress_by_token, should_include_message_in_history,
+        prioritize_summary_agents, select_messages_to_compress_by_token,
+        should_include_message_in_history,
     };
+    use crate::services::{project::ProjectService, repo::RepoService};
 
     #[test]
     fn parses_mentions_with_basic_tokens() {
@@ -183,8 +182,6 @@ mod tests {
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,
-                team_protocol TEXT DEFAULT '',
-                team_protocol_enabled INTEGER DEFAULT 0,
                 default_workspace_path TEXT,
                 chat_input_mode TEXT,
                 project_id BLOB,
@@ -296,8 +293,6 @@ mod tests {
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,
-                team_protocol TEXT DEFAULT '',
-                team_protocol_enabled INTEGER DEFAULT 0,
                 default_workspace_path TEXT,
                 chat_input_mode TEXT,
                 project_id BLOB,
@@ -544,7 +539,10 @@ mod tests {
             .await
             .expect("load member name overrides");
 
-        assert_eq!(overrides.get(&agent.id).map(String::as_str), Some("backend-lead"));
+        assert_eq!(
+            overrides.get(&agent.id).map(String::as_str),
+            Some("backend-lead")
+        );
         assert_eq!(
             effective_agent_name(&agent, overrides.get(&agent.id).map(String::as_str)),
             "backend-lead"

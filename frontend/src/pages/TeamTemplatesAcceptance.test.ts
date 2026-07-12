@@ -497,7 +497,7 @@ await runScenario(
   [
     '读取编辑后的聚合模板。',
     '用可用 runtime 构造成员创建规格。',
-    '确认团队协议和 lead agent patch 会传入会话更新。',
+    '确认团队协议写入项目，lead agent patch 只更新会话负责人。',
   ],
   async () => {
     const detail = await teamPresetsApi.get(createPayload.id);
@@ -508,9 +508,11 @@ await runScenario(
     );
     const sessionPatch = teamTemplateSessionUpdatePayload({
       lead_agent_id: 'agent-lead',
-      team_protocol: detail.team_protocol,
-      team_protocol_enabled: detail.team_protocol.trim().length > 0,
     });
+    const projectProtocol = {
+      content: detail.team_protocol,
+      enabled: detail.team_protocol.trim().length > 0,
+    };
 
     assertAcceptance(specs.length === detail.members.length, 'all enabled members should import');
     assertAcceptance(specs[0]?.role === 'lead', 'lead member should import as lead');
@@ -530,15 +532,14 @@ await runScenario(
       specs[0],
     );
     assertAcceptance(
-      sessionPatch.team_protocol === detail.team_protocol &&
-        sessionPatch.team_protocol_enabled === true,
-      'team protocol should be passed to session update',
-      sessionPatch,
+      projectProtocol.content === detail.team_protocol && projectProtocol.enabled,
+      'team protocol should be passed to project update',
+      projectProtocol,
     );
 
     return [
       `导入规格生成 ${specs.length} 个成员，名称、职责、技能和 MCP 与模板一致。`,
-      '负责人角色和团队协议 session patch 均按聚合模型生成。',
+      '负责人角色写入会话，团队协议写入项目级唯一真源。',
     ];
   },
 );

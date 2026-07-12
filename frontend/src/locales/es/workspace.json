@@ -174,6 +174,8 @@
   "sidebar.primary.inbox.helper": "Marcador local para actualizaciones del proyecto.",
   "sidebar.primary.new-session": "Nueva sesión",
   "sidebar.primary.new-session.helper": "Solo inicia el flujo de UI; no crea una sesión backend.",
+  "sidebar.primary.search": "Buscar",
+  "sidebar.primary.search.helper": "Buscar sesiones, incidencias, mensajes y worktrees aislados en el proyecto actual.",
   "sidebar.projectCreateFailed": "Error al crear el proyecto",
   "sidebar.projectDescription": "Descripción",
   "sidebar.projectFallback": "Proyecto",
