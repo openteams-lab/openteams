@@ -4007,6 +4007,17 @@ body[data-mode="light"] .workflow-graph-board > .absolute.bottom-4.right-4 butto
   color: #111827 !important;
 }
 
+.workflow-graph-board > .workflow-graph-controls button,
+body[data-mode="light"] .workflow-graph-board > .workflow-graph-controls button {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.workflow-graph-board > .workflow-graph-controls button:hover,
+body[data-mode="light"] .workflow-graph-board > .workflow-graph-controls button:hover {
+  background: var(--surface-2) !important;
+}
+
 .workflow-graph-board.workflow-card-graph-board {
   background-color: #101318 !important;
   background-image: radial-gradient(

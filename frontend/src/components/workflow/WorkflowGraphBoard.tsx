@@ -4,6 +4,8 @@ import {
   ArrowClockwiseIcon,
   ArrowsClockwiseIcon,
   ArrowsInSimpleIcon,
+  MinusIcon,
+  PlusIcon,
 } from '@phosphor-icons/react';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { motion } from 'framer-motion';
@@ -77,6 +79,9 @@ interface ElkLayoutEdge {
 
 const NODE_WIDTH = 240;
 const NODE_HEIGHT = 110;
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 4;
+const ZOOM_BUTTON_FACTOR = 1.2;
 
 function buildElkGraph(
   nodes: WorkflowGraphNode[],
@@ -524,8 +529,8 @@ export function WorkflowGraphBoard({
 
       setTransform((current) => {
         const newScale = Math.min(
-          Math.max(0.1, current.scale * scaleFactor),
-          4
+          Math.max(MIN_ZOOM, current.scale * scaleFactor),
+          MAX_ZOOM
         );
         const scaleRatio = newScale / current.scale;
         return {
@@ -583,6 +588,28 @@ export function WorkflowGraphBoard({
       const y = (container.height - h * scale) / 2;
       setTransform({ x, y, scale });
     }
+  };
+
+  const handleZoom = (scaleFactor: number) => {
+    if (!containerRef.current) return;
+
+    const container = containerRef.current.getBoundingClientRect();
+    const centerX = container.width / 2;
+    const centerY = container.height / 2;
+
+    setTransform((current) => {
+      const newScale = Math.min(
+        Math.max(MIN_ZOOM, current.scale * scaleFactor),
+        MAX_ZOOM
+      );
+      const scaleRatio = newScale / current.scale;
+
+      return {
+        x: centerX - (centerX - current.x) * scaleRatio,
+        y: centerY - (centerY - current.y) * scaleRatio,
+        scale: newScale,
+      };
+    });
   };
 
   const getStatusNodeStyles = (status?: string | null) => {
@@ -924,12 +951,37 @@ export function WorkflowGraphBoard({
         )}
       </div>
 
-      <div className="absolute bottom-4 right-4 z-20">
+      <div className="workflow-graph-controls absolute bottom-4 right-4 z-20 flex items-center overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
+        <button
+          type="button"
+          onClick={() => handleZoom(1 / ZOOM_BUTTON_FACTOR)}
+          className="flex size-9 items-center justify-center text-[var(--ink-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:opacity-40"
+          title={t('workflow.graph.zoomOut', { defaultValue: 'Zoom out' })}
+          aria-label={t('workflow.graph.zoomOut', { defaultValue: 'Zoom out' })}
+          disabled={transform.scale <= MIN_ZOOM}
+        >
+          <MinusIcon className="size-4" weight="bold" />
+        </button>
+        <div className="h-5 w-px bg-[var(--hairline)]" />
+        <button
+          type="button"
+          onClick={() => handleZoom(ZOOM_BUTTON_FACTOR)}
+          className="flex size-9 items-center justify-center text-[var(--ink-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:opacity-40"
+          title={t('workflow.graph.zoomIn', { defaultValue: 'Zoom in' })}
+          aria-label={t('workflow.graph.zoomIn', { defaultValue: 'Zoom in' })}
+          disabled={transform.scale >= MAX_ZOOM}
+        >
+          <PlusIcon className="size-4" weight="bold" />
+        </button>
+        <div className="h-5 w-px bg-[var(--hairline)]" />
         <button
           type="button"
           onClick={handleFitView}
-          className="p-2 text-white rounded-md hover:text-[var(--ink)] transition-colors"
+          className="flex size-9 items-center justify-center text-[var(--ink-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
           title={t('workflow.graph.fitView', { defaultValue: 'Fit to canvas' })}
+          aria-label={t('workflow.graph.fitView', {
+            defaultValue: 'Fit to canvas',
+          })}
         >
           <ArrowsInSimpleIcon className="size-5" weight="bold" />
         </button>
