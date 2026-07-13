@@ -955,35 +955,44 @@ export function WorkflowGraphBoard({
         <button
           type="button"
           onClick={() => handleZoom(1 / ZOOM_BUTTON_FACTOR)}
-          className="flex size-9 items-center justify-center text-[var(--ink-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:opacity-40"
+          className={cn(
+            'flex items-center justify-center text-[var(--ink-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:opacity-40',
+            compact ? 'size-5' : 'size-9',
+          )}
           title={t('workflow.graph.zoomOut', { defaultValue: 'Zoom out' })}
           aria-label={t('workflow.graph.zoomOut', { defaultValue: 'Zoom out' })}
           disabled={transform.scale <= MIN_ZOOM}
         >
-          <MinusIcon className="size-4" weight="bold" />
+          <MinusIcon size={compact ? 10 : 14} weight="bold" />
         </button>
         <div className="h-5 w-px bg-[var(--hairline)]" />
         <button
           type="button"
           onClick={() => handleZoom(ZOOM_BUTTON_FACTOR)}
-          className="flex size-9 items-center justify-center text-[var(--ink-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:opacity-40"
+          className={cn(
+            'flex items-center justify-center text-[var(--ink-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:opacity-40',
+            compact ? 'size-5' : 'size-9',
+          )}
           title={t('workflow.graph.zoomIn', { defaultValue: 'Zoom in' })}
           aria-label={t('workflow.graph.zoomIn', { defaultValue: 'Zoom in' })}
           disabled={transform.scale >= MAX_ZOOM}
         >
-          <PlusIcon className="size-4" weight="bold" />
+          <PlusIcon size={compact ? 10 : 14} weight="bold" />
         </button>
         <div className="h-5 w-px bg-[var(--hairline)]" />
         <button
           type="button"
           onClick={handleFitView}
-          className="flex size-9 items-center justify-center text-[var(--ink-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+          className={cn(
+            'flex items-center justify-center text-[var(--ink-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]',
+            compact ? 'size-5' : 'size-9',
+          )}
           title={t('workflow.graph.fitView', { defaultValue: 'Fit to canvas' })}
           aria-label={t('workflow.graph.fitView', {
             defaultValue: 'Fit to canvas',
           })}
         >
-          <ArrowsInSimpleIcon className="size-5" weight="bold" />
+          <ArrowsInSimpleIcon size={compact ? 10 : 14} weight="bold" />
         </button>
       </div>
 
