@@ -11,6 +11,7 @@ pub mod chat_session_agent;
 pub mod chat_session_path_index;
 pub mod chat_session_worktree;
 pub mod chat_skill;
+pub mod chat_team_template_catalog;
 pub mod chat_work_item;
 pub mod github_operation_audit;
 pub mod github_pending_operation;

@@ -15,6 +15,7 @@ const template = (
   team_protocol: patch.team_protocol ?? '',
   is_builtin: patch.is_builtin ?? true,
   enabled: patch.enabled ?? true,
+  tier: patch.tier ?? 'standard',
 });
 
 const teams = [

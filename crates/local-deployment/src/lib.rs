@@ -128,7 +128,6 @@ impl Deployment for LocalDeployment {
             );
             DBService::new_with_after_connect(hook).await?
         };
-
         let image = ImageService::new(db.clone().pool)?;
         {
             let image_service = image.clone();

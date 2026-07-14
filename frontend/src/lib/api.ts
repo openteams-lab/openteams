@@ -318,13 +318,19 @@ export const profilesApi = {
 };
 
 export const teamPresetsApi = {
-  list: async (): Promise<TeamPresetListResponse> => {
-    const r = await makeRequest("/api/team-presets", { cache: "no-store" });
+  list: async (locale?: string): Promise<TeamPresetListResponse> => {
+    const query = locale
+      ? `?${new URLSearchParams({ locale }).toString()}`
+      : "";
+    const r = await makeRequest(`/api/team-presets${query}`, { cache: "no-store" });
     return handleApiResponse<TeamPresetListResponse>(r);
   },
-  get: async (teamPresetId: string): Promise<ChatTeamPreset> => {
+  get: async (teamPresetId: string, locale?: string): Promise<ChatTeamPreset> => {
+    const query = locale
+      ? `?${new URLSearchParams({ locale }).toString()}`
+      : "";
     const r = await makeRequest(
-      `/api/team-presets/${encodeURIComponent(teamPresetId)}`,
+      `/api/team-presets/${encodeURIComponent(teamPresetId)}${query}`,
       { cache: "no-store" },
     );
     return handleApiResponse<ChatTeamPreset>(r);

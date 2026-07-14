@@ -1,18 +1,20 @@
-use std::time::Duration;
+use std::{path::PathBuf, time::Duration};
 
 use anyhow::{self, Error as AnyhowError};
 use deployment::{Deployment, DeploymentError};
 use server::{DeploymentImpl, npx_browser_lifecycle, routes};
 use services::services::{
-    build_stats::model_pricing_sync::ModelPricingSyncService, container::ContainerService,
+    build_stats::model_pricing_sync::ModelPricingSyncService,
+    config::{TeamTemplateCatalogService, TeamTemplateCatalogSyncResult},
+    container::ContainerService,
     project::migration::ProjectMigrationService,
 };
-use sqlx::Error as SqlxError;
+use sqlx::{Error as SqlxError, SqlitePool};
 use strip_ansi_escapes::strip;
 use thiserror::Error;
 use tracing_subscriber::{EnvFilter, prelude::*};
 use utils::{
-    assets::asset_dir,
+    assets::{asset_dir, config_path},
     browser::open_browser,
     port_file::write_port_file,
     sentry::{self as sentry_utils, SentrySource, sentry_layer},
@@ -127,6 +129,11 @@ async fn main() -> Result<(), OpenTeamsError> {
 
     let deployment = DeploymentImpl::new().await?;
     deployment.update_sentry_scope().await?;
+    let _ = sync_team_template_catalog_on_server_startup(
+        deployment.db().pool.clone(),
+        config_path().to_path_buf(),
+    )
+    .await;
     deployment
         .container()
         .cleanup_orphan_executions()
@@ -251,6 +258,35 @@ async fn main() -> Result<(), OpenTeamsError> {
     Ok(())
 }
 
+async fn sync_team_template_catalog_on_server_startup(
+    pool: SqlitePool,
+    config_path: PathBuf,
+) -> Result<TeamTemplateCatalogSyncResult, services::services::config::TeamTemplateCatalogError> {
+    match TeamTemplateCatalogService::new(pool, config_path.clone())
+        .sync()
+        .await
+    {
+        Ok(result) => {
+            tracing::info!(
+                builtin_upserted = result.builtin_upserted,
+                stale_builtin_deleted = result.stale_builtin_deleted,
+                custom_reconciled = result.custom_reconciled,
+                config_path = %config_path.display(),
+                "synced team template catalog during server startup"
+            );
+            Ok(result)
+        }
+        Err(err) => {
+            tracing::warn!(
+                error = ?err,
+                config_path = %config_path.display(),
+                "failed to sync team template catalog during server startup"
+            );
+            Err(err)
+        }
+    }
+}
+
 pub async fn shutdown_signal() {
     // Always wait for Ctrl+C
     let ctrl_c = async {
@@ -296,4 +332,53 @@ pub async fn perform_cleanup_actions(deployment: &DeploymentImpl) {
         .kill_all_running_processes()
         .await
         .expect("Failed to cleanly kill running execution processes");
+}
+
+#[cfg(test)]
+mod tests {
+    use db::models::chat_team_template_catalog::{
+        ChatTeamTemplateCatalog, TeamTemplateCatalogSource,
+    };
+    use services::services::config::{Config, save_config_to_file_atomic};
+
+    use super::*;
+
+    async fn setup_pool() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("create sqlite memory pool");
+        sqlx::migrate!("../db/migrations")
+            .run(&pool)
+            .await
+            .expect("run migrations");
+        pool
+    }
+
+    #[tokio::test]
+    async fn server_startup_team_template_catalog_sync_is_idempotent() {
+        let pool = setup_pool().await;
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        let config_path = temp.path().join("config.json");
+        save_config_to_file_atomic(&Config::default(), &config_path)
+            .await
+            .expect("write config");
+
+        sync_team_template_catalog_on_server_startup(pool.clone(), config_path.clone())
+            .await
+            .expect("first startup sync");
+        sync_team_template_catalog_on_server_startup(pool.clone(), config_path)
+            .await
+            .expect("second startup sync");
+
+        let rows = ChatTeamTemplateCatalog::list_stable_sorted(&pool)
+            .await
+            .expect("list catalog");
+        assert_eq!(rows.len(), 10);
+        assert_eq!(
+            rows.iter()
+                .filter(|row| row.source == TeamTemplateCatalogSource::Builtin)
+                .count(),
+            10
+        );
+    }
 }

@@ -145,6 +145,9 @@ pub struct ChatTeamPreset {
     /// Whether this preset is enabled (visible for import)
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Standard templates are shown before advanced templates in the catalog.
+    #[serde(default = "default_team_template_tier")]
+    pub tier: ChatTeamTemplateTier,
 }
 
 /// Intermediate representation used only to deserialize legacy and aggregate
@@ -170,6 +173,8 @@ struct ChatTeamPresetRaw {
     is_builtin: bool,
     #[serde(default = "default_true")]
     enabled: bool,
+    #[serde(default = "default_team_template_tier")]
+    tier: ChatTeamTemplateTier,
 }
 
 #[derive(Deserialize)]
@@ -250,6 +255,7 @@ impl<'de> Deserialize<'de> for ChatPresetsConfig {
                     team_protocol: team_raw.team_protocol,
                     is_builtin: team_raw.is_builtin,
                     enabled: team_raw.enabled,
+                    tier: team_raw.tier,
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -297,6 +303,19 @@ fn default_chat_compression() -> ChatCompressionConfig {
 
 fn default_true() -> bool {
     true
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ChatTeamTemplateTier {
+    #[default]
+    Standard,
+    Advanced,
+}
+
+fn default_team_template_tier() -> ChatTeamTemplateTier {
+    ChatTeamTemplateTier::Standard
 }
 
 fn normalize_selected_skill_ids(skill_ids: &[String]) -> Vec<String> {
@@ -375,6 +394,7 @@ fn complete_chat_presets_with_builtins(chat_presets: &mut ChatPresetsConfig) {
             preset.workflow_steps = default_preset.workflow_steps.clone();
             preset.team_protocol = default_preset.team_protocol.clone();
             preset.enabled = default_preset.enabled;
+            preset.tier = default_preset.tier;
         }
     }
 
@@ -1002,6 +1022,7 @@ mod tests {
             team_protocol: "Coordinate tightly.".to_string(),
             is_builtin: false,
             enabled: true,
+            tier: ChatTeamTemplateTier::Standard,
         };
 
         let serialized = serde_json::to_string(&preset).expect("serialize");
@@ -1010,6 +1031,35 @@ mod tests {
         assert_eq!(preset, deserialized);
         assert_eq!(deserialized.workflow_steps.len(), 2);
         assert_eq!(deserialized.workflow_steps[0].title, "Plan");
+    }
+
+    #[test]
+    fn chat_team_preset_tier_defaults_to_standard_and_uses_snake_case() {
+        let preset: ChatTeamPreset = serde_json::from_value(json!({
+            "id": "legacy_custom",
+            "name": "Legacy Custom",
+            "description": "Legacy custom team",
+            "members": [],
+            "is_builtin": false,
+            "enabled": true
+        }))
+        .expect("missing tier should deserialize");
+        assert_eq!(preset.tier, ChatTeamTemplateTier::Standard);
+
+        let advanced: ChatTeamPreset = serde_json::from_value(json!({
+            "id": "advanced_custom",
+            "name": "Advanced Custom",
+            "description": "Advanced custom team",
+            "members": [],
+            "is_builtin": false,
+            "enabled": true,
+            "tier": "advanced"
+        }))
+        .expect("advanced tier should deserialize");
+        let serialized = serde_json::to_value(&advanced).expect("serialize advanced");
+
+        assert_eq!(advanced.tier, ChatTeamTemplateTier::Advanced);
+        assert_eq!(serialized["tier"], "advanced");
     }
 
     #[test]
@@ -1052,6 +1102,17 @@ mod tests {
             ]
         );
         assert!(!fullstack.team_protocol.trim().is_empty());
+        assert_eq!(fullstack.tier, ChatTeamTemplateTier::Standard);
+        let advanced = chat_presets
+            .teams
+            .iter()
+            .filter(|preset| preset.tier == ChatTeamTemplateTier::Advanced)
+            .map(|preset| preset.id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            advanced,
+            vec!["advanced-growth-ops", "advanced-release-command"]
+        );
         assert!(
             fullstack
                 .team_protocol
@@ -1136,6 +1197,7 @@ mod tests {
             team_protocol: "Custom team protocol".to_string(),
             is_builtin: false,
             enabled: true,
+            tier: ChatTeamTemplateTier::Standard,
         };
         chat_presets.teams.push(custom_team.clone());
 

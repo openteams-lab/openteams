@@ -14,7 +14,7 @@ use git2::Error as Git2Error;
 use services::services::{
     chat::ChatServiceError,
     chat_runner::ChatRunnerError,
-    config::{ConfigError, EditorOpenError},
+    config::{ConfigError, EditorOpenError, TeamTemplateCatalogError},
     container::ContainerError,
     git_host::GitHostError,
     image::ImageError,
@@ -62,6 +62,8 @@ pub enum ApiError {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     EditorOpen(#[from] EditorOpenError),
+    #[error(transparent)]
+    TeamTemplateCatalog(#[from] TeamTemplateCatalogError),
     #[error("Unauthorized")]
     Unauthorized,
     #[error("Bad request: {0}")]
@@ -202,6 +204,7 @@ impl IntoResponse for ApiError {
             ApiError::EditorOpen(_) => {
                 ErrorInfo::bad_request("EditorOpenError", format!("{}", self))
             }
+            ApiError::TeamTemplateCatalog(_) => ErrorInfo::internal("TeamTemplateCatalogError"),
 
             ApiError::Unauthorized => ErrorInfo::with_status(
                 StatusCode::UNAUTHORIZED,

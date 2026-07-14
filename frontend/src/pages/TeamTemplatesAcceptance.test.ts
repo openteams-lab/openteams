@@ -72,6 +72,7 @@ const builtInTeam: ChatTeamPreset = {
   team_protocol: 'Built-in protocol.',
   is_builtin: true,
   enabled: true,
+  tier: 'standard',
 };
 
 const savedTeams = new Map<string, ChatTeamPreset>([[builtInTeam.id, builtInTeam]]);
@@ -102,6 +103,7 @@ const teamToSummary = (team: ChatTeamPreset): TeamPresetSummary => ({
   team_protocol: team.team_protocol,
   is_builtin: team.is_builtin,
   enabled: team.enabled,
+  tier: team.tier,
   member_count: team.members.length,
   members: team.members.map((member) => ({
     id: member.id,
@@ -140,6 +142,7 @@ const writeToTeam = (
   team_protocol: payload.team_protocol ?? '',
   is_builtin: false,
   enabled: payload.enabled ?? true,
+  tier: payload.tier ?? 'standard',
 });
 
 globalThis.fetch = (async (input: RequestInfo | URL, options?: RequestInit) => {
@@ -380,6 +383,7 @@ await runScenario(
       workflow_steps: [{ title: 'Ship', description: 'Validate and release.' }],
       team_protocol: '## Updated Protocol\n- Escalate blockers quickly.',
       enabled: true,
+      tier: null,
       members: [
         {
           id: 'lead',

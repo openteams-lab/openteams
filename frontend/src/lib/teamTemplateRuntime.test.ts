@@ -50,6 +50,7 @@ const team = (members: ChatMemberPreset[]): ChatTeamPreset => ({
   team_protocol: '',
   is_builtin: true,
   enabled: true,
+  tier: 'standard',
 });
 
 const runtimes = [

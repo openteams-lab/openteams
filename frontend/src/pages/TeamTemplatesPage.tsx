@@ -13,9 +13,6 @@ import {
   Rocket,
   Save,
   Settings,
-  PenTool,
-  Telescope,
-  Terminal,
   TrendingUp,
   Trash2,
   Workflow,
@@ -63,11 +60,11 @@ import { ProjectMemberType } from "../../../shared/types";
 import type {
   BaseCodingAgent as ProjectBaseCodingAgent,
   ChatMemberPreset,
+  ChatTeamTemplateTier,
   ChatTeamPreset,
   CreateTeamPresetRequest,
   JsonValue,
   ProjectMemberWithRuntime,
-  TeamPresetMemberSummary,
   TeamPresetSummary,
   UpdateTeamPresetRequest,
 } from "../../../shared/types";
@@ -101,6 +98,7 @@ type TeamPresetForm = {
   name: string;
   description: string;
   leadMemberId: string;
+  tier: ChatTeamTemplateTier;
   workflowSteps: WorkflowStepForm[];
   teamProtocol: string;
   enabled: boolean;
@@ -154,6 +152,7 @@ const blankForm = (): TeamPresetForm => ({
   name: "",
   description: "",
   leadMemberId: "lead",
+  tier: "standard",
   workflowSteps: [],
   teamProtocol: "",
   enabled: true,
@@ -165,6 +164,7 @@ const detailToForm = (detail: ChatTeamPreset): TeamPresetForm => ({
   name: detail.name,
   description: detail.description || "",
   leadMemberId: detail.lead_member_id ?? "",
+  tier: detail.tier,
   workflowSteps: detail.workflow_steps.map((step) => ({
     title: step.title,
     description: step.description,
@@ -212,6 +212,7 @@ const formToPayload = (
   name: form.name.trim(),
   description: form.description.trim() || null,
   lead_member_id: form.leadMemberId.trim() || null,
+  tier: form.tier,
   workflow_steps: normalizeWorkflowSteps(form.workflowSteps),
   team_protocol: form.teamProtocol.trim() || null,
   enabled: form.enabled,
@@ -337,6 +338,16 @@ export const teamTemplateSessionUpdatePayload = (
   ...patch,
 });
 
+export const teamPresetSessionProtocolPatch = (
+  detail: ChatTeamPreset,
+): Partial<UpdateChatSession> => {
+  const teamProtocol = detail.team_protocol.trim();
+  return {
+    team_protocol: teamProtocol,
+    team_protocol_enabled: teamProtocol.length > 0,
+  };
+};
+
 const isAgentProjectMember = (member: ProjectMemberWithRuntime): boolean =>
   member.member_type === ProjectMemberType.agent;
 
@@ -385,20 +396,20 @@ const resolveProjectActiveTemplate = (
   );
 };
 
-type ScenarioCategory = "开发" | "设计" | "科研" | "调研";
+export const groupTeamTemplatesByTier = (
+  templates: TeamPresetSummary[],
+): { standard: TeamPresetSummary[]; advanced: TeamPresetSummary[] } => ({
+  standard: templates.filter((template) => template.tier === "standard"),
+  advanced: templates.filter((template) => template.tier === "advanced"),
+});
 
-type WorkflowStepPreview = {
-  title: string;
-  description: string;
+export const createLatestRequestGate = () => {
+  let latestRequestId = 0;
+  return {
+    start: () => ++latestRequestId,
+    isLatest: (requestId: number) => requestId === latestRequestId,
+  };
 };
-
-type TeamTemplatePresentation = {
-  categories: ScenarioCategory[];
-  workflow: WorkflowStepPreview[];
-};
-
-const scenarioBadgeClassName =
-  "inline-flex items-center gap-1.5 font-mono text-[9px] font-semibold uppercase text-[var(--team-template-muted)]";
 
 const hairlineSurfaceClassName =
   "relative overflow-hidden border border-[var(--team-template-border)] bg-[linear-gradient(180deg,var(--team-template-surface-top),var(--team-template-surface))] shadow-[inset_0_1px_0_var(--team-template-top-highlight)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-[var(--team-template-top-glow)]";
@@ -418,97 +429,9 @@ const dangerGhostButtonClassName =
 const recommendedBadgeClassName =
   "inline-flex text-[var(--team-template-muted)] transition-colors duration-150 group-hover:text-[var(--team-template-accent)]";
 
-const categoryDotClassName: Record<ScenarioCategory, string> = {
-  开发: "bg-[#4DAAFB]",
-  设计: "bg-[#FF8A65]",
-  科研: "bg-[#5DE4A7]",
-  调研: "bg-[#C4A7FF]",
-};
-
-const defaultTemplatePresentation: TeamTemplatePresentation = {
-  categories: ["开发"],
-  workflow: [
-    {
-      title: "目标澄清",
-      description: "确认输入、约束和交付标准。",
-    },
-    {
-      title: "分工执行",
-      description: "成员按角色推进任务并同步状态。",
-    },
-    {
-      title: "复审交付",
-      description: "汇总结果、检查风险并形成交付物。",
-    },
-  ],
-};
-
-const templatePresentationById: Record<string, TeamTemplatePresentation> = {
-  "advanced-release-command": {
-    categories: ["开发"],
-    workflow: [
-      {
-        title: "版本范围",
-        description: "确认变更、风险和发布窗口。",
-      },
-      {
-        title: "质量校验",
-        description: "执行 QA、回归检查和阻塞项整理。",
-      },
-      {
-        title: "发布叙事",
-        description: "生成 release notes 与用户沟通材料。",
-      },
-      {
-        title: "上线复盘",
-        description: "跟踪信号、缺陷和后续行动。",
-      },
-    ],
-  },
-  "advanced-growth-ops": {
-    categories: ["调研"],
-    workflow: [
-      {
-        title: "假设收集",
-        description: "梳理实验目标、用户洞察和核心指标。",
-      },
-      {
-        title: "实验设计",
-        description: "确定变量、样本和成功判定方式。",
-      },
-      {
-        title: "数据解读",
-        description: "分析漏斗变化和显著性风险。",
-      },
-      {
-        title: "决策建议",
-        description: "沉淀结论并规划下一轮动作。",
-      },
-    ],
-  },
-};
-
-const getTemplatePresentation = (teamId: string): TeamTemplatePresentation =>
-  templatePresentationById[teamId] ?? defaultTemplatePresentation;
-
-const getCategoryIcon = (category?: ScenarioCategory): typeof Box => {
-  switch (category) {
-    case "开发":
-      return Terminal;
-    case "设计":
-      return PenTool;
-    case "科研":
-    case "调研":
-      return Telescope;
-    default:
-      return Box;
-  }
-};
-
 const getTemplateIcon = (
   teamId: string,
   teamName = "",
-  category?: ScenarioCategory,
 ): typeof Box => {
   const signature = `${teamId} ${teamName}`.toLowerCase();
 
@@ -522,141 +445,7 @@ const getTemplateIcon = (
   if (/(full.?stack|delivery|code|dev|engineer|frontend|backend)/.test(signature)) {
     return Code2;
   }
-
-  return getCategoryIcon(category);
-};
-
-const createMockMemberSummary = (
-  id: string,
-  name: string,
-  description: string,
-): TeamPresetMemberSummary => ({
-  id,
-  name,
-  description,
-  runner_type: null,
-  recommended_model: null,
-  is_builtin: true,
-  enabled: true,
-});
-
-const advancedReleaseMemberSummaries = [
-  createMockMemberSummary(
-    "release_lead",
-    "Release lead",
-    "Owns release scope, risk triage, and final go/no-go framing.",
-  ),
-  createMockMemberSummary(
-    "qa_reviewer",
-    "QA reviewer",
-    "Checks regression risk, verifies acceptance criteria, and records blockers.",
-  ),
-  createMockMemberSummary(
-    "growth_writer",
-    "Growth writer",
-    "Turns release details into clear user-facing updates and follow-up notes.",
-  ),
-];
-
-const advancedGrowthMemberSummaries = [
-  createMockMemberSummary(
-    "growth_lead",
-    "Growth lead",
-    "Defines experiment goals, prioritizes opportunities, and keeps the weekly decision loop tight.",
-  ),
-  createMockMemberSummary(
-    "analytics",
-    "Analytics",
-    "Reads funnel movement, checks data quality, and summarizes decision confidence.",
-  ),
-  createMockMemberSummary(
-    "copywriter",
-    "Copywriter",
-    "Drafts experiment variants, messaging angles, and post-test recommendations.",
-  ),
-];
-
-const advancedTeamTemplates: TeamPresetSummary[] = [
-  {
-    id: "advanced-release-command",
-    name: "Release command center",
-    description:
-      "Coordinate release notes, QA checks, rollout signals, and post-launch follow-up.",
-    lead_member_id: "release_lead",
-    team_protocol: "Mock professional release workflow placeholder.",
-    is_builtin: true,
-    enabled: true,
-    member_count: advancedReleaseMemberSummaries.length,
-    members: advancedReleaseMemberSummaries,
-  },
-  {
-    id: "advanced-growth-ops",
-    name: "Growth operations",
-    description:
-      "Plan experiments, analyze funnel deltas, and prepare weekly growth decisions.",
-    lead_member_id: "growth_lead",
-    team_protocol: "Mock professional growth workflow placeholder.",
-    is_builtin: true,
-    enabled: true,
-    member_count: advancedGrowthMemberSummaries.length,
-    members: advancedGrowthMemberSummaries,
-  },
-];
-
-const createMockMemberPreset = (
-  id: string,
-  name: string,
-  description: string,
-  selectedSkillIds: string[],
-): ChatMemberPreset => ({
-  id,
-  name,
-  description,
-  runner_type: null,
-  recommended_model: null,
-  system_prompt: description,
-  default_workspace_path: null,
-  selected_skill_ids: selectedSkillIds,
-  tools_enabled: null as JsonValue,
-  is_builtin: true,
-  enabled: true,
-});
-
-const mockTeamTemplateDetails: Record<string, ChatTeamPreset> = {
-  "advanced-release-command": {
-    id: "advanced-release-command",
-    name: "Release command center",
-    description:
-      "Coordinate release notes, QA checks, rollout signals, and post-launch follow-up.",
-    lead_member_id: "release_lead",
-    workflow_steps: [],
-    team_protocol:
-      "Release lead coordinates scope, QA signs off blockers, and growth writer prepares launch communication.",
-    is_builtin: true,
-    enabled: true,
-    members: [
-      createMockMemberPreset("release_lead", "Release lead", "Owns release scope, risk triage, and final go/no-go framing.", ["planning", "source-control"]),
-      createMockMemberPreset("qa_reviewer", "QA reviewer", "Checks regression risk, verifies acceptance criteria, and records blockers.", ["review", "testing"]),
-      createMockMemberPreset("growth_writer", "Growth writer", "Turns release details into clear user-facing updates and follow-up notes.", ["writing", "launch"]),
-    ],
-  },
-  "advanced-growth-ops": {
-    id: "advanced-growth-ops",
-    name: "Growth operations",
-    description:
-      "Plan experiments, analyze funnel deltas, and prepare weekly growth decisions.",
-    lead_member_id: "growth_lead",
-    workflow_steps: [],
-    team_protocol:
-      "Growth lead frames the hypothesis, analytics validates results, and copywriter prepares experiment messaging.",
-    is_builtin: true,
-    enabled: true,
-    members: [
-      createMockMemberPreset("growth_lead", "Growth lead", "Defines experiment goals, prioritizes opportunities, and keeps the weekly decision loop tight.", ["planning", "metrics"]),
-      createMockMemberPreset("analytics", "Analytics", "Reads funnel movement, checks data quality, and summarizes decision confidence.", ["analysis", "research"]),
-      createMockMemberPreset("copywriter", "Copywriter", "Drafts experiment variants, messaging angles, and post-test recommendations.", ["writing", "experiments"]),
-    ],
-  },
+  return Box;
 };
 
 function TeamTemplatesHeader({
@@ -984,27 +773,6 @@ function MarkdownEditableField({
   );
 }
 
-function ScenarioBadges({ categories }: { categories: ScenarioCategory[] }) {
-  const visibleCategories = categories.slice(0, 1);
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {visibleCategories.map((category) => (
-        <span
-          key={category}
-          className={scenarioBadgeClassName}
-          data-category={category}
-        >
-          <span
-            className={`h-1 w-1 rounded-full ${categoryDotClassName[category]}`}
-          />
-          {category}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function RecommendedBadge() {
   return (
     <span className={recommendedBadgeClassName} aria-label="热门" title="热门">
@@ -1159,7 +927,11 @@ const formToPreviewDetail = (form: TeamPresetForm): ChatTeamPreset => ({
   team_protocol: form.teamProtocol,
   is_builtin: false,
   enabled: form.enabled,
+  tier: form.tier,
 });
+
+export const teamPresetDetailToDraft = detailToForm;
+export const teamPresetDraftToPreviewDetail = formToPreviewDetail;
 
 const formDirtySnapshot = (form: TeamPresetForm): string =>
   JSON.stringify({
@@ -1776,7 +1548,7 @@ function WorkflowPreview({
   disabled?: boolean;
   editable?: boolean;
   onStepsChange?: (steps: WorkflowStepForm[]) => void;
-  steps: WorkflowStepPreview[];
+  steps: WorkflowStepForm[];
 }) {
   const stepCountLabel = String(steps.length).padStart(2, "0");
   const [litDotCount, setLitDotCount] = useState(0);
@@ -2104,20 +1876,8 @@ function TemplateDetailView({
 
   if (!viewDetail) return null;
 
-  const presentation = getTemplatePresentation(viewDetail.id);
-  const DetailCategoryIcon = getTemplateIcon(
-    viewDetail.id,
-    viewDetail.name,
-    presentation.categories[0],
-  );
-  const workflowSteps =
-    isEditing && form
-      ? form.workflowSteps
-      : viewDetail.workflow_steps.length > 0
-        ? viewDetail.workflow_steps
-        : viewDetail.is_builtin
-          ? presentation.workflow
-          : [];
+  const DetailCategoryIcon = getTemplateIcon(viewDetail.id, viewDetail.name);
+  const workflowSteps = isEditing && form ? form.workflowSteps : viewDetail.workflow_steps;
   const selectedFormMemberIndex =
     form?.members.findIndex((member) => member.id === selectedMemberId) ?? -1;
   const selectedFormMember =
@@ -2265,9 +2025,6 @@ function TemplateDetailView({
                       {viewDetail.name}
                     </h1>
                     {viewDetail.is_builtin && <RecommendedBadge />}
-                  </div>
-                  <div className="mt-2">
-                    <ScenarioBadges categories={presentation.categories} />
                   </div>
                   <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-[var(--team-template-muted)]">
                     {viewDetail.description || "No description provided for this template."}
@@ -2753,12 +2510,7 @@ function TemplateCard({
   template: TeamPresetSummary;
   onClick: () => void;
 }) {
-  const presentation = getTemplatePresentation(template.id);
-  const CategoryIcon = getTemplateIcon(
-    template.id,
-    template.name,
-    presentation.categories[0],
-  );
+  const CategoryIcon = getTemplateIcon(template.id, template.name);
   
   return (
     <div
@@ -2792,7 +2544,6 @@ function TemplateCard({
 
       <div className="mt-auto flex items-center justify-between gap-3 pt-0.5">
         <div className="flex min-w-0 items-center gap-2">
-          <ScenarioBadges categories={presentation.categories} />
           <AgentAvatarGroup template={template} />
           <span className="min-w-0 font-mono text-[11px] font-medium text-[var(--team-template-aux)] tabular-nums">
             {template.member_count} 成员
@@ -2815,6 +2566,7 @@ export function TeamTemplatesPage() {
     refreshSessions,
     showToast,
     skills,
+    locale,
   } = useWorkspace();
   const [templates, setTemplates] = useState<TeamPresetSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -2844,37 +2596,49 @@ export function TeamTemplatesPage() {
   const [projectTemplateMembersLoaded, setProjectTemplateMembersLoaded] =
     useState(false);
   const [runtimes, setRuntimes] = useState<AgentRuntimeStatus[]>([]);
+  const templateRequestGate = useRef(createLatestRequestGate());
+  const detailRequestGate = useRef(createLatestRequestGate());
 
   const loadTemplates = useCallback(async () => {
+    const requestId = templateRequestGate.current.start();
     setLoading(true);
     setLoadError(null);
     try {
-      const response = await teamPresetsApi.list();
-      setTemplates(response.teams);
+      const response = await teamPresetsApi.list(locale);
+      if (templateRequestGate.current.isLatest(requestId)) {
+        setTemplates(response.teams);
+      }
     } catch (error) {
-      setLoadError(errorText(error, "Failed to load templates."));
+      if (templateRequestGate.current.isLatest(requestId)) {
+        setLoadError(errorText(error, "Failed to load templates."));
+      }
     } finally {
-      setLoading(false);
+      if (templateRequestGate.current.isLatest(requestId)) {
+        setLoading(false);
+      }
     }
-  }, []);
+  }, [locale]);
 
   const loadDetail = useCallback(async (teamId: string) => {
+    const requestId = detailRequestGate.current.start();
     setDetailLoading(true);
     setDetailError(null);
+    setSelectedDetail(null);
     try {
-      const mockDetail = mockTeamTemplateDetails[teamId];
-      if (mockDetail) {
-        setSelectedDetail(mockDetail);
-        return;
+      const detail = await teamPresetsApi.get(teamId, locale);
+      if (detailRequestGate.current.isLatest(requestId)) {
+        setSelectedDetail(detail);
       }
-      const detail = await teamPresetsApi.get(teamId);
-      setSelectedDetail(detail);
     } catch (error) {
-      setDetailError(errorText(error, "Failed to load template details."));
+      if (detailRequestGate.current.isLatest(requestId)) {
+        setDetailError(errorText(error, "Failed to load template details."));
+      }
     } finally {
-      setDetailLoading(false);
+      if (detailRequestGate.current.isLatest(requestId)) {
+        setDetailLoading(false);
+      }
     }
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     void loadTemplates();
@@ -2897,12 +2661,13 @@ export function TeamTemplatesPage() {
   }, []);
 
   useEffect(() => {
+    setApplyTargetDetail(null);
     if (!selectedId) {
       setSelectedDetail(null);
       return;
     }
     void loadDetail(selectedId);
-  }, [loadDetail, selectedId]);
+  }, [loadDetail, locale, selectedId]);
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -2933,7 +2698,6 @@ export function TeamTemplatesPage() {
     };
   }, [selectedProjectId]);
 
-  const myTeamTemplates = useMemo(() => templates, [templates]);
   const selectedDetailForView =
     selectedDetail?.id === selectedId ? selectedDetail : null;
   const detailViewLoading = Boolean(
@@ -3227,8 +2991,8 @@ export function TeamTemplatesPage() {
   };
 
   const applyTemplateToProject = async () => {
-    const detail = applyTargetDetail;
-    if (!detail || applyingTemplate) return;
+    const target = applyTargetDetail;
+    if (!target || applyingTemplate) return;
 
     if (!selectedProjectId) {
       showToast("请先选择项目后再使用模板。", "warning");
@@ -3242,6 +3006,7 @@ export function TeamTemplatesPage() {
 
     setApplyingTemplate(true);
     try {
+      const detail = await teamPresetsApi.get(target.id, locale);
       const [runtimeResponse, existingMembers, projectAgents] =
         await Promise.all([
           agentRuntimeApi.list(),
@@ -3301,11 +3066,7 @@ export function TeamTemplatesPage() {
         createdMembers.find((member) => member.role === "lead")?.agent_id ??
         createdMembers[0]?.agent_id ??
         null;
-      const teamProtocol = detail.team_protocol.trim();
-      const sessionPatch: Partial<UpdateChatSession> = {
-        team_protocol: teamProtocol,
-        team_protocol_enabled: teamProtocol.length > 0,
-      };
+      const sessionPatch = teamPresetSessionProtocolPatch(detail);
       if (leadAgentId) {
         sessionPatch.lead_agent_id = leadAgentId;
       }
@@ -3331,21 +3092,16 @@ export function TeamTemplatesPage() {
     }
   };
 
-  const templateCandidates = useMemo(
-    () => [...templates, ...advancedTeamTemplates],
-    [templates],
-  );
+  const { standard: standardTemplates, advanced: advancedTemplates } =
+    useMemo(() => groupTeamTemplatesByTier(templates), [templates]);
+  const templateCandidates = templates;
   const currentActiveTemplate = useMemo(
     () => resolveProjectActiveTemplate(projectTemplateMembers, templateCandidates),
     [projectTemplateMembers, templateCandidates],
   );
-  const currentActivePresentation = currentActiveTemplate
-    ? getTemplatePresentation(currentActiveTemplate.id)
-    : null;
   const CurrentActiveIcon = getTemplateIcon(
     currentActiveTemplate?.id ?? "",
     currentActiveTemplate?.name ?? "",
-    currentActivePresentation?.categories[0],
   );
 
   return (
@@ -3493,9 +3249,9 @@ export function TeamTemplatesPage() {
 
             <section className="mb-12">
               <h2 className="mb-5 text-xs font-medium text-[var(--team-template-muted)]">
-                我的团队模板 (<span className="font-mono text-[13px] tabular-nums text-[var(--team-template-title)]">{myTeamTemplates.length}</span>)
+                标准模板 (<span className="font-mono text-[13px] tabular-nums text-[var(--team-template-title)]">{standardTemplates.length}</span>)
               </h2>
-              {myTeamTemplates.length === 0 ? (
+              {standardTemplates.length === 0 ? (
                 <button
                   type="button"
                   onClick={startCreate}
@@ -3513,7 +3269,7 @@ export function TeamTemplatesPage() {
                 </button>
               ) : (
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {myTeamTemplates.map((template) => (
+                  {standardTemplates.map((template) => (
                     <TemplateCard
                       key={template.id}
                       template={template}
@@ -3526,19 +3282,25 @@ export function TeamTemplatesPage() {
 
             <section>
               <h2 className="mb-5 text-xs font-medium text-[var(--team-template-muted)]">
-                更多推荐模板
+                高级模板 (<span className="font-mono text-[13px] tabular-nums text-[var(--team-template-title)]">{advancedTemplates.length}</span>)
               </h2>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                {advancedTeamTemplates.map((template) => (
-                  <TemplateCard
-                    key={template.id}
-                    template={template}
-                    onClick={() => {
-                      openTemplateDetail(template.id);
-                    }}
-                  />
-                ))}
-              </div>
+              {advancedTemplates.length === 0 ? (
+                <p className="text-[12px] text-[var(--team-template-muted)]">
+                  No advanced templates available.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                  {advancedTemplates.map((template) => (
+                    <TemplateCard
+                      key={template.id}
+                      template={template}
+                      onClick={() => {
+                        openTemplateDetail(template.id);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
           </div>
         )}

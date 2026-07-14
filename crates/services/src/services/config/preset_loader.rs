@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use anyhow::{Context, Result, anyhow, bail};
 use rust_embed::RustEmbed;
@@ -6,7 +6,7 @@ use serde::Deserialize;
 use utils::{path::home_directory, text::sanitize_member_handle};
 
 use crate::services::config::versions::v9::{
-    ChatMemberPreset, ChatPresetsConfig, ChatTeamPreset, ChatWorkflowStep,
+    ChatMemberPreset, ChatPresetsConfig, ChatTeamPreset, ChatTeamTemplateTier, ChatWorkflowStep,
 };
 
 const TEAM_COLLABORATION_PROTOCOL_FILE: &str = "team_collaboration_protocol.md";
@@ -709,6 +709,7 @@ struct TeamPresetFrontmatter {
     id: String,
     name: String,
     description: String,
+    #[serde(default)]
     member_ids: Vec<String>,
     #[serde(default)]
     lead_member_id: Option<String>,
@@ -716,6 +717,8 @@ struct TeamPresetFrontmatter {
     workflow_steps: Vec<ChatWorkflowStep>,
     #[serde(default = "default_true")]
     enabled: bool,
+    #[serde(default = "default_team_tier")]
+    tier: String,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -728,12 +731,29 @@ struct TeamPresetMd {
     workflow_steps: Vec<ChatWorkflowStep>,
     team_protocol: String,
     enabled: bool,
+    tier: ChatTeamTemplateTier,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct BuiltinTeamTemplateCatalogEntry {
+    pub template_id: String,
+    pub tier: String,
+    pub enabled: bool,
+    pub sort_order: i64,
+    pub source_content: String,
 }
 
 pub struct PresetLoader;
 
+const TEAM_TEMPLATE_LOCALES: &[&str] = &["en", "zh", "ja", "ko", "fr", "es"];
+
 impl PresetLoader {
     pub fn load_builtin_presets() -> ChatPresetsConfig {
+        Self::load_builtin_presets_for_locale(None)
+    }
+
+    pub fn load_builtin_presets_for_locale(locale: Option<&str>) -> ChatPresetsConfig {
+        let locale = normalize_team_template_locale(locale);
         let default_workspace_path = home_directory().to_string_lossy().to_string();
         let members = ROLE_PRESET_MARKDOWN
             .iter()
@@ -744,10 +764,16 @@ impl PresetLoader {
             .iter()
             .map(|member| (member.id.as_str(), member))
             .collect();
-        let teams = Self::embedded_team_preset_markdown_files()
+        let files = Self::embedded_team_preset_markdown_files()
             .expect("built-in team preset markdown files should be embedded")
             .into_iter()
-            .map(|(path, raw)| Self::parse_team_preset_markdown(&path, &raw))
+            .collect::<BTreeMap<_, _>>();
+        let teams = files
+            .iter()
+            .filter(|(path, _)| path.starts_with("en/"))
+            .map(|(english_path, english_raw)| {
+                Self::localized_team_preset_markdown(&files, english_path, english_raw, locale)
+            })
             .map(|team_result| {
                 team_result.and_then(|team_md| {
                     let team_members = team_md
@@ -788,6 +814,7 @@ impl PresetLoader {
                         team_protocol: team_md.team_protocol,
                         is_builtin: true,
                         enabled: team_md.enabled,
+                        tier: team_md.tier,
                     })
                 })
             })
@@ -835,11 +862,101 @@ impl PresetLoader {
         Ok(markdown_files)
     }
 
+    pub(crate) fn load_builtin_team_template_catalog_entries()
+    -> Result<Vec<BuiltinTeamTemplateCatalogEntry>> {
+        let files = Self::embedded_team_preset_markdown_files()?;
+        Self::load_builtin_team_template_catalog_entries_from_files(files)
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn load_builtin_team_template_catalog_entries_from_files(
+        files: Vec<(String, String)>,
+    ) -> Result<Vec<BuiltinTeamTemplateCatalogEntry>> {
+        let files_by_path = files.iter().cloned().collect::<BTreeMap<_, _>>();
+        let mut entries = files
+            .iter()
+            .filter(|(path, _)| path.starts_with("en/"))
+            .enumerate()
+            .map(|(index, (path, raw))| {
+                let parsed = Self::parse_team_preset_markdown(path, raw)?;
+                let file_name = path.strip_prefix("en/").ok_or_else(|| {
+                    anyhow!("English team template path must start with en/: {path}")
+                })?;
+                let source_content = TEAM_TEMPLATE_LOCALES
+                    .iter()
+                    .filter_map(|locale| {
+                        let localized_path = format!("{locale}/{file_name}");
+                        files_by_path
+                            .get(&localized_path)
+                            .map(|raw| (localized_path, raw))
+                    })
+                    .into_iter()
+                    .map(|(path, raw)| format!("{path}\n{}\n", normalize_newlines(&raw)))
+                    .collect::<String>();
+                Ok(BuiltinTeamTemplateCatalogEntry {
+                    template_id: parsed.id,
+                    tier: team_template_tier_wire_value(parsed.tier).to_string(),
+                    enabled: parsed.enabled,
+                    sort_order: index as i64,
+                    source_content,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        entries.sort_by(|left, right| left.sort_order.cmp(&right.sort_order));
+        Ok(entries)
+    }
+
     fn embedded_markdown_file(path: &str) -> Result<String> {
         let asset = EmbeddedTeamProtocolFiles::get(path)
             .ok_or_else(|| anyhow!("missing embedded team protocol markdown: {path}"))?;
         String::from_utf8(asset.data.into_owned())
             .with_context(|| format!("embedded team protocol markdown is not UTF-8: {path}"))
+    }
+
+    fn localized_team_preset_markdown(
+        files: &BTreeMap<String, String>,
+        english_path: &str,
+        english_raw: &str,
+        locale: &str,
+    ) -> Result<TeamPresetMd> {
+        let english = Self::parse_team_preset_markdown(english_path, english_raw)
+            .with_context(|| format!("failed to parse English team template {english_path}"))?;
+        if locale == "en" {
+            return Ok(english);
+        }
+
+        let file_name = english_path.strip_prefix("en/").ok_or_else(|| {
+            anyhow!("English team template path must start with en/: {english_path}")
+        })?;
+        let localized_path = format!("{locale}/{file_name}");
+        let Some(localized_raw) = files.get(&localized_path) else {
+            warn_team_template_locale_fallback(&english.id, locale, "localized file is missing");
+            return Ok(english);
+        };
+
+        match Self::parse_team_preset_markdown(&localized_path, localized_raw).and_then(
+            |localized| {
+                validate_localized_team_template(&english, localized_path.as_str(), localized)
+            },
+        ) {
+            Ok(localized) => Ok(localized),
+            Err(error) => {
+                #[cfg(test)]
+                record_team_template_locale_fallback_warning(
+                    &english.id,
+                    locale,
+                    &error.to_string(),
+                );
+                tracing::warn!(
+                    template_id = %english.id,
+                    locale,
+                    error = ?error,
+                    "falling back to English team template localization"
+                );
+                Ok(english)
+            }
+        }
     }
 
     fn parse_chat_member_preset(
@@ -915,7 +1032,7 @@ impl PresetLoader {
         }
 
         let member_ids = normalize_member_ids(frontmatter.member_ids);
-        if member_ids.is_empty() {
+        if member_ids.is_empty() && (path.starts_with("en/") || !path.contains('/')) {
             bail!("team preset contains no member_ids in {path}");
         }
 
@@ -931,12 +1048,119 @@ impl PresetLoader {
             workflow_steps: frontmatter.workflow_steps,
             team_protocol: body.trim().to_string(),
             enabled: frontmatter.enabled,
+            tier: normalize_team_template_tier(&frontmatter.tier, path)?,
         })
+    }
+}
+
+fn team_template_tier_wire_value(tier: ChatTeamTemplateTier) -> &'static str {
+    match tier {
+        ChatTeamTemplateTier::Standard => "standard",
+        ChatTeamTemplateTier::Advanced => "advanced",
     }
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_team_tier() -> String {
+    "standard".to_string()
+}
+
+fn normalize_team_template_tier(tier: &str, path: &str) -> Result<ChatTeamTemplateTier> {
+    match tier.trim() {
+        "standard" => Ok(ChatTeamTemplateTier::Standard),
+        "advanced" => Ok(ChatTeamTemplateTier::Advanced),
+        value => bail!("unsupported team template tier \"{value}\" in {path}"),
+    }
+}
+
+pub fn normalize_team_template_locale(locale: Option<&str>) -> &'static str {
+    let Some(locale) = locale else {
+        return "en";
+    };
+    let normalized = locale.trim().to_ascii_lowercase().replace('_', "-");
+    let language = normalized.split('-').next().unwrap_or_default();
+    match language {
+        "en" => "en",
+        "zh" | "cn" => "zh",
+        "ja" | "jp" => "ja",
+        "ko" | "kr" => "ko",
+        "fr" => "fr",
+        "es" => "es",
+        _ => "en",
+    }
+}
+
+fn validate_localized_team_template(
+    english: &TeamPresetMd,
+    path: &str,
+    mut localized: TeamPresetMd,
+) -> Result<TeamPresetMd> {
+    if localized.id != english.id {
+        bail!(
+            "localized team template id mismatch in {path}: expected {}, got {}",
+            english.id,
+            localized.id
+        );
+    }
+    if localized.name.trim().is_empty()
+        || localized.description.trim().is_empty()
+        || localized.team_protocol.trim().is_empty()
+    {
+        bail!("localized team template contains empty localized fields in {path}");
+    }
+    if localized.workflow_steps.len() != english.workflow_steps.len() {
+        bail!(
+            "localized team template workflow step count mismatch in {path}: expected {}, got {}",
+            english.workflow_steps.len(),
+            localized.workflow_steps.len()
+        );
+    }
+    for (index, step) in localized.workflow_steps.iter().enumerate() {
+        if step.title.trim().is_empty() || step.description.trim().is_empty() {
+            bail!("localized team template workflow step {index} contains empty fields in {path}");
+        }
+    }
+    localized.member_ids = english.member_ids.clone();
+    localized.lead_member_id = english.lead_member_id.clone();
+    localized.enabled = english.enabled;
+    localized.tier = english.tier;
+    Ok(localized)
+}
+
+fn warn_team_template_locale_fallback(template_id: &str, locale: &str, reason: &str) {
+    #[cfg(test)]
+    record_team_template_locale_fallback_warning(template_id, locale, reason);
+    tracing::warn!(
+        template_id,
+        locale,
+        reason,
+        "falling back to English team template localization"
+    );
+}
+
+#[cfg(test)]
+fn record_team_template_locale_fallback_warning(template_id: &str, locale: &str, reason: &str) {
+    TEAM_TEMPLATE_LOCALE_FALLBACK_WARNINGS.with(|warnings| {
+        warnings.borrow_mut().push((
+            template_id.to_string(),
+            locale.to_string(),
+            reason.to_string(),
+        ));
+    });
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEAM_TEMPLATE_LOCALE_FALLBACK_WARNINGS: std::cell::RefCell<Vec<(String, String, String)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+fn team_template_locale_fallback_warnings() -> Vec<(String, String, String)> {
+    TEAM_TEMPLATE_LOCALE_FALLBACK_WARNINGS.with(|warnings| warnings.borrow().clone())
 }
 
 fn normalize_selected_skill_ids(skill_ids: Vec<String>) -> Vec<String> {
@@ -978,7 +1202,7 @@ fn split_frontmatter(content: &str) -> Option<(&str, &str)> {
 mod tests {
     use utils::path::home_directory;
 
-    use super::{PresetLoader, TEAM_COLLABORATION_PROTOCOL_FILE};
+    use super::{PresetLoader, TEAM_COLLABORATION_PROTOCOL_FILE, normalize_team_template_locale};
 
     #[test]
     fn load_builtin_presets_reads_all_builtin_preset_markdown_files() {
@@ -987,7 +1211,11 @@ mod tests {
         assert_eq!(presets.members.len(), 166); // 22 original + 144 new
         let embedded_team_files = PresetLoader::embedded_team_preset_markdown_files()
             .expect("embedded team markdown files should load");
-        assert_eq!(presets.teams.len(), embedded_team_files.len());
+        let english_team_file_count = embedded_team_files
+            .iter()
+            .filter(|(path, _)| path.starts_with("en/"))
+            .count();
+        assert_eq!(presets.teams.len(), english_team_file_count);
 
         let fullstack = presets
             .members
@@ -1212,9 +1440,229 @@ Follow the team protocol.
             .map(|(path, _)| path.as_str())
             .collect::<Vec<_>>();
 
-        assert!(file_names.contains(&"fullstack_delivery_team.md"));
-        assert!(file_names.contains(&"rapid_bugfix_team.md"));
+        assert!(file_names.contains(&"en/fullstack_delivery_team.md"));
+        assert!(file_names.contains(&"zh/rapid_bugfix_team.md"));
         assert!(!file_names.contains(&TEAM_COLLABORATION_PROTOCOL_FILE));
+    }
+
+    #[test]
+    fn load_builtin_presets_parses_ten_english_team_templates_with_tiers() {
+        let presets = PresetLoader::load_builtin_presets_for_locale(Some("en-US"));
+
+        assert_eq!(presets.teams.len(), 10);
+        let advanced = presets
+            .teams
+            .iter()
+            .filter(|team| team.tier == crate::services::config::ChatTeamTemplateTier::Advanced)
+            .map(|team| team.id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            advanced,
+            vec!["advanced-growth-ops", "advanced-release-command"]
+        );
+        assert!(presets.teams.iter().all(|team| {
+            !team.name.trim().is_empty()
+                && !team.description.trim().is_empty()
+                && !team.members.is_empty()
+                && !team.workflow_steps.is_empty()
+                && !team.team_protocol.trim().is_empty()
+        }));
+    }
+
+    #[test]
+    fn load_builtin_presets_applies_all_supported_locales_without_changing_structure() {
+        let english = PresetLoader::load_builtin_presets_for_locale(Some("en"));
+        let english_fullstack = english
+            .teams
+            .iter()
+            .find(|team| team.id == "fullstack_delivery_team")
+            .expect("English fullstack template exists");
+        let english_member_ids = english_fullstack
+            .members
+            .iter()
+            .map(|member| member.id.as_str())
+            .collect::<Vec<_>>();
+
+        for locale in ["zh-CN", "ja-JP", "ko-KR", "fr-FR", "es-ES"] {
+            let localized = PresetLoader::load_builtin_presets_for_locale(Some(locale));
+            let fullstack = localized
+                .teams
+                .iter()
+                .find(|team| team.id == "fullstack_delivery_team")
+                .expect("localized fullstack template exists");
+            let member_ids = fullstack
+                .members
+                .iter()
+                .map(|member| member.id.as_str())
+                .collect::<Vec<_>>();
+
+            assert_eq!(localized.teams.len(), english.teams.len(), "{locale}");
+            assert_ne!(fullstack.name, english_fullstack.name, "{locale}");
+            assert_eq!(member_ids, english_member_ids, "{locale}");
+            assert_eq!(fullstack.lead_member_id, english_fullstack.lead_member_id);
+            assert_eq!(fullstack.tier, english_fullstack.tier);
+        }
+    }
+
+    #[test]
+    fn normalize_team_template_locale_maps_regions_and_unsupported_values() {
+        assert_eq!(normalize_team_template_locale(None), "en");
+        assert_eq!(normalize_team_template_locale(Some("zh-Hans")), "zh");
+        assert_eq!(normalize_team_template_locale(Some("ja_JP")), "ja");
+        assert_eq!(normalize_team_template_locale(Some("ko-KR")), "ko");
+        assert_eq!(normalize_team_template_locale(Some("fr-CA")), "fr");
+        assert_eq!(normalize_team_template_locale(Some("es-MX")), "es");
+        assert_eq!(normalize_team_template_locale(Some("de-DE")), "en");
+    }
+
+    #[test]
+    fn localized_team_template_falls_back_as_a_whole_when_file_is_missing() {
+        let (files, english_raw) = english_only_fullstack_files();
+
+        clear_fallback_warnings();
+        let localized = PresetLoader::localized_team_preset_markdown(
+            &files,
+            "en/fullstack_delivery_team.md",
+            &english_raw,
+            "zh",
+        )
+        .expect("fallback should succeed");
+        let english =
+            PresetLoader::parse_team_preset_markdown("en/fullstack_delivery_team.md", &english_raw)
+                .expect("English should parse");
+
+        assert_eq!(localized, english);
+        assert_fallback_warning("fullstack_delivery_team", "zh", "missing");
+    }
+
+    #[test]
+    fn localized_team_template_falls_back_as_a_whole_when_file_does_not_parse() {
+        let (mut files, english_raw) = english_only_fullstack_files();
+        files.insert(
+            "zh/fullstack_delivery_team.md".to_string(),
+            "not frontmatter".to_string(),
+        );
+
+        clear_fallback_warnings();
+        let localized = PresetLoader::localized_team_preset_markdown(
+            &files,
+            "en/fullstack_delivery_team.md",
+            &english_raw,
+            "zh",
+        )
+        .expect("fallback should succeed");
+        let english =
+            PresetLoader::parse_team_preset_markdown("en/fullstack_delivery_team.md", &english_raw)
+                .expect("English should parse");
+
+        assert_eq!(localized, english);
+        assert_fallback_warning("fullstack_delivery_team", "zh", "frontmatter");
+    }
+
+    #[test]
+    fn localized_team_template_falls_back_as_a_whole_when_id_mismatches() {
+        let (mut files, english_raw) = english_only_fullstack_files();
+        let damaged = english_raw.replace(
+            "id: fullstack_delivery_team",
+            "id: mismatched_fullstack_delivery_team",
+        );
+        files.insert("zh/fullstack_delivery_team.md".to_string(), damaged);
+
+        clear_fallback_warnings();
+        let localized = PresetLoader::localized_team_preset_markdown(
+            &files,
+            "en/fullstack_delivery_team.md",
+            &english_raw,
+            "zh",
+        )
+        .expect("fallback should succeed");
+        let english =
+            PresetLoader::parse_team_preset_markdown("en/fullstack_delivery_team.md", &english_raw)
+                .expect("English should parse");
+
+        assert_eq!(localized, english);
+        assert_fallback_warning("fullstack_delivery_team", "zh", "id mismatch");
+    }
+
+    #[test]
+    fn localized_team_template_falls_back_as_a_whole_when_structure_is_damaged() {
+        let (mut files, english_raw) = english_only_fullstack_files();
+        let damaged = english_raw.replace("- title: Requirements and planning", "- title: \"\"");
+        files.insert("zh/fullstack_delivery_team.md".to_string(), damaged);
+
+        clear_fallback_warnings();
+        let localized = PresetLoader::localized_team_preset_markdown(
+            &files,
+            "en/fullstack_delivery_team.md",
+            &english_raw,
+            "zh",
+        )
+        .expect("fallback should succeed");
+        let english =
+            PresetLoader::parse_team_preset_markdown("en/fullstack_delivery_team.md", &english_raw)
+                .expect("English should parse");
+
+        assert_eq!(localized, english);
+        assert_fallback_warning("fullstack_delivery_team", "zh", "empty fields");
+    }
+
+    #[test]
+    fn catalog_entries_do_not_parse_or_fail_on_damaged_localized_files() {
+        let (_files, english_raw) = english_only_fullstack_files();
+        let files = vec![
+            (
+                "en/fullstack_delivery_team.md".to_string(),
+                english_raw.clone(),
+            ),
+            (
+                "zh/fullstack_delivery_team.md".to_string(),
+                "not frontmatter".to_string(),
+            ),
+        ];
+
+        let entries = PresetLoader::load_builtin_team_template_catalog_entries_from_files(files)
+            .expect("damaged localized files should not abort catalog source indexing");
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].template_id, "fullstack_delivery_team");
+        assert!(entries[0].source_content.contains(&english_raw));
+        assert!(
+            entries[0]
+                .source_content
+                .contains("zh/fullstack_delivery_team.md\nnot frontmatter")
+        );
+    }
+
+    fn english_only_fullstack_files() -> (std::collections::BTreeMap<String, String>, String) {
+        let files = PresetLoader::embedded_team_preset_markdown_files()
+            .expect("embedded team markdown files should load")
+            .into_iter()
+            .filter(|(path, _)| path.starts_with("en/"))
+            .collect::<std::collections::BTreeMap<_, _>>();
+        let english_raw = files
+            .get("en/fullstack_delivery_team.md")
+            .expect("English fullstack file exists")
+            .clone();
+        (files, english_raw)
+    }
+
+    fn clear_fallback_warnings() {
+        super::TEAM_TEMPLATE_LOCALE_FALLBACK_WARNINGS
+            .with(|warnings| warnings.borrow_mut().clear());
+    }
+
+    fn assert_fallback_warning(template_id: &str, locale: &str, reason_contains: &str) {
+        let warnings = super::team_template_locale_fallback_warnings();
+        assert!(
+            warnings
+                .iter()
+                .any(|(logged_template_id, logged_locale, reason)| {
+                    logged_template_id == template_id
+                        && logged_locale == locale
+                        && reason.contains(reason_contains)
+                }),
+            "expected warning for {template_id}/{locale} containing {reason_contains:?}, got {warnings:?}"
+        );
     }
 
     #[test]

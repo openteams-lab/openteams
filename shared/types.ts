@@ -991,7 +991,13 @@ is_builtin: boolean,
 /**
  * Whether this preset is enabled (visible for import)
  */
-enabled: boolean, };
+enabled: boolean,
+/**
+ * Standard templates are shown before advanced templates in the catalog.
+ */
+tier: ChatTeamTemplateTier, };
+
+export type ChatTeamTemplateTier = "standard" | "advanced";
 
 export type ChatWorkflowStep = { title: string, description: string, };
 
@@ -1193,17 +1199,23 @@ export type CustomProviderProbeResponse = { status: CustomProviderProbeStatus, v
 
 export type TeamProtocolConfig = { content: string, enabled: boolean, };
 
+export type ApplyTeamPresetRequest = { session_id: string, locale: string | null, };
+
+export type ApplyTeamPresetResponse = { team: ChatTeamPreset, team_protocol: TeamProtocolConfig, };
+
 export type TeamPresetMemberSummary = { id: string, name: string, description: string, runner_type: string | null, recommended_model: string | null, is_builtin: boolean, enabled: boolean, };
 
-export type TeamPresetSummary = { id: string, name: string, description: string, lead_member_id: string | null, team_protocol: string, is_builtin: boolean, enabled: boolean, member_count: number, members: Array<TeamPresetMemberSummary>, };
+export type TeamPresetSummary = { id: string, name: string, description: string, lead_member_id: string | null, team_protocol: string, is_builtin: boolean, enabled: boolean, tier: ChatTeamTemplateTier, member_count: number, members: Array<TeamPresetMemberSummary>, };
 
 export type TeamPresetListResponse = { teams: Array<TeamPresetSummary>, };
 
+export type TeamPresetLocaleQuery = { locale: string | null, };
+
 export type TeamPresetMemberWrite = { id: string, name: string, description: string | null, runner_type: string | null, recommended_model: string | null, system_prompt: string | null, default_workspace_path: string | null, selected_skill_ids: Array<string>, tools_enabled: JsonValue | null, enabled: boolean | null, };
 
-export type CreateTeamPresetRequest = { id: string, name: string, description: string | null, lead_member_id: string | null, workflow_steps: Array<ChatWorkflowStep>, team_protocol: string | null, enabled: boolean | null, members: Array<TeamPresetMemberWrite>, };
+export type CreateTeamPresetRequest = { id: string, name: string, description: string | null, lead_member_id: string | null, tier: ChatTeamTemplateTier | null, workflow_steps: Array<ChatWorkflowStep>, team_protocol: string | null, enabled: boolean | null, members: Array<TeamPresetMemberWrite>, };
 
-export type UpdateTeamPresetRequest = { id: string, name: string, description: string | null, lead_member_id: string | null, workflow_steps: Array<ChatWorkflowStep>, team_protocol: string | null, enabled: boolean | null, members: Array<TeamPresetMemberWrite>, };
+export type UpdateTeamPresetRequest = { id: string, name: string, description: string | null, lead_member_id: string | null, tier: ChatTeamTemplateTier | null, workflow_steps: Array<ChatWorkflowStep>, team_protocol: string | null, enabled: boolean | null, members: Array<TeamPresetMemberWrite>, };
 
 export type CreatePresetSnapshotRequest = { team_preset_id: string | null, name: string | null, description: string | null, overwrite_strategy: PresetSnapshotOverwriteStrategy | null, };
 

@@ -48,6 +48,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, options?: RequestInit) => {
       team_protocol: 'Review before merge',
       is_builtin: false,
       enabled: true,
+      tier: 'standard',
     });
   }
   return jsonResponse({});
@@ -61,6 +62,7 @@ const writePayload = {
   workflow_steps: [{ title: 'Plan', description: 'Set direction' }],
   team_protocol: 'Review before merge',
   enabled: true,
+  tier: null,
   members: [
     {
       id: 'lead',
@@ -79,14 +81,22 @@ const writePayload = {
 
 console.log('teamPresetsApi');
 
-await teamPresetsApi.list();
-await teamPresetsApi.get('team-one');
+await teamPresetsApi.list('zh-CN');
+await teamPresetsApi.get('team-one', 'fr');
 await teamPresetsApi.create(writePayload);
 await teamPresetsApi.update('team-one', writePayload);
 await teamPresetsApi.delete('team-one');
 
-check('list uses team-presets collection endpoint', captured[0]?.url === '/api/team-presets', captured[0]);
-check('get encodes the team id', captured[1]?.url === '/api/team-presets/team-one', captured[1]);
+check(
+  'list sends an encoded locale query parameter',
+  captured[0]?.url === '/api/team-presets?locale=zh-CN',
+  captured[0],
+);
+check(
+  'get encodes the team id and locale query parameter',
+  captured[1]?.url === '/api/team-presets/team-one?locale=fr',
+  captured[1],
+);
 check('create posts JSON to the collection', captured[2]?.options.method === 'POST', captured[2]);
 check('update puts JSON to the detail endpoint', captured[3]?.options.method === 'PUT', captured[3]);
 check('delete calls the detail endpoint', captured[4]?.options.method === 'DELETE', captured[4]);

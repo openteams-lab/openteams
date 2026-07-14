@@ -5,15 +5,31 @@
 // Exits non-zero if any assertion fails.
 
 import { readFileSync } from 'node:fs';
+import { JSDOM } from 'jsdom';
+import { act, createElement, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import {
+  WorkspaceContext,
+  type WorkspaceContextProps,
+} from '../context/WorkspaceContext';
+import type { Locale } from '../types';
 import {
   addCustomMemberDraft,
   commitMemberSystemPromptDraft,
   commitTeamProtocolDraft,
   createTeamPresetDraft,
+  groupTeamTemplatesByTier,
+  teamPresetDetailToDraft,
   teamPresetDraftToPayload,
+  teamPresetDraftToPreviewDetail,
+  TeamTemplatesPage,
   validateMemberToolsEnabledDraft,
   validateTeamPresetDraft,
 } from './TeamTemplatesPage';
+import type {
+  ChatTeamPreset,
+  TeamPresetSummary,
+} from '../../../shared/types';
 
 let failures = 0;
 const check = (label: string, cond: boolean, detail?: unknown) => {
@@ -31,6 +47,12 @@ const source = readFileSync(new URL('./TeamTemplatesPage.tsx', import.meta.url),
 const styleSource = readFileSync(new URL('../index.css', import.meta.url), 'utf8');
 
 console.log('TeamTemplatesPage');
+
+const jsonResponse = (data: unknown) =>
+  new Response(JSON.stringify({ success: true, data }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 
 const draft = createTeamPresetDraft();
 check(
@@ -125,6 +147,42 @@ check(
   payload,
 );
 
+const tierGroups = groupTeamTemplatesByTier([
+  { id: 'advanced-one', tier: 'advanced' },
+  { id: 'standard-one', tier: 'standard' },
+  { id: 'advanced-two', tier: 'advanced' },
+] as TeamPresetSummary[]);
+check(
+  'tier grouping keeps API order within standard and advanced groups',
+  tierGroups.standard.map((template) => template.id).join(',') === 'standard-one' &&
+    tierGroups.advanced.map((template) => template.id).join(',') ===
+      'advanced-one,advanced-two',
+  tierGroups,
+);
+
+const advancedDetail: ChatTeamPreset = {
+  id: 'custom-advanced',
+  name: 'Advanced custom team',
+  description: '',
+  members: [],
+  lead_member_id: null,
+  workflow_steps: [],
+  team_protocol: '',
+  is_builtin: false,
+  enabled: true,
+  tier: 'advanced',
+};
+const advancedDraft = teamPresetDetailToDraft(advancedDetail);
+const advancedPayload = teamPresetDraftToPayload(advancedDraft);
+const advancedPreview = teamPresetDraftToPreviewDetail(advancedDraft);
+check(
+  'editing preserves an API-provided advanced tier in payload and preview',
+  advancedDraft.tier === 'advanced' &&
+    advancedPayload.tier === 'advanced' &&
+    advancedPreview.tier === 'advanced',
+  { advancedDraft, advancedPayload, advancedPreview },
+);
+
 const invalidMemberName = validateTeamPresetDraft({
   ...draft,
   name: 'Needs member name',
@@ -136,13 +194,258 @@ check(
   invalidMemberName,
 );
 
-check('loads templates through the real API adapter', source.includes('teamPresetsApi.list()'));
-check('loads template details on selection', source.includes('teamPresetsApi.get('));
-check('groups backend templates under my team templates', source.includes('myTeamTemplates') && source.includes('我的团队模板'));
-check('renders advanced team templates from mock data', source.includes('advancedTeamTemplates') && source.includes('更多推荐模板'));
+const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
+  url: 'http://localhost',
+});
+Object.assign(globalThis, {
+  window: dom.window,
+  document: dom.window.document,
+  HTMLElement: dom.window.HTMLElement,
+  Node: dom.window.Node,
+  Event: dom.window.Event,
+  MouseEvent: dom.window.MouseEvent,
+});
+Object.defineProperty(globalThis, 'navigator', {
+  configurable: true,
+  value: dom.window.navigator,
+});
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+dom.window.matchMedia ??= () =>
+  ({
+    matches: false,
+    media: '',
+    onchange: null,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    dispatchEvent: () => false,
+  }) as MediaQueryList;
+
+const uiRequests: Array<{ body?: string; method: string; url: string }> = [];
+const uiLead = {
+  id: 'localized-lead',
+  name: 'Localized lead',
+  description: 'Leads the localized team.',
+  runner_type: 'CODEX',
+  recommended_model: 'test-model',
+  system_prompt: 'Lead the team.',
+  default_workspace_path: null,
+  selected_skill_ids: [],
+  tools_enabled: {},
+  is_builtin: true,
+  enabled: true,
+};
+const detailForLocale = (locale: string): ChatTeamPreset => ({
+  id: 'localized-team',
+  name: locale === 'zh' ? '中文团队' : 'English team',
+  description: '',
+  members: [uiLead],
+  lead_member_id: uiLead.id,
+  workflow_steps: [],
+  team_protocol: locale === 'zh' ? '中文协议' : 'English protocol',
+  is_builtin: true,
+  enabled: true,
+  tier: 'advanced',
+});
+const summaryForLocale = (locale: string): TeamPresetSummary => {
+  const detail = detailForLocale(locale);
+  return {
+    id: detail.id,
+    name: detail.name,
+    description: detail.description,
+    lead_member_id: detail.lead_member_id ?? null,
+    team_protocol: detail.team_protocol,
+    is_builtin: detail.is_builtin,
+    enabled: detail.enabled,
+    tier: detail.tier,
+    member_count: detail.members.length,
+    members: detail.members.map((member) => ({
+      id: member.id,
+      name: member.name,
+      description: member.description ?? null,
+      runner_type: member.runner_type,
+      recommended_model: member.recommended_model,
+      is_builtin: member.is_builtin,
+      enabled: member.enabled,
+    })),
+  };
+};
+const apiResponse = (data: unknown) => jsonResponse(data);
+let deferChineseDetail = false;
+let resolveDeferredChineseDetail: ((response: Response) => void) | null = null;
+
+globalThis.fetch = (async (input: RequestInfo | URL, options?: RequestInit) => {
+  const url = String(input);
+  const method = options?.method ?? 'GET';
+  uiRequests.push({ url, method, body: typeof options?.body === 'string' ? options.body : undefined });
+  const parsed = new URL(url, 'http://localhost');
+  const locale = parsed.searchParams.get('locale') ?? 'en';
+
+  if (parsed.pathname === '/api/team-presets' && method === 'GET') {
+    return apiResponse({ teams: [summaryForLocale(locale)] });
+  }
+  if (parsed.pathname === '/api/team-presets/localized-team' && method === 'GET') {
+    if (locale === 'zh' && deferChineseDetail) {
+      return new Promise<Response>((resolve) => {
+        resolveDeferredChineseDetail = resolve;
+      });
+    }
+    return apiResponse(detailForLocale(locale));
+  }
+  if (parsed.pathname === '/api/agents/runtime') {
+    return apiResponse({
+      runners: [
+        {
+          runner_type: 'CODEX',
+          installed: true,
+          executable: true,
+          last_error: null,
+          discovered_models: ['test-model'],
+          executor_options: { model: 'test-model' },
+          env_summary: [],
+        },
+      ],
+    });
+  }
+  if (parsed.pathname === '/api/projects/project-1/members' && method === 'GET') {
+    return apiResponse([]);
+  }
+  if (parsed.pathname === '/api/projects/project-1/members' && method === 'POST') {
+    return apiResponse({ id: 'project-member-1', agent_id: 'agent-1', role: 'lead' });
+  }
+  if (parsed.pathname === '/api/projects/project-1/sessions') {
+    return apiResponse([{ id: 'session-1' }]);
+  }
+  if (parsed.pathname === '/api/chat/agents' && method === 'GET') {
+    return apiResponse([]);
+  }
+  if (parsed.pathname === '/api/chat/agents' && method === 'POST') {
+    return apiResponse({ id: 'agent-1', name: 'Localized lead' });
+  }
+  if (parsed.pathname === '/api/chat/sessions/session-1/agents') {
+    return apiResponse([]);
+  }
+  if (parsed.pathname === '/api/chat/sessions/session-1' && method === 'PUT') {
+    return apiResponse({});
+  }
+  return apiResponse([]);
+}) as typeof fetch;
+
+let setHarnessLocale: ((locale: Locale) => void) | null = null;
+const WorkspaceHarness = () => {
+  const [locale, setLocale] = useState<Locale>('en');
+  setHarnessLocale = setLocale;
+  const workspace = {
+    locale,
+    setLocale,
+    projects: [{ id: 'project-1', default_workspace_path: '/workspace' }],
+    selectedProjectId: 'project-1',
+    refreshMembers: async () => undefined,
+    refreshSessions: async () => undefined,
+    showToast: () => undefined,
+    skills: [],
+    t: (key: string) => key,
+  } as unknown as WorkspaceContextProps;
+
+  return createElement(
+    WorkspaceContext.Provider,
+    { value: workspace },
+    createElement(TeamTemplatesPage),
+  );
+};
+const rootElement = dom.window.document.getElementById('root');
+if (!rootElement) throw new Error('Missing test root element.');
+const root = createRoot(rootElement);
+const flushUi = async () => {
+  await new Promise((resolve) => dom.window.setTimeout(resolve, 0));
+};
+
+await act(async () => {
+  root.render(createElement(WorkspaceHarness));
+  await flushUi();
+});
+const templateCard = rootElement.querySelector<HTMLElement>('.team-template-card');
+if (!templateCard) throw new Error('Localized template card did not render.');
+await act(async () => {
+  templateCard.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await flushUi();
+});
+await act(async () => {
+  deferChineseDetail = true;
+  setHarnessLocale?.('zh');
+  await flushUi();
+});
+await act(async () => {
+  setHarnessLocale?.('en');
+  await flushUi();
+});
+await act(async () => {
+  resolveDeferredChineseDetail?.(apiResponse(detailForLocale('zh')));
+  await flushUi();
+});
+check(
+  'rendered page ignores an expired localized detail response',
+  rootElement.textContent?.includes('English team') === true,
+  uiRequests,
+);
+await act(async () => {
+  deferChineseDetail = false;
+  setHarnessLocale?.('zh');
+  await flushUi();
+});
+check(
+  'rendered page reloads list and current detail after Workspace locale changes',
+  uiRequests.some((request) => request.url === '/api/team-presets?locale=zh') &&
+    uiRequests.some(
+      (request) => request.url === '/api/team-presets/localized-team?locale=zh',
+    ) &&
+    rootElement.textContent?.includes('中文团队') === true,
+  uiRequests,
+);
+const useTemplateButton = Array.from(rootElement.querySelectorAll('button')).find(
+  (button) => button.textContent?.includes('使用模板'),
+);
+if (!useTemplateButton) throw new Error('Use template button did not render.');
+await act(async () => {
+  useTemplateButton.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await flushUi();
+});
+const confirmButton = Array.from(rootElement.querySelectorAll('button')).find(
+  (button) => button.textContent?.includes('确认替换'),
+);
+if (!confirmButton) throw new Error('Confirm template application button did not render.');
+const detailRequestCountBeforeApply = uiRequests.filter(
+  (request) => request.url === '/api/team-presets/localized-team?locale=zh',
+).length;
+await act(async () => {
+  confirmButton.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await flushUi();
+});
+const sessionUpdate = uiRequests.find(
+  (request) =>
+    request.url === '/api/chat/sessions/session-1' && request.method === 'PUT',
+);
+check(
+  'rendered page applies the freshly fetched localized protocol to project sessions',
+  JSON.parse(sessionUpdate?.body ?? '{}').team_protocol === '中文协议' &&
+    uiRequests.filter(
+      (request) => request.url === '/api/team-presets/localized-team?locale=zh',
+    ).length > detailRequestCountBeforeApply,
+  { detailRequestCountBeforeApply, sessionUpdate, uiRequests },
+);
+await act(async () => {
+  root.unmount();
+});
+dom.window.close();
+
+check('loads templates through the locale-aware API adapter', source.includes('teamPresetsApi.list(locale)'));
+check('loads template details with the current locale', source.includes('teamPresetsApi.get(teamId, locale)'));
+check('groups API templates by their backend tier', source.includes('groupTeamTemplatesByTier(templates)') && source.includes('standardTemplates') && source.includes('advancedTemplates'));
+check('removes local advanced template and detail mock content', !source.includes('const advanced' + 'TeamTemplates') && !source.includes('const mock' + 'TeamTemplateDetails'));
 check('keeps the detail page in the Linear-style pipeline layout', source.includes('team-template-workflow-preview') && source.includes('PIPELINE /') && source.includes('MEMBERS /'));
 check('shows recoverable loading errors', source.includes('loadError') && source.includes('loadTemplates()'));
-check('shows an empty my-template state', source.includes('myTeamTemplates.length === 0'));
+check('shows an empty standard-template state', source.includes('standardTemplates.length === 0'));
 check('keeps built-in templates read-only', source.includes('selectedDetail.is_builtin') && source.includes('canEditSelected'));
 check('supports create, update, and delete flows', source.includes('teamPresetsApi.create') && source.includes('teamPresetsApi.update') && source.includes('teamPresetsApi.delete'));
 check('confirms deletion before mutating', source.includes('window.confirm'));
@@ -157,6 +460,7 @@ check('uses shared DropdownSelect for member runtime and model picking', source.
 check('uses shared DropdownSelect for runtime-specific skill picking', source.includes('selectionMode="multiple"') && source.includes('listNative(effectiveRunnerType)') && source.includes('runtimeSkills') && source.includes('skillPlaceholder') && !source.includes('技能 ID（逗号分隔）'));
 check('keeps Linear visual refinement hooks', source.includes('team-template-card') && source.includes('team-template-member-row') && source.includes('team-template-field'));
 check('uses aggregate draft workflow steps', source.includes('workflowSteps') && source.includes('normalizeWorkflowSteps'));
+check('uses only backend workflow steps and has an explicit empty state', source.includes('const workflowSteps = isEditing && form ? form.workflowSteps : viewDetail.workflow_steps;') && source.includes('No workflow steps defined.') && !source.includes('presentation.workflow'));
 check('supports editable markdown fields rendered with AgentMarkdown', source.includes('function MarkdownEditableField') && source.includes('<AgentMarkdown content={value}'));
 check('edits member tool JSON through toolsEnabledText', source.includes('toolsEnabledText') && source.includes('parseToolsEnabled'));
 check('validates required team and member fields before saving', source.includes('validateTeamPresetForm') && source.includes('Team name is required.') && source.includes('Member name is required.'));

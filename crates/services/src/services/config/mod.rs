@@ -7,9 +7,13 @@ use thiserror::Error;
 
 pub mod editor;
 pub(crate) mod preset_loader;
+pub mod team_template_catalog;
 mod versions;
 
 pub use editor::EditorOpenError;
+pub use team_template_catalog::{
+    TeamTemplateCatalogError, TeamTemplateCatalogService, TeamTemplateCatalogSyncResult,
+};
 
 pub const DEFAULT_PR_DESCRIPTION_PROMPT: &str = r#"Update the PR that was just created with a better title and description.
 The PR number is #{pr_number} and the URL is {pr_url}.
@@ -50,6 +54,7 @@ pub type ShowcaseState = versions::v9::ShowcaseState;
 pub type SendMessageShortcut = versions::v9::SendMessageShortcut;
 pub type ChatMemberPreset = versions::v9::ChatMemberPreset;
 pub type ChatTeamPreset = versions::v9::ChatTeamPreset;
+pub type ChatTeamTemplateTier = versions::v9::ChatTeamTemplateTier;
 pub type ChatPresetsConfig = versions::v9::ChatPresetsConfig;
 pub type ChatWorkflowStep = versions::v9::ChatWorkflowStep;
 pub type ChatBubbleFontSize = versions::v9::ChatBubbleFontSize;

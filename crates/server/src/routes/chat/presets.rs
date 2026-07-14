@@ -2,7 +2,7 @@ use std::{collections::HashSet, str::FromStr};
 
 use axum::{
     Extension, Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     response::Json as ResponseJson,
     routing::get,
 };
@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 use services::services::{
     analytics_events::{AnalyticsProjector, DomainEvent},
     config::{
-        ChatMemberPreset, ChatPresetsConfig, ChatTeamPreset, ChatWorkflowStep,
-        save_config_to_file_atomic,
+        ChatMemberPreset, ChatPresetsConfig, ChatTeamPreset, ChatTeamTemplateTier,
+        ChatWorkflowStep, Config, TeamTemplateCatalogService,
     },
 };
 use sqlx::{FromRow, types::Json as SqlxJson};
@@ -67,6 +67,20 @@ pub struct CreatePresetSnapshotResponse {
     pub overwritten: bool,
 }
 
+#[derive(Debug, Clone, Deserialize, TS)]
+#[ts(export)]
+pub struct ApplyTeamPresetRequest {
+    pub session_id: Uuid,
+    pub locale: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct ApplyTeamPresetResponse {
+    pub team: ChatTeamPreset,
+    pub team_protocol: TeamProtocolConfig,
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct TeamPresetMemberSummary {
@@ -89,6 +103,7 @@ pub struct TeamPresetSummary {
     pub team_protocol: String,
     pub is_builtin: bool,
     pub enabled: bool,
+    pub tier: ChatTeamTemplateTier,
     pub member_count: usize,
     pub members: Vec<TeamPresetMemberSummary>,
 }
@@ -97,6 +112,12 @@ pub struct TeamPresetSummary {
 #[ts(export)]
 pub struct TeamPresetListResponse {
     pub teams: Vec<TeamPresetSummary>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, TS)]
+#[ts(export)]
+pub struct TeamPresetLocaleQuery {
+    pub locale: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, TS)]
@@ -122,6 +143,7 @@ pub struct CreateTeamPresetRequest {
     pub name: String,
     pub description: Option<String>,
     pub lead_member_id: Option<String>,
+    pub tier: Option<ChatTeamTemplateTier>,
     #[serde(default)]
     pub workflow_steps: Vec<ChatWorkflowStep>,
     pub team_protocol: Option<String>,
@@ -137,6 +159,7 @@ pub struct UpdateTeamPresetRequest {
     pub name: String,
     pub description: Option<String>,
     pub lead_member_id: Option<String>,
+    pub tier: Option<ChatTeamTemplateTier>,
     #[serde(default)]
     pub workflow_steps: Vec<ChatWorkflowStep>,
     pub team_protocol: Option<String>,
@@ -215,13 +238,19 @@ pub fn team_presets_router() -> Router<DeploymentImpl> {
                 .put(update_team_preset)
                 .delete(delete_team_preset),
         )
+        .route("/{id}/apply", axum::routing::post(apply_team_preset))
 }
 
 pub async fn list_team_presets(
     State(deployment): State<DeploymentImpl>,
+    Query(query): Query<TeamPresetLocaleQuery>,
 ) -> Result<ResponseJson<ApiResponse<TeamPresetListResponse>>, ApiError> {
     let config = deployment.config().read().await;
-    let response = list_team_presets_from_config(&config.chat_presets)?;
+    let catalog = TeamTemplateCatalogService::new(deployment.db().pool.clone(), config_path());
+    let templates = catalog
+        .list_templates(&config, query.locale.as_deref())
+        .await?;
+    let response = list_team_presets_from_templates(&templates);
 
     Ok(ResponseJson(ApiResponse::success(response)))
 }
@@ -229,10 +258,15 @@ pub async fn list_team_presets(
 pub async fn get_team_preset(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<String>,
+    Query(query): Query<TeamPresetLocaleQuery>,
 ) -> Result<ResponseJson<ApiResponse<ChatTeamPreset>>, ApiError> {
     let id = validate_preset_id(&id, "Team preset ID")?;
     let config = deployment.config().read().await;
-    let team = get_team_preset_from_config(&config.chat_presets, &id)?;
+    let catalog = TeamTemplateCatalogService::new(deployment.db().pool.clone(), config_path());
+    let team = catalog
+        .get_template(&config, &id, query.locale.as_deref())
+        .await?
+        .ok_or_else(|| ApiError::BadRequest(format!("Team preset not found: {id}")))?;
 
     Ok(ResponseJson(ApiResponse::success(team)))
 }
@@ -245,7 +279,7 @@ pub async fn create_team_preset(
     let mut next_config = config_guard.clone();
     let team = create_team_preset_in_config(&mut next_config.chat_presets, payload)?;
 
-    save_config_to_file_atomic(&next_config, &config_path()).await?;
+    persist_team_presets_config(&deployment.db().pool, &config_path(), &next_config).await?;
     *config_guard = next_config;
 
     Ok(ResponseJson(ApiResponse::success(team)))
@@ -261,7 +295,7 @@ pub async fn update_team_preset(
     let mut next_config = config_guard.clone();
     let team = update_team_preset_in_config(&mut next_config.chat_presets, &id, payload)?;
 
-    save_config_to_file_atomic(&next_config, &config_path()).await?;
+    persist_team_presets_config(&deployment.db().pool, &config_path(), &next_config).await?;
     *config_guard = next_config;
 
     Ok(ResponseJson(ApiResponse::success(team)))
@@ -277,10 +311,56 @@ pub async fn delete_team_preset(
 
     delete_team_preset_from_config(&mut next_config.chat_presets, &id)?;
 
-    save_config_to_file_atomic(&next_config, &config_path()).await?;
+    persist_team_presets_config(&deployment.db().pool, &config_path(), &next_config).await?;
     *config_guard = next_config;
 
     Ok(ResponseJson(ApiResponse::success(())))
+}
+
+pub async fn apply_team_preset(
+    State(deployment): State<DeploymentImpl>,
+    Path(id): Path<String>,
+    Json(payload): Json<ApplyTeamPresetRequest>,
+) -> Result<ResponseJson<ApiResponse<ApplyTeamPresetResponse>>, ApiError> {
+    let id = validate_preset_id(&id, "Team preset ID")?;
+    let config = deployment.config().read().await;
+    let catalog = TeamTemplateCatalogService::new(deployment.db().pool.clone(), config_path());
+    let team = catalog
+        .get_template(&config, &id, payload.locale.as_deref())
+        .await?
+        .ok_or_else(|| ApiError::BadRequest(format!("Team preset not found: {id}")))?;
+    drop(config);
+
+    let content = team.team_protocol.trim().to_string();
+    let effective = TeamProtocolConfig {
+        enabled: !content.is_empty(),
+        content: content.clone(),
+    };
+    ChatSession::update(
+        &deployment.db().pool,
+        payload.session_id,
+        &UpdateChatSession {
+            title: None,
+            status: None,
+            lead_agent_id: None,
+            summary_text: None,
+            archive_ref: None,
+            last_seen_diff_key: None,
+            team_protocol: Some(content),
+            team_protocol_enabled: Some(effective.enabled),
+            default_workspace_path: None,
+            chat_input_mode: None,
+            worktree_mode: None,
+        },
+    )
+    .await?;
+
+    Ok(ResponseJson(ApiResponse::success(
+        ApplyTeamPresetResponse {
+            team,
+            team_protocol: effective,
+        },
+    )))
 }
 
 pub async fn create_preset_snapshot(
@@ -302,7 +382,7 @@ pub async fn create_preset_snapshot(
     let mut next_config = config_guard.clone();
     let response = build_preset_snapshot(&session, rows, payload, &mut next_config.chat_presets)?;
 
-    save_config_to_file_atomic(&next_config, &config_path()).await?;
+    persist_team_presets_config(&deployment.db().pool, &config_path(), &next_config).await?;
     *config_guard = next_config;
     drop(config_guard);
 
@@ -359,27 +439,20 @@ async fn list_session_preset_member_rows(
     .await
 }
 
-fn list_team_presets_from_config(
-    presets: &ChatPresetsConfig,
-) -> Result<TeamPresetListResponse, ApiError> {
-    let teams = presets
-        .teams
-        .iter()
-        .map(team_preset_summary)
-        .collect::<Vec<_>>();
-    Ok(TeamPresetListResponse { teams })
+async fn persist_team_presets_config(
+    pool: &sqlx::SqlitePool,
+    config_path: &std::path::Path,
+    config: &Config,
+) -> Result<(), ApiError> {
+    TeamTemplateCatalogService::new(pool.clone(), config_path.to_path_buf())
+        .save_config_and_sync(config)
+        .await?;
+    Ok(())
 }
 
-fn get_team_preset_from_config(
-    presets: &ChatPresetsConfig,
-    id: &str,
-) -> Result<ChatTeamPreset, ApiError> {
-    presets
-        .teams
-        .iter()
-        .find(|preset| preset.id == id)
-        .cloned()
-        .ok_or_else(|| ApiError::BadRequest(format!("Team preset not found: {id}")))
+fn list_team_presets_from_templates(presets: &[ChatTeamPreset]) -> TeamPresetListResponse {
+    let teams = presets.iter().map(team_preset_summary).collect::<Vec<_>>();
+    TeamPresetListResponse { teams }
 }
 
 fn create_team_preset_in_config(
@@ -451,6 +524,7 @@ struct TeamPresetPayload {
     name: String,
     description: Option<String>,
     lead_member_id: Option<String>,
+    tier: Option<ChatTeamTemplateTier>,
     workflow_steps: Vec<ChatWorkflowStep>,
     team_protocol: Option<String>,
     enabled: Option<bool>,
@@ -464,6 +538,7 @@ impl From<CreateTeamPresetRequest> for TeamPresetPayload {
             name: req.name,
             description: req.description,
             lead_member_id: req.lead_member_id,
+            tier: req.tier,
             workflow_steps: req.workflow_steps,
             team_protocol: req.team_protocol,
             enabled: req.enabled,
@@ -479,6 +554,7 @@ impl From<UpdateTeamPresetRequest> for TeamPresetPayload {
             name: req.name,
             description: req.description,
             lead_member_id: req.lead_member_id,
+            tier: req.tier,
             workflow_steps: req.workflow_steps,
             team_protocol: req.team_protocol,
             enabled: req.enabled,
@@ -525,6 +601,7 @@ fn validate_team_preset_payload(payload: TeamPresetPayload) -> Result<ChatTeamPr
         team_protocol: normalize_optional_string(payload.team_protocol).unwrap_or_default(),
         is_builtin: false,
         enabled: payload.enabled.unwrap_or(true),
+        tier: payload.tier.unwrap_or(ChatTeamTemplateTier::Standard),
     })
 }
 
@@ -604,6 +681,7 @@ fn team_preset_summary(team: &ChatTeamPreset) -> TeamPresetSummary {
         team_protocol: team.team_protocol.clone(),
         is_builtin: team.is_builtin,
         enabled: team.enabled,
+        tier: team.tier,
         member_count: team.members.len(),
         members,
     }
@@ -733,6 +811,7 @@ fn build_preset_snapshot(
         team_protocol,
         is_builtin: false,
         enabled: true,
+        tier: ChatTeamTemplateTier::Standard,
     };
 
     if let Some(index) = existing_team_index {
@@ -908,11 +987,90 @@ fn normalize_optional_string(value: Option<String>) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use axum::{
+        Router,
+        body::{Body, to_bytes},
+        http::{Method, Request, StatusCode},
+    };
     use chrono::Utc;
-    use db::models::chat_session::ChatSessionStatus;
-    use serde_json::json;
+    use db::{
+        DBService,
+        models::{
+            chat_session::{ChatSessionStatus, CreateChatSession},
+            chat_team_template_catalog::{ChatTeamTemplateCatalog, TeamTemplateCatalogSource},
+        },
+    };
+    use serde_json::{Value, json};
+    use sqlx::SqlitePool;
+    use tower::ServiceExt;
 
     use super::*;
+
+    async fn setup_pool() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("create sqlite memory pool");
+        sqlx::migrate!("../db/migrations")
+            .run(&pool)
+            .await
+            .expect("run migrations");
+        pool
+    }
+
+    async fn setup_app() -> (Router, SqlitePool) {
+        let pool = setup_pool().await;
+        let deployment =
+            local_deployment::LocalDeployment::new_for_test_pool(DBService { pool: pool.clone() })
+                .await
+                .expect("create test deployment");
+        let app = Router::new()
+            .nest("/api/team-presets", team_presets_router())
+            .with_state(deployment);
+        (app, pool)
+    }
+
+    async fn request_json(
+        app: &Router,
+        method: Method,
+        uri: String,
+        body: Option<Value>,
+    ) -> (StatusCode, Value) {
+        let mut builder = Request::builder().method(method).uri(uri);
+        let request_body = if let Some(body) = body {
+            builder = builder.header("content-type", "application/json");
+            Body::from(serde_json::to_vec(&body).expect("serialize request body"))
+        } else {
+            Body::empty()
+        };
+        let response = app
+            .clone()
+            .oneshot(builder.body(request_body).expect("build request"))
+            .await
+            .expect("execute request");
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("read response body");
+        let body = serde_json::from_slice(&bytes).expect("parse response JSON");
+        (status, body)
+    }
+
+    async fn api_get(app: &Router, uri: impl Into<String>) -> Value {
+        let (status, body) = request_json(app, Method::GET, uri.into(), None).await;
+        assert_eq!(status, StatusCode::OK, "response body: {body}");
+        response_data(&body).clone()
+    }
+
+    async fn api_post(app: &Router, uri: impl Into<String>, body: Value) -> Value {
+        let (status, body) = request_json(app, Method::POST, uri.into(), Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "response body: {body}");
+        response_data(&body).clone()
+    }
+
+    fn response_data(body: &Value) -> &Value {
+        assert_eq!(body["success"], true, "response body: {body}");
+        body.get("data").expect("response data")
+    }
 
     fn test_session(team_protocol_enabled: bool) -> ChatSession {
         ChatSession {
@@ -995,6 +1153,7 @@ mod tests {
             name: "Delivery Team".to_string(),
             description: Some("Team description".to_string()),
             lead_member_id: None,
+            tier: None,
             workflow_steps: Vec::new(),
             team_protocol: Some("Coordinate before shipping.".to_string()),
             enabled: Some(true),
@@ -1011,6 +1170,7 @@ mod tests {
             name: "Delivery Team".to_string(),
             description: Some("Team description".to_string()),
             lead_member_id: None,
+            tier: None,
             workflow_steps: Vec::new(),
             team_protocol: Some("Coordinate before shipping.".to_string()),
             enabled: Some(true),
@@ -1084,6 +1244,7 @@ mod tests {
         let mut presets = test_presets();
         let mut request =
             create_team_request("delivery_team", vec![member_write("delivery_backend")]);
+        request.tier = Some(ChatTeamTemplateTier::Advanced);
         request.workflow_steps = vec![
             ChatWorkflowStep {
                 title: "Plan".to_string(),
@@ -1102,6 +1263,7 @@ mod tests {
         assert_eq!(team.workflow_steps[0].title, "Plan");
         assert_eq!(team.workflow_steps[0].description, "Clarify scope.");
         assert_eq!(team.team_protocol, "Coordinate tightly.");
+        assert_eq!(team.tier, ChatTeamTemplateTier::Advanced);
         assert_eq!(team.members[0].system_prompt, "You are delivery_backend.");
         assert_eq!(team.members[0].tools_enabled, json!({"mode": "test"}));
         assert_eq!(
@@ -1184,6 +1346,7 @@ mod tests {
             team_protocol: String::new(),
             is_builtin: false,
             enabled: true,
+            tier: ChatTeamTemplateTier::Standard,
         });
         presets.teams.push(ChatTeamPreset {
             id: "other_team".to_string(),
@@ -1195,12 +1358,173 @@ mod tests {
             team_protocol: String::new(),
             is_builtin: false,
             enabled: true,
+            tier: ChatTeamTemplateTier::Standard,
         });
 
         delete_team_preset_from_config(&mut presets, "target_team").expect("delete succeeds");
 
         assert!(!presets.teams.iter().any(|team| team.id == "target_team"));
         assert!(presets.teams.iter().any(|team| team.id == "other_team"));
+    }
+
+    #[tokio::test]
+    async fn persist_team_presets_config_keeps_catalog_in_sync_for_custom_mutations() {
+        let pool = setup_pool().await;
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        let config_path = temp.path().join("config.json");
+        let mut config = Config::default();
+        let mut team = ChatTeamPreset {
+            id: "route_custom_team".to_string(),
+            name: "Route Custom Team".to_string(),
+            description: "Created through route persistence.".to_string(),
+            members: vec![custom_member_preset("route_member")],
+            lead_member_id: None,
+            workflow_steps: Vec::new(),
+            team_protocol: "Original protocol.".to_string(),
+            is_builtin: false,
+            enabled: true,
+            tier: ChatTeamTemplateTier::Standard,
+        };
+        config.chat_presets.teams.push(team.clone());
+
+        persist_team_presets_config(&pool, &config_path, &config)
+            .await
+            .expect("persist create");
+        let created = ChatTeamTemplateCatalog::find_by_id(&pool, "route_custom_team")
+            .await
+            .expect("find created")
+            .expect("catalog row exists");
+        assert_eq!(created.source, TeamTemplateCatalogSource::Custom);
+
+        let original_checksum = created.content_checksum.clone();
+        team.team_protocol = "Updated protocol.".to_string();
+        config
+            .chat_presets
+            .teams
+            .retain(|preset| preset.id != "route_custom_team");
+        config.chat_presets.teams.push(team);
+        persist_team_presets_config(&pool, &config_path, &config)
+            .await
+            .expect("persist update");
+        let updated = ChatTeamTemplateCatalog::find_by_id(&pool, "route_custom_team")
+            .await
+            .expect("find updated")
+            .expect("catalog row still exists");
+        assert_ne!(updated.content_checksum, original_checksum);
+
+        config
+            .chat_presets
+            .teams
+            .retain(|preset| preset.id != "route_custom_team");
+        persist_team_presets_config(&pool, &config_path, &config)
+            .await
+            .expect("persist delete");
+        assert!(
+            ChatTeamTemplateCatalog::find_by_id(&pool, "route_custom_team")
+                .await
+                .expect("find deleted")
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn catalog_backed_team_preset_list_and_detail_support_all_locales_and_tier() {
+        let pool = setup_pool().await;
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        let config_path = temp.path().join("config.json");
+        let config = Config::default();
+        persist_team_presets_config(&pool, &config_path, &config)
+            .await
+            .expect("persist defaults");
+        let catalog = TeamTemplateCatalogService::new(pool, config_path);
+        let english = catalog
+            .get_template(&config, "fullstack_delivery_team", Some("en"))
+            .await
+            .expect("get English")
+            .expect("English template exists");
+
+        for locale in ["en", "zh", "ja", "ko", "fr", "es"] {
+            let templates = catalog
+                .list_templates(&config, Some(locale))
+                .await
+                .expect("list localized templates");
+            let detail = catalog
+                .get_template(&config, "fullstack_delivery_team", Some(locale))
+                .await
+                .expect("get localized template")
+                .expect("localized template exists");
+            let response = list_team_presets_from_templates(&templates);
+
+            assert_eq!(response.teams.len(), 10, "{locale}");
+            assert!(response.teams.iter().any(|team| {
+                team.id == "advanced-growth-ops" && team.tier == ChatTeamTemplateTier::Advanced
+            }));
+            assert_eq!(detail.id, "fullstack_delivery_team");
+            assert!(!detail.team_protocol.trim().is_empty());
+            if locale != "en" {
+                assert_ne!(detail.name, english.name, "{locale}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn team_preset_routes_accept_locale_and_apply_localized_protocol_to_session() {
+        let (app, pool) = setup_app().await;
+        let english = api_get(&app, "/api/team-presets/fullstack_delivery_team?locale=en").await;
+        let localized = api_get(
+            &app,
+            "/api/team-presets/fullstack_delivery_team?locale=fr-FR",
+        )
+        .await;
+        let list = api_get(&app, "/api/team-presets?locale=fr-FR").await;
+
+        assert_ne!(localized["name"], english["name"]);
+        assert_ne!(localized["team_protocol"], english["team_protocol"]);
+        assert_eq!(list["teams"].as_array().expect("teams array").len(), 10);
+        assert!(
+            list["teams"]
+                .as_array()
+                .expect("teams array")
+                .iter()
+                .any(|team| team["id"] == "advanced-growth-ops" && team["tier"] == "advanced")
+        );
+
+        let session = ChatSession::create(
+            &pool,
+            &CreateChatSession {
+                title: Some("Apply template".to_string()),
+                workspace_path: None,
+                project_id: None,
+                worktree_mode: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create session");
+        let applied = api_post(
+            &app,
+            "/api/team-presets/fullstack_delivery_team/apply",
+            json!({
+                "session_id": session.id,
+                "locale": "fr-FR"
+            }),
+        )
+        .await;
+
+        let updated = ChatSession::find_by_id(&pool, session.id)
+            .await
+            .expect("find session")
+            .expect("session exists");
+        assert_eq!(applied["team"]["id"], "fullstack_delivery_team");
+        assert_eq!(
+            applied["team_protocol"]["content"],
+            localized["team_protocol"]
+        );
+        assert_eq!(
+            updated.team_protocol.as_deref(),
+            localized["team_protocol"].as_str()
+        );
+        assert!(updated.team_protocol_enabled);
     }
 
     #[test]
@@ -1216,6 +1540,7 @@ mod tests {
             team_protocol: String::new(),
             is_builtin: true,
             enabled: true,
+            tier: ChatTeamTemplateTier::Standard,
         });
 
         let update_error = update_team_preset_in_config(
@@ -1504,6 +1829,7 @@ mod tests {
             team_protocol: String::new(),
             is_builtin: true,
             enabled: true,
+            tier: ChatTeamTemplateTier::Standard,
         });
 
         let error = build_preset_snapshot(
@@ -1543,6 +1869,7 @@ mod tests {
             team_protocol: "old".to_string(),
             is_builtin: false,
             enabled: true,
+            tier: ChatTeamTemplateTier::Standard,
         });
 
         let response = build_preset_snapshot(

@@ -3,12 +3,25 @@ id: fullstack_delivery_team
 name: Full-stack Delivery Team
 description: Planner-led web delivery across design, frontend, backend, QA, and review.
 member_ids:
-  - coordinator_pmo
-  - ux_ui_designer
-  - backend_engineer
-  - frontend_engineer
-  - qa_tester
-  - code_reviewer
+- coordinator_pmo
+- ux_ui_designer
+- backend_engineer
+- frontend_engineer
+- qa_tester
+- code_reviewer
+workflow_steps:
+- title: Requirements and planning
+  description: Clarify scope, acceptance criteria, owners, dependencies, and delivery order.
+- title: Experience and technical design
+  description: Shape user flows, interface contracts, data changes, and implementation risks.
+- title: Frontend and backend implementation
+  description: Build the agreed slices, keep interfaces aligned, and save deliverables in workspaces.
+- title: Quality verification and code review
+  description: Verify behavior, regressions, accessibility, performance, and maintainability.
+- title: Delivery summary
+  description: Report shipped changes, verification results, risks, and recommended follow-up work.
+tier: standard
+enabled: true
 ---
 
 # Team Protocol

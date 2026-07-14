@@ -1381,7 +1381,7 @@ const liveDeltaActivityLineId = (
   streamType: ChatRunActivityLine['stream_type'],
 ) => `${LIVE_DELTA_ACTIVITY_LINE_PREFIX}${runId}-${streamType}`;
 
-interface WorkspaceContextProps {
+export interface WorkspaceContextProps {
   theme: Theme;
   themePreference: ThemePreference;
   setTheme: (t: ThemePreference) => void;
@@ -1514,7 +1514,7 @@ interface WorkspaceContextProps {
   refreshAll: () => Promise<void>;
 }
 
-const WorkspaceContext = createContext<WorkspaceContextProps | undefined>(
+export const WorkspaceContext = createContext<WorkspaceContextProps | undefined>(
   undefined,
 );
 
