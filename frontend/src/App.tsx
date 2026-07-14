@@ -18,6 +18,7 @@ import { GlobalSearchDialog } from "@/components/GlobalSearchDialog";
 import {
   OnboardingGuide,
 } from "@/components/onboarding/OnboardingGuide";
+import { VersionUpdatePage } from "@/components/version-update/VersionUpdatePage";
 import { GitHubRepositoryPage } from "@/pages/GitHubRepositoryPage";
 import { IssuePage } from "@/pages/IssuePage";
 import { RoutingPage } from "@/pages/RoutingPage";
@@ -151,7 +152,7 @@ const extractAgentMentions = (text: string): string[] =>
   Array.from(
     new Set(
       Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
-        match[1].toLowerCase(),
+        match[1],
       ),
     ),
   );
@@ -233,7 +234,7 @@ const blankTeamId = "blank_team";
 const currentUpgradeVersion = rootPackage.version || "0.0.0";
 type OnboardingOverlay =
   | { mode: "onboarding"; state: OnboardingState | null }
-  | { mode: "upgrade"; state: OnboardingState | null }
+  | { mode: "upgrade" }
   | null;
 
 type CreateProjectOptions = {
@@ -839,16 +840,10 @@ function WorkspaceLayout() {
   }, []);
 
   const openVersionUpdatePage = useCallback(
-    (
-      _info?: VersionCheckResponse | null,
-      stateOverride?: OnboardingState | null,
-    ) => {
-      setOnboardingOverlay({
-        mode: "upgrade",
-        state: stateOverride ?? onboardingState,
-      });
+    (_info?: VersionCheckResponse | null) => {
+      setOnboardingOverlay({ mode: "upgrade" });
     },
-    [onboardingState],
+    [],
   );
 
   const versionUpdate = useVersionUpdate({
@@ -886,7 +881,7 @@ function WorkspaceLayout() {
     const handleUpgradeReplay = (event: Event) => {
       const nextState = (event as CustomEvent<OnboardingState>).detail;
       setOnboardingState(nextState);
-      openVersionUpdatePage(versionUpdate.info, nextState);
+      openVersionUpdatePage(versionUpdate.info);
     };
 
     window.addEventListener(ONBOARDING_GUIDE_RESET_EVENT, handleGuideReset);
@@ -1604,7 +1599,7 @@ function WorkspaceLayout() {
             ? mentions.length > 0
               ? mentions
               : freeChatSelectedAgentName
-                ? [freeChatSelectedAgentName.replace(/^@/, '').toLowerCase()]
+                ? [freeChatSelectedAgentName.replace(/^@/, '')]
                 : []
             : undefined;
         const fallbackMention =
@@ -2052,11 +2047,9 @@ function WorkspaceLayout() {
         translate={translate}
       />
 
-      {onboardingOverlay && (
+      {onboardingOverlay?.mode === "onboarding" && (
         <OnboardingGuide
-          mode={onboardingOverlay.mode}
           initialState={onboardingOverlay.state ?? onboardingState}
-          currentVersion={currentUpgradeVersion}
           locale={locale}
           theme={theme}
           t={t}
@@ -2067,6 +2060,14 @@ function WorkspaceLayout() {
           onClose={() => setOnboardingOverlay(null)}
           onComplete={handleOnboardingCompleted}
           onStateChange={handleOnboardingStateChange}
+        />
+      )}
+      {onboardingOverlay?.mode === "upgrade" && (
+        <VersionUpdatePage
+          currentVersion={currentUpgradeVersion}
+          theme={theme}
+          t={t}
+          onClose={() => setOnboardingOverlay(null)}
           versionUpdateInfo={versionUpdate.info}
           versionUpdateCheckStatus={versionUpdate.checkStatus}
           versionUpdateCheckError={versionUpdate.checkError}

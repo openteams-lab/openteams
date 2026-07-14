@@ -1405,12 +1405,14 @@ async fn discard_rejects_stale_expected_head() {
 }
 
 #[tokio::test]
-async fn discard_removes_untracked_added_file() {
+async fn discard_removes_untracked_file_inside_new_directory() {
     let pool = setup_pool().await;
     let (_tempdir, repo_path) = setup_git_workspace();
     let project = seed_project(&pool, &repo_path).await;
-    let session_id = seed_session_with_paths(&pool, project.id, &repo_path, &["new.txt"]).await;
-    fs::write(repo_path.join("new.txt"), "new\n").expect("write untracked");
+    let path = "generated/new.txt";
+    let session_id = seed_session_with_paths(&pool, project.id, &repo_path, &[path]).await;
+    fs::create_dir_all(repo_path.join("generated")).expect("create untracked directory");
+    fs::write(repo_path.join(path), "new\n").expect("write untracked");
 
     let response = SourceControlService::new()
         .discard(
@@ -1419,7 +1421,7 @@ async fn discard_removes_untracked_added_file() {
             SourceControlDiscardRequest {
                 session_id,
                 workspace_id: None,
-                paths: vec!["new.txt".to_string()],
+                paths: vec![path.to_string()],
                 force_shared: None,
                 expected_head_sha: Some(git_head_sha(&repo_path)),
             },
@@ -1428,8 +1430,8 @@ async fn discard_removes_untracked_added_file() {
         .expect("discard response");
 
     assert!(response.ok);
-    assert_eq!(response.succeeded, vec!["new.txt"]);
-    assert!(!repo_path.join("new.txt").exists());
+    assert_eq!(response.succeeded, vec![path]);
+    assert!(!repo_path.join(path).exists());
     let (changes, staged) = git_status_paths(operation_status(&response));
     assert!(changes.is_empty());
     assert!(staged.is_empty());
@@ -1451,6 +1453,35 @@ async fn status_maps_untracked_without_collapsing_to_added() {
     let SessionSourceControlStatus::Git { changes, .. } = status else {
         panic!("expected git status");
     };
+    assert_eq!(changes[0].status, SourceControlFileStatus::Untracked);
+}
+
+#[tokio::test]
+async fn status_reports_session_file_inside_new_untracked_directory() {
+    let pool = setup_pool().await;
+    let (_tempdir, repo_path) = setup_git_workspace();
+    let project = seed_project(&pool, &repo_path).await;
+    let path = "frontend/src/components/version-update/VersionUpdatePage.tsx";
+    let session_id = seed_session_with_paths(&pool, project.id, &repo_path, &[path]).await;
+    let absolute_path = repo_path.join(path);
+    fs::create_dir_all(absolute_path.parent().expect("new directory parent"))
+        .expect("create new directory");
+    fs::write(
+        &absolute_path,
+        "export const VersionUpdatePage = () => null;\n",
+    )
+    .expect("write untracked component");
+
+    let status = SourceControlService::new()
+        .session_status(&pool, project.id, session_id, None)
+        .await
+        .expect("status");
+
+    let SessionSourceControlStatus::Git { changes, .. } = status else {
+        panic!("expected git status");
+    };
+    assert_eq!(changes.len(), 1);
+    assert_eq!(changes[0].path, path);
     assert_eq!(changes[0].status, SourceControlFileStatus::Untracked);
 }
 

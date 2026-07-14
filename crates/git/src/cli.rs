@@ -28,6 +28,8 @@ use utils::{path::ALWAYS_SKIP_DIRS, shell::resolve_executable_path_blocking};
 use super::Commit;
 
 const GIT_ONLY_SKIP_DIRS: &[&str] = &[".openteams"];
+const STATUS_PATHSPEC_BATCH_MAX_COUNT: usize = 256;
+const STATUS_PATHSPEC_BATCH_MAX_BYTES: usize = 16 * 1024;
 
 #[derive(Debug, Error)]
 pub enum GitCliError {
@@ -241,6 +243,76 @@ impl GitCli {
             "--untracked-files=normal",
         ]);
         let out = self.git_impl(worktree_path, args, None, None)?;
+        Ok(Self::parse_worktree_status(&out))
+    }
+
+    /// Return file-level status for exact workspace-relative paths.
+    ///
+    /// Unlike [`Self::get_worktree_status`], this expands untracked directories,
+    /// but it limits Git to the requested paths and batches pathspecs. This keeps
+    /// source-control views precise without forcing Git to enumerate every
+    /// untracked file in a large workspace.
+    pub fn get_worktree_status_for_paths(
+        &self,
+        worktree_path: &Path,
+        paths: &[String],
+    ) -> Result<WorktreeStatus, GitCliError> {
+        let mut combined = WorktreeStatus::default();
+        let mut batch = Vec::new();
+        let mut batch_bytes = 0usize;
+
+        for path in paths.iter().filter(|path| !path.is_empty()) {
+            let path_bytes = path.len().saturating_add(16);
+            if !batch.is_empty()
+                && (batch.len() >= STATUS_PATHSPEC_BATCH_MAX_COUNT
+                    || batch_bytes.saturating_add(path_bytes) > STATUS_PATHSPEC_BATCH_MAX_BYTES)
+            {
+                self.append_file_level_status_batch(worktree_path, &batch, &mut combined)?;
+                batch.clear();
+                batch_bytes = 0;
+            }
+            batch.push(path.clone());
+            batch_bytes = batch_bytes.saturating_add(path_bytes);
+        }
+
+        if !batch.is_empty() {
+            self.append_file_level_status_batch(worktree_path, &batch, &mut combined)?;
+        }
+
+        Ok(combined)
+    }
+
+    fn append_file_level_status_batch(
+        &self,
+        worktree_path: &Path,
+        paths: &[String],
+        combined: &mut WorktreeStatus,
+    ) -> Result<(), GitCliError> {
+        let literal_paths = paths
+            .iter()
+            .map(|path| format!(":(literal){path}"))
+            .collect::<Vec<_>>();
+        let args = Self::apply_pathspec_filter(
+            vec![
+                "--no-optional-locks",
+                "status",
+                "--porcelain",
+                "-z",
+                "--untracked-files=all",
+            ],
+            Some(&literal_paths),
+        );
+        let out = self.git_impl(worktree_path, args, None, None)?;
+        let status = Self::parse_worktree_status(&out);
+        combined.uncommitted_tracked = combined
+            .uncommitted_tracked
+            .saturating_add(status.uncommitted_tracked);
+        combined.untracked = combined.untracked.saturating_add(status.untracked);
+        combined.entries.extend(status.entries);
+        Ok(())
+    }
+
+    fn parse_worktree_status(out: &[u8]) -> WorktreeStatus {
         let mut entries = Vec::new();
         let mut uncommitted_tracked = 0usize;
         let mut untracked = 0usize;
@@ -282,11 +354,11 @@ impl GitCli {
                 });
             }
         }
-        Ok(WorktreeStatus {
+        WorktreeStatus {
             uncommitted_tracked,
             untracked,
             entries,
-        })
+        }
     }
 
     /// Stage all changes in the working tree (respects sparse-checkout semantics).
@@ -916,7 +988,7 @@ impl GitCli {
 mod tests {
     use std::fs;
 
-    use super::GitCli;
+    use super::{GitCli, STATUS_PATHSPEC_BATCH_MAX_COUNT};
 
     #[test]
     fn get_worktree_status_skips_openteams_runtime_dir() {
@@ -945,6 +1017,61 @@ mod tests {
         assert!(paths.contains(&"notes.txt".to_string()));
         assert!(!paths.iter().any(|path| path.starts_with(".openteams/")));
     }
+
+    #[test]
+    fn file_level_status_expands_only_requested_files_in_untracked_directory() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let repo_path = tempdir.path().join("repo");
+        git2::Repository::init(&repo_path).expect("init repo");
+        let generated_dir = repo_path.join("generated");
+        fs::create_dir_all(&generated_dir).expect("create generated dir");
+        fs::write(generated_dir.join("target.tsx"), "target\n").expect("write target");
+        fs::write(generated_dir.join("unrelated.tsx"), "unrelated\n").expect("write sibling");
+
+        let git = GitCli::new();
+        let summary = git
+            .get_worktree_status(&repo_path)
+            .expect("read summary status");
+        let summary_paths = summary
+            .entries
+            .into_iter()
+            .map(|entry| String::from_utf8_lossy(&entry.path).to_string())
+            .collect::<Vec<_>>();
+        assert!(summary_paths.contains(&"generated/".to_string()));
+
+        let file_status = git
+            .get_worktree_status_for_paths(&repo_path, &["generated/target.tsx".to_string()])
+            .expect("read exact file status");
+        let file_paths = file_status
+            .entries
+            .into_iter()
+            .map(|entry| String::from_utf8_lossy(&entry.path).to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(file_paths, vec!["generated/target.tsx"]);
+    }
+
+    #[test]
+    fn file_level_status_batches_large_path_sets() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let repo_path = tempdir.path().join("repo");
+        git2::Repository::init(&repo_path).expect("init repo");
+        fs::create_dir_all(repo_path.join("generated")).expect("create generated dir");
+        let target_path = format!("generated/file-{}.tsx", STATUS_PATHSPEC_BATCH_MAX_COUNT);
+        fs::write(repo_path.join(&target_path), "target\n").expect("write target");
+        let paths = (0..=STATUS_PATHSPEC_BATCH_MAX_COUNT)
+            .map(|index| format!("generated/file-{index}.tsx"))
+            .collect::<Vec<_>>();
+
+        let status = GitCli::new()
+            .get_worktree_status_for_paths(&repo_path, &paths)
+            .expect("read batched file status");
+        let status_paths = status
+            .entries
+            .into_iter()
+            .map(|entry| String::from_utf8_lossy(&entry.path).to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(status_paths, vec![target_path]);
+    }
 }
 /// Parsed entry from `git status --porcelain`
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -962,7 +1089,7 @@ pub struct StatusEntry {
 }
 
 /// Summary + entries for a working tree status
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WorktreeStatus {
     pub uncommitted_tracked: usize,
     pub untracked: usize,

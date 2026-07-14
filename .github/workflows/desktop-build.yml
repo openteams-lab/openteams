@@ -32,6 +32,7 @@ env:
   RUST_TOOLCHAIN: nightly-2025-12-04
   CARGO_TERM_COLOR: always
   ENABLE_MACOS_DMG: "false"
+  ENABLE_LINUX_APPIMAGE_UPDATER: ${{ vars.ENABLE_LINUX_APPIMAGE_UPDATER == 'true' }}
   POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
   POSTHOG_API_ENDPOINT: ${{ secrets.POSTHOG_API_ENDPOINT }}
   VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
@@ -161,16 +162,46 @@ jobs:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
-      - name: Build desktop bundle (Linux)
-        if: matrix.platform == 'linux'
-        # AppImage bundling is intentionally disabled in CI due to recurring
-        # appimage.sh failures on GitHub runners.
-        run: pnpm tauri build --bundles deb
+      - name: Build desktop bundle (Linux with AppImage updater)
+        if: matrix.platform == 'linux' && env.ENABLE_LINUX_APPIMAGE_UPDATER == 'true'
+        run: pnpm tauri build --bundles deb,appimage,updater
         env:
           NODE_OPTIONS: --max-old-space-size=8192
           APPIMAGE_EXTRACT_AND_RUN: "1"
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Build desktop bundle (Linux deb only)
+        if: matrix.platform == 'linux' && env.ENABLE_LINUX_APPIMAGE_UPDATER != 'true'
+        run: pnpm tauri build --bundles deb
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Validate Linux updater artifacts
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          raw=(src-tauri/target/release/bundle/appimage/*.AppImage)
+          archives=(src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz)
+          signatures=(src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig)
+
+          if [ "$ENABLE_LINUX_APPIMAGE_UPDATER" = "true" ]; then
+            if [ "${#raw[@]}" -eq 0 ] || [ "${#archives[@]}" -eq 0 ] || [ "${#signatures[@]}" -eq 0 ]; then
+              echo "::error::Missing AppImage updater artifacts while the updater policy is enabled"
+              exit 1
+            fi
+            if [ ! -s "${signatures[0]}" ] || [ "${signatures[0]}" != "${archives[0]}.sig" ]; then
+              echo "::error::AppImage updater signature is missing, empty, or does not match its archive"
+              exit 1
+            fi
+          elif [ "${#raw[@]}" -ne 0 ] || [ "${#archives[@]}" -ne 0 ] || [ "${#signatures[@]}" -ne 0 ]; then
+            echo "::error::AppImage artifacts exist while the updater policy is disabled"
+            exit 1
+          fi
 
       - name: Detect Windows signing configuration
         id: windows_signing
@@ -454,6 +485,18 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Upload desktop AppImage updater artifacts (Linux)
+        if: matrix.platform == 'linux' && env.ENABLE_LINUX_APPIMAGE_UPDATER == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.artifact_meta.outputs.name }}-appimage
+          path: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz
+            src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload desktop artifacts (macOS unsigned)
         if: matrix.platform == 'macos' && inputs.macos_sign_and_notarize != 'true' && env.ENABLE_MACOS_DMG == 'true'
         uses: actions/upload-artifact@v6
@@ -490,6 +533,11 @@ jobs:
             cp "${{ steps.signed_macos_updater.outputs.bundle }}" gh-package/files/
           elif [[ "${{ matrix.platform }}" == "linux" ]]; then
             cp src-tauri/target/release/bundle/deb/*.deb gh-package/files/
+            if [ "$ENABLE_LINUX_APPIMAGE_UPDATER" = "true" ]; then
+              cp src-tauri/target/release/bundle/appimage/*.AppImage gh-package/files/
+              cp src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz gh-package/files/
+              cp src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig gh-package/files/
+            fi
           elif [[ "${{ matrix.platform }}" == "windows" ]]; then
             cp src-tauri/target/release/bundle/msi/*.msi gh-package/files/
           else

@@ -516,6 +516,8 @@ check(
   source.includes("const routeMentionsForText = (text: string): string[]") &&
     source.includes("const explicitAttachmentMentions = routeMentionsForText(messageText)") &&
     source.includes("const mainAgentRouteMention = mainAgentName") &&
+    source.includes('mainAgentName.trim().replace(/^@/, "")') &&
+    !source.includes('normalizeMentionHandle(mainAgentName).replace(/^@/, "")') &&
     source.includes('chatInputMode !== "workflow" && mainAgentRouteMention') &&
     source.includes("mentions: attachmentRouteMentions") &&
     apiSource.includes('form.append("mentions", JSON.stringify(options.mentions))'),

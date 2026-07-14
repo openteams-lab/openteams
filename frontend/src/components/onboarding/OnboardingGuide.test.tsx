@@ -22,6 +22,8 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 console.log('OnboardingGuide wiring');
 
 const guideSource = read('./OnboardingGuide.tsx');
+const updatePageSource = read('../version-update/VersionUpdatePage.tsx');
+const newSessionModalSource = read('../CreateAgentSessionModal.tsx');
 const appSource = read('../../App.tsx');
 const updateHookSource = read('../../hooks/useVersionUpdate.ts');
 const updatePresentationSource = read('../../lib/updatePresentation.ts');
@@ -82,12 +84,13 @@ const requiredLocaleKeys = [
 ];
 
 check(
-  'renders a full-screen guide component with onboarding and upgrade modes',
+  'renders separate full-screen onboarding and version update components',
   guideSource.includes('export function OnboardingGuide') &&
-    guideSource.includes("mode: 'onboarding' | 'upgrade'") &&
     guideSource.includes('fixed inset-0') &&
-    guideSource.includes('renderUpgradeGuide'),
-  guideSource,
+    updatePageSource.includes('export function VersionUpdatePage') &&
+    appSource.includes('onboardingOverlay?.mode === "onboarding"') &&
+    appSource.includes('onboardingOverlay?.mode === "upgrade"'),
+  { appSource, guideSource, updatePageSource },
 );
 
 check(
@@ -523,74 +526,94 @@ check(
 );
 
 check(
-  'upgrade guide delegates platform actions through the update adapter',
+  'version update page delegates platform actions through the update adapter',
   appSource.includes('versionUpdate.openUpdatePage') &&
     appSource.includes('versionUpdate.executeUpdate') &&
     appSource.includes('versionUpdate.openManualFallback') &&
     updateHookSource.includes("case 'npx_staged_restart':") &&
     updateHookSource.includes("case 'tauri_updater':") &&
     updateHookSource.includes("case 'manual_download':") &&
-    guideSource.includes('manualFallbackAvailable') &&
-    guideSource.includes('versionUpdateCheckStatus') &&
-    guideSource.includes('getUpdatePageViewModel') &&
-    guideSource.includes('onCheckUpdate') &&
+    appSource.includes('<VersionUpdatePage') &&
+    appSource.includes('manualFallbackAvailable={versionUpdate.manualFallbackAvailable}') &&
+    appSource.includes('versionUpdateCheckStatus={versionUpdate.checkStatus}') &&
+    appSource.includes('onCheckUpdate={versionUpdate.checkNow}') &&
+    updatePageSource.includes('getUpdatePageViewModel') &&
     updatePresentationSource.includes('signatureVerification') &&
-    guideSource.includes('onInstallUpdate()') &&
+    updatePageSource.includes('onInstallUpdate()') &&
     updatePresentationSource.includes('onboarding.upgrade.updateNow'),
-  { appSource, guideSource, updateHookSource, updatePresentationSource },
+  { appSource, guideSource, updateHookSource, updatePageSource, updatePresentationSource },
 );
 
 check(
-  'upgrade guide uses a floating onboarding-style window',
-  guideSource.includes('bg-black/45') &&
-    guideSource.includes('backdrop-blur-[2px]') &&
-    guideSource.includes('h-[min(720px,calc(100vh-32px))]') &&
-    guideSource.includes('max-w-[1080px]') &&
-    guideSource.includes('lg:overflow-hidden') &&
-    guideSource.includes('max-h-[240px]') &&
-    guideSource.includes('mt-auto grid shrink-0') &&
-    guideSource.includes('bg-[var(--upgrade-shell)]') &&
-    guideSource.includes('shadow-[var(--upgrade-shell-shadow)]') &&
-    guideSource.includes('pointer-events-none absolute inset-0 bg-[var(--upgrade-shell)]') &&
-    guideSource.includes('opacity-[0.025] mix-blend-soft-light') &&
-    guideSource.includes('bg-[#5E6AD2]') &&
-    guideSource.includes('onboarding.upgrade.releaseNotes') &&
-    guideSource.includes('style={upgradeThemeStyle}') &&
-    guideSource.includes('onboarding.upgrade.later'),
-  guideSource,
+  'version update page is isolated from the onboarding implementation',
+  appSource.includes('from "@/components/version-update/VersionUpdatePage"') &&
+    appSource.includes('<VersionUpdatePage') &&
+    !guideSource.includes('VersionUpdatePage') &&
+    !guideSource.includes('versionUpdateInfo') &&
+    !guideSource.includes('const upgradeDarkThemeVars = {') &&
+    !guideSource.includes('const renderUpgradeGuide = () => {') &&
+    updatePageSource.includes('export function VersionUpdatePage(') &&
+    updatePageSource.includes('const upgradeDarkThemeVars = {'),
+  { guideSource, updatePageSource },
 );
 
 check(
-  'upgrade guide uses a compact and layered Linear-style information hierarchy',
-  guideSource.includes('lg:grid-cols-[minmax(0,1fr)_328px]') &&
-    guideSource.includes('rounded-[12px] bg-[var(--upgrade-card)]') &&
-    guideSource.includes('font-sans text-[20px] font-semibold') &&
-    guideSource.includes('text-[var(--upgrade-text-muted)] sm:text-[15px]') &&
-    guideSource.includes('min-h-9 grid-cols-') &&
-    guideSource.includes('bg-[var(--upgrade-warning-bg)]') &&
-    guideSource.includes('backdrop-blur-xl') &&
-    guideSource.includes('strokeWidth={1.25}') &&
-    guideSource.includes('<CircleArrowUp className="h-4 w-4"') &&
-    guideSource.includes('<ReactMarkdown>') &&
-    guideSource.includes('[&_ul]:space-y-2') &&
-    guideSource.includes('onboarding.upgrade.viewFullChangelog') &&
-    guideSource.includes('updateDetailIconByLabel') &&
-    guideSource.includes('onboarding.upgrade.updateUnsupported'),
-  guideSource,
+  'version update page uses a floating window',
+  updatePageSource.includes('bg-black/45') &&
+    updatePageSource.includes('backdrop-blur-[2px]') &&
+    updatePageSource.includes('h-[min(720px,calc(100vh-32px))]') &&
+    updatePageSource.includes('max-w-[1080px]') &&
+    updatePageSource.includes('lg:overflow-hidden') &&
+    updatePageSource.includes('max-h-[240px]') &&
+    updatePageSource.includes('mt-auto grid shrink-0') &&
+    updatePageSource.includes('bg-[var(--upgrade-shell)]') &&
+    updatePageSource.includes('shadow-[var(--upgrade-shell-shadow)]') &&
+    updatePageSource.includes('pointer-events-none absolute inset-0 bg-[var(--upgrade-shell)]') &&
+    updatePageSource.includes('opacity-[0.025] mix-blend-soft-light') &&
+    updatePageSource.includes('bg-[#5E6AD2]') &&
+    updatePageSource.includes('onboarding.upgrade.releaseNotes') &&
+    updatePageSource.includes('style={themeStyle}') &&
+    updatePageSource.includes('onboarding.upgrade.later'),
+  updatePageSource,
 );
 
 check(
-  'upgrade guide derives a light palette from the dark layout without filter inversion',
-  guideSource.includes('const upgradeDarkThemeVars = {') &&
-    guideSource.includes('const upgradeLightThemeVars = {') &&
-    guideSource.includes("theme === 'light' ? upgradeLightThemeVars : upgradeDarkThemeVars") &&
-    guideSource.includes("theme === 'light' ? 'bg-slate-950/20' : 'bg-black/45'") &&
-    guideSource.includes('style={upgradeThemeStyle}') &&
-    guideSource.includes('px-4 py-3 shadow-[var(--upgrade-card-shadow)]') &&
-    guideSource.includes('mt-2.5 text-[12px]') &&
-    guideSource.includes('[scrollbar-width:none]') &&
-    guideSource.includes('[&::-webkit-scrollbar]:hidden'),
-  guideSource,
+  'version update page uses a compact and layered Linear-style information hierarchy',
+  updatePageSource.includes('lg:grid-cols-[minmax(0,1fr)_328px]') &&
+    updatePageSource.includes('mt-6 flex flex-wrap items-center') &&
+    updatePageSource.includes('inline-flex h-5 shrink-0 items-center rounded-[4px]') &&
+    updatePageSource.includes('font-sans text-[14px] font-semibold') &&
+    updatePageSource.includes('text-[var(--upgrade-text-muted)] sm:text-[15px]') &&
+    updatePageSource.includes('min-h-9 grid-cols-') &&
+    updatePageSource.includes('border-t border-[var(--upgrade-line)] bg-[var(--upgrade-shell)]') &&
+    updatePageSource.includes('lg:border-l lg:border-t-0') &&
+    updatePageSource.includes('mt-6 border-t border-[var(--upgrade-line)] pt-5') &&
+    updatePageSource.includes('bg-[var(--upgrade-warning-bg)]') &&
+    updatePageSource.includes('border-l-2 border-[var(--upgrade-warning-accent)]') &&
+    updatePageSource.includes('backdrop-blur-xl') &&
+    updatePageSource.includes('strokeWidth={1.25}') &&
+    updatePageSource.includes('<ReactMarkdown>') &&
+    updatePageSource.includes('[&_ul]:space-y-2') &&
+    updatePageSource.includes('onboarding.upgrade.viewFullChangelog') &&
+    updatePageSource.includes('updateDetailIconByLabel') &&
+    updatePageSource.includes('onboarding.upgrade.updateUnsupported'),
+  updatePageSource,
+);
+
+check(
+  'version update page derives a light palette from the dark layout without filter inversion',
+  updatePageSource.includes('const upgradeDarkThemeVars = {') &&
+    updatePageSource.includes('const upgradeLightThemeVars = {') &&
+    updatePageSource.includes("theme === 'light' ? upgradeLightThemeVars : upgradeDarkThemeVars") &&
+    updatePageSource.includes("theme === 'light' ? 'bg-slate-950/20' : 'bg-black/45'") &&
+    updatePageSource.includes('style={themeStyle}') &&
+    updatePageSource.includes("'--upgrade-shell': 'var(--surface-2)'") &&
+    updatePageSource.includes("'--upgrade-toolbar': 'var(--surface-2)'") &&
+    newSessionModalSource.includes('bg-[var(--surface-2)]') &&
+    updatePageSource.includes('rounded-[4px] bg-[var(--upgrade-fill)]') &&
+    updatePageSource.includes('[scrollbar-width:none]') &&
+    updatePageSource.includes('[&::-webkit-scrollbar]:hidden'),
+  updatePageSource,
 );
 
 check(

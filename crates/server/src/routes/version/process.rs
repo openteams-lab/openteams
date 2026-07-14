@@ -1,11 +1,50 @@
-async fn run_update_command(
-    command: &mut Command,
-) -> Result<String, (StatusCode, Json<ApiResponse<()>>)> {
+type CheckApiResponse = ApiResponse<VersionCheckResponse, UpdateErrorInfo>;
+type ActionApiResponse = ApiResponse<UpdateActionResponse, UpdateActionResponse>;
+
+fn update_error(
+    stage: UpdateErrorStage,
+    code: &str,
+    message: &str,
+    retryable: bool,
+) -> UpdateErrorInfo {
+    UpdateErrorInfo {
+        stage,
+        code: code.to_string(),
+        message: message.to_string(),
+        retryable,
+    }
+}
+
+fn check_api_error(
+    status: StatusCode,
+    error: UpdateErrorInfo,
+) -> (StatusCode, Json<CheckApiResponse>) {
+    (status, Json(ApiResponse::error_with_data(error)))
+}
+
+fn action_api_error(
+    status: StatusCode,
+    error: UpdateErrorInfo,
+) -> (StatusCode, Json<ActionApiResponse>) {
+    (status, Json(ApiResponse::error_with_data(action_update_error(error))))
+}
+
+async fn run_update_command(command: &mut Command) -> Result<String, (StatusCode, Json<ActionApiResponse>)> {
     let output = command
         .stdin(Stdio::null())
         .output()
         .await
-        .map_err(|error| internal_api_error(&format!("Failed to start update command: {error}")))?;
+        .map_err(|error| {
+            action_api_error(
+                StatusCode::BAD_GATEWAY,
+                update_error(
+                    UpdateErrorStage::Download,
+                    "npx_stage_failed",
+                    &format!("Failed to start update command: {error}"),
+                    true,
+                ),
+            )
+        })?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -14,14 +53,22 @@ async fn run_update_command(
     if output.status.success() {
         Ok(combined)
     } else {
-        Err(internal_api_error(&format!(
-            "update command failed{}",
-            if combined.is_empty() {
-                String::new()
-            } else {
-                format!(": {combined}")
-            }
-        )))
+        Err(action_api_error(
+            StatusCode::BAD_GATEWAY,
+            update_error(
+                UpdateErrorStage::Download,
+                "npx_stage_failed",
+                &format!(
+                    "update command failed{}",
+                    if combined.is_empty() {
+                        String::new()
+                    } else {
+                        format!(": {combined}")
+                    }
+                ),
+                true,
+            ),
+        ))
     }
 }
 
@@ -161,8 +208,4 @@ fn npm_command() -> &'static str {
 
 fn node_command() -> &'static str {
     "node"
-}
-
-fn internal_api_error(message: &str) -> (StatusCode, Json<ApiResponse<()>>) {
-    (StatusCode::BAD_GATEWAY, Json(ApiResponse::error(message)))
 }

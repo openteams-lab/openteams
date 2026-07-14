@@ -489,7 +489,7 @@ async fn mention_resolution_auto_configures_project_member_for_new_session() {
     .expect("insert project member");
 
     let (session_agent, resolved_agent) = runner
-        .resolve_session_agent_for_mention(session_id, "opencodeagent")
+        .resolve_session_agent_for_mention(session_id, "OpencodeAgent")
         .await
         .expect("resolve mention")
         .expect("project member is materialized");
@@ -503,6 +503,106 @@ async fn mention_resolution_auto_configures_project_member_for_new_session() {
         Some("/tmp/member-workspace")
     );
     assert_eq!(session_agent.allowed_skill_ids.0, vec!["skill-a"]);
+}
+
+#[tokio::test]
+async fn mention_resolution_uses_only_the_exact_member_name() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let project_id = Uuid::new_v4();
+    let session_id = Uuid::new_v4();
+    insert_test_project(&db.pool, project_id).await;
+    sqlx::query(
+        r#"
+        INSERT INTO chat_sessions (id, title, status, project_id)
+        VALUES (?1, ?2, ?3, ?4)
+        "#,
+    )
+    .bind(session_id)
+    .bind("project session")
+    .bind(ChatSessionStatus::Active)
+    .bind(project_id)
+    .execute(&db.pool)
+    .await
+    .expect("insert project session");
+
+    let lead_agent = insert_test_chat_agent(&db, "SharedTemplate").await;
+    let second_agent = insert_test_chat_agent(&db, "SharedTemplate").await;
+    let lead_member = ProjectMember::create(
+        &db.pool,
+        project_id,
+        ProjectMemberType::Agent,
+        None,
+        Some(lead_agent.id),
+        Some("CodexAgent".to_string()),
+        Some("lead".to_string()),
+        1,
+        None,
+        Vec::new(),
+        MemberExecutionConfig::default(),
+        true,
+    )
+    .await
+    .expect("create lead member");
+    let second_member = ProjectMember::create(
+        &db.pool,
+        project_id,
+        ProjectMemberType::Agent,
+        None,
+        Some(second_agent.id),
+        Some("CodexAgent2".to_string()),
+        Some("member".to_string()),
+        2,
+        None,
+        Vec::new(),
+        MemberExecutionConfig::default(),
+        true,
+    )
+    .await
+    .expect("create second member");
+
+    for (agent_id, project_member_id) in [
+        (lead_agent.id, lead_member.id),
+        (second_agent.id, second_member.id),
+    ] {
+        ChatSessionAgent::create(
+            &db.pool,
+            &db::models::chat_session_agent::CreateChatSessionAgent {
+                session_id,
+                agent_id,
+                workspace_path: Some("/tmp/project-default".to_string()),
+                allowed_skill_ids: Vec::new(),
+                project_member_id: Some(project_member_id),
+                execution_config: MemberExecutionConfig::default(),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create session member");
+    }
+
+    let resolved = runner
+        .resolve_session_agent_for_mention(session_id, "CodexAgent")
+        .await
+        .expect("resolve exact member")
+        .expect("exact member exists");
+    assert_eq!(resolved.1.id, lead_agent.id);
+    assert_eq!(resolved.1.name, "CodexAgent");
+
+    assert!(
+        runner
+            .resolve_session_agent_for_mention(session_id, "codexagent")
+            .await
+            .expect("resolve lowercase member")
+            .is_none()
+    );
+    assert!(
+        runner
+            .resolve_session_agent_for_mention(session_id, "SharedTemplate")
+            .await
+            .expect("resolve template name")
+            .is_none()
+    );
 }
 
 #[tokio::test]

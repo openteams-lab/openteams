@@ -21,6 +21,8 @@ export interface NotificationToastProps {
   icon?: ReactNode;
   actionLabel?: string;
   onAction?: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
   onClose?: () => void;
   closeAriaLabel?: string;
   className?: string;
@@ -71,6 +73,8 @@ export function NotificationToast({
   icon,
   actionLabel,
   onAction,
+  secondaryActionLabel,
+  onSecondaryAction,
   onClose,
   closeAriaLabel = 'Dismiss notification',
   className,
@@ -108,18 +112,31 @@ export function NotificationToast({
         <span className="mt-1 block break-words text-[12px] leading-relaxed text-[var(--ink-subtle)]">
           {message}
         </span>
-        {actionLabel && onAction && (
-          <button
-            type="button"
-            className={cn(
-              'mt-2 text-[12px] font-semibold leading-none transition hover:text-[var(--ink)]',
-              style.accent,
+        {(actionLabel && onAction) || (secondaryActionLabel && onSecondaryAction) ? (
+          <span className="mt-2 flex items-center gap-3">
+            {actionLabel && onAction && (
+              <button
+                type="button"
+                className={cn(
+                  'text-[12px] font-semibold leading-none transition hover:text-[var(--ink)]',
+                  style.accent,
+                )}
+                onClick={onAction}
+              >
+                {actionLabel}
+              </button>
             )}
-            onClick={onAction}
-          >
-            {actionLabel}
-          </button>
-        )}
+            {secondaryActionLabel && onSecondaryAction && (
+              <button
+                type="button"
+                className="text-[12px] font-medium leading-none text-[var(--ink-subtle)] transition hover:text-[var(--ink)]"
+                onClick={onSecondaryAction}
+              >
+                {secondaryActionLabel}
+              </button>
+            )}
+          </span>
+        ) : null}
       </span>
       {onClose && (
         <button

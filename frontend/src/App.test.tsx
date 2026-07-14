@@ -374,7 +374,9 @@ check(
     source.includes("let freeChatSelectedAgentName: string | null = null") &&
     source.includes("freeChatSelectedAgentName =") &&
     source.includes("const routeMentions =") &&
-    source.includes("freeChatSelectedAgentName.replace(/^@/, '').toLowerCase()") &&
+    source.includes("freeChatSelectedAgentName.replace(/^@/, '')") &&
+    !source.includes("freeChatSelectedAgentName.replace(/^@/, '').toLowerCase()") &&
+    !source.includes("match[1].toLowerCase()") &&
     source.includes("sendMessageToSession(backendSession.id, content") &&
     !source.includes("let freeChatMainAgentName: string | null = null") &&
     !source.includes("content = `${handle} ${content}`"),

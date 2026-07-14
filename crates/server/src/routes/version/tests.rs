@@ -6,20 +6,290 @@ mod tests {
         sync::{Mutex, OnceLock},
     };
 
+    use serde::Serialize;
+
     use super::{
         MOCK_DEPLOY_MODE_ENV, NPX_UPDATE_PACKAGE_ENV, NPX_UPDATE_PACKAGE_SPEC,
+        UpdateArchitecture, UpdateDownloadStatus, UpdateErrorInfo, UpdateErrorStage,
+        UpdateInstallStatus, UpdateMethod, UpdatePlatform, UpdatePlatform::*,
+        action_update_error, asset_matches_architecture, capability_for_executable_path,
+        fetch_manifest_from_release_assets,
+        fetch_signature_for_context,
         compact_command_output, current_binary_name, default_mock_release_tag,
         detect_deploy_mode_for_path, format_command_output, is_truthy_env_value,
-        locate_cli_path_in_extracted_package, locate_extracted_package_root,
-        mock_deploy_mode_from_env, normalize_version, resolve_local_package_archive_path,
+        legacy_deploy_mode_for_capability, locate_cli_path_in_extracted_package,
+        locate_extracted_package_root, mock_deploy_mode_from_env, normalize_version,
+        release_fixture_with_linux_manifest, resolve_desktop_capability,
+        resolve_local_package_archive_path,
         resolve_npx_update_package_spec, resolve_restart_working_dir,
         should_direct_execute_npx_update_target, should_stage_npx_update_for_restart,
+        validate_update_context,
     };
 
     static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
     fn env_lock() -> &'static Mutex<()> {
         ENV_LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn assert_wire_pairs<T: Serialize>(pairs: &[(T, &str)]) {
+        for (value, expected) in pairs {
+            assert_eq!(serde_json::to_string(value).unwrap(), format!("\"{expected}\""));
+        }
+    }
+
+    #[test]
+    fn update_platform_uses_snake_case_wire_values() {
+        let cases = [
+            (WebNpx, "\"web_npx\""),
+            (Macos, "\"macos\""),
+            (LinuxAppimage, "\"linux_appimage\""),
+            (LinuxDeb, "\"linux_deb\""),
+            (Windows, "\"windows\""),
+            (Unknown, "\"unknown\""),
+        ];
+        for (value, expected) in cases {
+            assert_eq!(serde_json::to_string(&value).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn remaining_update_enums_use_exact_wire_values() {
+        assert_wire_pairs(&[
+            (UpdateMethod::NpxStagedRestart, "npx_staged_restart"),
+            (UpdateMethod::TauriUpdater, "tauri_updater"),
+            (UpdateMethod::ManualDownload, "manual_download"),
+            (UpdateMethod::Unsupported, "unsupported"),
+        ]);
+        assert_wire_pairs(&[
+            (UpdateErrorStage::Check, "check"),
+            (UpdateErrorStage::Download, "download"),
+            (UpdateErrorStage::Install, "install"),
+            (UpdateErrorStage::Restart, "restart"),
+        ]);
+        assert_wire_pairs(&[
+            (UpdateDownloadStatus::Idle, "idle"),
+            (UpdateDownloadStatus::Downloading, "downloading"),
+            (UpdateDownloadStatus::Downloaded, "downloaded"),
+            (UpdateDownloadStatus::Failed, "failed"),
+            (UpdateDownloadStatus::NotApplicable, "not_applicable"),
+        ]);
+        assert_wire_pairs(&[
+            (UpdateInstallStatus::Idle, "idle"),
+            (UpdateInstallStatus::Installing, "installing"),
+            (UpdateInstallStatus::RestartRequired, "restart_required"),
+            (UpdateInstallStatus::Completed, "completed"),
+            (UpdateInstallStatus::Failed, "failed"),
+            (UpdateInstallStatus::NotApplicable, "not_applicable"),
+        ]);
+        assert_wire_pairs(&[
+            (UpdateArchitecture::Aarch64, "aarch64"),
+            (UpdateArchitecture::X86_64, "x86_64"),
+            (UpdateArchitecture::I686, "i686"),
+            (UpdateArchitecture::Unknown, "unknown"),
+        ]);
+    }
+
+    #[test]
+    fn manual_assets_use_packager_architecture_aliases() {
+        let cases = [
+            (
+                UpdateArchitecture::X86_64,
+                "openteams_0.4.8_amd64-linux.deb",
+                true,
+            ),
+            (
+                UpdateArchitecture::X86_64,
+                "openteams-0.4.8-x86_64.AppImage",
+                true,
+            ),
+            (
+                UpdateArchitecture::Aarch64,
+                "openteams_0.4.8_arm64-linux.deb",
+                true,
+            ),
+            (
+                UpdateArchitecture::Aarch64,
+                "openteams-0.4.8-aarch64.dmg",
+                true,
+            ),
+            (
+                UpdateArchitecture::I686,
+                "openteams_0.4.8_i386-linux.deb",
+                true,
+            ),
+            (
+                UpdateArchitecture::I686,
+                "openteams-0.4.8-x86_64.AppImage",
+                false,
+            ),
+            (
+                UpdateArchitecture::X86_64,
+                "openteams_0.4.8_arm64-linux.deb",
+                false,
+            ),
+        ];
+        for (architecture, name, expected) in cases {
+            assert_eq!(asset_matches_architecture(name, architecture), expected, "{name}");
+        }
+    }
+
+    #[test]
+    fn appimage_requires_matching_manifest_asset_and_signature() {
+        let capability = resolve_desktop_capability(
+            UpdatePlatform::LinuxAppimage,
+            UpdateArchitecture::X86_64,
+            &release_fixture_with_linux_manifest(),
+        );
+
+        assert_eq!(capability.method, UpdateMethod::TauriUpdater);
+        assert!(capability.can_install);
+        assert!(capability.fallback_url.unwrap().ends_with(".AppImage"));
+    }
+
+    #[test]
+    fn appimage_without_manifest_degrades_to_manual_asset() {
+        let mut release = release_fixture_with_linux_manifest();
+        release.manifest = None;
+
+        let capability = resolve_desktop_capability(
+            UpdatePlatform::LinuxAppimage,
+            UpdateArchitecture::X86_64,
+            &release,
+        );
+
+        assert_eq!(capability.method, UpdateMethod::ManualDownload);
+        assert!(capability.fallback_url.unwrap().ends_with(".AppImage"));
+    }
+
+    #[test]
+    fn validate_update_context_rejects_partial_and_unknown_pairs() {
+        let cases = [
+            (Some(UpdatePlatform::Macos), None),
+            (None, Some(UpdateArchitecture::X86_64)),
+            (Some(UpdatePlatform::WebNpx), Some(UpdateArchitecture::X86_64)),
+            (Some(UpdatePlatform::Macos), Some(UpdateArchitecture::Unknown)),
+        ];
+
+        for (platform, architecture) in cases {
+            let error = validate_update_context(platform, architecture)
+                .expect_err("invalid context should fail");
+            assert_eq!(error.code, "invalid_update_context");
+            assert_eq!(error.stage, UpdateErrorStage::Check);
+            assert!(!error.retryable);
+        }
+    }
+
+    #[test]
+    fn capability_for_executable_path_maps_npx_and_unknown_modes() {
+        let npx = capability_for_executable_path(
+            false,
+            Path::new("/home/test/.openteams/bin/openteams"),
+        );
+        assert_eq!(npx.platform, UpdatePlatform::WebNpx);
+        assert_eq!(npx.method, UpdateMethod::NpxStagedRestart);
+
+        let unknown = capability_for_executable_path(false, Path::new("/tmp/openteams"));
+        assert_eq!(unknown.platform, UpdatePlatform::Unknown);
+        assert_eq!(unknown.method, UpdateMethod::Unsupported);
+    }
+
+    #[test]
+    fn action_errors_preserve_stage_specific_statuses() {
+        let download = action_update_error(UpdateErrorInfo {
+            stage: UpdateErrorStage::Download,
+            code: "npx_stage_failed".to_string(),
+            message: "download failed".to_string(),
+            retryable: true,
+        });
+        assert_eq!(download.state.download_status, UpdateDownloadStatus::Failed);
+        assert_eq!(download.state.install_status, UpdateInstallStatus::Idle);
+        assert_eq!(download.state.error.unwrap().code, "npx_stage_failed");
+
+        let restart = action_update_error(UpdateErrorInfo {
+            stage: UpdateErrorStage::Restart,
+            code: "restart_spawn_failed".to_string(),
+            message: "restart failed".to_string(),
+            retryable: true,
+        });
+        assert_eq!(restart.state.download_status, UpdateDownloadStatus::Downloaded);
+        assert_eq!(restart.state.install_status, UpdateInstallStatus::Failed);
+        assert_eq!(restart.state.error.unwrap().code, "restart_spawn_failed");
+    }
+
+    #[test]
+    fn legacy_deploy_mode_preserves_frontend_compatibility() {
+        assert_eq!(
+            legacy_deploy_mode_for_capability(&capability_for_executable_path(
+                false,
+                Path::new("/home/test/.openteams/bin/openteams"),
+            )),
+            "npx"
+        );
+        assert_eq!(
+            legacy_deploy_mode_for_capability(&resolve_desktop_capability(
+                UpdatePlatform::Macos,
+                UpdateArchitecture::Aarch64,
+                &release_fixture_with_linux_manifest(),
+            )),
+            "tauri"
+        );
+        assert_eq!(
+            legacy_deploy_mode_for_capability(&capability_for_executable_path(
+                false,
+                Path::new("/tmp/openteams"),
+            )),
+            "unknown"
+        );
+    }
+
+    #[tokio::test]
+    async fn manifest_fetch_failures_degrade_instead_of_failing_version_check() {
+        let release = super::GitHubLatestRelease {
+            tag_name: "v0.4.8".to_string(),
+            html_url: "https://github.com/openteams-lab/openteams/releases/tag/v0.4.8"
+                .to_string(),
+            body: None,
+            published_at: None,
+            assets: vec![super::GitHubReleaseAsset {
+                name: "latest.json".to_string(),
+                browser_download_url: "http://127.0.0.1:9/latest.json".to_string(),
+            }],
+        };
+
+        let manifest = fetch_manifest_from_release_assets(&release)
+            .await
+            .expect("manifest fetch should degrade instead of failing");
+
+        assert!(manifest.is_none());
+    }
+
+    #[tokio::test]
+    async fn signature_fetch_failures_degrade_to_manual_download_capability() {
+        let mut release = release_fixture_with_linux_manifest();
+        for asset in &mut release.release.assets {
+            if asset.name.ends_with(".sig") {
+                asset.browser_download_url = "http://127.0.0.1:9/linux.sig".to_string();
+            }
+        }
+        release.signature_contents.clear();
+
+        fetch_signature_for_context(
+            &mut release,
+            UpdatePlatform::LinuxAppimage,
+            UpdateArchitecture::X86_64,
+        )
+        .await
+        .expect("signature fetch should degrade instead of failing");
+
+        let capability = resolve_desktop_capability(
+            UpdatePlatform::LinuxAppimage,
+            UpdateArchitecture::X86_64,
+            &release,
+        );
+
+        assert_eq!(capability.method, UpdateMethod::ManualDownload);
+        assert!(capability.fallback_url.unwrap().ends_with(".AppImage"));
     }
 
     #[test]

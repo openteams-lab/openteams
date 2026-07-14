@@ -1123,7 +1123,7 @@ const tokenUsageNotificationSignature = (
 
 const extractAgentMentions = (text: string): string[] =>
   Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
-    match[1].toLowerCase(),
+    match[1],
   );
 
 const asAgentHandle = (name: string): string =>
@@ -4297,7 +4297,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     const hasRouteMentionOverride =
       options.routeMentions !== undefined && options.routeMentions.length > 0;
     const mainAgentMention = mainAgentName
-      ? mainAgentName.replace(/^@/, '').toLowerCase()
+      ? mainAgentName.replace(/^@/, '')
       : null;
     const routeMentions =
       options.routeMentions ??
