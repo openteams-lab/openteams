@@ -467,6 +467,16 @@ check(
   source,
 );
 check(
+  "composer member picker closes when clicking outside",
+  source.includes("const memberPickerRef = useRef<HTMLDivElement | null>(null)") &&
+    source.includes('document.addEventListener("pointerdown", handlePointerDownOutside)') &&
+    source.includes("!memberPickerRef.current?.contains(target)") &&
+    source.includes('document.removeEventListener("pointerdown", handlePointerDownOutside)') &&
+    source.includes("<div ref={memberPickerRef} className=\"relative\">") &&
+    source.includes("setIsMemberPickerOpen(false)"),
+  source,
+);
+check(
   "user message rendering shows routed mention without mutating text",
   source.includes("sendMessage(messageText, {") &&
     source.includes("displayMentionForUserMessage(msg)") &&
