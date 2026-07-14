@@ -2316,14 +2316,11 @@ export function ProjectSidebar({
                   <p className="mt-2 text-xs text-red-400">{deleteError}</p>
                 )}
               </div>
-              <div className="flex items-center justify-between border-t border-[var(--hairline)] bg-[var(--surface-1)] px-5 py-3">
-                <span className="font-mono text-[10px] text-[var(--ink-tertiary)]">
-                  {translate("escToCancel", "Esc to cancel")}
-                </span>
+              <div className="flex items-center justify-end border-t border-[var(--hairline)] bg-[var(--surface-1)] px-5 py-2">
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    className="cursor-pointer rounded-md border border-[var(--hairline-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-3)] transition"
+                    className="inline-flex h-8 w-20 cursor-pointer items-center justify-center rounded-md border border-[var(--hairline-strong)] text-xs font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-3)] transition"
                     onClick={closeDeleteDialog}
                     disabled={deleteInFlight}
                   >
@@ -2331,14 +2328,14 @@ export function ProjectSidebar({
                   </button>
                   <button
                     type="button"
-                    className="flex cursor-pointer items-center gap-1.5 rounded-md bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600 transition disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-8 w-20 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-red-500 text-xs font-medium text-white hover:bg-red-600 transition disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={() => void confirmDeleteProject()}
                     disabled={deleteInFlight}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     {deleteInFlight
                       ? translate("sidebar.deleting", "Deleting...")
-                      : translate("sidebar.deleteProject", "Delete project")}
+                      : translate("sidebar.delete", "Delete")}
                   </button>
                 </div>
               </div>

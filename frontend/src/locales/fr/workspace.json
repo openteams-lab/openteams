@@ -125,6 +125,7 @@
   "sidebar.createProject": "Créer un projet",
   "sidebar.creatingProject": "Création...",
   "sidebar.deleteProject": "Supprimer le projet",
+  "sidebar.delete": "Supprimer",
   "sidebar.deleteProjectConfirmDesc": "« {name} » sera définitivement supprimé. Cette action est irréversible.",
   "sidebar.deleteProjectConfirmTitle": "Supprimer le projet ?",
   "sidebar.deleteProjectFailed": "Échec de la suppression du projet",

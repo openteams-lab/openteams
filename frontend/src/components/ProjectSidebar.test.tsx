@@ -721,6 +721,13 @@ check(
   componentSource,
 );
 check(
+  "project delete dialog uses compact equal-sized action buttons",
+  componentSource.includes('justify-end border-t border-[var(--hairline)] bg-[var(--surface-1)] px-5 py-2') &&
+    componentSource.match(/inline-flex h-8 w-20/g)?.length === 2 &&
+    componentSource.includes('translate("sidebar.delete", "Delete")'),
+  componentSource,
+);
+check(
   "supports editing and deleting projects from sidebar",
   componentSource.includes("onUpdateProject(editingProject.id") &&
     componentSource.includes("startDeleteProject(actionMenuProject)") &&
