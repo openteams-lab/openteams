@@ -17,7 +17,7 @@ const scenarioTemplateHints = {
     'research_innovation_team',
     'ai_prompt_quality_team',
   ],
-  [OnboardingScenario.other]: ['team_collaboration_protocol'],
+  [OnboardingScenario.other]: ['blank_team'],
 } as const;
 
 const normalizeTemplateText = (value: string | null | undefined): string =>

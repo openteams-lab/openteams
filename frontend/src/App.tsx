@@ -80,12 +80,7 @@ import { mockFrontendApi } from "@/lib/mockFrontendApi";
 import { projectDisplayName } from "@/lib/projectDisplay";
 import {
   buildTemplateMemberSpecs,
-  firstAvailableRuntime,
-  runtimeConfiguredModel,
 } from "@/lib/teamTemplateRuntime";
-import {
-  getRunnerLabel,
-} from "@/pages/agent-runtime/agentRuntimeViewModel";
 import type { ShellOptionsMock } from "@/mockApiData";
 import {
   type BaseCodingAgent as ProjectBaseCodingAgent,
@@ -746,32 +741,6 @@ function WorkspaceLayout() {
       },
       is_default: true,
     });
-  };
-
-  const createBlankTeamStarterMember = async (
-    projectId: string,
-    workspacePath: string | null,
-    runtimes: AgentRuntimeStatus[],
-  ): Promise<boolean> => {
-    const runtime = firstAvailableRuntime(runtimes);
-    if (!runtime) return false;
-
-    const modelName =
-      runtimeConfiguredModel(runtime) || runtime.discovered_models[0] || null;
-    await createProjectAgentMember({
-      projectId,
-      workspacePath,
-      name: `${getRunnerLabel(runtime.runner_type)} Agent`,
-      runnerType: runtime.runner_type,
-      systemPrompt: null,
-      toolsEnabled: {},
-      modelName,
-      allowedSkillIds: [],
-      role: "lead",
-      displayOrder: 1,
-    });
-
-    return true;
   };
 
   const createTeamPresetMembers = async (
@@ -1798,7 +1767,6 @@ function WorkspaceLayout() {
     );
     const selectedTeamProtocol = selectedTeamPreset?.team_protocol?.trim() ?? "";
     const runtimes = await loadRuntimeStatuses();
-    let starterMemberCreated = false;
     let templateMemberCount: number | null = null;
     let teamSetupFailed = false;
 
@@ -1822,16 +1790,10 @@ function WorkspaceLayout() {
         console.error("Failed to create team preset members", err);
       }
     } else {
-      try {
-        starterMemberCreated = await createBlankTeamStarterMember(
-          project.id,
-          data.default_workspace_path,
-          runtimes,
-        );
-      } catch (err) {
-        console.error("Failed to create blank team starter member", err);
-        teamSetupFailed = true;
-      }
+      console.error("Selected team preset was not returned by the backend", {
+        selectedTeamId,
+      });
+      teamSetupFailed = true;
     }
     if (selectedTeamProtocol) {
       try {
@@ -1862,15 +1824,7 @@ function WorkspaceLayout() {
               count: templateMemberCount,
             },
           )
-        : starterMemberCreated
-          ? translate(
-              "toast.projectCreatedWithStarter",
-              `Created ${project.name} with a starter AI member`,
-              {
-                name: project.name,
-              },
-            )
-          : translate("toast.projectCreated", `Created ${project.name}`, {
+        : translate("toast.projectCreated", `Created ${project.name}`, {
               name: project.name,
             });
     showToast(createdProjectToast);

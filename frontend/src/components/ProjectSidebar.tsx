@@ -237,15 +237,6 @@ export const prioritizeSessions = (
   ];
 };
 
-const blankTeamOptions: DropdownSelectOption[] = [
-  {
-    id: blankTeamId,
-    label: "Blank team",
-    description: "One starter AI member",
-    hint: "1",
-  },
-];
-
 const createProjectLabelClass =
   "mb-1.5 block text-[12px] font-semibold tracking-[0.04em] text-[var(--ink-tertiary)]";
 
@@ -620,15 +611,12 @@ export function ProjectSidebar({
     const enabledTeamPresets = teamPresets.filter(
       (preset) => preset.enabled !== false,
     );
-    return [
-      ...blankTeamOptions,
-      ...enabledTeamPresets.map((preset) => ({
+    return enabledTeamPresets.map((preset) => ({
         id: preset.id,
         label: preset.name,
         description: preset.description,
         hint: `${preset.members.length}`,
-      })),
-    ];
+      }));
   }, [teamPresets]);
 
   const translate = (

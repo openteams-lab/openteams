@@ -874,20 +874,18 @@ check(
   componentSource,
 );
 check(
-  "create project modal defaults to a blank starter team",
+  "create project modal defaults to the backend blank team preset",
   componentSource.includes('const blankTeamId = "blank_team"') &&
-    componentSource.includes('label: "Blank team"') &&
-    componentSource.includes('description: "One starter AI member"') &&
     componentSource.includes("teamId: selectedTeamId || blankTeamId") &&
     componentSource.includes("openSessionComposer: true") &&
-    !componentSource.includes("fullstack_delivery"),
+    !componentSource.includes("blankTeamOptions"),
   componentSource,
 );
 check(
-  "create project modal keeps configured team templates after blank team",
+  "create project modal renders team templates returned by the backend",
   componentSource.includes("teamPresets.filter") &&
     componentSource.includes("preset.members.length") &&
-    componentSource.includes("...blankTeamOptions") &&
+    componentSource.includes("return enabledTeamPresets.map") &&
     !componentSource.includes("fallbackTeamOptions"),
   componentSource,
 );

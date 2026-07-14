@@ -1061,6 +1061,19 @@ mod tests {
             team.team_protocol
                 .contains("Only the Planner (Coordinator / PMO) and the UI Designer (UX/UI Designer) may directly `@` the user.")
         );
+
+        let blank_team = presets
+            .teams
+            .iter()
+            .find(|preset| preset.id == "blank_team")
+            .expect("blank team preset should exist");
+        assert_eq!(blank_team.name, "Blank team");
+        assert_eq!(blank_team.members.len(), 1);
+        assert_eq!(blank_team.members[0].id, "fullstack_engineer");
+        assert_eq!(
+            blank_team.lead_member_id.as_deref(),
+            Some("fullstack_engineer")
+        );
     }
 
     #[test]
@@ -1213,6 +1226,7 @@ Follow the team protocol.
             .collect::<Vec<_>>();
 
         assert!(file_names.contains(&"fullstack_delivery_team.md"));
+        assert!(file_names.contains(&"blank_team.md"));
         assert!(file_names.contains(&"rapid_bugfix_team.md"));
         assert!(!file_names.contains(&TEAM_COLLABORATION_PROTOCOL_FILE));
     }
