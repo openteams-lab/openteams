@@ -2156,8 +2156,8 @@ function WorkspaceLayout() {
       )}
 
       <div className="flex-1 h-full min-w-0 overflow-hidden bg-[var(--canvas)] p-2 md:p-3">
-        <section className="flex h-full min-h-0 flex-col overflow-hidden gap-2">
-          <header className="h-10 bg-[var(--canvas)] flex items-center justify-between shrink-0 select-none z-10">
+        <section className="flex h-full min-h-0 flex-col overflow-hidden gap-1">
+          <header className="h-8 bg-[var(--canvas)] flex items-center justify-between shrink-0 select-none z-10">
             <div className="flex items-center gap-3 flex-1 min-w-0 h-full">
               <button
                 type="button"
@@ -2169,7 +2169,7 @@ function WorkspaceLayout() {
               </button>
 
               <nav className="flex h-full min-w-0 flex-1 items-center overflow-hidden">
-                <div className="flex h-9 w-full max-w-full min-w-0 items-center gap-1 overflow-hidden rounded-md bg-[var(--canvas)]">
+                <div className="flex h-8 w-full max-w-full min-w-0 items-center gap-1 overflow-hidden rounded-md bg-[var(--canvas)]">
                   {renderedTabs.map(({ tab, label, Icon }) => {
                     const active = tab.id === activeTabId;
                     return (

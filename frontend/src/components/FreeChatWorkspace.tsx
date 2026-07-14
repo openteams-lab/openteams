@@ -2898,7 +2898,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
               <PanelRightClose className="h-4 w-4" />
             </button>
 
-            <div className="shrink-0 px-3 pb-6 pt-2">
+            <div className="shrink-0 px-3 py-3">
               <div className="mb-2 pr-10 text-[14px] font-semibold text-[var(--ink)]">
                 {t("sessionMembers")}
               </div>
@@ -2924,10 +2924,10 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                             current === member.id ? null : member.id,
                           )
                         }
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-[var(--surface-1)] text-left transition-[background-color,border-color,box-shadow] hover:border-[var(--hairline-strong)] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--primary)] ${
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-left transition-[box-shadow] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--primary)] ${
                           isSelected
-                            ? "border-[var(--primary-focus)] ring-2 ring-[var(--primary-focus)]/55"
-                            : "border-[var(--hairline)]"
+                            ? "ring-2 ring-[var(--primary-focus)]/55"
+                            : ""
                         }`}
                         title={member.name}
                         aria-label={member.name}
@@ -2980,7 +2980,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
             </div>
 
             {/* Linked Work Items Section */}
-            <div className="shrink-0 px-3 pb-4">
+            <div className="shrink-0 px-3 py-3">
               <div className="mb-2 flex items-center justify-between">
                 <h2 className="text-[14px] font-semibold text-[var(--ink)]">
                   {t("linkedWorkItems.title")}
