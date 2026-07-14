@@ -24,6 +24,8 @@ const USER_APPROVED_LOOP_RESULT_MESSAGES = [
   "L'utilisateur a approuvé le résultat de la boucle.",
   'El usuario aprobó el resultado del bucle.',
 ];
+const COMPLETED_STATUS_LINE_PATTERN =
+  /(^|\r?\n)(?:Status|状态)[ \t]*[:：][ \t]*(?:DONE|COMPLETED)[ \t]*(?=\r?\n|$)/gim;
 
 function replaceExactGeneratedMessages(
   text: string,
@@ -57,6 +59,14 @@ export function localizeWorkflowGeneratedText(
       })
     );
   }
+
+  localized = localized.replace(
+    COMPLETED_STATUS_LINE_PATTERN,
+    (_match, linePrefix: string) =>
+      `${linePrefix}${t('workflow.generatedText.completedStatus', {
+        defaultValue: 'Status: Completed',
+      })}`
+  );
 
   localized = replaceExactGeneratedMessages(
     localized,

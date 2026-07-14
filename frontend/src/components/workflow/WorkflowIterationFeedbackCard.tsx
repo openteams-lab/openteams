@@ -309,65 +309,33 @@ export function WorkflowIterationFeedbackCard({
       {canReviewCurrentRound && (
         <div
           className={cn(
-            'border-t border-[var(--workflow-iteration-border-muted)] bg-transparent p-4 transition-all duration-300'
+            'border-t border-[var(--workflow-iteration-border-muted)] bg-transparent px-4 py-2.5 transition-all duration-300'
           )}
         >
           <div
             className={cn(
-              'flex items-center justify-between gap-3',
-              expandedReject && 'mb-3'
+              'flex items-center gap-3',
+              expandedReject ? 'mb-3 justify-between' : 'justify-end'
             )}
           >
-            <div className="flex min-w-0 items-center gap-2">
-              <div
-                className={cn(
-                  'h-1.5 w-1.5 shrink-0 rounded-full',
-                  expandedReject
-                    ? 'bg-[var(--workflow-danger,#ef4444)] shadow-[0_0_10px_color-mix(in_srgb,var(--workflow-danger,#ef4444)_55%,transparent)]'
-                    : 'bg-[var(--primary)] shadow-[0_0_10px_color-mix(in_srgb,var(--primary)_48%,transparent)]'
-                )}
-              />
-              <span
-                className={cn(
-                  'truncate font-mono text-[10px] font-medium uppercase',
-                  expandedReject
-                    ? 'text-[var(--workflow-danger,#ef4444)]'
-                    : 'text-[var(--workflow-iteration-muted)]'
-                )}
-              >
-                {expandedReject
-                  ? t('workflow.iterationFeedback.rejectWithFeedback', {
-                      defaultValue: 'Reject with Feedback',
-                    })
-                  : t('workflow.iterationFeedback.reviewRequired', {
-                      defaultValue: 'Review Required',
-                    })}
-              </span>
-            </div>
+            {expandedReject && (
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--workflow-danger,#ef4444)] shadow-[0_0_10px_color-mix(in_srgb,var(--workflow-danger,#ef4444)_55%,transparent)]" />
+                <span className="truncate font-mono text-[10px] font-medium uppercase text-[var(--workflow-danger,#ef4444)]">
+                  {t('workflow.iterationFeedback.rejectWithFeedback', {
+                    defaultValue: 'Feedback',
+                  })}
+                </span>
+              </div>
+            )}
 
             {!expandedReject && (
-              <div className="ml-auto flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleAccept}
-                  disabled={disabled || !canSubmit}
-                  className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-[var(--workflow-iteration-accept-border)] bg-[var(--workflow-iteration-accept-bg)] px-3 text-[13px] font-medium text-[var(--workflow-iteration-accept-text)] [box-shadow:var(--workflow-iteration-accept-shadow)] transition-colors hover:bg-[var(--workflow-iteration-accept-hover-bg)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
-                >
-                  <Check
-                    className="h-3.5 w-3.5"
-                    strokeWidth={2.3}
-                    strokeLinecap="square"
-                    strokeLinejoin="miter"
-                  />
-                  {t('workflow.iterationFeedback.accept', {
-                    defaultValue: 'ACCEPT',
-                  })}
-                </button>
+              <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={handleReject}
                   disabled={disabled || !canSubmit}
-                  className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-[var(--workflow-iteration-border)] bg-transparent px-3 text-[13px] font-medium text-[var(--workflow-iteration-muted)] [box-shadow:var(--workflow-iteration-button-shadow)] transition-colors hover:border-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_20%,transparent)] hover:bg-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_10%,transparent)] hover:text-[#d95c61] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+                  className="inline-flex h-7 w-20 items-center justify-center gap-1.5 rounded-md border border-[var(--workflow-iteration-border)] bg-transparent text-[13px] font-medium text-[var(--workflow-iteration-muted)] [box-shadow:var(--workflow-iteration-button-shadow)] transition-colors hover:border-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_20%,transparent)] hover:bg-[color-mix(in_srgb,var(--workflow-danger,#ef4444)_10%,transparent)] hover:text-[#d95c61] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
                 >
                   <X
                     className="h-3.5 w-3.5"
@@ -377,6 +345,22 @@ export function WorkflowIterationFeedbackCard({
                   />
                   {t('workflow.iterationFeedback.reject', {
                     defaultValue: 'REJECT',
+                  })}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAccept}
+                  disabled={disabled || !canSubmit}
+                  className="inline-flex h-7 w-20 items-center justify-center gap-1.5 rounded-md border border-[var(--workflow-iteration-accept-border)] bg-[var(--workflow-iteration-accept-bg)] text-[13px] font-medium text-[var(--workflow-iteration-accept-text)] [box-shadow:var(--workflow-iteration-accept-shadow)] transition-colors hover:bg-[var(--workflow-iteration-accept-hover-bg)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+                >
+                  <Check
+                    className="h-3.5 w-3.5"
+                    strokeWidth={2.3}
+                    strokeLinecap="square"
+                    strokeLinejoin="miter"
+                  />
+                  {t('workflow.iterationFeedback.accept', {
+                    defaultValue: 'ACCEPT',
                   })}
                 </button>
               </div>

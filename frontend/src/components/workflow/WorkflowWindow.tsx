@@ -210,10 +210,10 @@ const REVIEW_SETTINGS_EXECUTION_FINISHED_ERROR =
 const REVIEW_SETTINGS_ACTIVE_EXECUTION_ERROR =
   'Review settings can only be changed while execution is not running or waiting for review.';
 const workflowDetailMarkdownTextClassName = [
-  'text-[14px] text-[#A0A5B1] leading-[1.6]',
-  '[&_h1]:text-[#F2F2F3] [&_h1]:font-semibold [&_h1]:text-[16px] [&_h1]:mb-3 [&_h1]:mt-6',
-  '[&_h2]:text-[#F2F2F3] [&_h2]:font-semibold [&_h2]:text-[15px] [&_h2]:mb-3 [&_h2]:mt-5',
-  '[&_h3]:text-[#F2F2F3] [&_h3]:font-medium [&_h3]:text-[14px] [&_h3]:mb-2 [&_h3]:mt-4',
+  'text-[13px] text-[#A0A5B1] leading-[1.7]',
+  '[&_h1]:text-[var(--ink)] [&_h1]:font-semibold [&_h1]:text-[17px] [&_h1]:mb-3 [&_h1]:mt-6',
+  '[&_h2]:text-[var(--ink)] [&_h2]:font-semibold [&_h2]:text-[15px] [&_h2]:mb-3 [&_h2]:mt-5',
+  '[&_h3]:text-[var(--ink)] [&_h3]:font-medium [&_h3]:text-[14px] [&_h3]:mb-2 [&_h3]:mt-4',
   '[&_p]:mb-3',
   '[&_ul]:mb-3 [&_ul]:pl-4',
   '[&_ol]:mb-3 [&_ol]:pl-4',
@@ -461,7 +461,10 @@ function parseTranscriptSummaryPayload(
   }
 }
 
-function getTranscriptMarkdown(entry: WorkflowTranscriptEntry): string | null {
+function getTranscriptMarkdown(
+  entry: WorkflowTranscriptEntry,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string | null {
   const payload = parseTranscriptSummaryPayload(entry.meta_json);
   if (payload?.content) {
     const content = payload.content.trim();
@@ -472,9 +475,16 @@ function getTranscriptMarkdown(entry: WorkflowTranscriptEntry): string | null {
     const content = entry.content.trim();
     const verdict = getTranscriptReviewVerdict(entry);
     if (verdict) {
+      const localizedVerdict = t(`workflow.reviewVerdict.${verdict}`, {
+        defaultValue: verdict,
+      });
+      const verdictLine = t('workflow.generatedText.reviewVerdict', {
+        verdict: localizedVerdict,
+        defaultValue: `Verdict: ${localizedVerdict}`,
+      });
       return content.length > 0
-        ? `Verdict: ${verdict}\n\n${content}`
-        : `Verdict: ${verdict}`;
+        ? `${verdictLine}\n\n${content}`
+        : verdictLine;
     }
     return content.length > 0 ? content : null;
   }
@@ -494,7 +504,7 @@ function getLocalizedTranscriptMarkdown(
   entry: WorkflowTranscriptEntry,
   t: (key: string, opts?: Record<string, unknown>) => string
 ): string | null {
-  const markdown = getTranscriptMarkdown(entry);
+  const markdown = getTranscriptMarkdown(entry, t);
   return markdown ? localizeWorkflowGeneratedText(markdown, t) : null;
 }
 
@@ -577,8 +587,14 @@ function isWorkflowChatPanelEntry(entry: WorkflowTranscriptEntry): boolean {
 
 function getWorkflowReviewAgentName(
   entry: WorkflowTranscriptEntry,
-  fallbackAgentName: string
+  fallbackAgentName: string,
+  t: (key: string, opts?: Record<string, unknown>) => string
 ): string {
+  if (getTranscriptMetaString(entry, 'reviewer_type') === 'user') {
+    return t('workflow.reviewSettings.userLabel', {
+      defaultValue: 'User',
+    });
+  }
   const rawAgentName = entry.agent_name?.trim();
   if (rawAgentName) return rawAgentName;
   if (entry.entry_type === 'lead_review') return 'Lead';
@@ -1126,7 +1142,7 @@ function InspectorCard({
             />
 
             <div className="mt-0">
-              <h3 className="text-[11px] font-medium text-[#8A8F98] uppercase tracking-[0.05em] mb-2">
+              <h3 className="text-[14px] font-semibold text-[var(--ink)] tracking-normal mb-3">
                 {t('workflow.inspector.instructionHeading', {
                   defaultValue: 'Instruction',
                 })}
@@ -1143,7 +1159,7 @@ function InspectorCard({
 
             {(isFailed || isCompleted) && (
               <div className="mt-10 pt-10 border-t border-[rgba(255,255,255,0.06)]">
-                <h3 className="text-[11px] font-medium text-[#8A8F98] uppercase tracking-[0.05em] mb-2">
+                <h3 className="text-[14px] font-semibold text-[var(--ink)] tracking-normal mb-3">
                   {t('workflow.inspector.summaryHeading', {
                     defaultValue: 'Summary',
                   })}
@@ -1161,7 +1177,7 @@ function InspectorCard({
 
             {latestReviewLabel && (
               <div className="mt-10 pt-10 border-t border-[rgba(255,255,255,0.06)]">
-                <h3 className="text-[11px] font-medium text-[#8A8F98] uppercase tracking-[0.05em] mb-2">
+                <h3 className="text-[14px] font-semibold text-[var(--ink)] tracking-normal mb-3">
                   {t('workflow.inspector.feedbackHeading', {
                     defaultValue: 'Feedback',
                   })}
@@ -1182,7 +1198,7 @@ function InspectorCard({
             )}
 
             <div className="mt-10 pt-10 border-t border-[rgba(255,255,255,0.06)]">
-              <h3 className="text-[11px] font-medium text-[#8A8F98] uppercase tracking-[0.05em] mb-2">
+              <h3 className="text-[14px] font-semibold text-[var(--ink)] tracking-normal mb-3">
                 {t('workflow.inspector.executionRecordHeading', {
                   defaultValue: 'Execution Record Output',
                 })}
@@ -1208,7 +1224,7 @@ function InspectorCard({
                         entry.entry_type === 'output'
                           ? entry.agent_name?.trim() || undefined
                           : isWorkflowReviewEntry(entry)
-                            ? getWorkflowReviewAgentName(entry, 'Reviewer')
+                            ? getWorkflowReviewAgentName(entry, 'Reviewer', t)
                             : null;
                       const outputLabel =
                         outputAgentName || getWorkflowOutputEntryLabel(entry);
@@ -1262,7 +1278,7 @@ function InspectorCard({
 
             {hasError && (
               <div className="mt-10 pt-10 border-t border-[rgba(255,255,255,0.06)]">
-                <h3 className="text-[11px] font-medium text-[#E5484D] uppercase tracking-[0.05em] mb-2 flex items-center gap-2">
+                <h3 className="text-[14px] font-semibold text-[#E5484D] tracking-normal mb-3 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" />
                   {t('workflow.inspector.errorHeading', {
                     defaultValue: 'Error',
@@ -1315,7 +1331,6 @@ function InspectorCard({
                   defaultValue: 'Close Chat',
                 })
               : t('workflow.inspector.openChat', { defaultValue: 'Open Chat' })}
-            <kbd className="ml-1 text-[10px] text-[var(--ink-tertiary)] font-mono">⌘C</kbd>
           </button>
 
           {/* Right-side action buttons */}
@@ -1339,7 +1354,6 @@ function InspectorCard({
                   {t('workflow.inspector.terminate', {
                     defaultValue: 'Terminate',
                   })}
-                  <kbd className="ml-0.5 text-[10px] text-[var(--ink-tertiary)] font-mono">⌘X</kbd>
                 </button>
               )}
             {isRetryableWorkflowStepStatus(step.status) &&
@@ -1361,7 +1375,6 @@ function InspectorCard({
                     {t('workflow.inspector.retryTask', {
                       defaultValue: 'Retry task',
                     })}
-                    <kbd className="ml-0.5 text-[10px] text-[var(--ink-tertiary)] font-mono">⌘R</kbd>
                   </button>
                   <button
                     type="button"
@@ -1404,7 +1417,6 @@ function InspectorCard({
                     )}
                   />
                   {t('workflow.inspector.retry', { defaultValue: 'Retry' })}
-                  <kbd className="ml-0.5 text-[10px] text-[var(--ink-tertiary)] font-mono">⌘R</kbd>
                 </button>
               ))}
           </div>
@@ -1513,7 +1525,7 @@ function ChatPanel({
           const markdownContent = getLocalizedTranscriptMarkdown(entry, t);
           const entryAgentName =
             !isUser && isReviewEntry
-              ? getWorkflowReviewAgentName(entry, agentName)
+              ? getWorkflowReviewAgentName(entry, agentName, t)
               : !isUser && entry.agent_name?.trim()
                 ? entry.agent_name.trim()
                 : null;
