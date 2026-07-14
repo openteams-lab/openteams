@@ -800,6 +800,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   );
   const [isMemberPickerOpen, setIsMemberPickerOpen] = useState(false);
   const [activeMemberPickerIndex, setActiveMemberPickerIndex] = useState(0);
+  const memberPickerRef = useRef<HTMLDivElement | null>(null);
   const [isRelatedFilesOpen, setIsRelatedFilesOpen] = useState(true);
   const [wasRelatedFilesAutoCollapsed, setWasRelatedFilesAutoCollapsed] =
     useState(false);
@@ -1188,6 +1189,25 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
       setIsMemberPickerOpen(false);
     }
   }, [chatInputMode]);
+
+  useEffect(() => {
+    if (!isMemberPickerOpen) return;
+
+    const handlePointerDownOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        !memberPickerRef.current?.contains(target)
+      ) {
+        setIsMemberPickerOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDownOutside);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDownOutside);
+    };
+  }, [isMemberPickerOpen]);
 
   useEffect(() => {
     if (activeMemberPickerIndex >= members.length) {
@@ -2753,7 +2773,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                       <Lock className="h-3 w-3 shrink-0 opacity-70" />
                     </div>
                   ) : (
-                    <div className="relative">
+                    <div ref={memberPickerRef} className="relative">
                     <button
                       type="button"
                       onClick={(e) => {
