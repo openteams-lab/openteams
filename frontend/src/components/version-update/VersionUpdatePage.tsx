@@ -256,7 +256,7 @@ export function VersionUpdatePage({
           </div>
 
           <div className="relative z-10 grid min-h-0 flex-1 grid-cols-1 overflow-y-auto [scrollbar-width:none] lg:grid-cols-[minmax(0,1fr)_328px] lg:overflow-hidden [&::-webkit-scrollbar]:hidden">
-            <main className="min-w-0 overflow-y-auto px-6 py-6 [scrollbar-width:none] sm:px-8 lg:overflow-hidden lg:px-9 [&::-webkit-scrollbar]:hidden">
+            <main className="flex min-h-0 min-w-0 flex-col overflow-y-auto px-6 pb-[10px] pt-6 [scrollbar-width:none] sm:px-8 lg:overflow-hidden lg:px-9 [&::-webkit-scrollbar]:hidden">
               <p
                 className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--upgrade-text-subtle)]"
                 style={updateMonoFont}
@@ -303,7 +303,7 @@ export function VersionUpdatePage({
                 </div>
               </div>
 
-              <section className="mt-6 border-t border-[var(--upgrade-line)] pt-5">
+              <section className="mt-6 flex min-h-0 flex-1 flex-col border-t border-[var(--upgrade-line)] pt-5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <span className="h-5 w-[2px] rounded-full bg-[#5E6AD2]" />
@@ -324,7 +324,7 @@ export function VersionUpdatePage({
                     </a>
                   )}
                 </div>
-                <div className="mt-3.5 max-h-[240px] overflow-y-auto break-words font-sans text-[13px] leading-[1.75] tracking-[0] text-[var(--upgrade-text-muted)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&_a]:text-[var(--upgrade-accent)] [&_a]:underline-offset-2 hover:[&_a]:underline [&_code]:rounded [&_code]:bg-[var(--upgrade-fill)] [&_code]:px-1 [&_h1]:mb-3 [&_h1]:font-semibold [&_h1]:text-[var(--upgrade-text-strong)] [&_h2]:mb-3 [&_h2]:font-semibold [&_h2]:text-[var(--upgrade-text-strong)] [&_h3]:mb-2 [&_h3]:font-medium [&_h3]:text-[var(--upgrade-text-strong)] [&_li]:pl-1 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-5 [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5 [&_ul]:marker:text-[var(--upgrade-text-faint)]">
+                <div className="mt-3.5 min-h-0 flex-1 overflow-y-auto break-words font-sans text-[13px] leading-[1.75] tracking-[0] text-[var(--upgrade-text-muted)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&_a]:text-[var(--upgrade-accent)] [&_a]:underline-offset-2 hover:[&_a]:underline [&_code]:rounded [&_code]:bg-[var(--upgrade-fill)] [&_code]:px-1 [&_h1]:mb-3 [&_h1]:font-semibold [&_h1]:text-[var(--upgrade-text-strong)] [&_h2]:mb-3 [&_h2]:font-semibold [&_h2]:text-[var(--upgrade-text-strong)] [&_h3]:mb-2 [&_h3]:font-medium [&_h3]:text-[var(--upgrade-text-strong)] [&_li]:pl-1 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-5 [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5 [&_ul]:marker:text-[var(--upgrade-text-faint)]">
                   <ReactMarkdown>
                     {releaseNotes || t('onboarding.upgrade.releaseNotesEmpty')}
                   </ReactMarkdown>

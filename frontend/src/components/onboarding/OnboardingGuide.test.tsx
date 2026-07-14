@@ -564,7 +564,9 @@ check(
     updatePageSource.includes('h-[min(720px,calc(100vh-32px))]') &&
     updatePageSource.includes('max-w-[1080px]') &&
     updatePageSource.includes('lg:overflow-hidden') &&
-    updatePageSource.includes('max-h-[240px]') &&
+    updatePageSource.includes('pb-[10px]') &&
+    updatePageSource.includes('min-h-0 flex-1 flex-col') &&
+    !updatePageSource.includes('max-h-[240px]') &&
     updatePageSource.includes('mt-auto grid shrink-0') &&
     updatePageSource.includes('bg-[var(--upgrade-shell)]') &&
     updatePageSource.includes('shadow-[var(--upgrade-shell-shadow)]') &&
@@ -587,7 +589,7 @@ check(
     updatePageSource.includes('min-h-9 grid-cols-') &&
     updatePageSource.includes('border-t border-[var(--upgrade-line)] bg-[var(--upgrade-shell)]') &&
     updatePageSource.includes('lg:border-l lg:border-t-0') &&
-    updatePageSource.includes('mt-6 border-t border-[var(--upgrade-line)] pt-5') &&
+    updatePageSource.includes('mt-6 flex min-h-0 flex-1 flex-col border-t border-[var(--upgrade-line)] pt-5') &&
     updatePageSource.includes('bg-[var(--upgrade-warning-bg)]') &&
     updatePageSource.includes('border-l-2 border-[var(--upgrade-warning-accent)]') &&
     updatePageSource.includes('backdrop-blur-xl') &&
