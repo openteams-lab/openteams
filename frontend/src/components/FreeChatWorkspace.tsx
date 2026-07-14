@@ -899,6 +899,72 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
         );
       })
     : messages;
+  const workflowCardMessageIds = useMemo(
+    () =>
+      messages
+        .filter((message) => message.workflowCard)
+        .map((message) => message.id),
+    [messages],
+  );
+  const [unfinishedWorkflowCardMessageId, setUnfinishedWorkflowCardMessageId] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const findLatestUnfinishedWorkflowCard = async () => {
+      const projections = await Promise.all(
+        workflowCardMessageIds.map(async (messageId) => {
+          try {
+            const projection = await chatMessagesApi.getWorkflowCard(
+              messageId,
+              "summary",
+            );
+            return projection.is_terminal ? null : messageId;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (!cancelled) {
+        setUnfinishedWorkflowCardMessageId(
+          projections.slice().reverse().find((messageId) => messageId !== null) ??
+            null,
+        );
+      }
+    };
+
+    void findLatestUnfinishedWorkflowCard();
+    if (workflowCardMessageIds.length === 0) return () => {
+      cancelled = true;
+    };
+
+    const intervalId = window.setInterval(
+      findLatestUnfinishedWorkflowCard,
+      5_000,
+    );
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeSessionId, workflowCardMessageIds]);
+
+  const jumpToUnfinishedWorkflowCard = useCallback(() => {
+    if (!unfinishedWorkflowCardMessageId) return;
+    chatAutoFollowRef.current = false;
+    const scrollToCard = () =>
+      document
+        .getElementById(`chat-message-${unfinishedWorkflowCardMessageId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    if (selectedSidebarMemberId) {
+      setSelectedSidebarMemberId(null);
+      window.requestAnimationFrame(scrollToCard);
+      return;
+    }
+    scrollToCard();
+  }, [selectedSidebarMemberId, unfinishedWorkflowCardMessageId]);
+
   const messagesById = useMemo(
     () =>
       new Map([
@@ -2314,6 +2380,20 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
             embedded ? "bg-transparent" : "bg-[var(--canvas)]"
           }`}
         >
+          {unfinishedWorkflowCardMessageId && (
+            <button
+              type="button"
+              onClick={jumpToUnfinishedWorkflowCard}
+              className={`absolute top-1.5 z-20 flex h-7 items-center gap-1.5 rounded-full border border-amber-500/35 bg-[var(--surface-1)]/95 px-3 text-[10px] font-medium text-amber-600 shadow-sm backdrop-blur transition-colors hover:bg-amber-500/10 dark:text-amber-400 ${
+                isRelatedFilesOpen ? "right-7" : "right-10"
+              }`}
+              title="Jump to unfinished workflow"
+              aria-label="Jump to unfinished workflow"
+            >
+              <GitBranch className="h-3.5 w-3.5" />
+              <span>Active Workflow</span>
+            </button>
+          )}
           {!isRelatedFilesOpen && (
             <button
               type="button"
@@ -2342,9 +2422,10 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
           </div>
 
           {/* Messages Feed */}
+          <div className="relative mb-4 min-h-0 flex-1">
           <ScrollArea
             ref={chatMessagesScrollRef}
-            className="mb-4 flex-1 space-y-4 pr-1"
+            className="h-full space-y-4 pr-1"
             onScroll={handleChatScroll}
             onWheel={handleChatWheel}
           >
@@ -2363,6 +2444,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
             {displayedMessages.map((msg) => (
               <div
                 key={msg.id}
+                id={`chat-message-${msg.id}`}
                 className={`group/message relative flex w-full min-w-0 gap-3 items-start rounded-md ${
                   msg.isUser
                     ? "border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2.5"
@@ -2599,6 +2681,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
             ))}
             <div ref={chatEndRef} />
           </ScrollArea>
+          </div>
 
           {/* Chat discussion input styled in GPT-4 style with space */}
           <div className="shrink-0 pt-4 pb-0">
