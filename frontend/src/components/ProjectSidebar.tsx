@@ -2320,7 +2320,7 @@ export function ProjectSidebar({
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    className="inline-flex h-8 w-20 cursor-pointer items-center justify-center rounded-md border border-[var(--hairline-strong)] text-xs font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-3)] transition"
+                    className="inline-flex h-7 w-16 cursor-pointer items-center justify-center rounded-md border border-[var(--hairline-strong)] text-xs font-medium text-[var(--ink-muted)] hover:bg-[var(--surface-3)] transition"
                     onClick={closeDeleteDialog}
                     disabled={deleteInFlight}
                   >
@@ -2328,11 +2328,10 @@ export function ProjectSidebar({
                   </button>
                   <button
                     type="button"
-                    className="inline-flex h-8 w-20 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-red-500 text-xs font-medium text-white hover:bg-red-600 transition disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-7 w-16 cursor-pointer items-center justify-center rounded-md bg-red-500 text-xs font-medium text-white hover:bg-red-600 transition disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={() => void confirmDeleteProject()}
                     disabled={deleteInFlight}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
                     {deleteInFlight
                       ? translate("sidebar.deleting", "Deleting...")
                       : translate("sidebar.delete", "Delete")}
