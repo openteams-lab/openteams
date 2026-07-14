@@ -255,6 +255,7 @@ impl WorkflowOrchestrator {
                 .unwrap_or_else(|| plan.title.clone()),
             state: WorkflowCardState::PreviewReady,
             execution_status: "preview".to_string(),
+            stopped_by_user: false,
             error_message: None,
             completed_step_count: 0,
             total_step_count: parsed_plan.nodes.len(),
@@ -606,6 +607,83 @@ impl WorkflowOrchestrator {
         }
 
         Ok(bootstrap)
+    }
+
+    /// Stop a running workflow execution as a terminal user decision.
+    pub async fn stop_execution(
+        chat_runner: &ChatRunner,
+        pool: &SqlitePool,
+        execution_id: Uuid,
+    ) -> Result<WorkflowExecution, OrchestratorError> {
+        let execution = WorkflowExecution::find_by_id(pool, execution_id)
+            .await?
+            .ok_or_else(|| {
+                OrchestratorError::NotFound(format!("execution {} 未找到", execution_id))
+            })?;
+        if execution.status != WorkflowExecutionStatus::Running {
+            return Err(OrchestratorError::IllegalTransition(format!(
+                "cannot stop: execution is {:?}, expected running",
+                execution.status
+            )));
+        }
+
+        for step in WorkflowStep::find_by_execution(pool, execution.id).await? {
+            match step.status {
+                WorkflowStepStatus::Running
+                | WorkflowStepStatus::WaitingInput
+                | WorkflowStepStatus::WaitingReview => {
+                    if step.status == WorkflowStepStatus::Running {
+                        cancel_running_step(step.id);
+                    }
+                    let requested = Self::transition_step_and_sync(
+                        pool,
+                        chat_runner,
+                        &execution,
+                        &step,
+                        WorkflowStepStatus::InterruptRequested,
+                        "step_interrupt_requested_by_workflow_stop",
+                    )
+                    .await?;
+                    Self::transition_step_and_sync(
+                        pool,
+                        chat_runner,
+                        &execution,
+                        &requested,
+                        WorkflowStepStatus::Interrupted,
+                        "step_interrupted_by_workflow_stop",
+                    )
+                    .await?;
+                }
+                WorkflowStepStatus::Revising | WorkflowStepStatus::PreCompleted => {
+                    Self::transition_step_and_sync(
+                        pool,
+                        chat_runner,
+                        &execution,
+                        &step,
+                        WorkflowStepStatus::Failed,
+                        "step_stopped_with_workflow",
+                    )
+                    .await?;
+                }
+                _ => {}
+            }
+        }
+
+        let current = WorkflowExecution::find_by_id(pool, execution.id)
+            .await?
+            .ok_or_else(|| {
+                OrchestratorError::NotFound(format!("execution {} 未找到", execution.id))
+            })?;
+        Self::transition_execution_with_detail_and_sync(
+            pool,
+            chat_runner,
+            &current,
+            WorkflowExecutionStatus::Failed,
+            "stopped_by_user",
+            "execution_stopped_by_user",
+            None,
+        )
+        .await
     }
 
     /// Pause all running steps in the execution.

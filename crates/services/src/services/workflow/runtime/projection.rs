@@ -13,6 +13,7 @@ pub fn build_workflow_card_projection(
     workflow_agent_sessions: &[WorkflowAgentSession],
     session_agents: &[ChatSessionAgent],
     agents: &[ChatAgent],
+    stopped_by_user: bool,
     error_message: Option<String>,
 ) -> Result<WorkflowCardProjection, WorkflowRuntimeError> {
     let mut plan_json: WorkflowPlanJson = serde_json::from_str(&revision.plan_json)?;
@@ -142,6 +143,7 @@ pub fn build_workflow_card_projection(
             .unwrap_or_else(|| plan.title.clone()),
         state,
         execution_status: to_workflow_wire_value(&execution.status),
+        stopped_by_user,
         error_message,
         completed_step_count,
         total_step_count,
@@ -181,6 +183,7 @@ pub fn build_workflow_card_projection_lightweight(
     session_agents: &[ChatSessionAgent],
     agents: &[ChatAgent],
     transcript_count: Option<i64>,
+    stopped_by_user: bool,
     error_message: Option<String>,
 ) -> Result<WorkflowCardProjection, WorkflowRuntimeError> {
     let mut plan_json: WorkflowPlanJson = serde_json::from_str(&revision.plan_json)?;
@@ -311,6 +314,7 @@ pub fn build_workflow_card_projection_lightweight(
             .unwrap_or_else(|| plan.title.clone()),
         state,
         execution_status: to_workflow_wire_value(&execution.status),
+        stopped_by_user,
         error_message,
         completed_step_count,
         total_step_count,

@@ -1,14 +1,343 @@
 use chrono::Utc;
-use db::models::{
-    workflow_execution::WorkflowExecution, workflow_step::WorkflowStep,
-    workflow_step_edge::WorkflowStepEdge, workflow_transcript::WorkflowTranscript,
-    workflow_types::*,
+use db::{
+    DBService,
+    models::{
+        chat_session::{ChatSession, CreateChatSession},
+        workflow_event::WorkflowEvent,
+        workflow_execution::{CreateWorkflowExecution, WorkflowExecution},
+        workflow_plan::{CreateWorkflowPlan, WorkflowPlan},
+        workflow_plan_revision::{CreateWorkflowPlanRevision, WorkflowPlanRevision},
+        workflow_round::{CreateWorkflowRound, WorkflowRound},
+        workflow_step::{CreateWorkflowStep, WorkflowStep},
+        workflow_step_edge::WorkflowStepEdge,
+        workflow_transcript::WorkflowTranscript,
+        workflow_types::*,
+    },
 };
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use super::{
     super::workflow_runtime::WorkflowRevisionFeedbackSource, step_input::StepFollowUpMode, *,
 };
+
+struct StopFixture {
+    db: DBService,
+    execution: WorkflowExecution,
+    running_step_id: Uuid,
+    review_step_id: Uuid,
+    ready_step_id: Uuid,
+}
+
+async fn seed_workflow_stop_fixture() -> StopFixture {
+    let pool = SqlitePool::connect("sqlite::memory:")
+        .await
+        .expect("create sqlite memory pool");
+    sqlx::migrate!("../db/migrations")
+        .run(&pool)
+        .await
+        .expect("run migrations");
+    let db = DBService { pool };
+    let session = ChatSession::create(
+        &db.pool,
+        &CreateChatSession {
+            title: Some("stop fixture".to_string()),
+            workspace_path: None,
+            project_id: None,
+            worktree_mode: None,
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("create session");
+    let plan_json = serde_json::json!({
+        "version": "1",
+        "title": "Stop fixture",
+        "goal": "Test terminal stop",
+        "agents": { "lead": "lead", "available": [] },
+        "nodes": [],
+        "edges": []
+    })
+    .to_string();
+    let plan = WorkflowPlan::create(
+        &db.pool,
+        &CreateWorkflowPlan {
+            session_id: session.id,
+            source_message_id: None,
+            created_by_session_agent_id: None,
+            title: "Stop fixture".to_string(),
+            summary_text: None,
+            plan_json: plan_json.clone(),
+            plan_schema_version: 1,
+            plan_hash: "stop-fixture".to_string(),
+            validation_status: WorkflowValidationStatus::Valid,
+            validation_errors_json: None,
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("create plan");
+    let revision = WorkflowPlanRevision::create(
+        &db.pool,
+        &CreateWorkflowPlanRevision {
+            plan_id: plan.id,
+            revision_no: 1,
+            edited_by: WorkflowRevisionEditor::System,
+            editor_session_agent_id: None,
+            reason: Some("test".to_string()),
+            plan_json,
+            plan_hash: "stop-fixture".to_string(),
+            validation_status: WorkflowValidationStatus::Valid,
+            validation_errors_json: None,
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("create revision");
+    let execution = WorkflowExecution::create(
+        &db.pool,
+        &CreateWorkflowExecution {
+            session_id: session.id,
+            plan_id: plan.id,
+            active_revision_id: Some(revision.id),
+            lead_session_agent_id: None,
+            title: "Stop fixture".to_string(),
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("create execution");
+    let round = WorkflowRound::create(
+        &db.pool,
+        &CreateWorkflowRound {
+            execution_id: execution.id,
+            round_index: 1,
+            source_revision_id: Some(revision.id),
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("create round");
+    let execution = WorkflowExecution::update_active_round(&db.pool, execution.id, round.id, 1)
+        .await
+        .expect("activate round");
+    let execution =
+        WorkflowExecution::update_status(&db.pool, execution.id, WorkflowExecutionStatus::Running)
+            .await
+            .expect("mark execution running");
+
+    async fn create_step(
+        pool: &SqlitePool,
+        execution: &WorkflowExecution,
+        round: &WorkflowRound,
+        revision_id: Uuid,
+        key: &str,
+        display_order: i32,
+        status: WorkflowStepStatus,
+    ) -> WorkflowStep {
+        let step = WorkflowStep::create(
+            pool,
+            &CreateWorkflowStep {
+                execution_id: execution.id,
+                round_id: round.id,
+                compiled_revision_id: Some(revision_id),
+                step_key: key.to_string(),
+                step_type: WorkflowStepType::Task,
+                title: key.to_string(),
+                instructions: key.to_string(),
+                assigned_workflow_agent_session_id: None,
+                max_retry: 1,
+                round_index: 1,
+                display_order,
+                loop_id: None,
+                lead_review_required: Some(false),
+                user_review_required: Some(false),
+                revision_context: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create step");
+        WorkflowStep::update_status(pool, step.id, status)
+            .await
+            .expect("set step status")
+    }
+
+    let running = create_step(
+        &db.pool,
+        &execution,
+        &round,
+        revision.id,
+        "running",
+        0,
+        WorkflowStepStatus::Running,
+    )
+    .await;
+    let review = create_step(
+        &db.pool,
+        &execution,
+        &round,
+        revision.id,
+        "review",
+        1,
+        WorkflowStepStatus::WaitingReview,
+    )
+    .await;
+    let ready = create_step(
+        &db.pool,
+        &execution,
+        &round,
+        revision.id,
+        "ready",
+        2,
+        WorkflowStepStatus::Ready,
+    )
+    .await;
+    StopFixture {
+        db,
+        execution,
+        running_step_id: running.id,
+        review_step_id: review.id,
+        ready_step_id: ready.id,
+    }
+}
+
+#[tokio::test]
+async fn workflow_stop_execution_transitions_to_terminal_failed() {
+    let fixture = seed_workflow_stop_fixture().await;
+    let runner = ChatRunner::new(fixture.db.clone());
+    let stopped =
+        WorkflowOrchestrator::stop_execution(&runner, &fixture.db.pool, fixture.execution.id)
+            .await
+            .expect("stop execution");
+    assert_eq!(stopped.status, WorkflowExecutionStatus::Failed);
+    assert!(stopped.completed_at.is_some());
+    assert_eq!(
+        WorkflowStep::find_by_id(&fixture.db.pool, fixture.running_step_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        WorkflowStepStatus::Interrupted,
+    );
+    assert_eq!(
+        WorkflowStep::find_by_id(&fixture.db.pool, fixture.review_step_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        WorkflowStepStatus::Interrupted,
+    );
+    assert_eq!(
+        WorkflowStep::find_by_id(&fixture.db.pool, fixture.ready_step_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        WorkflowStepStatus::Ready,
+    );
+    let latest_event = WorkflowEvent::find_by_execution(&fixture.db.pool, stopped.id)
+        .await
+        .expect("list events")
+        .into_iter()
+        .rev()
+        .find(|event| event.step_id.is_none() && event.status_after.as_deref() == Some("failed"))
+        .expect("execution failed event");
+    assert!(
+        latest_event
+            .detail_json
+            .as_deref()
+            .unwrap_or_default()
+            .contains("stopped_by_user")
+    );
+}
+
+#[tokio::test]
+async fn workflow_stop_execution_rejects_non_running_execution() {
+    let completed = seed_workflow_stop_fixture().await;
+    WorkflowExecution::update_status(
+        &completed.db.pool,
+        completed.execution.id,
+        WorkflowExecutionStatus::Completed,
+    )
+    .await
+    .expect("complete execution");
+    let before = WorkflowEvent::find_by_execution(&completed.db.pool, completed.execution.id)
+        .await
+        .unwrap()
+        .len();
+    let error = WorkflowOrchestrator::stop_execution(
+        &ChatRunner::new(completed.db.clone()),
+        &completed.db.pool,
+        completed.execution.id,
+    )
+    .await
+    .expect_err("completed execution cannot stop");
+    assert!(error.to_string().contains("expected running"));
+    assert_eq!(
+        WorkflowEvent::find_by_execution(&completed.db.pool, completed.execution.id)
+            .await
+            .unwrap()
+            .len(),
+        before,
+    );
+
+    let failed = seed_workflow_stop_fixture().await;
+    WorkflowExecution::update_status(
+        &failed.db.pool,
+        failed.execution.id,
+        WorkflowExecutionStatus::Failed,
+    )
+    .await
+    .expect("fail execution");
+    let error = WorkflowOrchestrator::stop_execution(
+        &ChatRunner::new(failed.db.clone()),
+        &failed.db.pool,
+        failed.execution.id,
+    )
+    .await
+    .expect_err("failed execution cannot stop");
+    assert!(error.to_string().contains("expected running"));
+}
+
+#[tokio::test]
+async fn workflow_stop_execution_cannot_resume() {
+    let fixture = seed_workflow_stop_fixture().await;
+    let runner = ChatRunner::new(fixture.db.clone());
+    WorkflowOrchestrator::stop_execution(&runner, &fixture.db.pool, fixture.execution.id)
+        .await
+        .expect("stop execution");
+
+    let events_before = WorkflowEvent::find_by_execution(&fixture.db.pool, fixture.execution.id)
+        .await
+        .expect("list events before resume");
+    let error =
+        WorkflowOrchestrator::resume_execution(&fixture.db.pool, &runner, fixture.execution.id)
+            .await
+            .expect_err("a user-stopped workflow must not resume");
+    assert_eq!(
+        error.to_string(),
+        "状态迁移非法: workflow stopped by user cannot be resumed",
+    );
+    assert_eq!(
+        WorkflowStep::find_by_id(&fixture.db.pool, fixture.ready_step_id)
+            .await
+            .expect("load ready step")
+            .expect("ready step exists")
+            .status,
+        WorkflowStepStatus::Ready,
+    );
+    let events_after = WorkflowEvent::find_by_execution(&fixture.db.pool, fixture.execution.id)
+        .await
+        .expect("list events after resume");
+    assert_eq!(events_after.len(), events_before.len());
+    assert!(
+        !events_after
+            .iter()
+            .skip(events_before.len())
+            .any(|event| { event.status_after.as_deref() == Some("running") })
+    );
+}
 
 #[derive(Clone, Copy)]
 enum SimulatedLeadVerdict {

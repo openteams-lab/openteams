@@ -1314,6 +1314,63 @@ impl WorkflowOrchestrator {
         .await
     }
 
+    pub(super) async fn transition_execution_with_detail_and_sync(
+        pool: &SqlitePool,
+        chat_runner: &ChatRunner,
+        execution: &WorkflowExecution,
+        to: WorkflowExecutionStatus,
+        detail: &str,
+        projection_reason: &str,
+        projection_error_message: Option<String>,
+    ) -> Result<WorkflowExecution, OrchestratorError> {
+        let from_status = to_workflow_wire_value(&execution.status);
+        let to_status = to_workflow_wire_value(&to);
+        let mut transitioned = reducer::transition_execution_with_context(
+            pool,
+            execution,
+            to.clone(),
+            execution.active_round_id,
+            Some(detail),
+        )
+        .await?
+        .entity;
+        if to == WorkflowExecutionStatus::Running && transitioned.started_at.is_none() {
+            transitioned = WorkflowExecution::set_started(pool, transitioned.id).await?;
+        }
+        if matches!(
+            to,
+            WorkflowExecutionStatus::Completed | WorkflowExecutionStatus::Failed
+        ) && transitioned.completed_at.is_none()
+        {
+            transitioned = WorkflowExecution::set_completed(pool, transitioned.id).await?;
+        }
+
+        let duration_ms = transitioned.started_at.and_then(|started| {
+            transitioned
+                .completed_at
+                .map(|completed| (completed - started).num_milliseconds())
+        });
+        workflow_analytics::track_execution_state_changed(
+            chat_runner.analytics_service(),
+            execution.session_id,
+            execution.id,
+            execution.plan_id,
+            &from_status,
+            &to_status,
+            duration_ms,
+        );
+
+        Self::refresh_execution_projection_with_reason(
+            pool,
+            chat_runner,
+            transitioned.id,
+            projection_error_message,
+            projection_reason,
+            Vec::new(),
+        )
+        .await
+    }
+
     pub(crate) async fn transition_step_and_sync(
         pool: &SqlitePool,
         chat_runner: &ChatRunner,

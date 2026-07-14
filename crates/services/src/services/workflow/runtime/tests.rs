@@ -1379,6 +1379,7 @@ mod tests {
                 &[],
                 &session_agents,
                 &agents,
+                false,
                 None,
             )
             .expect("build projection");
@@ -1427,6 +1428,7 @@ mod tests {
                 &[],
                 &session_agents,
                 &agents,
+                false,
                 None,
             )
             .expect("build projection");
@@ -1476,6 +1478,7 @@ mod tests {
             &[],
             &session_agents,
             &agents,
+            false,
             None,
         )
         .expect("build projection");
@@ -1545,6 +1548,7 @@ mod tests {
             &[],
             &session_agents,
             &agents,
+            false,
             None,
         )
         .expect("build projection");
@@ -1595,6 +1599,7 @@ mod tests {
             &session_agents,
             &agents,
             Some(42i64),
+            false,
             None,
         )
         .expect("build lightweight projection");
@@ -1639,6 +1644,7 @@ mod tests {
                 &session_agents,
                 &agents,
                 None,
+                false,
                 None,
             )
             .expect("build lightweight projection");
@@ -1647,6 +1653,67 @@ mod tests {
                 "is_terminal mismatch for status {:?}",
                 execution.status
             );
+        }
+    }
+
+    #[test]
+    fn workflow_projection_separates_user_stop_marker_from_error() {
+        let execution = sample_execution(WorkflowExecutionStatus::Failed);
+        let plan = sample_plan(execution.plan_id);
+        let revision = sample_revision(plan.id, sample_plan_json());
+        let steps = vec![sample_step(WorkflowStepStatus::Completed)];
+        let (session_agents, agents) = sample_agent_views();
+
+        for (stopped_by_user, error_message) in [
+            (false, Some("ordinary failure".to_string())),
+            (true, None),
+        ] {
+            let full = build_workflow_card_projection(
+                &execution,
+                &plan,
+                &revision,
+                std::slice::from_ref(&revision),
+                &steps,
+                &[],
+                &[],
+                &[],
+                &[],
+                &[],
+                &[],
+                &[],
+                &session_agents,
+                &agents,
+                stopped_by_user,
+                error_message.clone(),
+            )
+            .expect("build full projection");
+            let lightweight = build_workflow_card_projection_lightweight(
+                &execution,
+                &plan,
+                &revision,
+                std::slice::from_ref(&revision),
+                &steps,
+                &[],
+                &[],
+                &[],
+                &[],
+                &[],
+                &[],
+                &[],
+                &session_agents,
+                &agents,
+                Some(0),
+                stopped_by_user,
+                error_message.clone(),
+            )
+            .expect("build lightweight projection");
+
+            for projection in [&full, &lightweight] {
+                assert_eq!(projection.stopped_by_user, stopped_by_user);
+                assert_eq!(projection.error_message, error_message);
+                let json = serde_json::to_string(projection).expect("serialize projection");
+                assert!(!json.contains("\"error_message\":\"stopped_by_user\""));
+            }
         }
     }
 }

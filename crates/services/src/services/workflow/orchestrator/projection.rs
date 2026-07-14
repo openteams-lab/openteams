@@ -91,6 +91,7 @@ impl WorkflowOrchestrator {
         let transcript_count = WorkflowTranscript::count_by_execution(pool, execution.id)
             .await
             .ok();
+        let stopped_by_user = Self::execution_was_stopped_by_user(pool, execution.id).await?;
 
         let projection = build_workflow_card_projection_lightweight(
             execution,
@@ -108,6 +109,7 @@ impl WorkflowOrchestrator {
             session_agents,
             agents,
             transcript_count,
+            stopped_by_user,
             error_message,
         )?;
         let mut meta = message.meta.0.clone();

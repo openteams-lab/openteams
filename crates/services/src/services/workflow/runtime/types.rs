@@ -155,6 +155,8 @@ pub struct WorkflowCardProjection {
     pub goal: String,
     pub state: WorkflowCardState,
     pub execution_status: String,
+    #[serde(default)]
+    pub stopped_by_user: bool,
     pub error_message: Option<String>,
     pub completed_step_count: usize,
     pub total_step_count: usize,

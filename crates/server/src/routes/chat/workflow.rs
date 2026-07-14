@@ -892,6 +892,37 @@ pub async fn resume_execution(
         .into_response())
 }
 
+pub async fn stop_execution(
+    Extension(session): Extension<ChatSession>,
+    State(deployment): State<DeploymentImpl>,
+    axum::extract::Path((_session_id, execution_id)): axum::extract::Path<(Uuid, Uuid)>,
+) -> Result<Response, ApiError> {
+    let execution = WorkflowExecution::find_by_id(&deployment.db().pool, execution_id)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Execution not found.".to_string()))?;
+    if execution.session_id != session.id {
+        return Err(ApiError::BadRequest(
+            "Execution not found in this session.".to_string(),
+        ));
+    }
+    let stopped = WorkflowOrchestrator::stop_execution(
+        deployment.chat_runner(),
+        &deployment.db().pool,
+        execution_id,
+    )
+    .await
+    .map_err(|error| ApiError::BadRequest(error.to_string()))?;
+    Ok((
+        StatusCode::OK,
+        ResponseJson(ApiResponse::<serde_json::Value>::success(
+            serde_json::json!({
+                "status": db::models::workflow_types::to_workflow_wire_value(&stopped.status)
+            }),
+        )),
+    )
+        .into_response())
+}
+
 // -----------------------------------------------------------------------
 // Pause All
 // -----------------------------------------------------------------------
@@ -1792,7 +1823,235 @@ async fn load_effective_agents_for_route(
 
 #[cfg(test)]
 mod tests {
+    use axum::{
+        Router,
+        body::{Body, to_bytes},
+        http::{Method, Request},
+    };
+    use db::{
+        DBService,
+        models::{
+            chat_message::{ChatSenderType, CreateChatMessage},
+            chat_session::CreateChatSession,
+            workflow_execution::CreateWorkflowExecution,
+        },
+    };
+    use serde_json::{Value, json};
+    use tower::ServiceExt;
+
     use super::*;
+    use crate::routes::chat::messages::{
+        build_execution_workflow_card_projection,
+        build_execution_workflow_card_projection_lightweight,
+    };
+
+    async fn setup_workflow_route_app() -> (Router, SqlitePool) {
+        let pool = SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("create sqlite memory pool");
+        sqlx::migrate!("../db/migrations")
+            .run(&pool)
+            .await
+            .expect("run migrations");
+        let deployment =
+            local_deployment::LocalDeployment::new_for_test_pool(DBService { pool: pool.clone() })
+                .await
+                .expect("create test deployment");
+        let app = Router::new()
+            .nest("/api", crate::routes::chat::router(&deployment))
+            .with_state(deployment);
+        (app, pool)
+    }
+
+    async fn create_test_session(pool: &SqlitePool, title: &str) -> ChatSession {
+        ChatSession::create(
+            pool,
+            &CreateChatSession {
+                title: Some(title.to_string()),
+                workspace_path: None,
+                project_id: None,
+                worktree_mode: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create chat session")
+    }
+
+    async fn seed_running_execution(pool: &SqlitePool, session: &ChatSession) -> WorkflowExecution {
+        let card = ChatMessage::create(
+            pool,
+            &CreateChatMessage {
+                session_id: session.id,
+                sender_type: ChatSenderType::System,
+                sender_id: None,
+                content: "Workflow".to_string(),
+                mentions: Vec::new(),
+                meta: json!({ "card_type": "workflow_execution" }),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create workflow card");
+        let plan_json = json!({
+            "version": "1",
+            "title": "Stop route",
+            "goal": "Verify stop route",
+            "agents": { "lead": "lead", "available": [] },
+            "nodes": [],
+            "edges": []
+        })
+        .to_string();
+        let plan = WorkflowPlan::create(
+            pool,
+            &CreateWorkflowPlan {
+                session_id: session.id,
+                source_message_id: None,
+                created_by_session_agent_id: None,
+                title: "Stop route".to_string(),
+                summary_text: Some("Verify stop route".to_string()),
+                plan_json: plan_json.clone(),
+                plan_schema_version: 1,
+                plan_hash: "stop-route-plan".to_string(),
+                validation_status: WorkflowValidationStatus::Valid,
+                validation_errors_json: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create workflow plan");
+        let plan = WorkflowPlan::update_workflow_card_message_id(pool, plan.id, card.id)
+            .await
+            .expect("attach card to plan");
+        let revision = WorkflowPlanRevision::create(
+            pool,
+            &CreateWorkflowPlanRevision {
+                plan_id: plan.id,
+                revision_no: 1,
+                edited_by: WorkflowRevisionEditor::System,
+                editor_session_agent_id: None,
+                reason: Some("route-test".to_string()),
+                plan_json,
+                plan_hash: "stop-route-plan".to_string(),
+                validation_status: WorkflowValidationStatus::Valid,
+                validation_errors_json: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create workflow revision");
+        let execution = WorkflowExecution::create(
+            pool,
+            &CreateWorkflowExecution {
+                session_id: session.id,
+                plan_id: plan.id,
+                active_revision_id: Some(revision.id),
+                lead_session_agent_id: None,
+                title: "Stop route".to_string(),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create workflow execution");
+        let execution =
+            WorkflowExecution::update_workflow_card_message_id(pool, execution.id, card.id)
+                .await
+                .expect("attach card to execution");
+        WorkflowExecution::update_status(pool, execution.id, WorkflowExecutionStatus::Running)
+            .await
+            .expect("mark execution running")
+    }
+
+    async fn post_without_body(app: &Router, uri: String) -> (StatusCode, Value) {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri(uri)
+                    .body(Body::empty())
+                    .expect("build request"),
+            )
+            .await
+            .expect("execute request");
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("read response");
+        let body = if bytes.is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_slice(&bytes).expect("parse JSON response")
+        };
+        (status, body)
+    }
+
+    #[tokio::test]
+    async fn workflow_stop_execution_route_enforces_owner_terminal_state_and_resume_guard() {
+        let (app, pool) = setup_workflow_route_app().await;
+        let owner = create_test_session(&pool, "owner").await;
+        let other = create_test_session(&pool, "other").await;
+        let execution = seed_running_execution(&pool, &owner).await;
+
+        let (cross_status, _) = post_without_body(
+            &app,
+            format!(
+                "/api/chat/sessions/{}/workflow/executions/{}/stop",
+                other.id, execution.id
+            ),
+        )
+        .await;
+        assert_eq!(cross_status, StatusCode::BAD_REQUEST);
+
+        let (stop_status, stop_body) = post_without_body(
+            &app,
+            format!(
+                "/api/chat/sessions/{}/workflow/executions/{}/stop",
+                owner.id, execution.id
+            ),
+        )
+        .await;
+        assert_eq!(stop_status, StatusCode::OK, "{stop_body}");
+        assert_eq!(stop_body["success"], true);
+        assert_eq!(stop_body["data"]["status"], "failed");
+
+        let card = ChatMessage::find_by_id(
+            &pool,
+            execution
+                .workflow_card_message_id
+                .expect("execution has workflow card"),
+        )
+        .await
+        .expect("load workflow card")
+        .expect("workflow card exists");
+        let full = build_execution_workflow_card_projection(&pool, &card)
+            .await
+            .expect("rebuild full projection after stop");
+        let lightweight = build_execution_workflow_card_projection_lightweight(&pool, &card)
+            .await
+            .expect("rebuild lightweight projection after stop");
+        for projection in [full, lightweight] {
+            assert!(projection.stopped_by_user);
+            assert_eq!(projection.error_message, None);
+            let json = serde_json::to_string(&projection).expect("serialize projection");
+            assert!(!json.contains("\"error_message\":\"stopped_by_user\""));
+        }
+
+        let (resume_status, resume_body) = post_without_body(
+            &app,
+            format!(
+                "/api/chat/sessions/{}/workflow/executions/{}/resume",
+                owner.id, execution.id
+            ),
+        )
+        .await;
+        assert_eq!(resume_status, StatusCode::BAD_REQUEST);
+        assert!(
+            resume_body
+                .to_string()
+                .contains("workflow stopped by user cannot be resumed")
+        );
+    }
 
     #[test]
     fn sidebar_running_workflow_state_only_counts_active_states() {

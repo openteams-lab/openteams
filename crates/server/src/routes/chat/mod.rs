@@ -86,6 +86,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             axum::routing::post(workflow::resume_execution),
         )
         .route(
+            "/workflow/executions/{execution_id}/stop",
+            axum::routing::post(workflow::stop_execution),
+        )
+        .route(
             "/workflow/executions/{execution_id}/review-settings",
             axum::routing::post(workflow::update_review_settings),
         )

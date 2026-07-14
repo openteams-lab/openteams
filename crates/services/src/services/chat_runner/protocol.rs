@@ -1098,6 +1098,7 @@ impl ChatRunner {
             goal: plan_goal.to_string(),
             state,
             execution_status: "plan_generation".to_string(),
+            stopped_by_user: false,
             error_message: error_message.clone(),
             completed_step_count: 0,
             total_step_count: 0,

@@ -25,6 +25,7 @@ use services::services::{
     chat::{ChatAttachmentMeta, emit_user_message_workflow_analytics},
     workflow::{
         workflow_analytics,
+        workflow_orchestrator::WorkflowOrchestrator,
         workflow_runtime::{
             WorkflowCardProjection, WorkflowCardState, WorkflowCardStep,
             build_workflow_card_projection, build_workflow_card_projection_lightweight,
@@ -530,6 +531,9 @@ pub(super) async fn build_execution_workflow_card_projection(
     let transcripts =
         db::models::workflow_transcript::WorkflowTranscript::find_by_execution(pool, execution.id)
             .await?;
+    let stopped_by_user = WorkflowOrchestrator::execution_was_stopped_by_user(pool, execution.id)
+        .await
+        .map_err(|error| ApiError::BadRequest(error.to_string()))?;
 
     build_workflow_card_projection(
         &execution,
@@ -546,6 +550,7 @@ pub(super) async fn build_execution_workflow_card_projection(
         &workflow_sessions,
         &session_agents,
         &agents,
+        stopped_by_user,
         None,
     )
     .map_err(|err| ApiError::BadRequest(err.to_string()))
@@ -600,6 +605,9 @@ pub(super) async fn build_execution_workflow_card_projection_lightweight(
         db::models::workflow_transcript::WorkflowTranscript::count_by_execution(pool, execution.id)
             .await
             .ok();
+    let stopped_by_user = WorkflowOrchestrator::execution_was_stopped_by_user(pool, execution.id)
+        .await
+        .map_err(|error| ApiError::BadRequest(error.to_string()))?;
 
     build_workflow_card_projection_lightweight(
         &execution,
@@ -617,6 +625,7 @@ pub(super) async fn build_execution_workflow_card_projection_lightweight(
         &session_agents,
         &agents,
         transcript_count,
+        stopped_by_user,
         None,
     )
     .map_err(|err| ApiError::BadRequest(err.to_string()))
@@ -701,6 +710,7 @@ async fn build_plan_workflow_card_projection(
             .unwrap_or_else(|| plan.title.clone()),
         state: WorkflowCardState::PreviewReady,
         execution_status: "preview".to_string(),
+        stopped_by_user: false,
         error_message: None,
         completed_step_count: 0,
         total_step_count: parsed_plan.nodes.len(),

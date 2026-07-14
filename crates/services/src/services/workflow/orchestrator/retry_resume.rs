@@ -4,11 +4,11 @@ use db::{
     DBService,
     models::{
         chat_session::ChatSession, chat_session_agent::ChatSessionAgent,
-        workflow_agent_session::WorkflowAgentSession, workflow_execution::WorkflowExecution,
-        workflow_loop::WorkflowLoop, workflow_plan::WorkflowPlan,
-        workflow_plan_revision::WorkflowPlanRevision, workflow_step::WorkflowStep,
-        workflow_step_edge::WorkflowStepEdge, workflow_transcript::WorkflowTranscript,
-        workflow_types::*,
+        workflow_agent_session::WorkflowAgentSession, workflow_event::WorkflowEvent,
+        workflow_execution::WorkflowExecution, workflow_loop::WorkflowLoop,
+        workflow_plan::WorkflowPlan, workflow_plan_revision::WorkflowPlanRevision,
+        workflow_step::WorkflowStep, workflow_step_edge::WorkflowStepEdge,
+        workflow_transcript::WorkflowTranscript, workflow_types::*,
     },
 };
 use sqlx::SqlitePool;
@@ -28,6 +28,29 @@ impl WorkflowOrchestrator {
     pub(super) const FINAL_REVIEW_CONTENT: &'static str = "任务已完成，是否接受结果？";
     pub(super) const FINAL_REVIEW_DESCRIPTION: &'static str =
         "所有任务步骤已执行完毕，等待用户确认最终结果。";
+
+    pub async fn execution_was_stopped_by_user(
+        pool: &SqlitePool,
+        execution_id: Uuid,
+    ) -> Result<bool, OrchestratorError> {
+        let events = WorkflowEvent::find_by_execution(pool, execution_id).await?;
+        Ok(events.iter().any(|event| {
+            event.step_id.is_none()
+                && event.status_after.as_deref() == Some("failed")
+                && event
+                    .detail_json
+                    .as_deref()
+                    .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+                    .and_then(|detail| {
+                        detail
+                            .get("message")
+                            .and_then(|value| value.as_str())
+                            .map(str::to_owned)
+                    })
+                    .as_deref()
+                    == Some("stopped_by_user")
+        }))
+    }
 
     pub async fn retry_step(
         db: &DBService,
@@ -593,6 +616,14 @@ impl WorkflowOrchestrator {
                 "execution {} is {:?}, expected paused or failed",
                 execution.id, execution.status
             )));
+        }
+
+        if execution.status == WorkflowExecutionStatus::Failed
+            && Self::execution_was_stopped_by_user(pool, execution.id).await?
+        {
+            return Err(OrchestratorError::IllegalTransition(
+                "workflow stopped by user cannot be resumed".to_string(),
+            ));
         }
 
         let steps = WorkflowStep::find_by_execution(pool, execution.id).await?;
