@@ -871,8 +871,8 @@ check(
   componentSource,
 );
 check(
-  "opens the new session composer after normal project creation",
-  componentSource.includes("openSessionComposer: true"),
+  "creates a default session after normal project creation",
+  componentSource.includes("createDefaultSession: true"),
   componentSource,
 );
 check(
@@ -887,8 +887,8 @@ check(
   "create project modal defaults to the backend blank team preset",
   componentSource.includes('const blankTeamId = "blank_team"') &&
     componentSource.includes("teamId: selectedTeamId || blankTeamId") &&
-    componentSource.includes("openSessionComposer: true") &&
-    !componentSource.includes("blankTeamOptions"),
+    componentSource.includes("createDefaultSession: true") &&
+    !componentSource.includes("fullstack_delivery"),
   componentSource,
 );
 check(

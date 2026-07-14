@@ -11,6 +11,7 @@ import {
   Bell,
   Check,
   ChevronDown,
+  CircleArrowUp,
   Cpu,
   CreditCard,
   FlaskConical,
@@ -23,7 +24,6 @@ import {
   Moon,
   Route,
   SlidersHorizontal,
-  Sparkles,
   Sun,
   Trash2,
   User,
@@ -974,7 +974,7 @@ export const SettingsWorkspace: React.FC = () => {
                       disabled={Boolean(onboardingAction)}
                       className="settings-secondary-button inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <Sparkles className={`h-3.5 w-3.5 ${onboardingAction === 'upgrade' ? 'animate-pulse' : ''}`} />
+                      <CircleArrowUp className={`h-3.5 w-3.5 ${onboardingAction === 'upgrade' ? 'animate-pulse' : ''}`} />
                       {onboardingAction === 'upgrade'
                         ? t('settings.onboarding.working')
                         : t('settings.onboarding.replayUpgrade')}

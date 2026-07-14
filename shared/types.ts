@@ -393,6 +393,34 @@ export type WorkflowStepTokensResponse = { steps: Array<WorkflowStepTokenEntry>,
 
 export type WorkflowStepTokenUsageResponse = { usage: WorkflowStepTokenEntry | null, };
 
+export type UpdatePlatform = "web_npx" | "macos" | "linux_appimage" | "linux_deb" | "windows" | "unknown";
+
+export type UpdateArchitecture = "aarch64" | "x86_64" | "i686" | "unknown";
+
+export type UpdateMethod = "npx_staged_restart" | "tauri_updater" | "manual_download" | "unsupported";
+
+export type UpdateCheckStatus = "idle" | "checking" | "update_available" | "up_to_date" | "failed";
+
+export type UpdateDownloadStatus = "idle" | "downloading" | "downloaded" | "failed" | "not_applicable";
+
+export type UpdateInstallStatus = "idle" | "installing" | "restart_required" | "completed" | "failed" | "not_applicable";
+
+export type UpdateErrorStage = "check" | "download" | "install" | "restart";
+
+export type UpdateErrorInfo = { stage: UpdateErrorStage, code: string, message: string, retryable: boolean, };
+
+export type UpdateCapability = { platform: UpdatePlatform, method: UpdateMethod, can_download: boolean, can_install: boolean, requires_restart: boolean, fallback_url: string | null, };
+
+export type UpdateCheckQuery = { platform: UpdatePlatform | null, architecture: UpdateArchitecture | null, };
+
+export type DesktopUpdateContext = { platform: UpdatePlatform, architecture: UpdateArchitecture, };
+
+export type VersionCheckResponse = { current_version: string, latest_version: string, has_update: boolean, deploy_mode: string, release_url: string, release_notes: string | null, published_at: string | null, capability: UpdateCapability, };
+
+export type UpdateOperationState = { download_status: UpdateDownloadStatus, install_status: UpdateInstallStatus, downloaded_bytes: number | null, total_bytes: number | null, error: UpdateErrorInfo | null, };
+
+export type UpdateActionResponse = { success: boolean, message: string, state: UpdateOperationState, };
+
 export type ChatWorkItem = { id: string, session_id: string, run_id: string, session_agent_id: string, agent_id: string, item_type: ChatWorkItemType, content: string, created_at: string, };
 
 export enum ChatWorkItemType { artifact = "artifact", conclusion = "conclusion" }

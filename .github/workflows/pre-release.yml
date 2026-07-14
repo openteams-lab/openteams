@@ -35,6 +35,7 @@ env:
   RUST_TOOLCHAIN: nightly-2025-12-04
   CARGO_XWIN_VERSION: 0.20.2
   ENABLE_MACOS_DMG: "false"
+  ENABLE_LINUX_APPIMAGE_UPDATER: ${{ vars.ENABLE_LINUX_APPIMAGE_UPDATER == 'true' }}
 
 jobs:
   bump-version:
@@ -1066,14 +1067,20 @@ jobs:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
-      - name: Build desktop bundle (Linux)
-        if: matrix.platform == 'linux'
-        # AppImage bundling is intentionally disabled in CI due to recurring
-        # appimage.sh failures on GitHub runners.
-        run: pnpm tauri build --bundles deb
+      - name: Build desktop bundle (Linux with AppImage updater)
+        if: matrix.platform == 'linux' && env.ENABLE_LINUX_APPIMAGE_UPDATER == 'true'
+        run: pnpm tauri build --bundles deb,appimage,updater
         env:
           NODE_OPTIONS: --max-old-space-size=8192
           APPIMAGE_EXTRACT_AND_RUN: "1"
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Build desktop bundle (Linux deb only)
+        if: matrix.platform == 'linux' && env.ENABLE_LINUX_APPIMAGE_UPDATER != 'true'
+        run: pnpm tauri build --bundles deb
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
@@ -1102,6 +1109,30 @@ jobs:
             mv "$file" "$new_path"
             echo "Renamed $filename -> $(basename "$new_path")"
           done
+
+      - name: Validate Linux updater artifacts
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          raw=(src-tauri/target/release/bundle/appimage/*.AppImage)
+          archives=(src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz)
+          signatures=(src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig)
+
+          if [ "$ENABLE_LINUX_APPIMAGE_UPDATER" = "true" ]; then
+            if [ "${#raw[@]}" -eq 0 ] || [ "${#archives[@]}" -eq 0 ] || [ "${#signatures[@]}" -eq 0 ]; then
+              echo "::error::Missing AppImage updater artifacts while the updater policy is enabled"
+              exit 1
+            fi
+            if [ ! -s "${signatures[0]}" ] || [ "${signatures[0]}" != "${archives[0]}.sig" ]; then
+              echo "::error::AppImage updater signature is missing, empty, or does not match its archive"
+              exit 1
+            fi
+          elif [ "${#raw[@]}" -ne 0 ] || [ "${#archives[@]}" -ne 0 ] || [ "${#signatures[@]}" -ne 0 ]; then
+            echo "::error::AppImage artifacts exist while the updater policy is disabled"
+            exit 1
+          fi
 
       - name: Detect Windows signing configuration
         id: windows_signing
@@ -1409,6 +1440,18 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      - name: Upload desktop AppImage updater artifacts (Linux)
+        if: matrix.platform == 'linux' && env.ENABLE_LINUX_APPIMAGE_UPDATER == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.artifact_meta.outputs.name }}-appimage
+          path: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz
+            src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Upload desktop artifacts (macOS unsigned)
         if: matrix.platform == 'macos' && steps.macos_signing.outputs.enabled != 'true' && env.ENABLE_MACOS_DMG == 'true'
         uses: actions/upload-artifact@v6
@@ -1445,6 +1488,11 @@ jobs:
             cp "${{ steps.signed_macos_updater.outputs.bundle }}" gh-package/files/
           elif [[ "${{ matrix.platform }}" == "linux" ]]; then
             cp src-tauri/target/release/bundle/deb/*.deb gh-package/files/
+            if [ "$ENABLE_LINUX_APPIMAGE_UPDATER" = "true" ]; then
+              cp src-tauri/target/release/bundle/appimage/*.AppImage gh-package/files/
+              cp src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz gh-package/files/
+              cp src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig gh-package/files/
+            fi
           elif [[ "${{ matrix.platform }}" == "windows" ]]; then
             cp src-tauri/target/release/bundle/msi/*.msi gh-package/files/
           else
@@ -1529,6 +1577,12 @@ jobs:
           path: release-assets/desktop/
           merge-multiple: true
 
+      - name: Write release update policy
+        shell: bash
+        run: |
+          jq -n --argjson enabled "$ENABLE_LINUX_APPIMAGE_UPDATER" \
+            '{linux_appimage_updater: $enabled}' > release-assets/desktop/update-policy.json
+
       - name: List downloaded artifacts
         run: |
           echo "Frontend dist:"
@@ -1546,14 +1600,21 @@ jobs:
         uses: ./.github/actions/setup-node
 
       - name: Generate desktop updater manifest
+        shell: bash
         run: |
-          node scripts/desktop/generate-github-updater-json.mjs \
-            --input-dir release-assets/desktop \
-            --output release-assets/desktop/latest.json \
-            --owner openteams-lab \
-            --repo openteams \
-            --tag ${{ needs.bump-version.outputs.new_tag }} \
-            --version ${{ needs.bump-version.outputs.new_tag }}
+          set -euo pipefail
+          args=(
+            --input-dir release-assets/desktop
+            --output release-assets/desktop/latest.json
+            --owner openteams-lab
+            --repo openteams
+            --tag "${{ needs.bump-version.outputs.new_tag }}"
+            --version "${{ needs.bump-version.outputs.new_tag }}"
+          )
+          if [ "$ENABLE_LINUX_APPIMAGE_UPDATER" = "true" ]; then
+            args+=(--require-linux-appimage)
+          fi
+          node scripts/desktop/generate-github-updater-json.mjs "${args[@]}"
 
       - name: Resolve storage public URL
         shell: bash
@@ -1741,6 +1802,25 @@ jobs:
           fi
           
           npm pack
+
+      - name: Stage release validator assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          main_tarball=$(find npx/openteams-npx -maxdepth 1 -type f -name 'openteams-*.tgz' ! -name 'openteams-web-*.tgz' ! -name 'openteams-cli-*.tgz' | head -n 1 || true)
+          if [ -z "${main_tarball:-}" ]; then
+            echo "::error::No main Web package tarball found for release validation"
+            exit 1
+          fi
+          cp "$main_tarball" release-assets/
+
+      - name: Validate release update assets before GitHub release
+        shell: bash
+        run: >-
+          node scripts/desktop/validate-release-update-assets.mjs
+          --assets-dir release-assets
+          --release-tag "${{ needs.bump-version.outputs.new_tag }}"
 
       - name: Publish NPX packages to npm
         id: npm_publish
@@ -1955,7 +2035,10 @@ jobs:
             release-assets/desktop/**/*.msi
             release-assets/desktop/**/*.dmg
             release-assets/desktop/**/*.deb
+            release-assets/desktop/**/*.AppImage
+            release-assets/desktop/**/*.AppImage.tar.gz
             release-assets/desktop/**/*.msi.zip
             release-assets/desktop/**/*.app.tar.gz
             release-assets/desktop/**/*.sig
             release-assets/desktop/latest.json
+            release-assets/desktop/update-policy.json

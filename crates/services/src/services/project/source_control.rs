@@ -1015,7 +1015,13 @@ impl SourceControlService {
         );
 
         let phase_started = Instant::now();
-        let entries = normalize_status_entries(worktree_status.entries);
+        let mut entries = normalize_status_entries(worktree_status.entries);
+        let expanded_untracked_count = append_session_file_level_untracked_entries(
+            &git,
+            &context.workspace_path,
+            &session_path_set,
+            &mut entries,
+        )?;
         let changed_session_paths = session_changed_paths(&entries, &session_path_set);
         tracing::debug!(
             project_id = %context.project_id,
@@ -1024,6 +1030,7 @@ impl SourceControlService {
             workspace_path = %context.workspace_path_string,
             elapsed_ms = elapsed_ms(phase_started.elapsed()),
             entry_count = entries.len(),
+            expanded_untracked_count,
             changed_session_path_count = changed_session_paths.len(),
             "source-control session-status phase completed: normalize_and_filter_status_entries"
         );
@@ -2341,6 +2348,54 @@ fn normalize_status_entries(entries: Vec<StatusEntry>) -> Vec<StatusPathEntry> {
         .collect()
 }
 
+fn append_session_file_level_untracked_entries(
+    git: &GitCli,
+    workspace_path: &Path,
+    session_path_set: &BTreeSet<String>,
+    entries: &mut Vec<StatusPathEntry>,
+) -> Result<usize> {
+    let collapsed_untracked_dirs = entries
+        .iter()
+        .filter(|entry| {
+            entry.is_untracked
+                && fs::symlink_metadata(workspace_path.join(&entry.path))
+                    .is_ok_and(|metadata| metadata.file_type().is_dir())
+        })
+        .map(|entry| format!("{}/", entry.path.trim_end_matches('/')))
+        .collect::<Vec<_>>();
+    if collapsed_untracked_dirs.is_empty() {
+        return Ok(0);
+    }
+
+    let candidates = session_path_set
+        .iter()
+        .filter(|path| {
+            collapsed_untracked_dirs
+                .iter()
+                .any(|prefix| path.starts_with(prefix))
+        })
+        .filter(|path| {
+            fs::symlink_metadata(workspace_path.join(path))
+                .is_ok_and(|metadata| !metadata.file_type().is_dir())
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if candidates.is_empty() {
+        return Ok(0);
+    }
+
+    let file_level_entries = normalize_status_entries(
+        git.get_worktree_status_for_paths(workspace_path, &candidates)?
+            .entries,
+    )
+    .into_iter()
+    .filter(|entry| entry.is_untracked)
+    .collect::<Vec<_>>();
+    let expanded_count = file_level_entries.len();
+    entries.extend(file_level_entries);
+    Ok(expanded_count)
+}
+
 fn normalize_status_path(path: &[u8]) -> Option<String> {
     validate_relative_path(&String::from_utf8_lossy(path)).ok()
 }
@@ -2511,7 +2566,7 @@ fn file_flags(path: &Path) -> (bool, bool) {
 
 fn is_untracked_path(workspace_path: &Path, path: &str) -> bool {
     GitCli::new()
-        .get_worktree_status(workspace_path)
+        .get_worktree_status_for_paths(workspace_path, &[path.to_string()])
         .map(|status| {
             status.entries.into_iter().any(|entry| {
                 entry.is_untracked && normalize_status_path(&entry.path).as_deref() == Some(path)

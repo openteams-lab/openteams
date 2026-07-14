@@ -18,6 +18,7 @@ import { GlobalSearchDialog } from "@/components/GlobalSearchDialog";
 import {
   OnboardingGuide,
 } from "@/components/onboarding/OnboardingGuide";
+import { VersionUpdatePage } from "@/components/version-update/VersionUpdatePage";
 import { GitHubRepositoryPage } from "@/pages/GitHubRepositoryPage";
 import { IssuePage } from "@/pages/IssuePage";
 import { RoutingPage } from "@/pages/RoutingPage";
@@ -51,9 +52,9 @@ import {
   onboardingApi,
   projectApi,
   projectWorkItemsApi,
-  versionApi,
   type VersionCheckResponse,
 } from "@/lib/api";
+import { useVersionUpdate } from "@/hooks/useVersionUpdate";
 import {
   ONBOARDING_GUIDE_RESET_EVENT,
   ONBOARDING_UPGRADE_REPLAY_EVENT,
@@ -146,7 +147,7 @@ const extractAgentMentions = (text: string): string[] =>
   Array.from(
     new Set(
       Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
-        match[1].toLowerCase(),
+        match[1],
       ),
     ),
   );
@@ -226,16 +227,14 @@ const compactViewportLayoutRelief = 0.06;
 const compactViewportFontScale = 1.06;
 const blankTeamId = "blank_team";
 const currentUpgradeVersion = rootPackage.version || "0.0.0";
-const versionUpdateCheckIntervalMs = 2 * 60 * 60 * 1000;
-
 type OnboardingOverlay =
   | { mode: "onboarding"; state: OnboardingState | null }
-  | { mode: "upgrade"; state: OnboardingState | null }
+  | { mode: "upgrade" }
   | null;
 
 type CreateProjectOptions = {
   teamId?: string;
-  openSessionComposer?: boolean;
+  createDefaultSession?: boolean;
   forceMemberWorkspacePath?: boolean;
   onboardingTeamConfig?: OnboardingTeamMemberConfig[];
 };
@@ -501,10 +500,6 @@ function WorkspaceLayout() {
     useState<OnboardingState | null>(null);
   const [onboardingAppTransitionActive, setOnboardingAppTransitionActive] =
     useState(false);
-  const [versionUpdateInfo, setVersionUpdateInfo] =
-    useState<VersionCheckResponse | null>(null);
-  const [versionUpdateToast, setVersionUpdateToast] =
-    useState<VersionCheckResponse | null>(null);
   const [openTabs, setOpenTabs] = useState<WorkspaceTab[]>(() =>
     activeSessionId ? [createSessionTab(activeSessionId)] : [],
   );
@@ -529,8 +524,6 @@ function WorkspaceLayout() {
     scale: 1,
   });
   const onboardingAppTransitionTimerRef = useRef<number | null>(null);
-  const versionUpdateCheckInFlightRef = useRef(false);
-  const versionUpdateNotifiedVersionRef = useRef<string | null>(null);
 
   const loadLeadMember = useCallback(
     async (projectId: string): Promise<Member | null> => {
@@ -815,54 +808,18 @@ function WorkspaceLayout() {
     };
   }, []);
 
-  const checkForVersionUpdate = useCallback(async () => {
-    if (versionUpdateCheckInFlightRef.current) return null;
-    versionUpdateCheckInFlightRef.current = true;
-    try {
-      const info = await versionApi.check();
-      setVersionUpdateInfo(info);
-      if (
-        info.has_update &&
-        versionUpdateNotifiedVersionRef.current !== info.latest_version
-      ) {
-        versionUpdateNotifiedVersionRef.current = info.latest_version;
-        setVersionUpdateToast(info);
-      }
-      return info;
-    } catch (err) {
-      console.error("Failed to check for OpenTeams updates", err);
-      return null;
-    } finally {
-      versionUpdateCheckInFlightRef.current = false;
-    }
-  }, []);
-
   const openVersionUpdatePage = useCallback(
-    (
-      info?: VersionCheckResponse | null,
-      stateOverride?: OnboardingState | null,
-    ) => {
-      if (info) {
-        setVersionUpdateInfo(info);
-      }
-      setVersionUpdateToast(null);
-      setOnboardingOverlay({
-        mode: "upgrade",
-        state: stateOverride ?? onboardingState,
-      });
-      void checkForVersionUpdate();
+    (_info?: VersionCheckResponse | null) => {
+      setOnboardingOverlay({ mode: "upgrade" });
     },
-    [checkForVersionUpdate, onboardingState],
+    [],
   );
 
-  useEffect(() => {
-    void checkForVersionUpdate();
-    const intervalId = window.setInterval(
-      () => void checkForVersionUpdate(),
-      versionUpdateCheckIntervalMs,
-    );
-    return () => window.clearInterval(intervalId);
-  }, [checkForVersionUpdate]);
+  const versionUpdate = useVersionUpdate({
+    onOpenUpdatePage: openVersionUpdatePage,
+    onInstallStarted: () =>
+      showToast(t("onboarding.upgrade.installStarted"), "success"),
+  });
 
   useEffect(() => {
     return () => {
@@ -893,7 +850,7 @@ function WorkspaceLayout() {
     const handleUpgradeReplay = (event: Event) => {
       const nextState = (event as CustomEvent<OnboardingState>).detail;
       setOnboardingState(nextState);
-      openVersionUpdatePage(versionUpdateInfo, nextState);
+      openVersionUpdatePage(versionUpdate.info);
     };
 
     window.addEventListener(ONBOARDING_GUIDE_RESET_EVENT, handleGuideReset);
@@ -908,7 +865,7 @@ function WorkspaceLayout() {
         handleUpgradeReplay,
       );
     };
-  }, [openVersionUpdatePage, versionUpdateInfo]);
+  }, [openVersionUpdatePage, versionUpdate.info]);
 
   useEffect(() => {
     if (!isSidebarResizing) return;
@@ -1611,7 +1568,7 @@ function WorkspaceLayout() {
             ? mentions.length > 0
               ? mentions
               : freeChatSelectedAgentName
-                ? [freeChatSelectedAgentName.replace(/^@/, '').toLowerCase()]
+                ? [freeChatSelectedAgentName.replace(/^@/, '')]
                 : []
             : undefined;
         const fallbackMention =
@@ -1828,8 +1785,11 @@ function WorkspaceLayout() {
               name: project.name,
             });
     showToast(createdProjectToast);
-    if (options?.openSessionComposer) {
-      setIsCreateSessionModalOpen(true);
+    if (options?.createDefaultSession) {
+      await handleCreateDefaultSession({
+        projectId: project.id,
+        workspacePath: data.default_workspace_path,
+      });
     }
     closeMobileSidebar();
     return { project };
@@ -1944,12 +1904,6 @@ function WorkspaceLayout() {
     setOnboardingState(nextState);
   };
 
-  const handleInstallVersionUpdate = async () => {
-    await versionApi.updateNpx();
-    showToast(t('onboarding.upgrade.installStarted'), 'success');
-    await versionApi.restart();
-  };
-
   const currentProject = projects.find(
     (project) => project.id === selectedProjectId,
   );
@@ -2002,19 +1956,21 @@ function WorkspaceLayout() {
       {toast && (
         <NotificationToast message={toast.message} tone={toast.tone} />
       )}
-      {versionUpdateToast && (
+      {versionUpdate.reminder && (
         <NotificationToast
           title={t('onboarding.upgrade.toastTitle', {
-            version: versionUpdateToast.latest_version,
+            version: versionUpdate.reminder.latest_version,
           })}
           message={t('onboarding.upgrade.toastMessage', {
-            current: versionUpdateToast.current_version,
-            latest: versionUpdateToast.latest_version,
+            current: versionUpdate.reminder.current_version,
+            latest: versionUpdate.reminder.latest_version,
           })}
           tone="info"
           actionLabel={t('onboarding.upgrade.toastAction')}
-          onAction={() => openVersionUpdatePage(versionUpdateToast)}
-          onClose={() => setVersionUpdateToast(null)}
+          onAction={versionUpdate.openUpdatePage}
+          secondaryActionLabel={t('onboarding.upgrade.later')}
+          onSecondaryAction={versionUpdate.snooze}
+          onClose={versionUpdate.snooze}
           closeAriaLabel={t('toast.dismissNotification')}
           className="min-h-[92px] max-w-[min(430px,calc(100vw-40px))] py-4"
         />
@@ -2045,11 +2001,9 @@ function WorkspaceLayout() {
         translate={translate}
       />
 
-      {onboardingOverlay && (
+      {onboardingOverlay?.mode === "onboarding" && (
         <OnboardingGuide
-          mode={onboardingOverlay.mode}
           initialState={onboardingOverlay.state ?? onboardingState}
-          currentVersion={currentUpgradeVersion}
           locale={locale}
           theme={theme}
           t={t}
@@ -2060,8 +2014,23 @@ function WorkspaceLayout() {
           onClose={() => setOnboardingOverlay(null)}
           onComplete={handleOnboardingCompleted}
           onStateChange={handleOnboardingStateChange}
-          versionUpdateInfo={versionUpdateInfo}
-          onInstallUpdate={handleInstallVersionUpdate}
+        />
+      )}
+      {onboardingOverlay?.mode === "upgrade" && (
+        <VersionUpdatePage
+          currentVersion={currentUpgradeVersion}
+          theme={theme}
+          t={t}
+          onClose={() => setOnboardingOverlay(null)}
+          versionUpdateInfo={versionUpdate.info}
+          versionUpdateCheckStatus={versionUpdate.checkStatus}
+          versionUpdateCheckError={versionUpdate.checkError}
+          versionUpdateState={versionUpdate.operation}
+          versionUpdateBusy={versionUpdate.isBusy}
+          onInstallUpdate={versionUpdate.executeUpdate}
+          onCheckUpdate={versionUpdate.checkNow}
+          onOpenManualFallback={versionUpdate.openManualFallback}
+          manualFallbackAvailable={versionUpdate.manualFallbackAvailable}
         />
       )}
 

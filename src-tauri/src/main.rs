@@ -14,6 +14,8 @@ use tauri::{
     Manager,
 };
 
+mod update;
+
 struct BackendState {
     child: Mutex<Option<CommandChild>>,
 }
@@ -361,7 +363,9 @@ fn main() {
             delete_all_user_data,
             delete_cache_data,
             reveal_path_in_file_manager,
-            select_directory_dialog
+            select_directory_dialog,
+            update::get_desktop_update_context,
+            update::install_desktop_update
         ])
         .setup(|app| {
             let port = pick_unused_port().unwrap_or(3999);

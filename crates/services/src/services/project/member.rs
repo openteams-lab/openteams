@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use anyhow::{Result, bail};
 use db::models::{
     chat_agent::ChatAgent,
@@ -8,6 +10,7 @@ use db::models::{
     workflow_agent_session::WorkflowAgentSession,
 };
 use sqlx::{Row, SqlitePool};
+use utils::text::sanitize_member_handle;
 use uuid::Uuid;
 
 #[derive(Clone, Default)]
@@ -68,14 +71,21 @@ impl ProjectMemberService {
         is_default: bool,
         execution_config: MemberExecutionConfig,
     ) -> Result<ProjectMember> {
-        if member_type == ProjectMemberType::Agent {
+        let member_name = if member_type == ProjectMemberType::Agent {
             let Some(agent_id) = agent_id else {
                 bail!("agent_id is required for agent project members");
             };
-            if ChatAgent::find_by_id(pool, agent_id).await?.is_none() {
+            let Some(agent) = ChatAgent::find_by_id(pool, agent_id).await? else {
                 bail!("chat agent not found");
-            }
-        }
+            };
+            let requested_name = member_name.as_deref().unwrap_or(&agent.name);
+            Some(
+                self.unique_agent_member_name(pool, project_id, None, requested_name)
+                    .await?,
+            )
+        } else {
+            member_name
+        };
 
         let member = ProjectMember::create(
             pool,
@@ -151,8 +161,29 @@ impl ProjectMemberService {
         &self,
         pool: &SqlitePool,
         id: Uuid,
-        input: ProjectMemberUpdateInput,
+        mut input: ProjectMemberUpdateInput,
     ) -> Result<ProjectMember> {
+        let existing = ProjectMember::find_by_id(pool, id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("project member not found"))?;
+        if existing.member_type == ProjectMemberType::Agent {
+            let agent_id = existing
+                .agent_id
+                .ok_or_else(|| anyhow::anyhow!("agent project member is missing agent_id"))?;
+            let agent = ChatAgent::find_by_id(pool, agent_id)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("chat agent not found"))?;
+            let requested_name = match input.member_name.as_ref() {
+                Some(Some(member_name)) => member_name.as_str(),
+                Some(None) => agent.name.as_str(),
+                None => existing.member_name.as_deref().unwrap_or(&agent.name),
+            };
+            let unique_name = self
+                .unique_agent_member_name(pool, existing.project_id, Some(id), requested_name)
+                .await?;
+            input.member_name = Some(Some(unique_name));
+        }
+
         let promote_to_lead = input.role.as_deref() == Some("lead");
         let should_sync_execution_config = input.execution_config.is_some();
         let should_sync_allowed_skill_ids = input.allowed_skill_ids.is_some();
@@ -236,6 +267,56 @@ impl ProjectMemberService {
         }
 
         Ok(member)
+    }
+
+    async fn unique_agent_member_name(
+        &self,
+        pool: &SqlitePool,
+        project_id: Uuid,
+        excluded_member_id: Option<Uuid>,
+        requested_name: &str,
+    ) -> Result<String> {
+        let agents = ChatAgent::find_all(pool).await?;
+        let agent_names = agents
+            .into_iter()
+            .map(|agent| (agent.id, agent.name))
+            .collect::<HashMap<_, _>>();
+        let used_names = ProjectMember::find_by_project(pool, project_id)
+            .await?
+            .into_iter()
+            .filter(|member| {
+                member.member_type == ProjectMemberType::Agent
+                    && Some(member.id) != excluded_member_id
+            })
+            .filter_map(|member| {
+                member
+                    .member_name
+                    .or_else(|| member.agent_id.and_then(|id| agent_names.get(&id).cloned()))
+            })
+            .map(|name| sanitize_member_handle(&name).to_lowercase())
+            .filter(|name| !name.is_empty())
+            .collect::<HashSet<_>>();
+
+        let base_name = {
+            let normalized = sanitize_member_handle(requested_name);
+            if normalized.is_empty() {
+                "member".to_string()
+            } else {
+                normalized
+            }
+        };
+        if !used_names.contains(&base_name.to_lowercase()) {
+            return Ok(base_name);
+        }
+
+        for suffix in 2_u64.. {
+            let candidate = format!("{base_name}_{suffix}");
+            if !used_names.contains(&candidate.to_lowercase()) {
+                return Ok(candidate);
+            }
+        }
+
+        unreachable!("member name suffix search is unbounded")
     }
 
     pub async fn remove_member(&self, pool: &SqlitePool, id: Uuid) -> Result<u64> {
@@ -615,6 +696,135 @@ mod tests {
             Some("/workspace/agent")
         );
         assert_eq!(session_agent.allowed_skill_ids.0, vec!["skill-a"]);
+    }
+
+    #[tokio::test]
+    async fn add_member_auto_indexes_duplicate_member_names() {
+        let pool = setup_pool().await;
+        let service = ProjectMemberService::new();
+        let project_id = Uuid::new_v4();
+        let first_agent = create_named_agent(&pool, "first-template").await;
+        let second_agent = create_named_agent(&pool, "second-template").await;
+        let third_agent = create_named_agent(&pool, "third-template").await;
+
+        let first = service
+            .add_member(
+                &pool,
+                project_id,
+                ProjectMemberType::Agent,
+                None,
+                Some(first_agent.id),
+                Some("Builder".to_string()),
+                Some("lead".to_string()),
+                1,
+                None,
+                Vec::new(),
+                true,
+                MemberExecutionConfig::default(),
+            )
+            .await
+            .expect("create first member");
+        let second = service
+            .add_member(
+                &pool,
+                project_id,
+                ProjectMemberType::Agent,
+                None,
+                Some(second_agent.id),
+                Some("builder".to_string()),
+                Some("member".to_string()),
+                2,
+                None,
+                Vec::new(),
+                true,
+                MemberExecutionConfig::default(),
+            )
+            .await
+            .expect("create second member");
+        let third = service
+            .add_member(
+                &pool,
+                project_id,
+                ProjectMemberType::Agent,
+                None,
+                Some(third_agent.id),
+                Some("Builder".to_string()),
+                Some("member".to_string()),
+                3,
+                None,
+                Vec::new(),
+                true,
+                MemberExecutionConfig::default(),
+            )
+            .await
+            .expect("create third member");
+
+        assert_eq!(first.member_name.as_deref(), Some("Builder"));
+        assert_eq!(second.member_name.as_deref(), Some("builder_2"));
+        assert_eq!(third.member_name.as_deref(), Some("Builder_3"));
+    }
+
+    #[tokio::test]
+    async fn update_member_auto_indexes_a_duplicate_member_name() {
+        let pool = setup_pool().await;
+        let service = ProjectMemberService::new();
+        let project_id = Uuid::new_v4();
+        let first_agent = create_named_agent(&pool, "first-template").await;
+        let second_agent = create_named_agent(&pool, "second-template").await;
+
+        service
+            .add_member(
+                &pool,
+                project_id,
+                ProjectMemberType::Agent,
+                None,
+                Some(first_agent.id),
+                Some("Builder".to_string()),
+                Some("lead".to_string()),
+                1,
+                None,
+                Vec::new(),
+                true,
+                MemberExecutionConfig::default(),
+            )
+            .await
+            .expect("create first member");
+        let second = service
+            .add_member(
+                &pool,
+                project_id,
+                ProjectMemberType::Agent,
+                None,
+                Some(second_agent.id),
+                Some("Reviewer".to_string()),
+                Some("member".to_string()),
+                2,
+                None,
+                Vec::new(),
+                true,
+                MemberExecutionConfig::default(),
+            )
+            .await
+            .expect("create second member");
+
+        let updated = service
+            .update_member(
+                &pool,
+                second.id,
+                super::ProjectMemberUpdateInput {
+                    member_name: Some(Some("builder".to_string())),
+                    role: None,
+                    display_order: None,
+                    default_workspace_path: None,
+                    is_default: None,
+                    allowed_skill_ids: None,
+                    execution_config: None,
+                },
+            )
+            .await
+            .expect("update duplicate member name");
+
+        assert_eq!(updated.member_name.as_deref(), Some("builder_2"));
     }
 
     #[tokio::test]

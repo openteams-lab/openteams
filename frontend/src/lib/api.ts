@@ -125,21 +125,6 @@ export interface ChatMessageMutationResponse {
   runtime: ChatSessionRuntimeSnapshot;
 }
 
-export interface VersionCheckResponse {
-  current_version: string;
-  latest_version: string;
-  has_update: boolean;
-  deploy_mode: string;
-  release_url: string;
-  release_notes: string | null;
-  published_at: string | null;
-}
-
-export interface UpdateNpxResponse {
-  success: boolean;
-  message: string;
-}
-
 import type {
   AddProjectMemberRequest,
   ChatTeamPreset,
@@ -147,6 +132,7 @@ import type {
   ChatSearchResponse,
   CreateProjectRequest,
   CreateTeamPresetRequest,
+  DesktopUpdateContext,
   InitializeWorkspaceGitRequest,
   InitializeWorkspaceGitResponse,
   Project,
@@ -172,7 +158,15 @@ import type {
   MarkAllInboxItemsReadRequest,
   MarkInboxItemsReadRequest,
   OnboardingState,
+  UpdateActionResponse as SharedUpdateActionResponse,
+  UpdateDownloadStatus,
+  UpdateErrorInfo,
+  UpdateErrorStage,
+  UpdateInstallStatus,
+  UpdateMethod,
   UpdateOnboardingStateRequest,
+  UpdatePlatform,
+  VersionCheckResponse as SharedVersionCheckResponse,
 } from "../../../shared/types";
 import {
   ApiError,
@@ -191,10 +185,324 @@ export { cliConfigApi } from "./cliConfigApi";
 
 export type WorkflowCardData = WorkflowCardProjection;
 export type WorkflowCardLoopData = WorkflowCardLoop;
+export type UpdateActionResponse = SharedUpdateActionResponse;
+export type VersionCheckResponse = Pick<
+  SharedVersionCheckResponse,
+  | 'current_version'
+  | 'latest_version'
+  | 'has_update'
+  | 'release_url'
+  | 'release_notes'
+  | 'published_at'
+  | 'capability'
+>;
 export type {
   WorkflowIterationSummaryData,
   WorkflowPendingInputData,
   WorkflowPendingReviewData,
+};
+
+type UpdateApiErrorData = UpdateErrorInfo | UpdateActionResponse;
+
+export class UpdateApiError<
+  E extends UpdateApiErrorData = UpdateApiErrorData,
+> extends ApiError<E> {
+  constructor(message: string, status?: number, errorData?: E) {
+    super(message, status, errorData);
+    this.name = "UpdateApiError";
+  }
+}
+
+const updatePlatforms = new Set<UpdatePlatform>([
+  "web_npx",
+  "macos",
+  "linux_appimage",
+  "linux_deb",
+  "windows",
+  "unknown",
+]);
+const updateDownloadStatuses = new Set<UpdateDownloadStatus>([
+  "idle",
+  "downloading",
+  "downloaded",
+  "failed",
+  "not_applicable",
+]);
+const updateInstallStatuses = new Set<UpdateInstallStatus>([
+  "idle",
+  "installing",
+  "restart_required",
+  "completed",
+  "failed",
+  "not_applicable",
+]);
+const updateMethods = new Set<UpdateMethod>([
+  'npx_staged_restart',
+  'tauri_updater',
+  'manual_download',
+  'unsupported',
+]);
+const updateErrorStages = new Set<UpdateErrorStage>([
+  "check",
+  "download",
+  "install",
+  "restart",
+]);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const asOptionalString = (value: unknown): string | null =>
+  value === null || value === undefined
+    ? null
+    : typeof value === "string"
+      ? value
+      : null;
+
+const parseUpdateErrorInfo = (value: unknown): UpdateErrorInfo | null => {
+  if (!isRecord(value)) return null;
+  const { stage, code, message, retryable } = value;
+  if (
+    !updateErrorStages.has(stage as UpdateErrorStage) ||
+    typeof code !== "string" ||
+    typeof message !== "string" ||
+    typeof retryable !== "boolean"
+  ) {
+    return null;
+  }
+  return {
+    stage: stage as UpdateErrorStage,
+    code,
+    message,
+    retryable,
+  };
+};
+
+const parseVersionCheckResponse = (
+  value: unknown,
+): VersionCheckResponse | null => {
+  if (!isRecord(value)) return null;
+  const {
+    current_version,
+    latest_version,
+    has_update,
+    release_url,
+    release_notes,
+    published_at,
+    capability,
+  } = value;
+  if (
+    typeof current_version !== "string" ||
+    typeof latest_version !== "string" ||
+    typeof has_update !== "boolean" ||
+    typeof release_url !== "string" ||
+    !isRecord(capability)
+  ) {
+    return null;
+  }
+  const {
+    platform,
+    method,
+    can_download,
+    can_install,
+    requires_restart,
+    fallback_url,
+  } = capability;
+  if (
+    !updatePlatforms.has(platform as UpdatePlatform) ||
+    !updateMethods.has(method as UpdateMethod) ||
+    typeof can_download !== "boolean" ||
+    typeof can_install !== "boolean" ||
+    typeof requires_restart !== "boolean" ||
+    asOptionalString(fallback_url) === null && fallback_url !== null && fallback_url !== undefined
+  ) {
+    return null;
+  }
+  if (asOptionalString(release_notes) === null && release_notes !== null && release_notes !== undefined) {
+    return null;
+  }
+  if (asOptionalString(published_at) === null && published_at !== null && published_at !== undefined) {
+    return null;
+  }
+  return value as VersionCheckResponse;
+};
+
+const parseUpdateActionResponse = (
+  value: unknown,
+): UpdateActionResponse | null => {
+  if (!isRecord(value)) return null;
+  const { success, message, state } = value;
+  if (typeof success !== "boolean" || typeof message !== "string" || !isRecord(state)) {
+    return null;
+  }
+  const {
+    download_status,
+    install_status,
+    downloaded_bytes,
+    total_bytes,
+    error,
+  } = state;
+  if (
+    !updateDownloadStatuses.has(download_status as UpdateDownloadStatus) ||
+    !updateInstallStatuses.has(install_status as UpdateInstallStatus) ||
+    !(
+      downloaded_bytes === null ||
+      downloaded_bytes === undefined ||
+      typeof downloaded_bytes === "number"
+    ) ||
+    !(
+      total_bytes === null ||
+      total_bytes === undefined ||
+      typeof total_bytes === "number"
+    )
+  ) {
+    return null;
+  }
+  if (error !== null && error !== undefined && parseUpdateErrorInfo(error) === null) {
+    return null;
+  }
+  return value as UpdateActionResponse;
+};
+
+const normalizeCheckError = (
+  message: string,
+  status?: number,
+): UpdateApiError<UpdateErrorInfo> =>
+  new UpdateApiError(message, status, {
+    stage: "check",
+    code: "release_check_failed",
+    message,
+    retryable: true,
+  });
+
+const failedActionState = (
+  error: UpdateErrorInfo,
+): UpdateActionResponse["state"] => {
+  switch (error.stage) {
+    case "download":
+      return {
+        download_status: "failed",
+        install_status: "idle",
+        downloaded_bytes: null,
+        total_bytes: null,
+        error,
+      };
+    case "install":
+      return {
+        download_status: "idle",
+        install_status: "failed",
+        downloaded_bytes: null,
+        total_bytes: null,
+        error,
+      };
+    case "restart":
+      return {
+        download_status: "downloaded",
+        install_status: "failed",
+        downloaded_bytes: null,
+        total_bytes: null,
+        error,
+      };
+    case "check":
+      return {
+        download_status: "idle",
+        install_status: "idle",
+        downloaded_bytes: null,
+        total_bytes: null,
+        error,
+      };
+  }
+};
+
+const normalizeActionError = (
+  stage: UpdateErrorStage,
+  message: string,
+  status?: number,
+): UpdateApiError<UpdateActionResponse> => {
+  const errorInfo: UpdateErrorInfo = {
+    stage,
+    code: "update_transport_failed",
+    message,
+    retryable: true,
+  };
+  return new UpdateApiError(message, status, {
+    success: false,
+    message,
+    state: failedActionState(errorInfo),
+  });
+};
+
+const readUpdateJson = async (response: Response): Promise<unknown> => {
+  try {
+    return await response.json();
+  } catch {
+    throw new Error("Invalid JSON response from update API");
+  }
+};
+
+const handleUpdateApiResponse = async <TData, TError extends UpdateApiErrorData>(
+  request: () => Promise<Response>,
+  options: {
+    parseData: (value: unknown) => TData | null;
+    parseErrorData: (value: unknown) => TError | null;
+    normalizeTransportError: (message: string, status?: number) => UpdateApiError<TError>;
+  },
+): Promise<TData> => {
+  let response: Response;
+  try {
+    response = await request();
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to contact the OpenTeams update service";
+    throw options.normalizeTransportError(message);
+  }
+
+  let body: unknown;
+  try {
+    body = await readUpdateJson(response);
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Invalid JSON response from update API";
+    throw options.normalizeTransportError(message, response.status);
+  }
+
+  if (!response.ok) {
+    if (isRecord(body)) {
+      const parsedError = options.parseErrorData(body.error_data);
+      if (parsedError) {
+        const message =
+          typeof body.message === "string"
+            ? body.message
+            : parsedError.message;
+        throw new UpdateApiError(message, response.status, parsedError);
+      }
+    }
+    throw options.normalizeTransportError(
+      `Update API request failed with status ${response.status}`,
+      response.status,
+    );
+  }
+
+  if (!isRecord(body) || body.success !== true) {
+    throw options.normalizeTransportError(
+      "Update API returned an invalid success envelope",
+      response.status,
+    );
+  }
+
+  const parsedData = options.parseData(body.data);
+  if (!parsedData) {
+    throw options.normalizeTransportError(
+      "Update API returned an invalid success payload",
+      response.status,
+    );
+  }
+
+  return parsedData;
 };
 
 // -----------------------------------------------------------------------------
@@ -411,19 +719,108 @@ export const onboardingApi = {
 // Version updates
 // -----------------------------------------------------------------------------
 
+const wait = (delayMs: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+
+export const versionServiceRestartDelayMs = 750;
+export const versionServiceReadinessTimeoutMs = 15_000;
+export const versionServicePollIntervalMs = 250;
+
+export type VersionServiceWaitOptions = {
+  request?: () => Promise<Response>;
+  sleep?: (delayMs: number) => Promise<void>;
+  now?: () => number;
+  initialDelayMs?: number;
+  timeoutMs?: number;
+  intervalMs?: number;
+};
+
+export const waitForVersionService = async ({
+  request = () => makeRequest('/health', { cache: 'no-store' }),
+  sleep = wait,
+  now = Date.now,
+  initialDelayMs = versionServiceRestartDelayMs,
+  timeoutMs = versionServiceReadinessTimeoutMs,
+  intervalMs = versionServicePollIntervalMs,
+}: VersionServiceWaitOptions = {}): Promise<void> => {
+  const deadline = now() + timeoutMs;
+  await sleep(initialDelayMs);
+  while (now() < deadline) {
+    try {
+      const response = await request();
+      if (response.ok) {
+        const body = (await response.json()) as { success?: boolean };
+        if (body.success === true) return;
+      }
+    } catch {
+      // The old process is expected to disappear before the replacement starts.
+    }
+    await sleep(intervalMs);
+  }
+
+  const error: UpdateErrorInfo = {
+    stage: 'restart',
+    code: 'restart_service_unavailable',
+    message: 'The updated OpenTeams service did not become ready.',
+    retryable: true,
+  };
+  throw new UpdateApiError<UpdateActionResponse>(error.message, 503, {
+    success: false,
+    message: error.message,
+    state: {
+      download_status: 'downloaded',
+      install_status: 'failed',
+      downloaded_bytes: null,
+      total_bytes: null,
+      error,
+    },
+  });
+};
+
 export const versionApi = {
-  check: async (): Promise<VersionCheckResponse> => {
-    const r = await makeRequest("/api/version/check", { cache: "no-store" });
-    return handleApiResponse<VersionCheckResponse>(r);
+  check: async (
+    context?: DesktopUpdateContext | null,
+  ): Promise<VersionCheckResponse> => {
+    const resolvedContext = context ?? null;
+    return handleUpdateApiResponse(
+      () =>
+        makeRequest(
+          `/api/version/check${qs({
+            platform: resolvedContext?.platform,
+            architecture: resolvedContext?.architecture,
+          })}`,
+          { cache: "no-store" },
+        ),
+      {
+        parseData: parseVersionCheckResponse,
+        parseErrorData: parseUpdateErrorInfo,
+        normalizeTransportError: normalizeCheckError,
+      },
+    );
   },
-  updateNpx: async (): Promise<UpdateNpxResponse> => {
-    const r = await makeRequest("/api/version/update-npx", { method: "POST" });
-    return handleApiResponse<UpdateNpxResponse>(r);
+  updateNpx: async (): Promise<UpdateActionResponse> => {
+    return handleUpdateApiResponse(
+      () => makeRequest("/api/version/update-npx", { method: "POST" }),
+      {
+        parseData: parseUpdateActionResponse,
+        parseErrorData: parseUpdateActionResponse,
+        normalizeTransportError: (message, status) =>
+          normalizeActionError("download", message, status),
+      },
+    );
   },
-  restart: async (): Promise<UpdateNpxResponse> => {
-    const r = await makeRequest("/api/version/restart", { method: "POST" });
-    return handleApiResponse<UpdateNpxResponse>(r);
+  restart: async (): Promise<UpdateActionResponse> => {
+    return handleUpdateApiResponse(
+      () => makeRequest("/api/version/restart", { method: "POST" }),
+      {
+        parseData: parseUpdateActionResponse,
+        parseErrorData: parseUpdateActionResponse,
+        normalizeTransportError: (message, status) =>
+          normalizeActionError("restart", message, status),
+      },
+    );
   },
+  waitForService: waitForVersionService,
 };
 
 // -----------------------------------------------------------------------------

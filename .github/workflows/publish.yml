@@ -54,9 +54,6 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node
 
-      - name: Upgrade npm for OIDC support
-        run: npm install -g npm@latest
-
       - name: Download release assets
         uses: actions/github-script@v8
         env:
@@ -105,27 +102,59 @@ jobs:
               ).data;
             }
 
-            const tgzAsset = release.assets.find((asset) => asset.name.endsWith('.tgz'));
-            if (!tgzAsset) {
-              core.setFailed('No .tgz file found in release assets');
-              return;
+            fs.mkdirSync('release-assets', { recursive: true });
+            const seen = new Set();
+            for (const asset of release.assets) {
+              const baseName = path.basename(asset.name);
+              if (asset.name !== baseName) {
+                core.setFailed(`Refusing suspicious release asset name: ${asset.name}`);
+                return;
+              }
+              if (seen.has(baseName)) {
+                core.setFailed(`Duplicate release asset name: ${baseName}`);
+                return;
+              }
+              seen.add(baseName);
+
+              const response = await github.rest.repos.getReleaseAsset({
+                owner,
+                repo,
+                asset_id: asset.id,
+                headers: {
+                  Accept: 'application/octet-stream'
+                }
+              });
+
+              const filePath = path.join('release-assets', baseName);
+              fs.writeFileSync(filePath, Buffer.from(response.data));
+              console.log(`Downloaded ${baseName} to ${filePath}`);
             }
 
-            const response = await github.rest.repos.getReleaseAsset({
-              owner,
-              repo,
-              asset_id: tgzAsset.id,
-              headers: {
-                Accept: 'application/octet-stream'
-              }
-            });
+      - name: Validate release update assets
+        run: >-
+          node scripts/desktop/validate-release-update-assets.mjs
+          --assets-dir release-assets
+          --release-tag "${{ steps.meta.outputs.release_tag }}"
 
-            fs.mkdirSync('npx/openteams-npx', { recursive: true });
-            const filePath = path.join('npx/openteams-npx', tgzAsset.name);
-            fs.writeFileSync(filePath, Buffer.from(response.data));
+      - name: Stage verified Web package
+        id: verified_package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t packages < <(find release-assets -maxdepth 1 -type f \
+            -name 'openteams-*.tgz' \
+            ! -name 'openteams-web-*.tgz' \
+            ! -name 'openteams-cli-*.tgz' -print)
+          if [ "${#packages[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one validated main Web package"
+            exit 1
+          fi
+          mkdir -p npx/openteams-npx
+          cp "${packages[0]}" npx/openteams-npx/
+          echo "package-name=$(basename "${packages[0]}")" >> "$GITHUB_OUTPUT"
 
-            console.log(`Downloaded ${tgzAsset.name} to ${filePath}`);
-            core.setOutput('package-name', tgzAsset.name);
+      - name: Upgrade npm for OIDC support
+        run: npm install -g npm@latest
 
       - name: Verify package integrity
         id: verify

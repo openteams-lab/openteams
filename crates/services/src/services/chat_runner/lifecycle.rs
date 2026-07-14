@@ -933,9 +933,6 @@ impl ChatRunner {
                 agents.into_iter().map(|agent| (agent.id, agent)).collect();
 
             let mut exact_member_match: Option<(ChatSessionAgent, ChatAgent)> = None;
-            let mut exact_template_match: Option<(ChatSessionAgent, ChatAgent)> = None;
-            let mut ci_member_match: Option<(ChatSessionAgent, ChatAgent)> = None;
-            let mut ci_template_match: Option<(ChatSessionAgent, ChatAgent)> = None;
 
             for session_agent in session_agents {
                 let Some(agent) = agent_map.get(&session_agent.agent_id) else {
@@ -958,43 +955,19 @@ impl ChatRunner {
                 };
 
                 if effective_name == mention {
+                    if exact_member_match.is_some() {
+                        tracing::warn!(
+                            session_id = %session_id,
+                            mention = mention,
+                            "multiple session agents have the same exact member name; skipping"
+                        );
+                        return Ok(None);
+                    }
                     exact_member_match = Some(build_match(&session_agent, &effective_name));
-                    break;
-                }
-                if agent.name == mention && exact_template_match.is_none() {
-                    exact_template_match = Some(build_match(&session_agent, &effective_name));
-                }
-
-                if effective_name.eq_ignore_ascii_case(mention) {
-                    if ci_member_match.is_some() {
-                        tracing::warn!(
-                            session_id = %session_id,
-                            mention = mention,
-                            "multiple session agents matched mention; skipping"
-                        );
-                        return Ok(None);
-                    }
-                    ci_member_match = Some(build_match(&session_agent, &effective_name));
-                }
-
-                if agent.name.eq_ignore_ascii_case(mention) {
-                    if ci_template_match.is_some() {
-                        tracing::warn!(
-                            session_id = %session_id,
-                            mention = mention,
-                            "multiple session agents matched template name mention; skipping"
-                        );
-                        return Ok(None);
-                    }
-                    ci_template_match = Some(build_match(&session_agent, &effective_name));
                 }
             }
 
-            let Some((session_agent, agent)) = exact_member_match
-                .or(exact_template_match)
-                .or(ci_member_match)
-                .or(ci_template_match)
-            else {
+            let Some((session_agent, agent)) = exact_member_match else {
                 return Ok(None);
             };
 
@@ -1047,9 +1020,6 @@ impl ChatRunner {
             agents.into_iter().map(|agent| (agent.id, agent)).collect();
 
         let mut exact_member_match = None;
-        let mut exact_template_match = None;
-        let mut ci_member_match = None;
-        let mut ci_template_match = None;
 
         for member in project_members {
             if member.member_type != ProjectMemberType::Agent {
@@ -1066,41 +1036,19 @@ impl ChatRunner {
             let candidate = (member, agent.clone(), effective_name.clone());
 
             if effective_name == mention {
+                if exact_member_match.is_some() {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        mention = mention,
+                        "multiple project agents have the same exact member name; skipping auto-configuration"
+                    );
+                    return Ok(None);
+                }
                 exact_member_match = Some(candidate);
-                break;
-            }
-            if agent.name == mention && exact_template_match.is_none() {
-                exact_template_match = Some(candidate.clone());
-            }
-            if effective_name.eq_ignore_ascii_case(mention) {
-                if ci_member_match.is_some() {
-                    tracing::warn!(
-                        session_id = %session_id,
-                        mention = mention,
-                        "multiple project members matched mention; skipping auto-configuration"
-                    );
-                    return Ok(None);
-                }
-                ci_member_match = Some(candidate.clone());
-            }
-            if agent.name.eq_ignore_ascii_case(mention) {
-                if ci_template_match.is_some() {
-                    tracing::warn!(
-                        session_id = %session_id,
-                        mention = mention,
-                        "multiple project members matched template name mention; skipping auto-configuration"
-                    );
-                    return Ok(None);
-                }
-                ci_template_match = Some(candidate);
             }
         }
 
-        let Some((member, mut agent, effective_name)) = exact_member_match
-            .or(exact_template_match)
-            .or(ci_member_match)
-            .or(ci_template_match)
-        else {
+        let Some((member, mut agent, effective_name)) = exact_member_match else {
             return Ok(None);
         };
 
@@ -1272,32 +1220,13 @@ impl ChatRunner {
                 return Err(err);
             }
         }) else {
-            if let Some(agent) = ChatAgent::find_by_name(&self.db.pool, mention).await? {
-                tracing::debug!(
-                    session_id = %session_id,
-                    agent_id = %agent.id,
-                    mention = mention,
-                    "chat session agent not configured; marking mention as failed"
-                );
-                if track_source_message {
-                    self.report_mention_failure(
-                        session_id,
-                        source_message.id,
-                        &agent.name,
-                        Some(agent.id),
-                        "Agent is not configured in this session.",
-                    )
-                    .await;
-                }
-                return Err(ChatRunnerError::AgentNotFound(mention.to_string()));
-            }
             if track_source_message {
                 self.report_mention_failure(
                     session_id,
                     source_message.id,
                     mention,
                     None,
-                    "Mentioned agent was not found.",
+                    "Mentioned member was not found in this session.",
                 )
                 .await;
             }

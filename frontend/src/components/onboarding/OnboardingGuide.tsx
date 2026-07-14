@@ -8,6 +8,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import {
+  ArrowRight,
   Bot,
   Check,
   ChevronUp,
@@ -21,7 +22,6 @@ import {
   Monitor,
   Moon,
   Plus,
-  Rocket,
   Search,
   Sparkles,
   Sun,
@@ -37,7 +37,6 @@ import {
   chatSessionsApi,
   filesystemApi,
   onboardingApi,
-  type VersionCheckResponse,
 } from '@/lib/api';
 import {
   normalizeGitignoreTemplateSelection,
@@ -75,7 +74,6 @@ const onboardingSteps = ['appearance', 'scenario', 'executor', 'project_path'] a
 
 type OnboardingStepKey = (typeof onboardingSteps)[number];
 type ActiveStepKey = OnboardingStepKey | typeof welcomeStepKey;
-type OnboardingMode = 'onboarding' | 'upgrade';
 const firstOnboardingStep: OnboardingStepKey = 'appearance';
 const finalOnboardingStep: OnboardingStepKey = 'project_path';
 type TranslateFn = (
@@ -90,9 +88,7 @@ type OnboardingCompleteOptions = {
 };
 
 interface OnboardingGuideProps {
-  mode: 'onboarding' | 'upgrade';
   initialState: OnboardingState | null;
-  currentVersion: string;
   locale: Locale;
   theme: Theme;
   t: TranslateFn;
@@ -111,8 +107,6 @@ interface OnboardingGuideProps {
     options?: OnboardingCompleteOptions,
   ) => void | Promise<void>;
   onStateChange?: (state: OnboardingState) => void;
-  versionUpdateInfo: VersionCheckResponse | null;
-  onInstallUpdate: () => Promise<void>;
 }
 
 const onboardingDarkThemeVars = {
@@ -444,9 +438,7 @@ const roleBadgeLabel = (name: string) => {
 export { compareVersions };
 
 export function OnboardingGuide({
-  mode,
   initialState,
-  currentVersion,
   locale,
   theme,
   t,
@@ -457,8 +449,6 @@ export function OnboardingGuide({
   onClose,
   onComplete,
   onStateChange,
-  versionUpdateInfo,
-  onInstallUpdate,
 }: OnboardingGuideProps) {
   const initialStep = initialState?.welcome_seen_at
     ? stepFromBackend(initialState.current_step)
@@ -800,7 +790,6 @@ export function OnboardingGuide({
   }, [initialState]);
 
   useEffect(() => {
-    if (mode !== 'onboarding') return;
     let cancelled = false;
     void agentRuntimeApi
       .list()
@@ -834,7 +823,7 @@ export function OnboardingGuide({
     return () => {
       cancelled = true;
     };
-  }, [initialState?.team_config?.length, mode, selectedScenario, teamPresets]);
+  }, [initialState?.team_config?.length, selectedScenario, teamPresets]);
 
   const loadGitignoreTemplates = useCallback(async () => {
     setGitignoreTemplatesLoading(true);
@@ -851,15 +840,15 @@ export function OnboardingGuide({
   }, []);
 
   useEffect(() => {
-    if (mode !== 'onboarding' || activeStepKey !== 'project_path') return;
+    if (activeStepKey !== 'project_path') return;
     void loadGitignoreTemplates();
-  }, [activeStepKey, loadGitignoreTemplates, mode]);
+  }, [activeStepKey, loadGitignoreTemplates]);
 
   useEffect(() => {
-    if (mode !== 'onboarding' || activeStepKey !== 'project_path') return;
+    if (activeStepKey !== 'project_path') return;
     if (entries.length > 0 || pathLoading) return;
     void loadRoots();
-  }, [activeStepKey, entries.length, mode, pathLoading]);
+  }, [activeStepKey, entries.length, pathLoading]);
 
   const applyState = (nextState: OnboardingState) => {
     setState(nextState);
@@ -1032,7 +1021,7 @@ export function OnboardingGuide({
   };
 
   useEffect(() => {
-    if (mode !== 'onboarding' || isWelcome) return;
+    if (isWelcome) return;
 
     const handleConfigurationShortcut = (event: KeyboardEvent) => {
       if (saving || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -1113,7 +1102,6 @@ export function OnboardingGuide({
     activeStepKey,
     handleStepNext,
     isWelcome,
-    mode,
     saving,
     scenarios,
     selectedScenario,
@@ -1348,7 +1336,7 @@ export function OnboardingGuide({
   }, [t]);
 
   useEffect(() => {
-    if (mode !== 'onboarding' || activeStepKey !== 'project_path') return;
+    if (activeStepKey !== 'project_path') return;
     const trimmed = projectPath.trim();
     if (!trimmed) {
       pathValidationRequestRef.current += 1;
@@ -1361,198 +1349,7 @@ export function OnboardingGuide({
       void validateProjectPath(trimmed).catch(() => undefined);
     }, 100);
     return () => window.clearTimeout(timeout);
-  }, [activeStepKey, mode, projectPath, validateProjectPath]);
-
-  const handleInstallUpdate = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      await onInstallUpdate();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t('onboarding.upgrade.installFailed'),
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const renderUpgradeGuide = () => {
-    const currentDisplay = versionUpdateInfo?.current_version ?? currentVersion;
-    const latestDisplay = versionUpdateInfo?.latest_version ?? currentVersion;
-    const releaseNotes = versionUpdateInfo?.release_notes?.trim();
-    const hasUpdate = Boolean(versionUpdateInfo?.has_update);
-    const updateButtonLabel = saving
-      ? t('onboarding.upgrade.installing')
-      : hasUpdate
-        ? t('onboarding.upgrade.updateNow')
-        : versionUpdateInfo
-          ? t('onboarding.upgrade.updateUnavailable')
-          : t('onboarding.upgrade.updateChecking');
-    const releaseMetaRows = [
-      {
-        key: 'deploy_mode',
-        label: t('onboarding.upgrade.deployMode'),
-        value: versionUpdateInfo?.deploy_mode ?? 'unknown',
-      },
-      {
-        key: 'published_at',
-        label: t('onboarding.upgrade.publishedAt'),
-        value: versionUpdateInfo?.published_at ?? 'null',
-      },
-    ];
-
-    return (
-      <section className="relative isolate flex max-h-[min(720px,calc(100vh-48px))] min-h-[520px] w-full flex-col overflow-hidden rounded-[8px] border border-white/[0.12] bg-[var(--onboarding-card)] text-[#f4f4f5] shadow-[0_24px_80px_rgba(0,0,0,0.44),inset_0_0_0_1px_rgba(255,255,255,0.035)]">
-        <div className="pointer-events-none absolute inset-0 bg-[var(--onboarding-stage)]" />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.032] mix-blend-screen"
-          style={onboardingNoiseTextureStyle}
-        />
-        <div className="relative z-10 flex min-h-11 items-center gap-2 border-b border-white/[0.08] bg-[var(--onboarding-card)] px-3 py-2.5">
-          <span className="h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]" />
-          <span className="h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]" />
-          <span className="h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]" />
-          <div className="ml-2 flex min-w-0 flex-1 items-center gap-2 rounded-[5px] border border-white/[0.08] bg-white/[0.045] px-2.5 py-1.5">
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#cfd5ff]" />
-            <span className="truncate font-mono text-[11px] font-medium tracking-[0] text-[#a8b3c2]">
-              {t('onboarding.upgrade.eyebrow', { version: latestDisplay })}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t('onboarding.upgrade.later')}
-            className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-[5px] border border-transparent text-[#8a8f98] transition hover:border-white/[0.08] hover:bg-white/[0.05] hover:text-[#f4f4f5] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/[0.35]"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <div className="relative z-10 grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_300px]">
-          <main className="min-w-0 px-5 py-6 sm:px-7 sm:py-7 lg:px-8">
-            <p
-              className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#8A8F98]"
-              style={onboardingMonoFont}
-            >
-              {t('onboarding.upgrade.eyebrow', { version: latestDisplay })}
-            </p>
-            <h1 className="mt-3 max-w-2xl font-sans text-[25px] font-[600] leading-tight tracking-[0] text-[#f4f4f5] sm:text-[31px]">
-              {t('onboarding.upgrade.title')}
-            </h1>
-            <p className="mt-3 max-w-2xl text-[13px] leading-5 text-[#a8b3c2] sm:text-[14px] sm:leading-6">
-              {t('onboarding.upgrade.desc')}
-            </p>
-
-            <div className="mt-7 grid gap-3 sm:grid-cols-2">
-              <article className="rounded-[8px] border border-white/[0.09] bg-white/[0.035] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-[7px] border border-white/[0.12] bg-white/[0.055] text-[#dbe0ff]">
-                    <Monitor className="h-4 w-4" strokeWidth={1.6} />
-                  </span>
-                  <span
-                    className="font-mono text-[10px] font-medium tracking-[0] text-white/35"
-                    style={onboardingMonoFont}
-                  >
-                    installed
-                  </span>
-                </div>
-                <h2 className="mt-4 text-[12px] font-medium tracking-[0] text-[#8a8f98]">
-                  {t('onboarding.upgrade.currentVersion')}
-                </h2>
-                <p className="mt-1 truncate font-mono text-[20px] font-semibold tracking-[0] text-[#f4f4f5]">
-                  {currentDisplay}
-                </p>
-              </article>
-              <article className="rounded-[8px] border border-[var(--primary)]/70 bg-[var(--primary-tint)] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.035)]">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-[7px] border border-[var(--primary)]/45 bg-[var(--primary)]/15 text-[var(--primary-hover)]">
-                    <Sparkles className="h-4 w-4" strokeWidth={1.6} />
-                  </span>
-                  <span
-                    className="font-mono text-[10px] font-medium tracking-[0] text-white/45"
-                    style={onboardingMonoFont}
-                  >
-                    release
-                  </span>
-                </div>
-                <h2 className="mt-4 text-[12px] font-medium tracking-[0] text-[#a8b3c2]">
-                  {t('onboarding.upgrade.latestVersion')}
-                </h2>
-                <p className="mt-1 truncate font-mono text-[20px] font-semibold tracking-[0] text-[#f4f4f5]">
-                  {latestDisplay}
-                </p>
-              </article>
-            </div>
-
-            <section className="mt-5 overflow-hidden rounded-[8px] border border-white/[0.09] bg-white/[0.035]">
-              <div className="flex items-center gap-2 border-b border-white/[0.08] px-4 py-3">
-                <FileText className="h-4 w-4 text-[#cfd5ff]" strokeWidth={1.6} />
-                <h2 className="text-[13px] font-semibold tracking-[0] text-[#f4f4f5]">
-                  {t('onboarding.upgrade.releaseNotes')}
-                </h2>
-              </div>
-              <pre className="max-h-[260px] overflow-y-auto whitespace-pre-wrap break-words px-4 py-3 font-sans text-[12px] leading-relaxed tracking-[0] text-[#a8b3c2]">
-                {releaseNotes || t('onboarding.upgrade.releaseNotesEmpty')}
-              </pre>
-            </section>
-          </main>
-
-          <aside className="flex min-h-0 flex-col border-t border-white/[0.08] bg-black/[0.08] p-5 lg:border-l lg:border-t-0">
-            <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#8A8F98]">
-              {t('onboarding.upgrade.stateTitle')}
-            </h2>
-            <div className="mt-3 divide-y divide-white/[0.08] rounded-[7px] border border-white/[0.09] bg-white/[0.035] text-[12px]">
-              {releaseMetaRows.map(({ key, label, value }) => (
-                <div key={key} className="grid gap-1 px-3 py-2.5">
-                  <span className="font-mono text-[10px] tracking-[0] text-[#6f6f76]">
-                    {label}
-                  </span>
-                  <span className="truncate font-mono text-[#d4d4d8]">
-                    {value}
-                  </span>
-                </div>
-              ))}
-              {versionUpdateInfo?.release_url && (
-                <div className="grid gap-1 px-3 py-2.5">
-                  <span className="font-mono text-[10px] tracking-[0] text-[#6f6f76]">
-                    release_url
-                  </span>
-                  <a
-                    href={versionUpdateInfo.release_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="truncate font-mono text-[var(--primary-hover)] transition hover:text-[#f4f4f5]"
-                  >
-                    {t('onboarding.upgrade.releaseLink')}
-                  </a>
-                </div>
-              )}
-            </div>
-            {error && <p className="mt-3 text-[12px] text-red-300">{error}</p>}
-            <div className="mt-auto grid gap-2 pt-5">
-              <button
-                type="button"
-                onClick={() => void handleInstallUpdate()}
-                disabled={saving || !hasUpdate}
-                className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2.5 rounded-[4px] border border-white bg-[linear-gradient(180deg,#FFFFFF_0%,#F2F2F2_100%)] px-5 py-2 text-[13px] font-semibold text-black shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.28)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-[linear-gradient(180deg,#FFFFFF_0%,#EDEDED_100%)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                {updateButtonLabel}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-[4px] border border-white/[0.09] bg-white/[0.035] px-4 py-2 text-[12px] font-medium text-[#a8b3c2] transition hover:border-white/[0.14] hover:bg-white/[0.055] hover:text-[#f4f4f5]"
-              >
-                {t('onboarding.upgrade.later')}
-              </button>
-            </div>
-          </aside>
-        </div>
-      </section>
-    );
-  };
+  }, [activeStepKey, projectPath, validateProjectPath]);
 
   const renderExecutorStep = () => (
     <div className="flex h-[340px] items-center justify-center">
@@ -2489,19 +2286,6 @@ export function OnboardingGuide({
 
     return renderConfigurationStep();
   };
-
-  if (mode === 'upgrade') {
-    return (
-      <div
-        className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-black/45 p-3 text-[var(--ink)] backdrop-blur-[2px] sm:p-6"
-        style={onboardingRootStyle}
-      >
-        <div className="w-full max-w-5xl" style={onboardingInvertedContentStyle}>
-          {renderUpgradeGuide()}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div

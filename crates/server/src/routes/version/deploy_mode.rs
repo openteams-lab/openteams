@@ -73,6 +73,7 @@ improve skill discover and new message notify method by @Caleb196x in #26"
         html_url,
         body,
         published_at,
+        assets: Vec::new(),
     }))
 }
 
@@ -111,6 +112,54 @@ fn detect_deploy_mode_for_path(is_desktop: bool, current_exe: &Path) -> &'static
         "npx"
     } else {
         "unknown"
+    }
+}
+
+fn capability_for_backend_executable() -> Result<UpdateCapability, UpdateErrorInfo> {
+    let current_exe = env::current_exe().map_err(|error| {
+        update_error(
+            UpdateErrorStage::Check,
+            "release_check_failed",
+            &format!("Failed to resolve current executable: {error}"),
+            true,
+        )
+    })?;
+
+    Ok(capability_for_executable_path(
+        env::var_os("AGENT_CHATGROUP_DESKTOP").is_some(),
+        &current_exe,
+    ))
+}
+
+fn capability_for_executable_path(is_desktop: bool, current_exe: &Path) -> UpdateCapability {
+    match detect_deploy_mode_for_path(is_desktop, current_exe) {
+        "npx" => UpdateCapability {
+            platform: UpdatePlatform::WebNpx,
+            method: UpdateMethod::NpxStagedRestart,
+            can_download: true,
+            can_install: true,
+            requires_restart: true,
+            fallback_url: None,
+        },
+        _ => UpdateCapability {
+            platform: UpdatePlatform::Unknown,
+            method: UpdateMethod::Unsupported,
+            can_download: false,
+            can_install: false,
+            requires_restart: false,
+            fallback_url: None,
+        },
+    }
+}
+
+fn legacy_deploy_mode_for_capability(capability: &UpdateCapability) -> &'static str {
+    match capability.platform {
+        UpdatePlatform::WebNpx => "npx",
+        UpdatePlatform::Macos
+        | UpdatePlatform::LinuxAppimage
+        | UpdatePlatform::LinuxDeb
+        | UpdatePlatform::Windows => "tauri",
+        UpdatePlatform::Unknown => "unknown",
     }
 }
 

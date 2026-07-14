@@ -116,7 +116,7 @@ interface ProjectSidebarProps {
     data: CreateProjectRequest,
     options?: {
       teamId?: string;
-      openSessionComposer?: boolean;
+      createDefaultSession?: boolean;
       forceMemberWorkspacePath?: boolean;
     },
   ) => Promise<unknown>;
@@ -1598,7 +1598,7 @@ export function ProjectSidebar({
           },
           {
             teamId: selectedTeamId || blankTeamId,
-            openSessionComposer: true,
+            createDefaultSession: true,
             forceMemberWorkspacePath: true,
           },
         );

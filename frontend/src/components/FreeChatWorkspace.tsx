@@ -346,7 +346,7 @@ const routeMentionsForText = (text: string): string[] =>
   Array.from(
     new Set(
       Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
-        match[1].toLowerCase(),
+        match[1],
       ),
     ),
   );
@@ -1887,7 +1887,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
         }
         const explicitAttachmentMentions = routeMentionsForText(messageText);
         const mainAgentRouteMention = mainAgentName
-          ? normalizeMentionHandle(mainAgentName).replace(/^@/, "")
+          ? mainAgentName.trim().replace(/^@/, "")
           : null;
         const attachmentRouteMentions =
           explicitAttachmentMentions.length > 0

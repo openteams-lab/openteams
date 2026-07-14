@@ -51,6 +51,7 @@ function parseArgs(argv) {
     version: '',
     pubDate: '',
     notesFile: '',
+    requireLinuxAppimage: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -95,6 +96,10 @@ function parseArgs(argv) {
       index += 1;
       continue;
     }
+    if (value === '--require-linux-appimage') {
+      args.requireLinuxAppimage = true;
+      continue;
+    }
     throw new Error(`Unknown argument: ${value}`);
   }
 
@@ -109,6 +114,10 @@ function parseArgs(argv) {
   }
 
   return args;
+}
+
+function normalizeVersion(raw) {
+  return raw.replace(/^v/i, '');
 }
 
 async function walk(dir) {
@@ -322,8 +331,16 @@ async function main() {
         `Missing updater signature for ${fileName}: ${error instanceof Error ? error.message : String(error)}`
       );
     }
+    if (!signature) {
+      throw new Error(`Updater signature is empty for ${fileName}`);
+    }
 
     for (const platformKey of platformKeys) {
+      if (platforms[platformKey]) {
+        throw new Error(
+          `Duplicate updater platform entry: ${platformKey} (${fileName})`
+        );
+      }
       platforms[platformKey] = {
         signature,
         url: buildReleaseAssetUrl(args.owner, args.repo, args.tag, fileName),
@@ -334,9 +351,17 @@ async function main() {
   if (Object.keys(platforms).length === 0) {
     throw new Error(`No updater bundles found under ${inputDir}`);
   }
+  if (
+    args.requireLinuxAppimage &&
+    !Object.keys(platforms).some((key) => key.startsWith('linux-'))
+  ) {
+    throw new Error(
+      'Linux AppImage updater bundles are required but no linux-* manifest entries were generated.'
+    );
+  }
 
   const payload = {
-    version: args.version,
+    version: normalizeVersion(args.version),
     platforms,
   };
 

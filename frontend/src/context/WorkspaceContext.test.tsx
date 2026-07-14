@@ -168,6 +168,9 @@ check(
     source.includes('const visibleMentions =') &&
     source.includes('mentions: visibleMentions') &&
     source.includes('options.routeMentions') &&
+    source.includes("mainAgentName.replace(/^@/, '')") &&
+    !source.includes("mainAgentName.replace(/^@/, '').toLowerCase()") &&
+    !source.includes('match[1].toLowerCase()') &&
     source.includes('meta.client_message_id = userMsgId') &&
     source.includes('upsertStreamedMessage(sid, incomingMessage)') &&
     pendingPlaceholderIndex < sendApiIndex,
