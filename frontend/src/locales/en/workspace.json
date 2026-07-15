@@ -266,6 +266,7 @@
   "sidebar.createProject": "Create project",
   "sidebar.creatingProject": "Creating...",
   "sidebar.deleteProject": "Delete project",
+  "sidebar.delete": "Delete",
   "sidebar.deleteProjectConfirmDesc": "\"{name}\" will be permanently deleted. This action cannot be undone.",
   "sidebar.deleteProjectConfirmTitle": "Delete project?",
   "sidebar.deleteProjectFailed": "Failed to delete project",

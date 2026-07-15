@@ -467,6 +467,24 @@ check(
   source,
 );
 check(
+  "composer member picker closes when clicking outside",
+  source.includes("const memberPickerRef = useRef<HTMLDivElement | null>(null)") &&
+    source.includes('document.addEventListener("pointerdown", handlePointerDownOutside)') &&
+    source.includes("!memberPickerRef.current?.contains(target)") &&
+    source.includes('document.removeEventListener("pointerdown", handlePointerDownOutside)') &&
+    source.includes("<div ref={memberPickerRef} className=\"relative\">") &&
+    source.includes("setIsMemberPickerOpen(false)"),
+  source,
+);
+check(
+  "composer member picker trigger does not duplicate mentioned members",
+  !source.includes("const mentionedMemberNames = new Set(") &&
+    !source.includes("mentionedMembers.length") &&
+    source.includes('<AtSign className="h-3.5 w-3.5') &&
+    source.includes("insertMemberMention(member)"),
+  source,
+);
+check(
   "user message rendering shows routed mention without mutating text",
   source.includes("sendMessage(messageText, {") &&
     source.includes("displayMentionForUserMessage(msg)") &&
@@ -601,6 +619,20 @@ check(
     activityPanelSource.includes("onWheel: noteUserInteraction") &&
     activityPanelSource.includes("onScroll: handleScroll"),
   activityPanelSource,
+);
+check(
+  "composer links to the latest unfinished workflow card",
+  source.includes("unfinishedWorkflowCardMessageId") &&
+    source.includes('projection.is_terminal ? null : messageId') &&
+    source.includes('id={`chat-message-${msg.id}`}') &&
+    source.includes("jumpToUnfinishedWorkflowCard") &&
+    source.includes('className={`absolute top-2 z-20') &&
+    source.includes('isRelatedFilesOpen ? "right-5" : "right-10"') &&
+    source.includes('<GitBranch className="h-3.5 w-3.5" />') &&
+    !source.includes("handleWorkflowReminderPointerMove") &&
+    source.includes('scrollIntoView({ behavior: "smooth", block: "center" })') &&
+    source.includes("setSelectedSidebarMemberId(null)"),
+  source,
 );
 
 if (failures > 0) {

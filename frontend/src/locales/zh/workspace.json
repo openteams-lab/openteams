@@ -306,6 +306,7 @@
   "sidebar.createProject": "创建项目",
   "sidebar.creatingProject": "创建中...",
   "sidebar.deleteProject": "删除项目",
+  "sidebar.delete": "删除",
   "sidebar.deleteProjectConfirmDesc": "“{name}” 将被永久删除，此操作无法撤销。",
   "sidebar.deleteProjectConfirmTitle": "确认删除项目？",
   "sidebar.deleteProjectFailed": "删除项目失败",

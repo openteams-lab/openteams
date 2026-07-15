@@ -125,6 +125,7 @@
   "sidebar.createProject": "プロジェクト作成",
   "sidebar.creatingProject": "作成中...",
   "sidebar.deleteProject": "プロジェクトを削除",
+  "sidebar.delete": "削除",
   "sidebar.deleteProjectConfirmDesc": "「{name}」は完全に削除されます。この操作は元に戻せません。",
   "sidebar.deleteProjectConfirmTitle": "プロジェクトを削除しますか？",
   "sidebar.deleteProjectFailed": "プロジェクトの削除に失敗しました",

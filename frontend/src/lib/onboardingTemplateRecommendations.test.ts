@@ -22,7 +22,7 @@ const teams = [
   template('fullstack_delivery_team'),
   template('product_discovery_team'),
   template('research_innovation_team'),
-  template('team_collaboration_protocol'),
+  template('blank_team'),
 ];
 
 assert.equal(
@@ -39,7 +39,7 @@ assert.equal(
 );
 assert.equal(
   recommendOnboardingTeamTemplate(OnboardingScenario.other, teams)?.id,
-  'team_collaboration_protocol',
+  'blank_team',
 );
 assert.equal(
   recommendOnboardingTeamTemplate(OnboardingScenario.software, [

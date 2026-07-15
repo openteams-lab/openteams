@@ -125,6 +125,7 @@
   "sidebar.createProject": "Crear proyecto",
   "sidebar.creatingProject": "Creando...",
   "sidebar.deleteProject": "Eliminar proyecto",
+  "sidebar.delete": "Eliminar",
   "sidebar.deleteProjectConfirmDesc": "\"{name}\" se eliminará permanentemente. Esta acción no se puede deshacer.",
   "sidebar.deleteProjectConfirmTitle": "¿Eliminar proyecto?",
   "sidebar.deleteProjectFailed": "Error al eliminar el proyecto",

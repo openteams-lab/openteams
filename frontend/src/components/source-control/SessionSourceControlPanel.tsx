@@ -705,7 +705,7 @@ export const SessionSourceControlPanel: React.FC<
       : "";
   return (
     <>
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col pt-3">
       <div className="flex h-9 shrink-0 items-center justify-between px-3">
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="truncate text-[14px] font-semibold text-[var(--ink)]">

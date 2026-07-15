@@ -721,6 +721,16 @@ check(
   componentSource,
 );
 check(
+  "project delete dialog uses compact equal-sized action buttons",
+    componentSource.includes('justify-end border-t border-[var(--hairline)] bg-[var(--surface-1)] px-5 py-2') &&
+    componentSource.match(/inline-flex h-7 w-16/g)?.length === 2 &&
+    componentSource.includes('translate("sidebar.delete", "Delete")') &&
+    !/<Trash2 className="h-3\.5 w-3\.5" \/>\s*\{deleteInFlight/.test(
+      componentSource,
+    ),
+  componentSource,
+);
+check(
   "supports editing and deleting projects from sidebar",
   componentSource.includes("onUpdateProject(editingProject.id") &&
     componentSource.includes("startDeleteProject(actionMenuProject)") &&
@@ -874,20 +884,18 @@ check(
   componentSource,
 );
 check(
-  "create project modal defaults to a blank starter team",
+  "create project modal defaults to the backend blank team preset",
   componentSource.includes('const blankTeamId = "blank_team"') &&
-    componentSource.includes('label: "Blank team"') &&
-    componentSource.includes('description: "One starter AI member"') &&
     componentSource.includes("teamId: selectedTeamId || blankTeamId") &&
     componentSource.includes("createDefaultSession: true") &&
     !componentSource.includes("fullstack_delivery"),
   componentSource,
 );
 check(
-  "create project modal keeps configured team templates after blank team",
+  "create project modal renders team templates returned by the backend",
   componentSource.includes("teamPresets.filter") &&
     componentSource.includes("preset.members.length") &&
-    componentSource.includes("...blankTeamOptions") &&
+    componentSource.includes("return enabledTeamPresets.map") &&
     !componentSource.includes("fallbackTeamOptions"),
   componentSource,
 );

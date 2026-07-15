@@ -178,12 +178,13 @@ check(
   source,
 );
 check(
-  "creates a blank-team starter member from the first available runtime",
+  "creates blank teams through backend presets without a frontend fallback",
   source.includes("agentRuntimeApi.list()") &&
-    source.includes("firstAvailableRuntime(runtimes)") &&
     source.includes("chatAgentsApi.create({") &&
     source.includes("owner_project_id: projectId") &&
-    source.includes("projectApi.addMember(projectId"),
+    source.includes("projectApi.addMember(projectId") &&
+    !source.includes("createBlankTeamStarterMember") &&
+    source.includes("Selected team preset was not returned by the backend"),
   source,
 );
 check(
