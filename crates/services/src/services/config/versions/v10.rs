@@ -7,9 +7,9 @@ use ts_rs::TS;
 use utils::{path::home_directory, text::sanitize_member_handle};
 pub use v9::{
     ChatBubbleFontSize, ChatCompressionConfig, ChatMemberPreset, ChatPresetsConfig, ChatTeamPreset,
-    ChatWorkflowStep, EditorConfig, EditorType, GitHubConfig, NotificationConfig,
-    NotificationInboxSource, NotificationInboxSourcesConfig, SendMessageShortcut, ShowcaseState,
-    SoundFile, ThemeMode, UiLanguage,
+    ChatTeamTemplateTier, ChatWorkflowStep, EditorConfig, EditorType, GitHubConfig,
+    NotificationConfig, NotificationInboxSource, NotificationInboxSourcesConfig,
+    SendMessageShortcut, ShowcaseState, SoundFile, ThemeMode, UiLanguage,
 };
 
 use crate::services::config::{ConfigError, preset_loader::PresetLoader, versions::v9};
