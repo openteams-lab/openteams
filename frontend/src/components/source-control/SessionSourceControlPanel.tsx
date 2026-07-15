@@ -1197,7 +1197,6 @@ export const SessionSourceControlPanel: React.FC<
             aria-keyshortcuts={
               commitCommandPresentation.ariaKeyShortcuts || undefined
             }
-            title={commitCommandPresentation.tooltip}
             value={commitMessage}
             onChange={(event) =>
               setCommitMessageForScope(scopeKey, event.target.value)

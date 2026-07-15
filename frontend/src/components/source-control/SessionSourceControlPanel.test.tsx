@@ -171,6 +171,13 @@ check(
 );
 
 check(
+  "commit message input does not show tooltip information",
+  source.includes("ref={commitMessageRef}") &&
+    !source.includes("title={commitCommandPresentation.tooltip}"),
+  source,
+);
+
+check(
   "records late async errors under their original session scope",
   source.includes("const actionScopeKey = scopeKeyRef.current") &&
     source.includes("const operationScopeKey = scopeKeyRef.current") &&
