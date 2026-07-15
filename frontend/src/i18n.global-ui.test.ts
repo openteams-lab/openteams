@@ -7,6 +7,8 @@ import { readSplitLocaleForTest, testLocales } from "./i18n.test-utils";
 
 const locales = testLocales;
 const requiredKeys = [
+  "chatMarkdown.copied",
+  "chatMarkdown.copy",
   "globalSearch.clear",
   "globalSearch.dialogLabel",
   "globalSearch.empty",
@@ -35,6 +37,7 @@ const requiredKeys = [
   "globalSearch.worktreeStatus.merging",
   "globalSearch.worktreeStatus.needs_conflict_resolution",
   "sidebar.aria.openNotifications",
+  "sidebar.buildStats.open",
   "sidebar.archiveSession",
   "sidebar.archiveSessionFailed",
   "sidebar.archivingSession",
@@ -58,6 +61,7 @@ const requiredKeys = [
   "sidebar.inbox.time.minutes",
   "sidebar.inbox.time.now",
   "sidebar.inbox.title",
+  "sidebar.primary.new-session.helper",
   "sidebar.pinSession",
   "sidebar.pinSessionFailed",
   "sidebar.renameSession",
@@ -69,6 +73,8 @@ const requiredKeys = [
   "sidebar.unpinSession",
   "sidebar.updatingPin",
   "sidebar.viewSessionId",
+  "settings.providers.custom.modality.image",
+  "settings.providers.custom.modality.text",
   "toast.dismissNotification",
 ] as const;
 

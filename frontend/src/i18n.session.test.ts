@@ -22,6 +22,7 @@ const prefixes = [
   "agentActivity.",
   "createSession.",
   "linkedWorkItems.",
+  "queue.",
   "relatedFiles.",
   "sourceControl.",
 ] as const;
@@ -59,7 +60,7 @@ const usedSessionKeys = () => {
   for (const file of sourceFiles) {
     const text = readText(file);
     for (const match of text.matchAll(
-      /["']((?:agentActivity|createSession|linkedWorkItems|relatedFiles|sourceControl)\.[^"']+)["']/g,
+      /["']((?:agentActivity|createSession|linkedWorkItems|queue|relatedFiles|sourceControl)\.[^"']+)["']/g,
     )) {
       keys.add(match[1]);
     }

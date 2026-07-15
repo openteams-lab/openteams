@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FolderOpen } from "lucide-react";
 import { ScrollArea } from "@/components/ScrollArea";
+import { useAppTranslation } from "@/hooks/useAppTranslation";
 import { projectSourceControlApi } from "@/lib/api";
 import { parseUnifiedDiff, alignSplitLines } from "@/lib/parseDiff";
 import type { DiffLine, DiffHunk, SplitRow } from "@/lib/parseDiff";
@@ -164,6 +165,7 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
   workspacePath,
   sourceControlRef,
 }) => {
+  const { t } = useAppTranslation();
   const [diffMode, setDiffMode] = useState<"unified" | "split">("unified");
   const [sourceDiff, setSourceDiff] = useState<SourceControlDiffResponse | null>(
     null,
@@ -258,12 +260,15 @@ export const DiffViewTab: React.FC<DiffViewTabProps> = ({
       });
   }, [effectiveFilePath, sessionId, sourceSessionId, workspacePath]);
 
+  const openInFileExplorerLabel = t("sourceControl.openInFileExplorer", {
+    defaultValue: "Open in file explorer",
+  });
   const openExplorerButton = effectiveFilePath ? (
     <button
       type="button"
       onClick={handleOpenInExplorer}
-      title="Open in file explorer"
-      aria-label="Open in file explorer"
+      title={openInFileExplorerLabel}
+      aria-label={openInFileExplorerLabel}
       className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[var(--hairline)] text-[var(--ink-subtle)] transition hover:bg-[var(--surface-1)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--primary)]"
     >
       <FolderOpen className="h-3.5 w-3.5" />

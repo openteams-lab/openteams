@@ -36,6 +36,8 @@
   "brandTag": "openteams · Linear-style 디자인 프리뷰 · 제6장",
   "bugsFixed": "수정된 버그",
   "cancel": "취소",
+  "chatMarkdown.copied": "복사했습니다!",
+  "chatMarkdown.copy": "Markdown으로 복사",
   "codeLocalAlways": "실제 원천 소스 코드는 외부로 반출되지 않고 로컬 물리 장비에 남아 안전합니다",
   "configImportExport": "데이터 내보내기/가져오기 · 로컬 물리적 완벽 격리 구조",
   "connectAgentsExisting": "소지하고 계신 타사 토큰 연계 가능. openteams가 배율을 지혜롭게 자동 연출하며 안전합니다.",

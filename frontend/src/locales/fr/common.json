@@ -36,6 +36,8 @@
   "brandTag": "openteams · Prototypes de Design Linear · ch.6",
   "bugsFixed": "Bugs corrigés",
   "cancel": "Annuler",
+  "chatMarkdown.copied": "Copié !",
+  "chatMarkdown.copy": "Copier en Markdown",
   "codeLocalAlways": "Votre précieux code reste sur votre machine informatique.",
   "configImportExport": "Exportation config · Synchronisation confidentielle, code local",
   "connectAgentsExisting": "Connectez vos propres clés API existantes. openteams gère l'orchestration optimale.",

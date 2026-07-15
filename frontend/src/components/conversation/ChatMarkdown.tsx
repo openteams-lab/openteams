@@ -2,6 +2,7 @@ import { useMemo, type MouseEvent } from 'react';
 import { Check, Clipboard } from 'lucide-react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { cn } from '@/lib/utils';
 import {
   fileHrefToPath,
@@ -184,6 +185,7 @@ export function ChatMarkdown({
   readOnlyLinkBasePath = null,
   onFilePath,
 }: ChatMarkdownProps) {
+  const { t } = useAppTranslation();
   const workspacePath = readOnlyLinkBasePath;
   const resolvedContent = useMemo(
     () => (onFilePath ? linkifyFilePaths(content, workspacePath) : content),
@@ -196,12 +198,20 @@ export function ChatMarkdown({
     await writeClipboardViaBridge(copiedText);
     const button = event.currentTarget;
     button.dataset.copied = 'true';
-    button.title = 'Copied!';
-    button.setAttribute('aria-label', 'Copied!');
+    button.title = t('chatMarkdown.copied', { defaultValue: 'Copied!' });
+    button.setAttribute(
+      'aria-label',
+      t('chatMarkdown.copied', { defaultValue: 'Copied!' })
+    );
     window.setTimeout(() => {
       button.dataset.copied = 'false';
-      button.title = 'Copy as Markdown';
-      button.setAttribute('aria-label', 'Copy as Markdown');
+      button.title = t('chatMarkdown.copy', {
+        defaultValue: 'Copy as Markdown',
+      });
+      button.setAttribute(
+        'aria-label',
+        t('chatMarkdown.copy', { defaultValue: 'Copy as Markdown' })
+      );
     }, 1200);
   };
 
@@ -473,8 +483,12 @@ export function ChatMarkdown({
           <div className="flex justify-end opacity-0 transition-opacity duration-150 group-hover:opacity-100">
             <button
               type="button"
-              aria-label="Copy as Markdown"
-              title="Copy as Markdown"
+              aria-label={t('chatMarkdown.copy', {
+                defaultValue: 'Copy as Markdown',
+              })}
+              title={t('chatMarkdown.copy', {
+                defaultValue: 'Copy as Markdown',
+              })}
               onClick={handleCopy}
               data-copied="false"
               className="chat-markdown-copy-button pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border transition-colors"

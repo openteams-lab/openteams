@@ -1789,8 +1789,8 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                     }
                     disabled={queueActionIds.has(item.message.id)}
                     className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-rose-500 disabled:cursor-wait disabled:opacity-60"
-                    title="删除排队消息"
-                    aria-label="删除排队消息"
+                    title={t("queue.deleteMessage")}
+                    aria-label={t("queue.deleteMessage")}
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
@@ -1811,8 +1811,8 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
               }
               disabled={queueActionIds.has(continueActionId)}
               className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-2)] hover:text-[var(--primary)] disabled:cursor-wait disabled:opacity-60"
-              title="继续执行队列"
-              aria-label="继续执行队列"
+              title={t("queue.continueExecution")}
+              aria-label={t("queue.continueExecution")}
             >
               <Play className="h-3 w-3" />
             </button>
@@ -2488,6 +2488,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
           {!isRelatedFilesOpen && (
             <button
               type="button"
+              data-command-id="sidebar.right.toggle"
               onClick={openRelatedFiles}
               className="absolute top-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--ink-subtle)] shadow-sm transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
               title={t("relatedFiles.show")}
@@ -3070,6 +3071,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
           >
             <button
               type="button"
+              data-command-id="sidebar.right.toggle"
               onClick={closeRelatedFiles}
               className="absolute right-1 top-0 z-10 flex h-7 w-7 items-center justify-center rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--ink-subtle)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
               title={t("relatedFiles.hide")}

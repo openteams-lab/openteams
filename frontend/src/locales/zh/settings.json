@@ -1,4 +1,6 @@
 {
+  "settings.providers.custom.modality.image": "图像",
+  "settings.providers.custom.modality.text": "文本",
   "settings.account.desc": "管理开发者资料配置。",
   "settings.account.emailEndpoint": "账号",
   "settings.account.title": "账户设置",

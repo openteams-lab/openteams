@@ -36,6 +36,8 @@
   "brandTag": "openteams · Linear風デザインシステム試作 · 第6章",
   "bugsFixed": "バグ修復数",
   "cancel": "キャンセル",
+  "chatMarkdown.copied": "コピーしました！",
+  "chatMarkdown.copy": "Markdownとしてコピー",
   "codeLocalAlways": "あなたのソースコードは常に手元のローカルに保護されます",
   "configImportExport": "構成インポート/エクスポート · コードを完全保護",
   "connectAgentsExisting": "すでにお持ちのAPIキーを導入可能。openteamsが賢く自動配分。追加課金なし。",

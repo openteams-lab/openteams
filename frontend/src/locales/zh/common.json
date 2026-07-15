@@ -36,6 +36,8 @@
   "brandTag": "openteams",
   "bugsFixed": "修复 Bug",
   "cancel": "取消",
+  "chatMarkdown.copied": "已复制！",
+  "chatMarkdown.copy": "复制为 Markdown",
   "codeLocalAlways": "代码完全保留在您本地物理机。确保安全。",
   "configImportExport": "配置导入/导出 · 本地数据与机器保持物理隔离",
   "connectAgentsExisting": "无缝配置您已拥有的 API 凭证。openteams 将根据场景、成本进行最优精细化路由。",

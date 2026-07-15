@@ -1,6 +1,6 @@
 {
   "shortcuts.command.commandPalette.open": "Ouvrir la palette de commandes",
-  "shortcuts.command.shortcuts.help.open": "Ouvrir l’aide des raccourcis",
+  "shortcuts.command.shortcuts.help.open": "Aide des raccourcis",
   "shortcuts.command.sidebar.right.toggle": "Afficher ou masquer la barre latérale droite",
   "shortcuts.command.shortcuts.settings.open": "Ouvrir les paramètres des raccourcis",
   "shortcuts.command.agent-runtime.sidebar.toggle": "Afficher ou masquer la navigation des agents",
@@ -59,6 +59,7 @@
   "shortcuts.category.issues": "Tickets",
   "shortcuts.category.team": "Équipe",
   "shortcuts.category.workflow": "Workflow",
+  "shortcuts.tooltip.shortcut": "Raccourci : {shortcut}",
   "shortcuts.unbound": "Raccourci non défini",
   "shortcuts.settings.title": "Raccourcis clavier",
   "shortcuts.search.placeholder": "Rechercher une commande ou une touche",

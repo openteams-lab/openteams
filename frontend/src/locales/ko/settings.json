@@ -1,4 +1,6 @@
 {
+  "settings.providers.custom.modality.image": "이미지",
+  "settings.providers.custom.modality.text": "텍스트",
   "settings.account.desc": "개발자 프로필 구성을 관리합니다.",
   "settings.account.emailEndpoint": "계정",
   "settings.account.title": "계정 설정",

@@ -1371,8 +1371,8 @@ export function TeamPage() {
                   type="button"
                   onClick={() => setNotice(null)}
                   className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] text-[var(--success)] opacity-70 transition hover:bg-[var(--success)]/10 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--success)]/35"
-                  aria-label="Close notification"
-                  title="Close notification"
+                  aria-label={t("teamPage.notification.close")}
+                  title={t("teamPage.notification.close")}
                 >
                   <X aria-hidden="true" className="h-3.5 w-3.5" />
                 </button>

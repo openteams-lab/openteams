@@ -1,6 +1,6 @@
 {
   "shortcuts.command.commandPalette.open": "Open command palette",
-  "shortcuts.command.shortcuts.help.open": "Open shortcut help",
+  "shortcuts.command.shortcuts.help.open": "Shortcut help",
   "shortcuts.command.sidebar.right.toggle": "Toggle right sidebar",
   "shortcuts.command.shortcuts.settings.open": "Open keyboard shortcut settings",
   "shortcuts.command.agent-runtime.sidebar.toggle": "Toggle agent navigation",
@@ -59,6 +59,7 @@
   "shortcuts.category.issues": "Issues",
   "shortcuts.category.team": "Team",
   "shortcuts.category.workflow": "Workflow",
+  "shortcuts.tooltip.shortcut": "Shortcut: {shortcut}",
   "shortcuts.unbound": "Not assigned",
   "shortcuts.settings.title": "Keyboard shortcuts",
   "shortcuts.search.placeholder": "Search commands or keys",

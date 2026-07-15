@@ -1,6 +1,6 @@
 {
   "shortcuts.command.commandPalette.open": "コマンドパレットを開く",
-  "shortcuts.command.shortcuts.help.open": "ショートカットヘルプを開く",
+  "shortcuts.command.shortcuts.help.open": "ショートカットヘルプ",
   "shortcuts.command.sidebar.right.toggle": "右サイドバーを切り替える",
   "shortcuts.command.shortcuts.settings.open": "キーボードショートカット設定を開く",
   "shortcuts.command.agent-runtime.sidebar.toggle": "エージェントナビゲーションを切り替える",
@@ -59,6 +59,7 @@
   "shortcuts.category.issues": "課題",
   "shortcuts.category.team": "チーム",
   "shortcuts.category.workflow": "ワークフロー",
+  "shortcuts.tooltip.shortcut": "ショートカット：{shortcut}",
   "shortcuts.unbound": "ショートカット未設定",
   "shortcuts.settings.title": "キーボードショートカット",
   "shortcuts.search.placeholder": "コマンドまたはキーを検索",

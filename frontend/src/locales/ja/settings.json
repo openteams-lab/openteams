@@ -1,4 +1,6 @@
 {
+  "settings.providers.custom.modality.image": "画像",
+  "settings.providers.custom.modality.text": "テキスト",
   "settings.account.desc": "開発者プロフィール設定を管理します。",
   "settings.account.emailEndpoint": "アカウント",
   "settings.account.title": "アカウント設定",

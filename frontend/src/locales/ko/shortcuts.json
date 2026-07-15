@@ -1,6 +1,6 @@
 {
   "shortcuts.command.commandPalette.open": "명령 팔레트 열기",
-  "shortcuts.command.shortcuts.help.open": "단축키 도움말 열기",
+  "shortcuts.command.shortcuts.help.open": "단축키 도움말",
   "shortcuts.command.sidebar.right.toggle": "오른쪽 사이드바 전환",
   "shortcuts.command.shortcuts.settings.open": "키보드 단축키 설정 열기",
   "shortcuts.command.agent-runtime.sidebar.toggle": "에이전트 탐색 전환",
@@ -59,6 +59,7 @@
   "shortcuts.category.issues": "이슈",
   "shortcuts.category.team": "팀",
   "shortcuts.category.workflow": "워크플로",
+  "shortcuts.tooltip.shortcut": "단축키: {shortcut}",
   "shortcuts.unbound": "단축키 미지정",
   "shortcuts.settings.title": "키보드 단축키",
   "shortcuts.search.placeholder": "명령 또는 키 검색",

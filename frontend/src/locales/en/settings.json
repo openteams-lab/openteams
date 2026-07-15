@@ -1,4 +1,6 @@
 {
+  "settings.providers.custom.modality.image": "Image",
+  "settings.providers.custom.modality.text": "Text",
   "settings.account.desc": "Manage developer profiling configurations.",
   "settings.account.emailEndpoint": "Account",
   "settings.account.title": "Account settings",

@@ -89,12 +89,18 @@ export function CustomProviderModelCard({
           </span>
           <span className="hidden shrink-0 items-center gap-1 sm:flex">
             {hasText ? (
-              <span className="provider-model-modality" title="Text">
+              <span
+                className="provider-model-modality"
+                title={copy('settings.providers.custom.modality.text', 'Text')}
+              >
                 <FileText className="h-3 w-3" />
               </span>
             ) : null}
             {hasImage ? (
-              <span className="provider-model-modality" title="Image">
+              <span
+                className="provider-model-modality"
+                title={copy('settings.providers.custom.modality.image', 'Image')}
+              >
                 <ImageIcon className="h-3 w-3" />
               </span>
             ) : null}

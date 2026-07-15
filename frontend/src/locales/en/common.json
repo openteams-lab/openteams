@@ -36,6 +36,8 @@
   "brandTag": "openteams · Linear-style design system · ch.6",
   "bugsFixed": "Bugs fixed",
   "cancel": "Cancel",
+  "chatMarkdown.copied": "Copied!",
+  "chatMarkdown.copy": "Copy as Markdown",
   "codeLocalAlways": "Your code stays local. Always.",
   "configImportExport": "Config export/import · setup syncs, code stays local",
   "connectAgentsExisting": "Connect the AI agents you already use. openteams will route tasks across them.",

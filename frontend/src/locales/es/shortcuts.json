@@ -1,6 +1,6 @@
 {
   "shortcuts.command.commandPalette.open": "Abrir la paleta de comandos",
-  "shortcuts.command.shortcuts.help.open": "Abrir la ayuda de atajos",
+  "shortcuts.command.shortcuts.help.open": "Ayuda de atajos",
   "shortcuts.command.sidebar.right.toggle": "Alternar la barra lateral derecha",
   "shortcuts.command.shortcuts.settings.open": "Abrir la configuración de atajos",
   "shortcuts.command.agent-runtime.sidebar.toggle": "Alternar la navegación de agentes",
@@ -59,6 +59,7 @@
   "shortcuts.category.issues": "Incidencias",
   "shortcuts.category.team": "Equipo",
   "shortcuts.category.workflow": "Flujo de trabajo",
+  "shortcuts.tooltip.shortcut": "Atajo: {shortcut}",
   "shortcuts.unbound": "Atajo no asignado",
   "shortcuts.settings.title": "Atajos de teclado",
   "shortcuts.search.placeholder": "Buscar comandos o teclas",

@@ -1,6 +1,6 @@
 {
   "shortcuts.command.commandPalette.open": "打开命令面板",
-  "shortcuts.command.shortcuts.help.open": "打开快捷键帮助",
+  "shortcuts.command.shortcuts.help.open": "快捷键帮助",
   "shortcuts.command.sidebar.right.toggle": "切换右侧栏",
   "shortcuts.command.shortcuts.settings.open": "打开快捷键设置",
   "shortcuts.command.agent-runtime.sidebar.toggle": "切换 Agent 导航",
@@ -59,6 +59,7 @@
   "shortcuts.category.issues": "事项",
   "shortcuts.category.team": "团队",
   "shortcuts.category.workflow": "工作流",
+  "shortcuts.tooltip.shortcut": "快捷键：{shortcut}",
   "shortcuts.unbound": "未设置快捷键",
   "shortcuts.settings.title": "快捷键",
   "shortcuts.search.placeholder": "搜索命令或按键",
