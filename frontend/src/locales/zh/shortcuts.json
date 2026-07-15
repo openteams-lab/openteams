@@ -85,5 +85,6 @@
   "shortcuts.reason.unavailable": "当前上下文不可用。",
   "shortcuts.chord.create": "创建：P 项目｜I 事项｜M 成员｜S 会话",
   "shortcuts.chord.go": "前往：B 构建统计｜I 事项｜W 工作流",
+  "shortcuts.recorder.recording": "正在录制快捷键",
   "shortcuts.recorder.firstStroke": "请按第二个键，或按 Enter 保存单键。"
 }

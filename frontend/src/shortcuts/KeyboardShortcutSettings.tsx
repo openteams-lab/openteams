@@ -130,9 +130,9 @@ export function KeyboardShortcutSettings({
           [commandId]: { sequence: [...sequence] },
         };
     setSaveError(null);
+    closeRecorder();
     try {
       await persistOverrideSet(next, savePlatformOverrides);
-      closeRecorder();
     } catch {
       setSaveError(translate('shortcuts.error.saveFailed'));
     }
@@ -227,19 +227,43 @@ export function KeyboardShortcutSettings({
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(8rem,1fr)_minmax(0,1fr)] items-center gap-3">
               <div className="min-w-0">
                 <div className="text-sm font-medium">{row.title}</div>
-                {row.modified && (
-                  <div className="text-xs text-[var(--ink-subtle)]">
-                    {translate('shortcuts.filter.modified')}
-                  </div>
-                )}
               </div>
               <div
                 data-shortcut-binding
                 className="text-center text-xs font-medium text-[var(--ink-subtle)]"
               >
-                {row.currentLabel}
+                {editingCommandId === row.id ? (
+                  <KeybindingRecorder
+                    active
+                    translate={translate}
+                    onComplete={(sequence) =>
+                      handleRecordedSequence(row.id, sequence)
+                    }
+                    onCancel={closeRecorder}
+                  />
+                ) : (
+                  row.currentLabel
+                )}
               </div>
               <div className="flex min-w-0 items-center justify-end gap-2">
+                {editingCommandId === row.id &&
+                  pendingConflict &&
+                  recordedSequence && (
+                  <button
+                    type="button"
+                    data-shortcut-replace
+                    onClick={() =>
+                      void saveRecordedSequence(
+                        row.id,
+                        recordedSequence,
+                        pendingConflict.conflictingCommandId,
+                      )
+                    }
+                    className="shrink-0 whitespace-nowrap rounded border border-[var(--hairline)] px-2 py-1 text-xs"
+                  >
+                    {translate('shortcuts.action.replace')}
+                  </button>
+                )}
                 <button
                   type="button"
                   data-shortcut-edit
@@ -248,54 +272,36 @@ export function KeyboardShortcutSettings({
                     setPendingConflict(null);
                     setSaveError(null);
                   }}
-                  className="rounded border border-[var(--hairline)] px-2 py-1 text-xs"
+                  className="shrink-0 whitespace-nowrap rounded border border-[var(--hairline)] px-2 py-1 text-xs"
                 >
                   {translate('shortcuts.action.record')}
                 </button>
                 {row.modified && (
                   <button
                     type="button"
+                    data-shortcut-reset
                     onClick={() => void restoreCommand(row.id)}
-                    className="rounded border border-[var(--hairline)] px-2 py-1 text-xs"
+                    className="shrink-0 whitespace-nowrap rounded border border-[var(--hairline)] px-2 py-1 text-xs"
                   >
                     {translate('shortcuts.action.reset')}
                   </button>
                 )}
               </div>
             </div>
-            {editingCommandId === row.id && (
-              <div className="mt-3 space-y-2">
-                <KeybindingRecorder
-                  active
-                  translate={translate}
-                  onComplete={(sequence) =>
-                    handleRecordedSequence(row.id, sequence)
-                  }
-                  onCancel={closeRecorder}
-                />
-                <button
-                  type="button"
-                  onClick={() => void saveRecordedSequence(row.id, [])}
-                  className="text-xs text-red-600"
-                >
-                  {translate('shortcuts.action.remove')}
-                </button>
-                {pendingConflict && recordedSequence && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void saveRecordedSequence(
-                        row.id,
-                        recordedSequence,
-                        pendingConflict.conflictingCommandId,
-                      )
-                    }
-                    className="ml-3 text-xs text-amber-600"
-                  >
-                    {translate('shortcuts.action.replace')}
-                  </button>
-                )}
-              </div>
+            {editingCommandId === row.id &&
+              pendingConflict &&
+              recordedSequence && (
+              <p
+                data-shortcut-conflict
+                role="status"
+                className="mt-3 text-xs text-amber-600 dark:text-amber-400"
+              >
+                {translate('shortcuts.conflict.blocking', {
+                  command: presentationFor(
+                    pendingConflict.conflictingCommandId,
+                  ).title,
+                })}
+              </p>
             )}
           </div>
         ))}

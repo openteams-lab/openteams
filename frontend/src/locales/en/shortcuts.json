@@ -85,5 +85,6 @@
   "shortcuts.reason.unavailable": "Unavailable in the current context.",
   "shortcuts.chord.create": "Create: P project | I issue | M member | S session",
   "shortcuts.chord.go": "Go to: B build statistics | I issues | W workflow",
+  "shortcuts.recorder.recording": "Recording shortcut",
   "shortcuts.recorder.firstStroke": "Press a second key, or Enter to save one key."
 }

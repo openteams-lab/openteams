@@ -85,5 +85,6 @@
   "shortcuts.reason.unavailable": "現在のコンテキストでは使用できません。",
   "shortcuts.chord.create": "作成：P プロジェクト｜I 課題｜M メンバー｜S セッション",
   "shortcuts.chord.go": "移動：B ビルド統計｜I 課題｜W ワークフロー",
+  "shortcuts.recorder.recording": "ショートカットを記録中",
   "shortcuts.recorder.firstStroke": "2 番目のキーを押すか、Enter で単一キーを保存します。"
 }

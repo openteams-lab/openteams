@@ -85,5 +85,6 @@
   "shortcuts.reason.unavailable": "No disponible en el contexto actual.",
   "shortcuts.chord.create": "Crear: P proyecto | I incidencia | M miembro | S sesión",
   "shortcuts.chord.go": "Ir a: B estadísticas | I incidencias | W flujo",
+  "shortcuts.recorder.recording": "Grabando atajo",
   "shortcuts.recorder.firstStroke": "Pulsa una segunda tecla o Intro para guardar una sola tecla."
 }

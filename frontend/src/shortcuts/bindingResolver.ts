@@ -41,14 +41,7 @@ const normalizeAsciiKey = (key: string) =>
   key.length === 1 && /^[\x20-\x7e]$/.test(key) ? key.toLowerCase() : null;
 
 export function keyFromLayout(event: KeyboardEventSnapshot): string | null {
-  if (
-    event.altGraph ||
-    event.key === 'Dead' ||
-    event.key === 'Unidentified' ||
-    event.key === 'Process'
-  ) {
-    return null;
-  }
+  if (event.altGraph) return null;
   if (/^Key[A-Z]$/.test(event.code)) {
     return event.code.slice(3).toLowerCase();
   }
@@ -57,6 +50,13 @@ export function keyFromLayout(event: KeyboardEventSnapshot): string | null {
   }
   if (CODE_KEY[event.code]) {
     return CODE_KEY[event.code];
+  }
+  if (
+    event.key === 'Dead' ||
+    event.key === 'Unidentified' ||
+    event.key === 'Process'
+  ) {
+    return null;
   }
   return normalizeNamedKey(event.key) ?? normalizeAsciiKey(event.key);
 }

@@ -116,6 +116,34 @@ const sortHandlers = (
   rankShortcutScope(right.scope) - rankShortcutScope(left.scope) ||
   right.registrationOrder - left.registrationOrder;
 
+const overrideSetsMatch = (
+  pending: Readonly<Record<string, KeyboardShortcutOverride>>,
+  acknowledged: Readonly<Record<string, readonly string[]>>,
+) => {
+  const entries = Object.entries(pending);
+  return (
+    entries.length === Object.keys(acknowledged).length &&
+    entries.every(([commandId, override]) => {
+      if (!override || typeof override !== 'object' || Array.isArray(override)) {
+        return false;
+      }
+      const pendingSequence = (override as { sequence?: unknown }).sequence;
+      if (
+        !Array.isArray(pendingSequence) ||
+        !pendingSequence.every((stroke) => typeof stroke === 'string')
+      ) {
+        return false;
+      }
+      const sequence = acknowledged[commandId];
+      return (
+        sequence !== undefined &&
+        pendingSequence.length === sequence.length &&
+        pendingSequence.every((stroke, index) => stroke === sequence[index])
+      );
+    })
+  );
+};
+
 const ariaShortcutFor = (sequence: readonly string[]) => {
   if (sequence.length !== 1) return '';
   return sequence[0]
@@ -167,16 +195,9 @@ export function ShortcutProvider({
         : { overrides: {}, preservedUnknown: {}, invalidCommandIds: [] },
     [config, runtime.platform],
   );
-  const mergedBindings = useMemo(
-    () =>
-      mergeEffectiveBindings(
-        commandRegistry,
-        runtime.platform,
-        shortcutConfig.overrides,
-      ).bindings,
-    [runtime.platform, shortcutConfig.overrides],
-  );
-  const platformOverrides = useMemo<Record<string, KeyboardShortcutOverride>>(
+  const acknowledgedPlatformOverrides = useMemo<
+    Record<string, KeyboardShortcutOverride>
+  >(
     () =>
       Object.fromEntries(
         Object.entries(shortcutConfig.overrides).map(([commandId, sequence]) => [
@@ -185,6 +206,28 @@ export function ShortcutProvider({
         ]),
       ),
     [shortcutConfig.overrides],
+  );
+  const [pendingPlatformOverrides, setPendingPlatformOverrides] = useState<
+    Record<string, KeyboardShortcutOverride> | null
+  >(null);
+  useEffect(() => {
+    if (
+      pendingPlatformOverrides &&
+      overrideSetsMatch(pendingPlatformOverrides, shortcutConfig.overrides)
+    ) {
+      setPendingPlatformOverrides(null);
+    }
+  }, [pendingPlatformOverrides, shortcutConfig.overrides]);
+  const platformOverrides =
+    pendingPlatformOverrides ?? acknowledgedPlatformOverrides;
+  const mergedBindings = useMemo(
+    () =>
+      mergeEffectiveBindings(
+        commandRegistry,
+        runtime.platform,
+        platformOverrides,
+      ).bindings,
+    [platformOverrides, runtime.platform],
   );
 
   const clearChord = useCallback(() => {
@@ -329,6 +372,7 @@ export function ShortcutProvider({
   const savePlatformOverrides = useCallback(
     async (overrides: Record<string, KeyboardShortcutOverride>) => {
       if (!config) throw new Error('Config is not loaded');
+      setPendingPlatformOverrides(overrides);
       const current = readShortcutConfig(config, runtime.platform, commandRegistry);
       const keyboardShortcuts: KeyboardShortcutsConfig = {
         ...config.keyboard_shortcuts,
@@ -340,7 +384,18 @@ export function ShortcutProvider({
           },
         },
       };
-      return saveShortcutConfig(config, keyboardShortcuts, saveConfigPatch);
+      try {
+        return await saveShortcutConfig(
+          config,
+          keyboardShortcuts,
+          saveConfigPatch,
+        );
+      } catch (error) {
+        setPendingPlatformOverrides((pending) =>
+          pending === overrides ? null : pending,
+        );
+        throw error;
+      }
     },
     [config, runtime.platform, saveConfigPatch],
   );
@@ -406,7 +461,7 @@ export function ShortcutProvider({
   const executeCommandRef = useRef(executeCommand);
   executeCommandRef.current = executeCommand;
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
+    const onCapturedKeyDown = (event: KeyboardEvent) => {
       const capture = [...capturesRef.current.values()]
         .filter((entry) => entry.active)
         .sort(
@@ -418,6 +473,8 @@ export function ShortcutProvider({
         clearChord();
         return;
       }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
       const result = resolverRef.current(event, chordRef.current);
       if (result.kind === 'waiting') {
         event.preventDefault();
@@ -442,10 +499,15 @@ export function ShortcutProvider({
         clearChord();
       }
     };
+    // Active capture leases (for example the keybinding recorder) must run
+    // before page-level React/native handlers can stop propagation. Regular
+    // shortcuts intentionally remain on the bubble listener below.
+    window.addEventListener('keydown', onCapturedKeyDown, true);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('blur', onBlur);
     document.addEventListener('focusin', onFocusIn, true);
     return () => {
+      window.removeEventListener('keydown', onCapturedKeyDown, true);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('blur', onBlur);
       document.removeEventListener('focusin', onFocusIn, true);

@@ -85,5 +85,6 @@
   "shortcuts.reason.unavailable": "현재 컨텍스트에서 사용할 수 없습니다.",
   "shortcuts.chord.create": "만들기: P 프로젝트 | I 이슈 | M 멤버 | S 세션",
   "shortcuts.chord.go": "이동: B 빌드 통계 | I 이슈 | W 워크플로",
+  "shortcuts.recorder.recording": "단축키 기록 중",
   "shortcuts.recorder.firstStroke": "두 번째 키를 누르거나 Enter로 단일 키를 저장하세요."
 }

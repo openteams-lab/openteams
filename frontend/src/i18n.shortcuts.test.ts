@@ -21,8 +21,9 @@ for (const definition of commandRegistry) {
 }
 assert.ok(englishKeys.includes('shortcuts.reason.selectProject'));
 assert.ok(englishKeys.includes('shortcuts.tooltip.shortcut'));
+assert.ok(englishKeys.includes('shortcuts.recorder.recording'));
 for (const dictionary of dictionaries) {
   assert.ok(dictionary['shortcuts.tooltip.shortcut'].includes('{shortcut}'));
 }
-assert.equal(englishKeys.length, 87);
+assert.equal(englishKeys.length, 88);
 console.log('Shortcut translations: PASS');

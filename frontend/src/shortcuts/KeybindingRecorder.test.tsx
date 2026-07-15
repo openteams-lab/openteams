@@ -51,6 +51,21 @@ assert.deepEqual(
   ['c', 'shift+p'],
   'recorded sequences use the shared physical-layout normalizer',
 );
+assert.deepEqual(
+  normalizeSequence([
+    {
+      key: 'Dead',
+      code: 'KeyE',
+      ctrlKey: false,
+      metaKey: false,
+      altKey: true,
+      shiftKey: false,
+      altGraph: false,
+    },
+  ]),
+  ['alt+e'],
+  'physical key codes keep Option shortcuts recordable when macOS reports Dead',
+);
 
 const press = (target: EventTarget, init: KeyboardEventInit) => {
   const event = new window.KeyboardEvent('keydown', {
@@ -65,6 +80,7 @@ const press = (target: EventTarget, init: KeyboardEventInit) => {
 const completed: string[][] = [];
 let cancelled = 0;
 let searchCalls = 0;
+let pageKeyDownCalls = 0;
 function Harness() {
   useCommandHandler('search.open', {
     scope: 'global',
@@ -74,14 +90,21 @@ function Harness() {
     },
   });
   return (
-    <KeybindingRecorder
-      active
-      translate={(key) => key}
-      onComplete={(sequence) => completed.push([...sequence])}
-      onCancel={() => {
-        cancelled += 1;
+    <div
+      onKeyDown={(event) => {
+        pageKeyDownCalls += 1;
+        event.stopPropagation();
       }}
-    />
+    >
+      <KeybindingRecorder
+        active
+        translate={(key) => key}
+        onComplete={(sequence) => completed.push([...sequence])}
+        onCancel={() => {
+          cancelled += 1;
+        }}
+      />
+    </div>
   );
 }
 
@@ -112,12 +135,21 @@ const leakedListener = () => {
 };
 window.addEventListener('keydown', leakedListener);
 const metaK = press(recorder, { key: 'k', code: 'KeyK', metaKey: true });
-press(recorder, { key: 'x', code: 'KeyX' });
 await act(async () => undefined);
 assert.equal(metaK.defaultPrevented, true);
-assert.deepEqual(completed.shift(), ['meta+k', 'x']);
+assert.deepEqual(completed.shift(), ['meta+k']);
 assert.equal(searchCalls, 0);
 assert.equal(leakedWindowEvents, 0);
+assert.equal(pageKeyDownCalls, 0);
+
+press(recorder, { key: 'Dead', code: 'KeyE', altKey: true });
+await act(async () => undefined);
+assert.deepEqual(completed.shift(), ['alt+e']);
+
+press(recorder, { key: 'x', code: 'KeyX' });
+press(recorder, { key: 'p', code: 'KeyP' });
+await act(async () => undefined);
+assert.deepEqual(completed.shift(), ['x', 'p']);
 
 press(recorder, { key: 'q', code: 'KeyQ' });
 press(recorder, { key: 'Enter', code: 'Enter' });

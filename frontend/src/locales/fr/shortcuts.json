@@ -85,5 +85,6 @@
   "shortcuts.reason.unavailable": "Indisponible dans le contexte actuel.",
   "shortcuts.chord.create": "Créer : P projet | I ticket | M membre | S session",
   "shortcuts.chord.go": "Aller à : B statistiques | I tickets | W workflow",
+  "shortcuts.recorder.recording": "Enregistrement du raccourci",
   "shortcuts.recorder.firstStroke": "Appuyez sur une seconde touche, ou Entrée pour enregistrer une seule touche."
 }

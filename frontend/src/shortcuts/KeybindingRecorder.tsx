@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   normalizeKeyboardEvent,
   snapshotKeyboardEvent,
@@ -20,6 +20,7 @@ export function KeybindingRecorder({
   onCancel,
 }: KeybindingRecorderProps) {
   const [firstStroke, setFirstStroke] = useState<string | null>(null);
+  const recorderRef = useRef<HTMLDivElement>(null);
   const firstStrokeRef = useRef<string | null>(null);
   const timerRef = useRef<number | null>(null);
   const clearTimer = () => {
@@ -47,10 +48,20 @@ export function KeybindingRecorder({
         complete([firstStrokeRef.current]);
         return true;
       }
-      const stroke = normalizeKeyboardEvent(snapshotKeyboardEvent(event));
+      const snapshot = snapshotKeyboardEvent(event);
+      const stroke = normalizeKeyboardEvent(snapshot);
       if (!stroke) return true;
       if (firstStrokeRef.current) {
         complete([firstStrokeRef.current, stroke]);
+        return true;
+      }
+      if (
+        snapshot.ctrlKey ||
+        snapshot.metaKey ||
+        snapshot.altKey ||
+        snapshot.shiftKey
+      ) {
+        complete([stroke]);
         return true;
       }
       firstStrokeRef.current = stroke;
@@ -68,19 +79,19 @@ export function KeybindingRecorder({
       setFirstStroke(null);
     }
   }, [active]);
+  useLayoutEffect(() => {
+    if (active) recorderRef.current?.focus();
+  }, [active]);
   useEffect(() => clearTimer, []);
   return (
     <div
+      ref={recorderRef}
       data-shortcut-recorder
-      tabIndex={-1}
-      className="rounded border border-blue-500/40 bg-blue-500/10 px-3 py-2 text-sm outline-none"
+      tabIndex={0}
+      aria-live="polite"
+      className="inline-flex items-center justify-center rounded-full border border-blue-500/40 bg-blue-500/10 px-3 py-1 text-xs font-medium text-[var(--ink-subtle)] outline-none"
     >
-      {translate(
-        firstStroke
-          ? 'shortcuts.recorder.firstStroke'
-          : 'shortcuts.action.record',
-        firstStroke ? { stroke: firstStroke } : undefined,
-      )}
+      {translate('shortcuts.recorder.recording')}
     </div>
   );
 }
