@@ -2319,7 +2319,7 @@ function WorkspaceLayout() {
             id="app-main-content"
             tabIndex={-1}
             data-shortcut-focus="tab-main-content"
-            className={`relative flex-1 min-h-0 rounded-lg border border-[var(--hairline)] bg-[var(--surface-2)] ${
+            className={`relative flex-1 min-h-0 rounded-lg border border-[var(--hairline)] bg-[var(--surface-2)] outline-none ${
               activeAppPage === "providers" ||
               activeAppPage === "build-stats" ||
               activeAppPage === "github" ||

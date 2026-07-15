@@ -12,7 +12,7 @@ export function ChordHintOverlay() {
     <div
       data-chord-hint
       aria-live="polite"
-      className="fixed bottom-5 left-1/2 z-[75] -translate-x-1/2 rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white shadow-xl"
+      className="fixed bottom-5 left-1/2 z-[75] -translate-x-1/2 rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface-1)] px-4 py-2 text-sm text-[var(--ink)] shadow-xl"
     >
       {candidates.map((binding) => (
         <span key={`${binding.commandId}-${binding.sequence.join(':')}`} className="mr-4 last:mr-0">

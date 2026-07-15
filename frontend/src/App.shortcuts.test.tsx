@@ -60,6 +60,10 @@ assert.ok(app.includes('getRelativeSessionId('));
 assert.ok(app.includes('prioritizeSessions('));
 assert.ok(app.includes('useLayoutEffect(() => {'));
 assert.ok(app.includes('data-shortcut-focus="tab-main-content"'));
+assert.match(
+  app,
+  /data-shortcut-focus="tab-main-content"[\s\S]{0,180}outline-none/,
+);
 assert.ok(app.includes("openSettingsTab('shortcuts')"));
 assert.ok(
   app.includes("target.kind === 'list' || target.kind === 'create'"),
