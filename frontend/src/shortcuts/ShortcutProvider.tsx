@@ -303,6 +303,9 @@ export function ShortcutProvider({
         .map((item) => item.sequence);
       const sequence = sequences[0] ?? [];
       const label = formatShortcutSequences(sequences, runtime.platform, translate);
+      const tooltipShortcut = sequence.length > 0
+        ? translate('shortcuts.tooltip.shortcut', { shortcut: label })
+        : '';
       const handler = [...handlersRef.current.values()]
         .map(snapshotHandler)
         .filter((item) => item.commandId === commandId)
@@ -313,8 +316,9 @@ export function ShortcutProvider({
         sequence,
         label,
         ariaKeyShortcuts: ariaShortcutFor(sequence),
-        tooltip: label
-          ? `${translate(definition.titleKey)} (${label})`
+        tooltipShortcut,
+        tooltip: tooltipShortcut
+          ? `${translate(definition.titleKey)} (${tooltipShortcut})`
           : translate(definition.titleKey),
         disabledReason: handler?.enabled ? undefined : handler?.disabledReason,
       };

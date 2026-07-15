@@ -338,6 +338,13 @@ function SidebarNavigationButton({
   return (
     <button
       type="button"
+      data-command-id={
+        item.id === "project-issue"
+          ? "issue.open-list"
+          : item.id === "settings"
+            ? "settings.open"
+            : undefined
+      }
       disabled={item.disabled}
       onClick={onClick}
       title={title}
@@ -2713,6 +2720,11 @@ export function ProjectSidebar({
               <button
                 key={action.id}
                 type="button"
+                data-command-id={
+                  action.id === "search"
+                    ? "search.open"
+                    : "session.create"
+                }
                 className={`${sidebarItemClass} cursor-pointer border-transparent text-[var(--ink-subtle)] hover:bg-[var(--surface-1)] hover:text-[var(--ink)]`}
                 onClick={() => onPrimaryAction(action)}
                 title={translate(
@@ -2740,6 +2752,7 @@ export function ProjectSidebar({
           <div className="flex items-center gap-1 px-[7px] py-2">
             <button
               type="button"
+              data-command-id="build-stats.open"
               className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm text-left outline-none transition hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
               onClick={openBuildStatsPage}
               title={translate(

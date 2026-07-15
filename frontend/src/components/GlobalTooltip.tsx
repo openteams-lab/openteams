@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { useShortcuts } from '@/shortcuts/ShortcutProvider';
 
 type ActiveTooltip = {
   anchor: HTMLElement;
@@ -15,6 +16,7 @@ type ActiveTooltip = {
 
 type StoredTitle = ActiveTooltip & {
   describedBy: string | null;
+  originalTitle: string;
 };
 
 type TooltipPosition = {
@@ -30,6 +32,7 @@ function titleAnchor(target: EventTarget | null): HTMLElement | null {
 }
 
 export function GlobalTooltip() {
+  const { presentationFor } = useShortcuts();
   const tooltipId = useId();
   const tooltipRef = useRef<HTMLDivElement>(null);
   const storedTitleRef = useRef<StoredTitle | null>(null);
@@ -40,7 +43,7 @@ export function GlobalTooltip() {
     const stored = storedTitleRef.current;
     if (stored) {
       if (!stored.anchor.hasAttribute('title')) {
-        stored.anchor.setAttribute('title', stored.text);
+        stored.anchor.setAttribute('title', stored.originalTitle);
       }
       if (stored.describedBy) {
         stored.anchor.setAttribute('aria-describedby', stored.describedBy);
@@ -58,8 +61,24 @@ export function GlobalTooltip() {
       if (storedTitleRef.current?.anchor === anchor) return;
       closeTooltip();
 
-      const text = anchor.getAttribute('title')?.trim();
-      if (!text) return;
+      const originalTitle = anchor.getAttribute('title')?.trim();
+      if (!originalTitle) return;
+      const commandElement = anchor.closest<HTMLElement>('[data-command-id]');
+      const commandId = commandElement?.dataset.commandId;
+      let text = originalTitle;
+      if (commandId) {
+        try {
+          const presentation = presentationFor(commandId);
+          if (
+            presentation.tooltipShortcut &&
+            !text.includes(presentation.label)
+          ) {
+            text = `${text} (${presentation.tooltipShortcut})`;
+          }
+        } catch {
+          // A stale or extension-owned command id should not break its tooltip.
+        }
+      }
       const describedBy = anchor.getAttribute('aria-describedby');
       const tooltipDescription = [describedBy, tooltipId]
         .filter(Boolean)
@@ -67,11 +86,11 @@ export function GlobalTooltip() {
 
       anchor.removeAttribute('title');
       anchor.setAttribute('aria-describedby', tooltipDescription);
-      storedTitleRef.current = { anchor, text, describedBy };
+      storedTitleRef.current = { anchor, text, describedBy, originalTitle };
       setActive({ anchor, text });
       setPosition(null);
     },
-    [closeTooltip, tooltipId],
+    [closeTooltip, presentationFor, tooltipId],
   );
 
   useEffect(() => {

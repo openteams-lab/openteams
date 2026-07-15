@@ -3,9 +3,10 @@ import { JSDOM } from 'jsdom';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GlobalTooltip } from './GlobalTooltip';
+import { ShortcutProvider } from '@/shortcuts/ShortcutProvider';
 
 const dom = new JSDOM(
-  '<!doctype html><html><body><div id="root"></div><button title="Refresh">R</button></body></html>',
+  '<!doctype html><html><body><div id="root"></div><button data-command-id="search.open" title="Search">S</button></body></html>',
   { url: 'http://localhost' },
 );
 Object.assign(globalThis, {
@@ -27,7 +28,25 @@ Object.defineProperty(globalThis, 'navigator', {
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 const root = createRoot(document.getElementById('root')!);
-await act(async () => root.render(<GlobalTooltip />));
+await act(async () =>
+  root.render(
+    <ShortcutProvider
+      runtime={{ platform: 'macos', isDesktopShell: false, source: 'fallback' }}
+      translate={(key, replacements) =>
+        key === 'shortcuts.tooltip.shortcut'
+          ? `Shortcut: ${replacements?.shortcut}`
+          : key
+      }
+      config={null}
+      saveConfigPatch={async () => {
+        throw new Error('not used');
+      }}
+      showToast={() => undefined}
+    >
+      <GlobalTooltip />
+    </ShortcutProvider>,
+  ),
+);
 
 const trigger = document.querySelector('button')!;
 await act(async () => {
@@ -36,7 +55,7 @@ await act(async () => {
 
 const tooltip = document.querySelector<HTMLElement>('[role="tooltip"]');
 assert.equal(trigger.hasAttribute('title'), false);
-assert.equal(tooltip?.textContent, 'Refresh');
+assert.equal(tooltip?.textContent, 'Search (Shortcut: ⌘K)');
 assert.ok(tooltip?.classList.contains('app-tooltip'));
 assert.ok(trigger.getAttribute('aria-describedby')?.includes(tooltip?.id ?? ''));
 
@@ -48,7 +67,7 @@ await act(async () => {
     }),
   );
 });
-assert.equal(trigger.getAttribute('title'), 'Refresh');
+assert.equal(trigger.getAttribute('title'), 'Search');
 assert.equal(document.querySelector('[role="tooltip"]'), null);
 
 await act(async () => root.unmount());

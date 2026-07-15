@@ -2001,7 +2001,9 @@ export function IssueDetailPage({
                 {linkedSessionLinks.length === 0 && (
                   <button
                     type="button"
+                    data-command-id="issue.session.create"
                     disabled={action === 'create-session' || detailLoading || worktreeSessionOpen}
+                    title={tr('issue.detail.createSession', 'Create session')}
                     className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-full bg-[var(--primary)] px-2.5 text-[12px] font-bold leading-none text-[var(--on-primary)] transition hover:bg-[var(--primary-hover)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
                     onClick={() => void handleOpenCreateSessionDialog()}
                   >
@@ -2151,7 +2153,9 @@ function IssueDetailHeader({
         />
         <button
           type="button"
+          data-command-id="issue.detail.back"
           className="truncate text-[16px] font-semibold leading-none text-[var(--ink)] transition hover:text-[var(--ink)]"
+          title={tr('issue.header.title', 'Issues')}
           onClick={onBack}
         >
           {tr('issue.header.title', 'Issues')}
@@ -2438,7 +2442,9 @@ function StatusDropdown({
     <div className="relative">
       <button
         type="button"
+        data-command-id="issue.status.open"
         disabled={disabled}
+        title={tr('issue.detail.changeStatus', 'Change status...')}
         aria-haspopup="listbox"
         aria-expanded={open}
         className="inline-flex h-7 max-w-full items-center gap-2 rounded-full px-1.5 text-[14px] font-normal leading-none text-[var(--ink)] transition hover:bg-[var(--surface-4)] hover:text-[var(--ink)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
@@ -2536,7 +2542,9 @@ function PriorityDropdown({
     <div className="relative">
       <button
         type="button"
+        data-command-id="issue.priority.open"
         disabled={disabled}
+        title={tr('issue.detail.setPriority', 'Set priority to...')}
         aria-haspopup="listbox"
         aria-expanded={open}
         className="inline-flex h-7 max-w-full items-center gap-2 rounded-full px-1.5 text-[14px] font-normal leading-none text-[var(--ink)] transition hover:bg-[var(--surface-4)] hover:text-[var(--ink)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
@@ -2866,6 +2874,7 @@ function LabelDropdown({
         ))}
         <button
           type="button"
+          data-command-id="issue.labels.open"
           disabled={disabled}
           aria-haspopup="listbox"
           aria-expanded={open}

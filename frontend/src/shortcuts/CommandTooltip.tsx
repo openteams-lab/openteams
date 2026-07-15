@@ -30,6 +30,7 @@ export function CommandTooltip({ commandId, children }: Props) {
   return (
     <span
       className="relative inline-flex"
+      data-command-id={commandId}
       tabIndex={disabledButton ? 0 : undefined}
       aria-disabled={disabledButton || undefined}
       aria-describedby={disabledButton ? describedBy : undefined}

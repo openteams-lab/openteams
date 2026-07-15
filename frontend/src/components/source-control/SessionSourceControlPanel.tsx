@@ -1208,6 +1208,7 @@ export const SessionSourceControlPanel: React.FC<
           />
           <button
             type="button"
+            data-command-id="source-control.commit"
             onClick={handleCommit}
             disabled={
               Boolean(pendingAction) ||

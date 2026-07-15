@@ -162,6 +162,7 @@ export function TeamAddMemberButton({
     <div className="relative" ref={menuRef}>
       <button
         type="button"
+        data-command-id="team.member.add"
         onClick={() => setShowAddMenu((current) => !current)}
         disabled={saving}
         className={cx(

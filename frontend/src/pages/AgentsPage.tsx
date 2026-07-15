@@ -1676,6 +1676,7 @@ export function AgentsPage() {
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
+            data-command-id="agent-runtime.sidebar.toggle"
             onClick={toggleAgentNavCollapsed}
             className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-3)] hover:text-[var(--ink)]"
             aria-label={agentNavToggleLabel}

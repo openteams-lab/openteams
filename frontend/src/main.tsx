@@ -1,7 +1,6 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from '@/App';
-import {GlobalTooltip} from '@/components/GlobalTooltip';
 import './index.css';
 
 const isMacOsTauri =
@@ -14,6 +13,5 @@ if (isMacOsTauri) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
-    <GlobalTooltip />
   </StrictMode>,
 );

@@ -2981,8 +2981,10 @@ function IssueToolbar({
         />
         <button
           type="button"
+          data-command-id="issue.create"
           className="ml-5 flex h-[26px] w-[26px] items-center justify-center rounded-full text-[#8a8d93] transition hover:bg-[#1d1e20] hover:text-[#f4f4f5]"
           aria-label={tr('issue.toolbar.createIssue', 'Create issue')}
+          title={tr('issue.toolbar.createIssue', 'Create issue')}
           onClick={() => onCreateIssue()}
         >
           <Plus aria-hidden="true" className="h-[15px] w-[15px]" />
