@@ -673,13 +673,13 @@ function ConfigTab({
           title={t("teamPage.systemPrompt.title")}
           description={t("teamPage.systemPrompt.desc")}
           className="!pb-0"
-          bodyClassName="!p-0"
+          bodyClassName="!p-0 flex flex-col"
         >
           <MarkdownEditableField
             value={roleDefinition}
             onChange={setRoleDefinition}
             placeholder={t("teamPage.systemPrompt.placeholder")}
-            minHeightClassName="min-h-[360px]"
+            minHeightClassName="min-h-[360px] flex-1"
           />
         </ConfigSection>
       </div>

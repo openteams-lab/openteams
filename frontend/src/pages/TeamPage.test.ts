@@ -134,10 +134,14 @@ check(
 );
 
 check(
-  "empty markdown fields preserve placeholder line breaks",
+  "empty role prompt preserves placeholder line breaks and fills its panel",
   configTabsSource.includes(
     '<span className="whitespace-pre-wrap text-[var(--ink-muted)]">',
-  ),
+  ) &&
+    configTabsSource.includes('bodyClassName="!p-0 flex flex-col"') &&
+    configTabsSource.includes(
+      'minHeightClassName="min-h-[360px] flex-1"',
+    ),
   configTabsSource,
 );
 
