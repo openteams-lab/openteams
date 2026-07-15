@@ -40,6 +40,7 @@ import {
   useCommandHandler,
   useShortcutScope,
 } from "@/shortcuts/ShortcutProvider";
+import { CommandTooltip } from "@/shortcuts/CommandTooltip";
 import { preventTabFocusChange } from "@/shortcuts/textInputFocus";
 import {
   chatMessagesApi,
@@ -554,12 +555,6 @@ function LinkedWorkItemRow({
             setStatusMenuOpen((current) => !current);
           }}
           className="inline-flex h-full max-w-[128px] items-center gap-1.5 rounded-r-md bg-[var(--surface-1)] px-2 py-1.5 text-[var(--ink-tertiary)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 disabled:cursor-not-allowed disabled:opacity-70"
-          title={translateWithFallback(
-            t,
-            "linkedWorkItems.changeStatusTitle",
-            "Change status: {status}",
-            { status: statusLabel },
-          )}
           aria-label={translateWithFallback(
             t,
             "linkedWorkItems.changeStatusFor",
@@ -1150,9 +1145,24 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     setIsRelatedFilesOpen(false);
   };
 
+  const handleTogglePlanMode = useCallback(() => {
+    setChatInputMode(chatInputMode === "workflow" ? "free" : "workflow");
+  }, [chatInputMode, setChatInputMode]);
+
   useShortcutScope('session-workspace', {
     active: Boolean(activeSessionId),
     rootRef: workspaceRootRef,
+  });
+  useShortcutScope('chat-composer', {
+    active: Boolean(activeSessionId),
+    rootRef: inputRef,
+  });
+  useCommandHandler('session.plan-mode.toggle', {
+    scope: 'focused-component',
+    enabled: Boolean(activeSessionId),
+    allowInEditable: true,
+    ownsEventTarget: (target) => target === inputRef.current,
+    execute: handleTogglePlanMode,
   });
   useCommandHandler('sidebar.right.toggle', {
     scope: "page",
@@ -1822,6 +1832,24 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     );
   };
 
+  const handleJumpToMessage = useCallback(
+    (messageId: string) => {
+      chatAutoFollowRef.current = false;
+      const scrollToMessage = () =>
+        document
+          .getElementById(`chat-message-${messageId}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      if (selectedSidebarMemberId) {
+        setSelectedSidebarMemberId(null);
+        window.requestAnimationFrame(scrollToMessage);
+        return;
+      }
+      scrollToMessage();
+    },
+    [selectedSidebarMemberId],
+  );
+
   const handleCopyAgentMessage = async (messageId: string, text: string) => {
     try {
       if (!navigator.clipboard) {
@@ -2061,6 +2089,9 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Let the shortcut provider consume Shift+Tab for plan mode while keeping
+    // plain Tab from moving focus out of the composer.
+    if (e.key === "Tab" && e.shiftKey) return;
     if (preventTabFocusChange(e)) return;
 
     if (isMemberPickerOpen) {
@@ -2104,10 +2135,6 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
       e.preventDefault();
       void handleSend();
     }
-  };
-
-  const handleTogglePlanMode = () => {
-    setChatInputMode(chatInputMode === "workflow" ? "free" : "workflow");
   };
 
   // Quick summon clicks
@@ -2587,6 +2614,27 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                     </div>
                   )}
 
+                  {msg.agentSourceMessage && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleJumpToMessage(msg.agentSourceMessage!.id)
+                      }
+                      className="mb-2 flex w-full min-w-0 items-center gap-1.5 rounded-sm text-left text-[10px] font-mono text-[var(--ink-tertiary)] transition-colors hover:text-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-focus)]"
+                      title={msg.agentSourceMessage.content}
+                    >
+                      <Quote className="h-3 w-3 shrink-0" />
+                      <span className="shrink-0 font-semibold text-[var(--ink-muted)]">
+                        {msg.agentSourceMessage.sender}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span className="truncate">
+                        {msg.agentSourceMessage.summary ||
+                          t("message.quoteEmpty")}
+                      </span>
+                    </button>
+                  )}
+
                   {msg.isUser ? (
                     <div
                       className="whitespace-pre-wrap break-words leading-relaxed text-[var(--ink)] select-text"
@@ -2897,32 +2945,29 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                     )}
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleTogglePlanMode();
-                    }}
-                    className={`plan-mode-toggle flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium transition cursor-pointer ${
-                      isPlanMode
-                        ? "plan-mode-toggle-active border-[var(--primary)] bg-[var(--primary-tint)] text-[var(--primary)]"
-                        : "border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-muted)] hover:bg-[var(--surface-3)]"
-                    }`}
-                    title={
-                      isPlanMode
-                        ? t("switchToChatMode")
-                        : t("switchToPlanMode")
-                    }
-                    aria-pressed={isPlanMode}
-                    aria-label={
-                      isPlanMode
-                        ? t("switchToChatMode")
-                        : t("switchToPlanMode")
-                    }
-                  >
-                    <GitBranch className="h-3 w-3" />
-                    <span>{t("planMode")}</span>
-                  </button>
+                  <CommandTooltip commandId="session.plan-mode.toggle">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleTogglePlanMode();
+                      }}
+                      className={`plan-mode-toggle flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium transition cursor-pointer ${
+                        isPlanMode
+                          ? "plan-mode-toggle-active border-[var(--primary)] bg-[var(--primary-tint)] text-[var(--primary)]"
+                          : "border-[var(--hairline)] bg-[var(--surface-2)] text-[var(--ink-muted)] hover:bg-[var(--surface-3)]"
+                      }`}
+                      aria-pressed={isPlanMode}
+                      aria-label={
+                        isPlanMode
+                          ? t("switchToChatMode")
+                          : t("switchToPlanMode")
+                      }
+                    >
+                      <GitBranch className="h-3 w-3" />
+                      <span>{t("planMode")}</span>
+                    </button>
+                  </CommandTooltip>
                 </div>
 
                 {/* Right controls: session members, voice icon, and send action */}

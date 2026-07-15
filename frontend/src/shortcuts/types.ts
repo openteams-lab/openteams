@@ -11,6 +11,7 @@ export type ShortcutSequence = readonly ShortcutStroke[];
 export type ShortcutContextId =
   | 'global'
   | 'session-workspace'
+  | 'chat-composer'
   | 'source-control-list'
   | 'source-control-commit'
   | 'worktree'

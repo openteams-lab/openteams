@@ -33,6 +33,7 @@
   "shortcuts.command.issue.labels.open": "Modifier les étiquettes du ticket",
   "shortcuts.command.issue.session.create": "Créer une session depuis le ticket",
   "shortcuts.command.team.member.add": "Ajouter un membre à l’équipe",
+  "shortcuts.command.session.plan-mode.toggle": "Activer ou désactiver le mode planification",
   "shortcuts.command.workflow.open": "Ouvrir le workflow",
   "shortcuts.command.workflow.node.up": "Sélectionner le nœud supérieur",
   "shortcuts.command.workflow.node.down": "Sélectionner le nœud inférieur",

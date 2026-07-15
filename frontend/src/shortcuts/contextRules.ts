@@ -16,6 +16,7 @@ type ContextRule = {
 export const contextCatalog: Record<ShortcutContextId, ContextRule> = {
   global: { pageDomain: 'any', activation: 'always' },
   'session-workspace': { pageDomain: 'session', activation: 'mounted' },
+  'chat-composer': { pageDomain: 'session', activation: 'focused' },
   'source-control-list': { pageDomain: 'session', activation: 'focused' },
   'source-control-commit': { pageDomain: 'session', activation: 'focused' },
   worktree: { pageDomain: 'session', activation: 'mounted' },

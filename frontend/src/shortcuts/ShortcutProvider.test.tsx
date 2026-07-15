@@ -114,6 +114,29 @@ function DynamicHarness({
   );
 }
 
+function PlanModeHarness() {
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  useShortcutScope('chat-composer', {
+    active: true,
+    rootRef: composerRef,
+  });
+  useCommandHandler('session.plan-mode.toggle', {
+    scope: 'focused-component',
+    enabled: true,
+    allowInEditable: true,
+    ownsEventTarget: (target) => target === composerRef.current,
+    execute: () => {
+      calls.push('plan-mode');
+    },
+  });
+  return (
+    <div>
+      <textarea ref={composerRef} data-testid="plan-mode-composer" />
+      <textarea data-testid="other-composer" />
+    </div>
+  );
+}
+
 const press = (target: EventTarget, init: KeyboardEventInit) => {
   const event = new window.KeyboardEvent('keydown', {
     bubbles: true,
@@ -195,6 +218,28 @@ dynamicCommit.focus();
 press(dynamicCommit, { key: 'Enter', code: 'Enter', metaKey: true });
 await act(async () => undefined);
 assert.deepEqual(calls, ['dynamic-search', 'dynamic-commit']);
+
+calls.length = 0;
+await act(async () => {
+  root.render(provider(<PlanModeHarness />));
+});
+const planModeComposer = document.querySelector<HTMLTextAreaElement>(
+  '[data-testid="plan-mode-composer"]',
+)!;
+const otherComposer = document.querySelector<HTMLTextAreaElement>(
+  '[data-testid="other-composer"]',
+)!;
+let planModeEvent: KeyboardEvent;
+await act(async () => {
+  press(otherComposer, { key: 'Tab', code: 'Tab', shiftKey: true });
+  planModeEvent = press(planModeComposer, {
+    key: 'Tab',
+    code: 'Tab',
+    shiftKey: true,
+  });
+});
+assert.deepEqual(calls, ['plan-mode']);
+assert.equal(planModeEvent!.defaultPrevented, true);
 
 await act(async () => root.unmount());
 calls.length = 0;

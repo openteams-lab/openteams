@@ -9,6 +9,11 @@ assert.ok(source.includes("useCommandHandler('source-control.commit-message.focu
 assert.ok(source.includes('setCommitMessageFocusRequestKey((value) => value + 1)'));
 assert.ok(source.includes('commitFocusRequestKey={commitMessageFocusRequestKey}'));
 assert.ok(source.includes("useCommandHandler('session.linked-issue.status.open'"));
+assert.ok(source.includes("useShortcutScope('chat-composer'"));
+assert.ok(source.includes("useCommandHandler('session.plan-mode.toggle'"));
+assert.ok(source.includes("ownsEventTarget: (target) => target === inputRef.current"));
+assert.ok(source.includes('if (e.key === "Tab" && e.shiftKey) return;'));
+assert.ok(source.includes('<CommandTooltip commandId="session.plan-mode.toggle">'));
 assert.ok(source.includes('setLinkedWorkItemStatusMenuRequestKey((value) => value + 1)'));
 assert.ok(source.includes('candidate.shortcut === event.key'));
 assert.ok(source.includes('statusTriggerRef.current?.focus()'));

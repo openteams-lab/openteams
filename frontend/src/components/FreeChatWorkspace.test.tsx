@@ -394,6 +394,17 @@ check(
   source,
 );
 check(
+  "agent replies show a compact source-agent message above the response",
+  source.includes("msg.agentSourceMessage") &&
+    source.includes("msg.agentSourceMessage.sender") &&
+    source.includes("msg.agentSourceMessage.summary") &&
+    source.includes('className="truncate"') &&
+    source.includes("handleJumpToMessage(msg.agentSourceMessage!.id)") &&
+    source.includes('getElementById(`chat-message-${messageId}`)') &&
+    source.includes('scrollIntoView({ behavior: "smooth", block: "center" })'),
+  source,
+);
+check(
   "composer supports text/image attachments and clipboard image paste",
   source.includes("CHAT_ATTACHMENT_ACCEPT") &&
     source.includes("allowedAttachmentExtensions") &&
@@ -584,6 +595,11 @@ check(
     source.includes("statusPending={updatingLinkedWorkItemIds.has(item.id)}") &&
     source.includes("onStatusChange={(nextItem, status) =>") &&
     !source.includes("projectGithubApi.updateIssueState"),
+  source,
+);
+check(
+  "linked work item status trigger does not show a redundant tooltip",
+  !source.includes('"linkedWorkItems.changeStatusTitle"'),
   source,
 );
 check(

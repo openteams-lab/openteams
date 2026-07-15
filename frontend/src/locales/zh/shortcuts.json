@@ -33,6 +33,7 @@
   "shortcuts.command.issue.labels.open": "编辑事项标签",
   "shortcuts.command.issue.session.create": "从事项创建会话",
   "shortcuts.command.team.member.add": "添加团队成员",
+  "shortcuts.command.session.plan-mode.toggle": "切换计划模式",
   "shortcuts.command.workflow.open": "打开工作流",
   "shortcuts.command.workflow.node.up": "选择上方工作流节点",
   "shortcuts.command.workflow.node.down": "选择下方工作流节点",

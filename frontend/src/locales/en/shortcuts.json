@@ -33,6 +33,7 @@
   "shortcuts.command.issue.labels.open": "Edit issue labels",
   "shortcuts.command.issue.session.create": "Create session from issue",
   "shortcuts.command.team.member.add": "Add team member",
+  "shortcuts.command.session.plan-mode.toggle": "Toggle plan mode",
   "shortcuts.command.workflow.open": "Open workflow",
   "shortcuts.command.workflow.node.up": "Select workflow node above",
   "shortcuts.command.workflow.node.down": "Select workflow node below",

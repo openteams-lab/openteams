@@ -33,6 +33,7 @@
   "shortcuts.command.issue.labels.open": "이슈 라벨 편집",
   "shortcuts.command.issue.session.create": "이슈에서 세션 만들기",
   "shortcuts.command.team.member.add": "팀원 추가",
+  "shortcuts.command.session.plan-mode.toggle": "계획 모드 전환",
   "shortcuts.command.workflow.open": "워크플로 열기",
   "shortcuts.command.workflow.node.up": "위쪽 워크플로 노드 선택",
   "shortcuts.command.workflow.node.down": "아래쪽 워크플로 노드 선택",

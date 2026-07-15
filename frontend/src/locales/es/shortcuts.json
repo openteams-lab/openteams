@@ -33,6 +33,7 @@
   "shortcuts.command.issue.labels.open": "Editar etiquetas de la incidencia",
   "shortcuts.command.issue.session.create": "Crear una sesión desde la incidencia",
   "shortcuts.command.team.member.add": "Añadir miembro al equipo",
+  "shortcuts.command.session.plan-mode.toggle": "Alternar el modo de planificación",
   "shortcuts.command.workflow.open": "Abrir el flujo de trabajo",
   "shortcuts.command.workflow.node.up": "Seleccionar el nodo superior",
   "shortcuts.command.workflow.node.down": "Seleccionar el nodo inferior",

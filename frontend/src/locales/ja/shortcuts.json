@@ -33,6 +33,7 @@
   "shortcuts.command.issue.labels.open": "課題ラベルを編集",
   "shortcuts.command.issue.session.create": "課題からセッションを作成",
   "shortcuts.command.team.member.add": "チームメンバーを追加",
+  "shortcuts.command.session.plan-mode.toggle": "プランモードを切り替える",
   "shortcuts.command.workflow.open": "ワークフローを開く",
   "shortcuts.command.workflow.node.up": "上のワークフローノードを選択",
   "shortcuts.command.workflow.node.down": "下のワークフローノードを選択",

@@ -2,6 +2,7 @@ type ShortcutSequence = readonly string[];
 type ShortcutContextId =
   | 'global'
   | 'session-workspace'
+  | 'chat-composer'
   | 'source-control-list'
   | 'source-control-commit'
   | 'worktree'
@@ -95,6 +96,7 @@ export const expectedCommandRegistry = [
   expectedCommand('issue.labels.open', 12, 'issues', same(sequence('l')), ['issue-detail'], 'safe', 'issue-label-search'),
   expectedCommand('issue.session.create', 13, 'issues', same(sequence('c', 's')), ['issue-detail'], 'safe', 'issue-session-first-option'),
   expectedCommand('team.member.add', 14, 'team', same(sequence('c', 'm')), ['global'], 'safe', 'team-add-member-action'),
+  expectedCommand('session.plan-mode.toggle', null, 'workflow', same(sequence('shift+tab')), ['chat-composer'], 'safe', 'chat-composer-input'),
   expectedCommand('workflow.open', 15, 'workflow', same(sequence('g', 'w')), ['workflow-session'], 'safe', 'current-or-first-workflow-node'),
   expectedCommand('workflow.node.up', 16, 'workflow', same(sequence('arrowup')), ['workflow-graph'], 'safe', 'nearest-workflow-node-up'),
   expectedCommand('workflow.node.down', 16, 'workflow', same(sequence('arrowdown')), ['workflow-graph'], 'safe', 'nearest-workflow-node-down'),
