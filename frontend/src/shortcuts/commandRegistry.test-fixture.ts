@@ -10,6 +10,7 @@ type ShortcutContextId =
   | 'agent-runtime'
   | 'workflow-session'
   | 'workflow-graph'
+  | 'workflow-node-detail'
   | 'workflow-preview'
   | 'workflow-running'
   | 'workflow-review';
@@ -77,6 +78,7 @@ export const expectedCommandRegistry = [
   expectedCommand('source-control.selection.toggle-stage', 6, 'sourceControl', same(sequence('space')), ['source-control-list'], 'guarded', 'same-source-file'),
   expectedCommand('source-control.selection.open-diff', 6, 'sourceControl', same(sequence('enter')), ['source-control-list'], 'safe', 'source-diff-tab'),
   expectedCommand('source-control.stage-all', 6, 'sourceControl', same(), ['source-control-list'], 'guarded', 'source-control-list'),
+  expectedCommand('source-control.commit-message.focus', 7, 'sourceControl', same(sequence('g', 'c')), ['session-workspace'], 'safe', 'commit-message-input'),
   expectedCommand('source-control.commit', 7, 'sourceControl', split([sequence('meta+enter')], [sequence('ctrl+enter')]), ['source-control-commit'], 'guarded', 'commit-message-input'),
   expectedCommand('worktree.merge', 8, 'sourceControl', same(), ['worktree'], 'confirmation_required', 'worktree-merge-confirmation'),
   expectedCommand('worktree.discard', 9, 'sourceControl', same(), ['worktree'], 'confirmation_required', 'worktree-discard-confirmation'),
@@ -86,14 +88,8 @@ export const expectedCommandRegistry = [
   expectedCommand('issue.selection.previous', 11, 'issues', same(sequence('k'), sequence('arrowup')), ['issue-list'], 'safe', 'previous-issue-row'),
   expectedCommand('issue.selection.open', 11, 'issues', same(sequence('enter')), ['issue-list'], 'safe', 'issue-detail-heading'),
   expectedCommand('issue.detail.back', 11, 'issues', same(sequence('escape')), ['issue-detail'], 'safe', 'origin-issue-row'),
-  expectedCommand('issue.status.1', 12, 'issues', same(sequence('s', '1')), ['issue-detail'], 'guarded', 'issue-status-trigger'),
-  expectedCommand('issue.status.2', 12, 'issues', same(sequence('s', '2')), ['issue-detail'], 'guarded', 'issue-status-trigger'),
-  expectedCommand('issue.status.3', 12, 'issues', same(sequence('s', '3')), ['issue-detail'], 'guarded', 'issue-status-trigger'),
-  expectedCommand('issue.status.4', 12, 'issues', same(sequence('s', '4')), ['issue-detail'], 'guarded', 'issue-status-trigger'),
-  expectedCommand('issue.status.5', 12, 'issues', same(sequence('s', '5')), ['issue-detail'], 'guarded', 'issue-status-trigger'),
-  expectedCommand('issue.status.6', 12, 'issues', same(sequence('s', '6')), ['issue-detail'], 'guarded', 'issue-status-trigger'),
-  expectedCommand('issue.status.7', 12, 'issues', same(sequence('s', '7')), ['issue-detail'], 'guarded', 'issue-status-trigger'),
-  expectedCommand('issue.status.8', 12, 'issues', same(sequence('s', '8')), ['issue-detail'], 'guarded', 'issue-status-trigger'),
+  expectedCommand('issue.status.open', 12, 'issues', same(sequence('s')), ['issue-detail'], 'safe', 'issue-status-search'),
+  expectedCommand('issue.priority.open', 12, 'issues', same(sequence('k')), ['issue-detail'], 'safe', 'issue-priority-search'),
   expectedCommand('issue.labels.open', 12, 'issues', same(sequence('l')), ['issue-detail'], 'safe', 'issue-label-search'),
   expectedCommand('issue.session.create', 13, 'issues', same(sequence('c', 's')), ['issue-detail'], 'safe', 'issue-session-first-option'),
   expectedCommand('team.member.add', 14, 'team', same(sequence('c', 'm')), ['global'], 'safe', 'team-add-member-action'),
@@ -104,10 +100,14 @@ export const expectedCommandRegistry = [
   expectedCommand('workflow.node.right', 16, 'workflow', same(sequence('arrowright')), ['workflow-graph'], 'safe', 'nearest-workflow-node-right'),
   expectedCommand('workflow.node.open', 16, 'workflow', same(sequence('enter')), ['workflow-graph'], 'safe', 'workflow-node-inspector'),
   expectedCommand('workflow.start', 16, 'workflow', split([sequence('meta+enter')], [sequence('ctrl+enter')]), ['workflow-preview'], 'guarded', 'workflow-review-settings'),
-  expectedCommand('workflow.node.stop', 16, 'workflow', same(), ['workflow-running'], 'confirmation_required', 'workflow-node-stop-confirmation'),
+  expectedCommand('workflow.node.retry', 16, 'workflow', split([sequence('meta+r')], [sequence('ctrl+r')]), ['workflow-node-detail'], 'guarded', 'workflow-node-inspector'),
+  expectedCommand('workflow.node.retry-review', 16, 'workflow', split([sequence('meta+t')], [sequence('ctrl+t')]), ['workflow-node-detail'], 'guarded', 'workflow-node-inspector'),
+  expectedCommand('workflow.node.stop', 16, 'workflow', split([sequence('meta+x')], [sequence('ctrl+x')]), ['workflow-node-detail'], 'confirmation_required', 'workflow-node-stop-confirmation'),
+  expectedCommand('workflow.node.chat.toggle', 16, 'workflow', split([sequence('meta+q')], [sequence('ctrl+q')]), ['workflow-node-detail'], 'safe', 'workflow-node-chat'),
   expectedCommand('workflow.stop', 16, 'workflow', same(), ['workflow-running'], 'confirmation_required', 'workflow-stop-confirmation'),
   expectedCommand('workflow.review.select-approve', 17, 'workflow', same(sequence('a')), ['workflow-review'], 'confirmation_required', 'workflow-review-confirm-button'),
   expectedCommand('workflow.review.select-reject', 17, 'workflow', same(sequence('r')), ['workflow-review'], 'confirmation_required', 'workflow-review-confirm-button'),
   expectedCommand('workflow.review.confirm', 17, 'workflow', same(sequence('enter')), ['workflow-review'], 'confirmation_required', 'workflow-review-result'),
   expectedCommand('settings.open', 18, 'settings', split([sequence('meta+comma')], [sequence('ctrl+comma')]), ['global'], 'safe', 'settings-active-sidebar-item'),
+  expectedCommand('session.linked-issue.status.open', null, 'issues', same(sequence('s')), ['session-workspace'], 'safe', 'linked-issue-status-menu'),
 ] satisfies readonly ExpectedCommandDefinition[];

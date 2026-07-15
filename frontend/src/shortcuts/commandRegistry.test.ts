@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { commandRegistry } from './commandRegistry';
 import { expectedCommandRegistry } from './commandRegistry.test-fixture';
 
-assert.equal(expectedCommandRegistry.length, 50);
-assert.equal(new Set(expectedCommandRegistry.map((item) => item.id)).size, 50);
+assert.equal(expectedCommandRegistry.length, 49);
+assert.equal(new Set(expectedCommandRegistry.map((item) => item.id)).size, 49);
 assert.deepEqual(commandRegistry, expectedCommandRegistry);
-assert.equal(new Set(commandRegistry.map((item) => item.id)).size, 50);
+assert.equal(new Set(commandRegistry.map((item) => item.id)).size, 49);
 assert.deepEqual(
   [
     ...new Set(
@@ -26,7 +26,6 @@ assert.deepEqual(
   [
     'shortcuts.settings.open',
     'source-control.stage-all',
-    'workflow.node.stop',
     'workflow.stop',
     'worktree.discard',
     'worktree.merge',
@@ -50,6 +49,14 @@ assert.deepEqual(
     macos: [['meta+enter']],
     windows: [['ctrl+enter']],
     linux: [['ctrl+enter']],
+  },
+);
+assert.deepEqual(
+  commandRegistry.find((item) => item.id === 'workflow.node.retry')?.defaults,
+  {
+    macos: [['meta+r']],
+    windows: [['ctrl+r']],
+    linux: [['ctrl+r']],
   },
 );
 console.log('commandRegistry: PASS');

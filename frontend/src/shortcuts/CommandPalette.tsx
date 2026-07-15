@@ -28,12 +28,12 @@ export function CommandPalette() {
   }, [definitions, presentationFor, query]);
   if (!paletteOpen) return null;
   return (
-    <div className="fixed inset-0 z-[70] flex justify-center bg-black/45 pt-[12vh]">
+    <div className="fixed inset-0 z-[70] flex justify-center bg-black/55 px-4 pt-[12vh] backdrop-blur-[2px]">
       <div
         data-command-palette
         role="dialog"
         aria-modal="true"
-        className="max-h-[70vh] w-[min(640px,calc(100vw-32px))] overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-900"
+        className="flex h-fit max-h-[70vh] w-full max-w-[640px] flex-col overflow-hidden rounded-[14px] border border-[var(--hairline-strong)] bg-[var(--surface-1)] text-[var(--ink)] shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
       >
         <input
           ref={inputRef}
@@ -44,9 +44,9 @@ export function CommandPalette() {
             if (event.key === 'Escape') setPaletteOpen(false);
           }}
           placeholder={presentationFor('commandPalette.open').title}
-          className="w-full border-b border-black/10 bg-transparent px-4 py-3 outline-none dark:border-white/10"
+          className="h-12 w-full shrink-0 border-b border-[var(--hairline)] bg-[var(--surface-1)] px-4 text-[14px] text-[var(--ink)] caret-[var(--primary)] outline-none placeholder:text-[var(--ink-tertiary)] focus:bg-[var(--surface-2)]"
         />
-        <div className="max-h-[55vh] overflow-y-auto p-2">
+        <div className="max-h-[min(55vh,480px)] overflow-y-auto p-1.5 ot-scroll-area-styled">
           {commands.map((command) => {
             const presentation = presentationFor(command.id);
             return (
@@ -59,10 +59,12 @@ export function CommandPalette() {
                     if (executed) setPaletteOpen(false);
                   });
                 }}
-                className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/5"
+                className="flex min-h-9 w-full items-center justify-between gap-4 rounded-[8px] px-3 py-2 text-left text-[13px] text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:text-[var(--ink-tertiary)] disabled:opacity-55"
               >
-                <span>{presentation.title}</span>
-                <span className="text-xs opacity-60">
+                <span className="min-w-0 flex-1 truncate font-medium">
+                  {presentation.title}
+                </span>
+                <span className="shrink-0 rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-2)] px-2 py-1 font-mono text-[10px] leading-none text-[var(--ink-subtle)]">
                   {presentation.label}
                 </span>
               </button>

@@ -5,6 +5,13 @@ const source = readFileSync(new URL('./FreeChatWorkspace.tsx', import.meta.url),
 assert.ok(source.includes("useShortcutScope('session-workspace'"));
 assert.ok(source.includes("useCommandHandler('sidebar.right.toggle'"));
 assert.ok(source.includes("useCommandHandler('source-control.open'"));
+assert.ok(source.includes("useCommandHandler('source-control.commit-message.focus'"));
+assert.ok(source.includes('setCommitMessageFocusRequestKey((value) => value + 1)'));
+assert.ok(source.includes('commitFocusRequestKey={commitMessageFocusRequestKey}'));
+assert.ok(source.includes("useCommandHandler('session.linked-issue.status.open'"));
+assert.ok(source.includes('setLinkedWorkItemStatusMenuRequestKey((value) => value + 1)'));
+assert.ok(source.includes('candidate.shortcut === event.key'));
+assert.ok(source.includes('statusTriggerRef.current?.focus()'));
 assert.ok(source.includes('openRelatedFiles();'));
 assert.ok(source.includes('setSourceControlFocusRequestKey((value) => value + 1)'));
 assert.ok(source.includes('focusRequestKey={sourceControlFocusRequestKey}'));

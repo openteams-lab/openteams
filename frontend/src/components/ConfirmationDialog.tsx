@@ -39,12 +39,25 @@ export function ConfirmationDialog({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !confirming) {
+        event.preventDefault();
+        event.stopPropagation();
         onCancel();
+        return;
+      }
+      if (
+        event.key === 'Enter' &&
+        !event.repeat &&
+        !event.isComposing &&
+        !confirming
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        onConfirm();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [confirming, onCancel]);
+  }, [confirming, onCancel, onConfirm]);
 
   return (
     <div

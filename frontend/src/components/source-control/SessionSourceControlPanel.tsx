@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ChevronRight,
   Loader2,
@@ -49,6 +55,7 @@ interface SessionSourceControlPanelProps {
   fallbackRelatedFiles: React.ReactNode;
   linkedWorkItemIds?: string[];
   focusRequestKey?: number;
+  commitFocusRequestKey?: number;
   onOpenDiff: (
     projectId: string,
     sessionId: string,
@@ -377,6 +384,7 @@ export const SessionSourceControlPanel: React.FC<
   fallbackRelatedFiles,
   linkedWorkItemIds = [],
   focusRequestKey = 0,
+  commitFocusRequestKey = 0,
   onOpenDiff,
   onOpenConflictResolver,
 }) => {
@@ -443,6 +451,7 @@ export const SessionSourceControlPanel: React.FC<
   const emptyStateHeadingRef = useRef<HTMLHeadingElement>(null);
   const commitMessageRef = useRef<HTMLTextAreaElement>(null);
   const fileRowRefs = useRef(new Map<string, HTMLDivElement>());
+  const shortcutSelectionFocusPathRef = useRef<string | null>(null);
   scopeKeyRef.current = scopeKey;
 
   const isCurrentScope = (key: string) => scopeKeyRef.current === key;
@@ -559,6 +568,13 @@ export const SessionSourceControlPanel: React.FC<
     });
   }, [scopeKey, selectableFilePaths, selectedPath]);
 
+  useLayoutEffect(() => {
+    const path = shortcutSelectionFocusPathRef.current;
+    if (!path || selectedFile?.path !== path) return;
+    fileRowRefs.current.get(path)?.focus();
+    shortcutSelectionFocusPathRef.current = null;
+  }, [selectedFile?.area, selectedFile?.path]);
+
   useEffect(() => {
     if (!focusRequestKey || !enabled || !projectId || !sessionId) return;
     const frame = window.requestAnimationFrame(() => {
@@ -575,6 +591,28 @@ export const SessionSourceControlPanel: React.FC<
     selectableFilePaths,
     selectedPathsByScope,
     sessionId,
+  ]);
+
+  useEffect(() => {
+    if (
+      !commitFocusRequestKey ||
+      !enabled ||
+      !projectId ||
+      !sessionId ||
+      viewModel.stagedPaths.length === 0
+    ) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      commitMessageRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    commitFocusRequestKey,
+    enabled,
+    projectId,
+    sessionId,
+    viewModel.stagedPaths.length,
   ]);
 
   if (!enabled || !projectId || !sessionId) {
@@ -876,6 +914,7 @@ export const SessionSourceControlPanel: React.FC<
   const handleToggleSelectedStage = (
     selectedFile: SelectableSourceControlFile,
   ) => {
+    shortcutSelectionFocusPathRef.current = selectedFile.path;
     if (selectedFile.area === "changes") handleStageFiles([selectedFile]);
     else handleUnstageFiles([selectedFile]);
   };

@@ -34,6 +34,7 @@ export const contextCatalog: Record<ShortcutContextId, ContextRule> = {
   'agent-runtime': { pageDomain: 'agents', activation: 'mounted' },
   'workflow-session': { pageDomain: 'session', activation: 'mounted' },
   'workflow-graph': { pageDomain: 'session', activation: 'focused' },
+  'workflow-node-detail': { pageDomain: 'session', activation: 'state' },
   'workflow-preview': {
     pageDomain: 'session',
     activation: 'focused',

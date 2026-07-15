@@ -19,6 +19,7 @@ export type ShortcutContextId =
   | 'agent-runtime'
   | 'workflow-session'
   | 'workflow-graph'
+  | 'workflow-node-detail'
   | 'workflow-preview'
   | 'workflow-running'
   | 'workflow-review';

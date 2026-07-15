@@ -37,6 +37,7 @@ import { CommandTooltip } from '@/shortcuts/CommandTooltip';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import {
   useCommandHandler,
+  useCommandPresentation,
   useShortcutScope,
 } from '@/shortcuts/ShortcutProvider';
 import { getWorkflowTranscriptRefetchInterval } from '@/lib/workflowRequestPolicy';
@@ -986,6 +987,14 @@ function InspectorCard({
   const hasError = isFailed;
   const leadReviewRequired = step.lead_review_required;
   const canRetryReviewStep = canRetryWorkflowStepReview(step);
+  const retryPresentation = useCommandPresentation('workflow.node.retry');
+  const retryReviewPresentation = useCommandPresentation(
+    'workflow.node.retry-review'
+  );
+  const terminatePresentation = useCommandPresentation('workflow.node.stop');
+  const chatPresentation = useCommandPresentation(
+    'workflow.node.chat.toggle'
+  );
   const hasFooterActions =
     step.status === 'running' ||
     step.status === 'waiting_review' ||
@@ -1339,6 +1348,7 @@ function InspectorCard({
           <button
             type="button"
             onClick={onOpenChat}
+            aria-keyshortcuts={chatPresentation.ariaKeyShortcuts || undefined}
             className={cn(
               'flex-none flex items-center gap-1.5 text-[12px] font-medium transition-colors',
               isChatVisible
@@ -1352,6 +1362,9 @@ function InspectorCard({
                   defaultValue: 'Close Chat',
                 })
               : t('workflow.inspector.openChat', { defaultValue: 'Open Chat' })}
+            <kbd className="ml-1 text-[10px] text-[var(--ink-tertiary)] font-mono">
+              {chatPresentation.label}
+            </kbd>
           </button>
 
           {/* Right-side action buttons */}
@@ -1362,6 +1375,9 @@ function InspectorCard({
               (onInterruptStep || onStopStep) && (
                 <button
                   type="button"
+                  aria-keyshortcuts={
+                    terminatePresentation.ariaKeyShortcuts || undefined
+                  }
                   onClick={() => {
                     if (onInterruptStep) {
                       onInterruptStep(step.id);
@@ -1375,6 +1391,9 @@ function InspectorCard({
                   {t('workflow.inspector.terminate', {
                     defaultValue: 'Terminate',
                   })}
+                  <kbd className="ml-0.5 text-[10px] text-[var(--ink-tertiary)] font-mono">
+                    {terminatePresentation.label}
+                  </kbd>
                 </button>
               )}
             {isRetryableWorkflowStepStatus(step.status) &&
@@ -1384,6 +1403,9 @@ function InspectorCard({
                   <button
                     type="button"
                     onClick={() => onRetryStep(step.id)}
+                    aria-keyshortcuts={
+                      retryPresentation.ariaKeyShortcuts || undefined
+                    }
                     disabled={pendingActionId === step.id}
                     className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--ink-subtle)] hover:text-[var(--ink)] transition-colors disabled:opacity-50"
                   >
@@ -1396,9 +1418,15 @@ function InspectorCard({
                     {t('workflow.inspector.retryTask', {
                       defaultValue: 'Retry task',
                     })}
+                    <kbd className="ml-0.5 text-[10px] text-[var(--ink-tertiary)] font-mono">
+                      {retryPresentation.label}
+                    </kbd>
                   </button>
                   <button
                     type="button"
+                    aria-keyshortcuts={
+                      retryReviewPresentation.ariaKeyShortcuts || undefined
+                    }
                     onClick={() => {
                       if (!canRetryReviewStep) return;
                       onRetryStep(step.id, 'review');
@@ -1422,12 +1450,18 @@ function InspectorCard({
                     {t('workflow.inspector.retryReview', {
                       defaultValue: 'Retry review',
                     })}
+                    <kbd className="ml-0.5 text-[10px] text-[var(--ink-tertiary)] font-mono">
+                      {retryReviewPresentation.label}
+                    </kbd>
                   </button>
                 </>
               ) : (
                 <button
                   type="button"
                   onClick={() => onRetryStep(step.id)}
+                  aria-keyshortcuts={
+                    retryPresentation.ariaKeyShortcuts || undefined
+                  }
                   disabled={pendingActionId === step.id}
                   className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--ink-subtle)] hover:text-[var(--ink)] transition-colors disabled:opacity-50"
                 >
@@ -1438,6 +1472,9 @@ function InspectorCard({
                     )}
                   />
                   {t('workflow.inspector.retry', { defaultValue: 'Retry' })}
+                  <kbd className="ml-0.5 text-[10px] text-[var(--ink-tertiary)] font-mono">
+                    {retryPresentation.label}
+                  </kbd>
                 </button>
               ))}
           </div>
@@ -1912,6 +1949,10 @@ export function WorkflowWindow({
   });
   useShortcutScope('workflow-running', {
     active: !isPreview && projection.execution_status === 'running',
+    rootRef: workflowWindowRef,
+  });
+  useShortcutScope('workflow-node-detail', {
+    active: isOpen && Boolean(activeNodeId),
     rootRef: workflowWindowRef,
   });
   const isReviewSettingsLocked =
@@ -2575,14 +2616,56 @@ export function WorkflowWindow({
     enabled: isOpen && isPreview && Boolean(projection.plan_id && onExecute),
     execute: () => onExecute?.(projection),
   });
-  useCommandHandler('workflow.node.stop', {
-    scope: 'focused-component',
-    enabled: Boolean(isOpen && activeStep?.id && onStopStep),
+  useCommandHandler('workflow.node.retry', {
+    scope: 'global',
+    enabled: Boolean(
+      isOpen &&
+        activeStep?.id &&
+        isRetryableWorkflowStepStatus(activeStep.status) &&
+        onRetryStep &&
+        pendingActionId !== activeStep.id
+    ),
     execute: () => {
-      if (activeStep?.id) {
-        setStopConfirmation({ kind: 'step', stepId: activeStep.id });
-      }
+      if (activeStep?.id) onRetryStep?.(activeStep.id);
     },
+  });
+  useCommandHandler('workflow.node.retry-review', {
+    scope: 'global',
+    enabled: Boolean(
+      isOpen &&
+        activeStep?.id &&
+        canRetryWorkflowStepReview(activeStep) &&
+        onRetryStep &&
+        pendingActionId !== activeStep.id
+    ),
+    execute: () => {
+      if (activeStep?.id) onRetryStep?.(activeStep.id, 'review');
+    },
+  });
+  useCommandHandler('workflow.node.stop', {
+    scope: 'global',
+    enabled: Boolean(
+      isOpen &&
+        activeStep?.id &&
+        ['running', 'waiting_review', 'waiting_input'].includes(
+          activeStep.status
+        ) &&
+        (onInterruptStep || onStopStep) &&
+        pendingActionId !== activeStep.id
+    ),
+    execute: () => {
+      if (!activeStep?.id) return;
+      if (onInterruptStep) {
+        onInterruptStep(activeStep.id);
+        return;
+      }
+      setStopConfirmation({ kind: 'step', stepId: activeStep.id });
+    },
+  });
+  useCommandHandler('workflow.node.chat.toggle', {
+    scope: 'global',
+    enabled: Boolean(isOpen && activeStep?.id),
+    execute: () => setIsChatVisible((visible) => !visible),
   });
   useCommandHandler('workflow.stop', {
     scope: 'focused-component',

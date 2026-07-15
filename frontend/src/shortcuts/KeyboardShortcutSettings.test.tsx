@@ -48,7 +48,7 @@ await act(async () => {
   );
 });
 
-assert.equal(document.querySelectorAll('[data-command-id]').length, 50);
+assert.equal(document.querySelectorAll('[data-command-id]').length, 49);
 const search = document.querySelector<HTMLInputElement>(
   '[data-shortcut-search]',
 )!;

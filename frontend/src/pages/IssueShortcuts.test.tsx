@@ -12,14 +12,8 @@ for (const commandId of [
 }
 for (const commandId of [
   'issue.detail.back',
-  'issue.status.1',
-  'issue.status.2',
-  'issue.status.3',
-  'issue.status.4',
-  'issue.status.5',
-  'issue.status.6',
-  'issue.status.7',
-  'issue.status.8',
+  'issue.status.open',
+  'issue.priority.open',
   'issue.labels.open',
   'issue.session.create',
 ]) {
@@ -36,6 +30,9 @@ assert.ok(page.includes('focusSelectedOrFirstIssueRow()'));
 assert.ok(detail.includes('data-shortcut-focus="issue-detail-heading"'));
 assert.ok(detail.includes('headingRef.current?.focus()'));
 assert.ok(detail.includes('handleStatusMenuSelect'));
+assert.ok(detail.includes("setOpenPropertyMenu('status')"));
+assert.ok(detail.includes("setOpenPropertyMenu('priority')"));
+assert.ok(detail.includes('shortcut="K"'));
 assert.ok(detail.includes("setOpenPropertyMenu('labels')"));
 assert.ok(detail.includes('handleOpenCreateSessionDialog'));
 assert.equal(

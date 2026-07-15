@@ -455,12 +455,14 @@ const translateWithFallback = (
 function LinkedWorkItemRow({
   item,
   statusPending,
+  statusMenuRequestKey,
   onOpen,
   onStatusChange,
   t,
 }: {
   item: ProjectWorkItem;
   statusPending: boolean;
+  statusMenuRequestKey: number;
   onOpen: (item: ProjectWorkItem) => void;
   onStatusChange: (
     item: ProjectWorkItem,
@@ -470,6 +472,7 @@ function LinkedWorkItemRow({
 }) {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement | null>(null);
+  const statusTriggerRef = useRef<HTMLButtonElement | null>(null);
   const issueStatus = linkedWorkItemIssueStatus(item.status);
   const statusLabel =
     translateWithFallback(
@@ -488,6 +491,12 @@ function LinkedWorkItemRow({
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [statusMenuOpen]);
+
+  useEffect(() => {
+    if (!statusMenuRequestKey || statusPending) return;
+    setStatusMenuOpen(true);
+    window.requestAnimationFrame(() => statusTriggerRef.current?.focus());
+  }, [statusMenuRequestKey, statusPending]);
 
   const handleStatusSelect = (status: ProjectWorkItem["status"]) => {
     setStatusMenuOpen(false);
@@ -515,8 +524,26 @@ function LinkedWorkItemRow({
           {item.title}
         </span>
       </button>
-      <div ref={statusMenuRef} className="relative shrink-0">
+      <div
+        ref={statusMenuRef}
+        className="relative shrink-0"
+        onKeyDown={(event) => {
+          if (!statusMenuOpen) return;
+          if (event.key === "Escape") {
+            event.preventDefault();
+            setStatusMenuOpen(false);
+            return;
+          }
+          const option = linkedWorkItemStatusOptions.find(
+            (candidate) => candidate.shortcut === event.key,
+          );
+          if (!option) return;
+          event.preventDefault();
+          handleStatusSelect(option.value);
+        }}
+      >
         <button
+          ref={statusTriggerRef}
           type="button"
           disabled={statusPending}
           aria-haspopup="listbox"
@@ -829,7 +856,13 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   );
   const [sourceControlFocusRequestKey, setSourceControlFocusRequestKey] =
     useState(0);
+  const [commitMessageFocusRequestKey, setCommitMessageFocusRequestKey] =
+    useState(0);
   const [linkedWorkItems, setLinkedWorkItems] = useState<ProjectWorkItem[]>([]);
+  const [
+    linkedWorkItemStatusMenuRequestKey,
+    setLinkedWorkItemStatusMenuRequestKey,
+  ] = useState(0);
   const [linkedWorkItemsLoading, setLinkedWorkItemsLoading] = useState(false);
   const [linkedWorkItemsError, setLinkedWorkItemsError] = useState<
     string | null
@@ -1139,6 +1172,28 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
       openRelatedFiles();
       setSourceControlFocusRequestKey((value) => value + 1);
     },
+  });
+  useCommandHandler('source-control.commit-message.focus', {
+    scope: "page",
+    enabled: Boolean(activeSessionId && selectedProjectId),
+    disabledReason:
+      activeSessionId && selectedProjectId
+        ? undefined
+        : t("shortcuts.reason.selectProject"),
+    execute: () => {
+      openRelatedFiles();
+      setCommitMessageFocusRequestKey((value) => value + 1);
+    },
+  });
+  useCommandHandler('session.linked-issue.status.open', {
+    scope: "page",
+    enabled: Boolean(
+      activeSessionId &&
+        linkedWorkItems.length > 0 &&
+        !updatingLinkedWorkItemIds.has(linkedWorkItems[0].id),
+    ),
+    execute: () =>
+      setLinkedWorkItemStatusMenuRequestKey((value) => value + 1),
   });
 
   useEffect(() => {
@@ -3138,6 +3193,11 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                         key={item.id}
                         item={item}
                         statusPending={updatingLinkedWorkItemIds.has(item.id)}
+                        statusMenuRequestKey={
+                          item.id === linkedWorkItems[0]?.id
+                            ? linkedWorkItemStatusMenuRequestKey
+                            : 0
+                        }
                         onOpen={handleOpenLinkedWorkItem}
                         t={t}
                         onStatusChange={(nextItem, status) => {
@@ -3164,6 +3224,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
               fallbackRelatedFiles={plainRelatedFilesContent}
               linkedWorkItemIds={linkedWorkItems.map((item) => item.id)}
               focusRequestKey={sourceControlFocusRequestKey}
+              commitFocusRequestKey={commitMessageFocusRequestKey}
               onOpenDiff={(projectId, sessionId, filePath, area) => {
                 onOpenSourceControlDiffTab?.(
                   projectId,

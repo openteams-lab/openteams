@@ -1389,51 +1389,33 @@ export function IssueDetailPage({
     }
   };
 
-  const statusShortcutEnabled = !openPropertyMenu && !action;
+  const propertyShortcutEnabled = !openPropertyMenu && !action;
   useCommandHandler('issue.detail.back', {
     scope: 'page',
     enabled: !openPropertyMenu && !titleEditing && !descriptionEditing,
     execute: onBack,
   });
-  useCommandHandler('issue.status.1', {
+  useCommandHandler('issue.status.open', {
     scope: 'page',
-    enabled: statusShortcutEnabled,
-    execute: () => handleStatusMenuSelect(statusMenuValues[0].value),
+    enabled: propertyShortcutEnabled,
+    execute: () => {
+      setStatusQuery('');
+      setPriorityQuery('');
+      setLabelQuery('');
+      setSessionQuery('');
+      setOpenPropertyMenu('status');
+    },
   });
-  useCommandHandler('issue.status.2', {
+  useCommandHandler('issue.priority.open', {
     scope: 'page',
-    enabled: statusShortcutEnabled,
-    execute: () => handleStatusMenuSelect(statusMenuValues[1].value),
-  });
-  useCommandHandler('issue.status.3', {
-    scope: 'page',
-    enabled: statusShortcutEnabled,
-    execute: () => handleStatusMenuSelect(statusMenuValues[2].value),
-  });
-  useCommandHandler('issue.status.4', {
-    scope: 'page',
-    enabled: statusShortcutEnabled,
-    execute: () => handleStatusMenuSelect(statusMenuValues[3].value),
-  });
-  useCommandHandler('issue.status.5', {
-    scope: 'page',
-    enabled: statusShortcutEnabled,
-    execute: () => handleStatusMenuSelect(statusMenuValues[4].value),
-  });
-  useCommandHandler('issue.status.6', {
-    scope: 'page',
-    enabled: statusShortcutEnabled,
-    execute: () => handleStatusMenuSelect(statusMenuValues[5].value),
-  });
-  useCommandHandler('issue.status.7', {
-    scope: 'page',
-    enabled: statusShortcutEnabled,
-    execute: () => handleStatusMenuSelect(statusMenuValues[6].value),
-  });
-  useCommandHandler('issue.status.8', {
-    scope: 'page',
-    enabled: statusShortcutEnabled,
-    execute: () => handleStatusMenuSelect(statusMenuValues[7].value),
+    enabled: propertyShortcutEnabled,
+    execute: () => {
+      setPriorityQuery('');
+      setStatusQuery('');
+      setLabelQuery('');
+      setSessionQuery('');
+      setOpenPropertyMenu('priority');
+    },
   });
   useCommandHandler('issue.labels.open', {
     scope: 'page',
@@ -2561,7 +2543,7 @@ function PriorityDropdown({
         <CommandMenuShell>
           <CommandSearchRow
             placeholder={tr('issue.detail.setPriority', 'Set priority to...')}
-            shortcut="P"
+            shortcut="K"
             value={query}
             onChange={onQueryChange}
           />

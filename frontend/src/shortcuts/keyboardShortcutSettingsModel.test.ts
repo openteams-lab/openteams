@@ -16,7 +16,7 @@ const rows = buildShortcutSettingsRows({
   unboundCommandIds: new Set(['worktree.merge']),
 });
 
-assert.equal(rows.length, 50);
+assert.equal(rows.length, 49);
 assert.equal(new Set(rows.map((row) => row.categoryKey)).size, 9);
 assert.deepEqual(
   filterShortcutSettingsRows(rows, {

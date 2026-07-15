@@ -32,8 +32,14 @@ for (const commandId of [
   'workflow.node.left',
   'workflow.node.right',
   'workflow.node.open',
+  'workflow.node.retry',
+  'workflow.node.retry-review',
+  'workflow.node.chat.toggle',
 ]) {
   assert.ok(windowSource.includes(`useCommandHandler('${commandId}'`), commandId);
 }
 assert.ok(windowSource.includes('handleNodeClick'));
+assert.ok(windowSource.includes("useShortcutScope('workflow-node-detail'"));
+assert.ok(windowSource.includes("onRetryStep?.(activeStep.id, 'review')"));
+assert.ok(windowSource.includes('setIsChatVisible((visible) => !visible)'));
 console.log('Workflow open and spatial shortcuts: PASS');
