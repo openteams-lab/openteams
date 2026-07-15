@@ -1,4 +1,6 @@
 {
+  "workflow.activeWorkflow.jumpToUnfinished": "완료되지 않은 워크플로로 이동",
+  "workflow.activeWorkflow.label": "활성 워크플로",
   "workflow.approvalCard.approve": "승인",
   "workflow.approvalCard.reject": "거부",
   "workflow.approvalCard.title": "승인 필요",

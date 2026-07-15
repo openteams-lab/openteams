@@ -1,4 +1,6 @@
 {
+  "workflow.activeWorkflow.jumpToUnfinished": "Accéder au workflow inachevé",
+  "workflow.activeWorkflow.label": "Workflow actif",
   "workflow.approvalCard.approve": "Approuver",
   "workflow.approvalCard.reject": "Rejeter",
   "workflow.approvalCard.title": "Approbation requise",

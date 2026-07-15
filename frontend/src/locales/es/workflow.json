@@ -1,4 +1,6 @@
 {
+  "workflow.activeWorkflow.jumpToUnfinished": "Ir al flujo de trabajo sin terminar",
+  "workflow.activeWorkflow.label": "Flujo de trabajo activo",
   "workflow.approvalCard.approve": "Aprobar",
   "workflow.approvalCard.reject": "Rechazar",
   "workflow.approvalCard.title": "Aprobación requerida",

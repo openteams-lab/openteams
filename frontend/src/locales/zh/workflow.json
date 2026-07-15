@@ -1,4 +1,6 @@
 {
+  "workflow.activeWorkflow.jumpToUnfinished": "跳转到未完成的工作流",
+  "workflow.activeWorkflow.label": "活跃工作流",
   "workflow.approvalCard.approve": "批准",
   "workflow.approvalCard.reject": "拒绝",
   "workflow.approvalCard.title": "需要批准",

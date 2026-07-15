@@ -78,11 +78,6 @@ const memberInviteSource =
   memberInviteIndex >= 0
     ? source.slice(memberInviteIndex, memberInviteIndex + 160)
     : "";
-const sendActionIndex = source.indexOf("{/* Send action on the right */}");
-const sendActionSource =
-  sendActionIndex >= 0
-    ? source.slice(sendActionIndex, sendActionIndex + 700)
-    : "";
 
 check(
   "uses a wider related-files default width",
@@ -459,12 +454,6 @@ check(
   source,
 );
 check(
-  "composer send action does not show tooltip information",
-  sendActionSource.includes("onClick={() => void handleSend()}") &&
-    !sendActionSource.includes("title="),
-  sendActionSource,
-);
-check(
   "composer mention picker opens on @ and captures keyboard selection",
   source.includes("activeMemberPickerIndex") &&
     source.includes("const handleInputChange = (") &&
@@ -648,6 +637,14 @@ check(
     !source.includes("handleWorkflowReminderPointerMove") &&
     source.includes('scrollIntoView({ behavior: "smooth", block: "center" })') &&
     source.includes("setSelectedSidebarMemberId(null)"),
+  source,
+);
+check(
+  "localizes the active workflow shortcut",
+  source.includes('t("workflow.activeWorkflow.label")') &&
+    source.includes('t("workflow.activeWorkflow.jumpToUnfinished")') &&
+    !source.includes(">Active Workflow<") &&
+    !source.includes('title="Jump to unfinished workflow"'),
   source,
 );
 

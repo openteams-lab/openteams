@@ -86,6 +86,15 @@ const disallowedNotificationLocaleSnippets = [
   'bandeja Bell',
 ];
 
+const expectedWorktreeDirectoryLabels: Record<string, string> = {
+  en: 'Default git worktree directory',
+  zh: '默认 git worktree 目录',
+  ja: 'デフォルトの git worktree ディレクトリ',
+  ko: '기본 git worktree 디렉터리',
+  fr: 'Répertoire git worktree par défaut',
+  es: 'Directorio git worktree predeterminado',
+};
+
 check(
   'adds a follow-system theme option to General settings',
   settingsSource.includes("id: 'system'") &&
@@ -213,6 +222,12 @@ for (const locale of ['en', 'zh', 'ja', 'ko', 'fr', 'es']) {
     localeSource,
   );
   const localeSettings = JSON.parse(localeSource) as Record<string, string>;
+  check(
+    `locale ${locale} uses the default git worktree directory label`,
+    localeSettings['settings.storage.worktreeSessionsDir'] ===
+      expectedWorktreeDirectoryLabels[locale],
+    localeSettings['settings.storage.worktreeSessionsDir'],
+  );
   const notificationLocaleValues = Object.entries(localeSettings)
     .filter(([key]) => key.startsWith('settings.notifications.'))
     .map(([, value]) => value)

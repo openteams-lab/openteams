@@ -102,7 +102,7 @@
   "settings.storage.browse": "찾아보기",
   "settings.storage.saveFailed": "설정을 저장하지 못했습니다.",
   "settings.storage.saving": "저장 중...",
-  "settings.storage.worktreeSessionsDir": "세션 worktree 디렉터리",
+  "settings.storage.worktreeSessionsDir": "기본 git worktree 디렉터리",
   "settings.storage.worktreeSessionsDirDesc": "격리된 세션 worktree 폴더가 생성될 위치를 선택합니다.",
   "settings.storage.worktreeSessionsDirPickerTitle": "세션 worktree 디렉터리 선택",
   "settings.storage.worktreeSessionsDirSelectFailed": "파일 선택기가 로컬 폴더 경로를 반환하지 않았습니다. 경로를 직접 입력하세요.",

@@ -1,4 +1,6 @@
 {
+  "workflow.activeWorkflow.jumpToUnfinished": "未完了のワークフローに移動",
+  "workflow.activeWorkflow.label": "実行中のワークフロー",
   "workflow.approvalCard.approve": "承認",
   "workflow.approvalCard.reject": "却下",
   "workflow.approvalCard.title": "承認が必要",

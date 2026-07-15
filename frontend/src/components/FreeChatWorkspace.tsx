@@ -2478,11 +2478,11 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
               className={`absolute top-1.5 z-20 flex h-7 items-center gap-1.5 rounded-full border border-amber-500/35 bg-[var(--surface-1)]/95 px-3 text-[10px] font-medium text-amber-600 shadow-sm backdrop-blur transition-colors hover:bg-amber-500/10 dark:text-amber-400 ${
                 isRelatedFilesOpen ? "right-7" : "right-10"
               }`}
-              title="Jump to unfinished workflow"
-              aria-label="Jump to unfinished workflow"
+              title={t("workflow.activeWorkflow.jumpToUnfinished")}
+              aria-label={t("workflow.activeWorkflow.jumpToUnfinished")}
             >
               <GitBranch className="h-3.5 w-3.5" />
-              <span>Active Workflow</span>
+              <span>{t("workflow.activeWorkflow.label")}</span>
             </button>
           )}
           {!isRelatedFilesOpen && (
@@ -3036,6 +3036,11 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                         ? "bg-[var(--primary)] text-white hover:opacity-95 cursor-pointer hover:scale-105"
                         : "bg-[var(--surface-3)] text-[var(--ink-tertiary)] cursor-not-allowed"
                     }`}
+                    title={
+                      isUploadingAttachments
+                        ? t("attachment.uploading")
+                        : undefined
+                    }
                   >
                     <ArrowUp className="h-3.5 w-3.5" />
                   </button>

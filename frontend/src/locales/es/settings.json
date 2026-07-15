@@ -102,7 +102,7 @@
   "settings.storage.browse": "Examinar",
   "settings.storage.saveFailed": "No se pudieron guardar los ajustes.",
   "settings.storage.saving": "Guardando...",
-  "settings.storage.worktreeSessionsDir": "Directorio de worktrees de sesión",
+  "settings.storage.worktreeSessionsDir": "Directorio git worktree predeterminado",
   "settings.storage.worktreeSessionsDirDesc": "Elige dónde se crean las carpetas worktree de sesiones aisladas.",
   "settings.storage.worktreeSessionsDirPickerTitle": "Seleccionar directorio de worktrees de sesión",
   "settings.storage.worktreeSessionsDirSelectFailed": "El selector de archivos no devolvió una ruta de carpeta local. Introduce la ruta manualmente.",

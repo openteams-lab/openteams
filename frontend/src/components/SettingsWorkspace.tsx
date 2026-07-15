@@ -889,7 +889,7 @@ export const SettingsWorkspace: React.FC = () => {
                     <p className="settings-row-title leading-tight">
                       {translate(
                         'settings.storage.worktreeSessionsDir',
-                        'Session worktree directory',
+                        'Default git worktree directory',
                       )}
                     </p>
                     <p className="settings-row-description mt-1 leading-snug">

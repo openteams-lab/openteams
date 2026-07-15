@@ -102,7 +102,7 @@
   "settings.storage.browse": "浏览",
   "settings.storage.saveFailed": "保存设置失败。",
   "settings.storage.saving": "保存中...",
-  "settings.storage.worktreeSessionsDir": "会话 worktree 目录",
+  "settings.storage.worktreeSessionsDir": "默认 git worktree 目录",
   "settings.storage.worktreeSessionsDirDesc": "选择隔离会话 worktree 文件夹的创建位置。",
   "settings.storage.worktreeSessionsDirPickerTitle": "选择会话 worktree 目录",
   "settings.storage.worktreeSessionsDirSelectFailed": "文件选择器未返回本地文件夹路径。请手动输入路径。",

@@ -102,7 +102,7 @@
   "settings.storage.browse": "参照",
   "settings.storage.saveFailed": "設定を保存できませんでした。",
   "settings.storage.saving": "保存中...",
-  "settings.storage.worktreeSessionsDir": "セッション worktree ディレクトリ",
+  "settings.storage.worktreeSessionsDir": "デフォルトの git worktree ディレクトリ",
   "settings.storage.worktreeSessionsDirDesc": "分離されたセッション worktree フォルダを作成する場所を選択します。",
   "settings.storage.worktreeSessionsDirPickerTitle": "セッション worktree ディレクトリを選択",
   "settings.storage.worktreeSessionsDirSelectFailed": "ファイル選択でローカルフォルダパスを取得できませんでした。パスを手動で入力してください。",

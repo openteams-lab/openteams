@@ -103,7 +103,7 @@
   "settings.storage.browse": "Browse",
   "settings.storage.saveFailed": "Failed to save settings.",
   "settings.storage.saving": "Saving...",
-  "settings.storage.worktreeSessionsDir": "Session worktree directory",
+  "settings.storage.worktreeSessionsDir": "Default git worktree directory",
   "settings.storage.worktreeSessionsDirDesc": "Choose where isolated session worktree folders are created.",
   "settings.storage.worktreeSessionsDirPickerTitle": "Select session worktree directory",
   "settings.storage.worktreeSessionsDirSelectFailed": "The file picker did not return a local folder path. Enter the path manually.",
