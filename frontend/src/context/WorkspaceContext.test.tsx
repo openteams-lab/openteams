@@ -160,6 +160,7 @@ check(
     /shouldQueueForMember\s*\?\s*\[\]/.test(source) &&
     source.includes('fallbackMention?: string | null') &&
     source.includes('sendMessageToSession') &&
+    source.includes("/@([\\p{L}\\p{N}_-]+)/gu") &&
     source.includes('stagePendingAgentPlaceholder') &&
     source.includes('persistToBackend?: boolean') &&
     source.includes("placeholderMember?: Pick<Member, 'avatar' | 'name' | 'modelName'> | null") &&

@@ -157,7 +157,7 @@ type RenderedWorkspaceTab = {
 const extractAgentMentions = (text: string): string[] =>
   Array.from(
     new Set(
-      Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
+      Array.from(text.matchAll(/@([\p{L}\p{N}_-]+)/gu), (match) =>
         match[1],
       ),
     ),

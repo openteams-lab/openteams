@@ -371,6 +371,7 @@ check(
 check(
   "new free-chat session routes to selected member without prefixing content",
   source.includes("const extractAgentMentions = (text: string): string[]") &&
+    source.includes("/@([\\p{L}\\p{N}_-]+)/gu") &&
     source.includes("const mentions = extractAgentMentions(content)") &&
     source.includes("let freeChatSelectedAgentName: string | null = null") &&
     source.includes("freeChatSelectedAgentName =") &&

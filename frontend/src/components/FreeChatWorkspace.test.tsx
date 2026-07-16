@@ -199,6 +199,7 @@ check(
     source.includes("const displayedMessages = selectedSidebarMember") &&
     source.includes("message.sender === selectedSidebarMember.name") &&
     source.includes("const extractMentionHandles = (text: string): string[]") &&
+    source.includes("/@[\\p{L}\\p{N}_-]+/gu") &&
     source.includes("const memberMentionHandles = new Set(") &&
     source.includes("const matchedMemberMentions = extractMentionHandles(") &&
     source.includes("memberMentionHandles.has(mention)") &&
@@ -302,6 +303,7 @@ check(
 check(
   "agent markdown renders leading mentions outside markdown content",
   markdownSource.includes("extractAgentMarkdownParts") &&
+    markdownSource.includes("@[\\p{L}\\p{N}_-]+(?=\\s|$)") &&
     markdownSource.includes("ReactMarkdown") &&
     markdownSource.includes("remarkGfm") &&
     markdownSource.includes("remarkPlugins={[remarkGfm]}") &&
@@ -519,7 +521,7 @@ check(
     source.includes(
       "Highlight @mentions while keeping user-entered markdown characters literal",
     ) &&
-    source.includes("text.split(/(@[a-zA-Z0-9_-]+)/g)") &&
+    source.includes("text.split(/(@[\\p{L}\\p{N}_-]+)/gu)") &&
     !source.includes("el.substring(1, el.length - 1)"),
   source,
 );
@@ -548,6 +550,7 @@ check(
 check(
   "attachment send routes unmentioned free-mode uploads to the main agent",
   source.includes("const routeMentionsForText = (text: string): string[]") &&
+    source.includes("/@([\\p{L}\\p{N}_-]+)/gu") &&
     source.includes("const explicitAttachmentMentions = routeMentionsForText(messageText)") &&
     source.includes("const mainAgentRouteMention = mainAgentName") &&
     source.includes('mainAgentName.trim().replace(/^@/, "")') &&
