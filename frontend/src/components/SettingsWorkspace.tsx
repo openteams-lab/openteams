@@ -309,6 +309,7 @@ export const SettingsWorkspace: React.FC = () => {
   const [githubAccount, setGithubAccount] = useState<GitHubAccount | null>(
     null,
   );
+  const [analyticsUserId, setAnalyticsUserId] = useState<string | null>(null);
   const [notificationSavingField, setNotificationSavingField] =
     useState<NotificationConfigField | null>(null);
   const [notificationSettingsMessage, setNotificationSettingsMessage] =
@@ -386,6 +387,7 @@ export const SettingsWorkspace: React.FC = () => {
       .getInfo()
       .then((info) => {
         if (cancelled) return;
+        setAnalyticsUserId(info.analytics_user_id.trim() || null);
         setWorktreeDefaultSystemInfo({
           home_directory: info.home_directory,
           environment: info.environment,
@@ -658,8 +660,7 @@ export const SettingsWorkspace: React.FC = () => {
     }
   };
 
-  const accountDisplayLabel =
-    githubAccount?.login ?? settingsOptions?.account.email ?? '-';
+  const accountDisplayLabel = githubAccount?.login ?? analyticsUserId ?? '-';
   const languageOptions = settingsOptions?.languages ?? [];
   const selectedLanguage = languageOptions.find((lang) => lang.code === locale);
   const selectedLanguageLabel = selectedLanguage

@@ -14,7 +14,6 @@ use db::models::{
     chat_message::{ChatMessage, ChatSenderType, CreateChatMessage},
     chat_session::{ChatSession, ChatSessionStatus},
     chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
-    project_member::{ProjectMember, ProjectMemberType},
 };
 use executors::{
     approvals::NoopExecutorApprovalService,

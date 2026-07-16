@@ -245,6 +245,7 @@ mod tests {
             agent_session_id: None,
             agent_message_id: None,
             project_member_id: None,
+            member_name: "member".to_string(),
             execution_config: Json(config),
             allowed_skill_ids: Json(Vec::new()),
             created_at: chrono::Utc::now(),

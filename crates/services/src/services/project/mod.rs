@@ -145,6 +145,7 @@ mod tests {
                 title TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
                 lead_agent_id BLOB,
+                lead_session_agent_id BLOB,
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,

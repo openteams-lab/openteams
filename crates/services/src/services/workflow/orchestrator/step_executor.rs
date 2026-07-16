@@ -152,7 +152,7 @@ fn detect_active_frontier_workspace_conflicts(
             .or_insert_with(|| ActiveFrontierWorkspaceMember {
                 session_agent_id: session_agent.id,
                 agent_id: agent.id,
-                agent_name: agent.name.clone(),
+                agent_name: session_agent.member_name.clone(),
                 step_key: step.step_key.clone(),
             });
     }

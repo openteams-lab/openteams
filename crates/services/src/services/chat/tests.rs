@@ -119,6 +119,7 @@ mod tests {
             session_id: Uuid::new_v4(),
             sender_type: ChatSenderType::User,
             sender_id: None,
+            sender_session_agent_id: None,
             content: "hello @planner with file".to_string(),
             mentions: sqlx::types::Json(vec!["planner".to_string()]),
             meta: sqlx::types::Json(serde_json::json!({
@@ -186,6 +187,7 @@ mod tests {
                 chat_input_mode TEXT,
                 project_id BLOB,
                 lead_agent_id TEXT,
+                lead_session_agent_id BLOB,
                 worktree_mode TEXT NOT NULL DEFAULT 'inherit'
                     CHECK (worktree_mode IN ('inherit', 'disabled', 'isolated')),
                 pinned_at TEXT,
@@ -213,6 +215,7 @@ mod tests {
                 sender_type TEXT NOT NULL
                     CHECK (sender_type IN ('user','agent','system')),
                 sender_id BLOB,
+                sender_session_agent_id BLOB,
                 content TEXT NOT NULL,
                 mentions TEXT NOT NULL DEFAULT '[]',
                 meta TEXT NOT NULL DEFAULT '{}',
@@ -290,6 +293,7 @@ mod tests {
                 status TEXT NOT NULL DEFAULT 'active'
                     CHECK (status IN ('active','archived')),
                 lead_agent_id BLOB,
+                lead_session_agent_id BLOB,
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,
@@ -346,6 +350,7 @@ mod tests {
                 agent_session_id TEXT,
                 agent_message_id TEXT,
                 project_member_id BLOB,
+                member_name TEXT NOT NULL DEFAULT '',
                 execution_config TEXT NOT NULL DEFAULT '{}',
                 allowed_skill_ids TEXT NOT NULL DEFAULT '[]',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
@@ -538,13 +543,22 @@ mod tests {
         let overrides = member_name_overrides_for_session(&pool, session.id)
             .await
             .expect("load member name overrides");
+        let session_agent = ChatSessionAgent::find_all_for_session(&pool, session.id)
+            .await
+            .expect("load session members")
+            .into_iter()
+            .next()
+            .expect("session member exists");
 
         assert_eq!(
-            overrides.get(&agent.id).map(String::as_str),
+            overrides.get(&session_agent.id).map(String::as_str),
             Some("backend-lead")
         );
         assert_eq!(
-            effective_agent_name(&agent, overrides.get(&agent.id).map(String::as_str)),
+            effective_agent_name(
+                &agent,
+                overrides.get(&session_agent.id).map(String::as_str)
+            ),
             "backend-lead"
         );
     }
@@ -741,6 +755,7 @@ mod tests {
             agent_session_id: None,
             agent_message_id: None,
             project_member_id: None,
+            member_name: "member".to_string(),
             execution_config: sqlx::types::Json(MemberExecutionConfig::default()),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
@@ -885,6 +900,7 @@ mod tests {
             session_id: Uuid::new_v4(),
             sender_type,
             sender_id: None,
+            sender_session_agent_id: None,
             content: "message".to_string(),
             mentions: sqlx::types::Json(Vec::new()),
             meta: sqlx::types::Json(meta),

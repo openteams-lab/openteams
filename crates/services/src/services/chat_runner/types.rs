@@ -164,6 +164,8 @@ pub enum ChatStreamEvent {
     MentionAcknowledged {
         session_id: Uuid,
         message_id: Uuid,
+        session_agent_id: Option<Uuid>,
+        project_member_id: Option<Uuid>,
         mentioned_agent: String,
         agent_id: Uuid,
         status: MentionStatus,
@@ -191,6 +193,8 @@ pub enum ChatStreamEvent {
     MentionError {
         session_id: Uuid,
         message_id: Uuid,
+        session_agent_id: Option<Uuid>,
+        project_member_id: Option<Uuid>,
         agent_name: String,
         agent_id: Option<Uuid>,
         reason: String,

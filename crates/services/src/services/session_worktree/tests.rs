@@ -206,6 +206,7 @@ async fn setup_pool() -> SqlitePool {
             agent_session_id    TEXT,
             agent_message_id    BLOB,
             project_member_id   BLOB,
+            member_name         TEXT    NOT NULL DEFAULT '',
             execution_config    TEXT    NOT NULL DEFAULT '{}',
             allowed_skill_ids   TEXT    NOT NULL DEFAULT '[]',
             created_at          TEXT    NOT NULL DEFAULT (datetime('now', 'subsec')),

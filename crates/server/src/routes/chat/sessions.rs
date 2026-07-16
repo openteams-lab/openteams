@@ -98,8 +98,15 @@ pub async fn update_session(
     State(deployment): State<DeploymentImpl>,
     Json(payload): Json<UpdateChatSession>,
 ) -> Result<ResponseJson<ApiResponse<ChatSession>>, ApiError> {
-    // Validate lead_agent_id if provided
-    if let Some(Some(lead_agent_id)) = &payload.lead_agent_id {
+    if let Some(Some(lead_session_agent_id)) = &payload.lead_session_agent_id {
+        let session_agent =
+            ChatSessionAgent::find_by_id(&deployment.db().pool, *lead_session_agent_id).await?;
+        if !session_agent.is_some_and(|session_agent| session_agent.session_id == session.id) {
+            return Err(ApiError::BadRequest(
+                "Session agent is not a member of this session".to_string(),
+            ));
+        }
+    } else if let Some(Some(lead_agent_id)) = &payload.lead_agent_id {
         let session_agents =
             ChatSessionAgent::find_all_for_session(&deployment.db().pool, session.id).await?;
         let agent_exists = session_agents
@@ -160,12 +167,18 @@ pub async fn delete_session(
 #[derive(Debug, Deserialize, TS)]
 pub struct CreateChatSessionAgentRequest {
     pub agent_id: Uuid,
+    #[serde(default)]
+    #[ts(optional)]
+    pub member_name: Option<String>,
     pub workspace_path: Option<String>,
     pub allowed_skill_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, TS)]
 pub struct UpdateChatSessionAgentRequest {
+    #[serde(default)]
+    #[ts(optional)]
+    pub member_name: Option<String>,
     pub workspace_path: Option<String>,
     pub allowed_skill_ids: Option<Vec<String>>,
 }
@@ -1469,20 +1482,19 @@ fn normalize_allowed_skill_ids(allowed_skill_ids: Option<Vec<String>>) -> Vec<St
 async fn session_has_duplicate_member_name(
     pool: &sqlx::SqlitePool,
     session_id: Uuid,
-    agent_id: Uuid,
-    agent_name: &str,
+    excluded_session_agent_id: Option<Uuid>,
+    member_name: &str,
 ) -> Result<bool, sqlx::Error> {
     let count: i64 = sqlx::query_scalar(
         r#"SELECT COUNT(1)
-           FROM chat_session_agents session_agents
-           JOIN chat_agents agents ON agents.id = session_agents.agent_id
-           WHERE session_agents.session_id = ?1
-             AND session_agents.agent_id != ?2
-             AND lower(trim(agents.name)) = lower(trim(?3))"#,
+           FROM chat_session_agents
+           WHERE session_id = ?1
+             AND (?2 IS NULL OR id != ?2)
+             AND lower(trim(member_name)) = lower(trim(?3))"#,
     )
     .bind(session_id)
-    .bind(agent_id)
-    .bind(agent_name)
+    .bind(excluded_session_agent_id)
+    .bind(member_name)
     .fetch_one(pool)
     .await?;
 
@@ -1812,16 +1824,39 @@ pub async fn create_session_agent(
         normalize_or_inherit_workspace_path(&session, payload.workspace_path).await?;
     let allowed_skill_ids = normalize_allowed_skill_ids(payload.allowed_skill_ids.clone());
 
-    if let Some(existing) = ChatSessionAgent::find_by_session_and_agent(
+    let Some(agent) = ChatAgent::find_by_id(&deployment.db().pool, payload.agent_id).await? else {
+        return Err(ApiError::BadRequest("Chat agent not found".to_string()));
+    };
+
+    let project_name = session.title.as_deref().map(str::trim).unwrap_or("");
+    let requested_member_name = payload.member_name.as_deref().unwrap_or(&agent.name);
+    let member_name = utils::text::sanitize_member_handle(requested_member_name);
+    if member_name.is_empty() {
+        return Err(ApiError::BadRequest(
+            "Member name cannot be empty".to_string(),
+        ));
+    }
+    let agent_name = member_name.as_str();
+    if !project_name.is_empty() && project_name.to_lowercase() == agent_name.to_lowercase() {
+        return Err(ApiError::BadRequest(
+            "AI member name cannot match the project name.".to_string(),
+        ));
+    }
+
+    if let Some(existing) = ChatSessionAgent::find_by_session_and_member_name(
         &deployment.db().pool,
         session.id,
-        payload.agent_id,
+        &member_name,
     )
     .await?
     {
+        if existing.agent_id != payload.agent_id {
+            return Err(ApiError::BadRequest(
+                "An AI member with this name already exists in this session.".to_string(),
+            ));
+        }
         let mut updated = existing.clone();
         let mut changed = false;
-
         if workspace_path.is_some() {
             updated = ChatSessionAgent::update_workspace_path(
                 &deployment.db().pool,
@@ -1831,7 +1866,6 @@ pub async fn create_session_agent(
             .await?;
             changed = true;
         }
-
         if payload.allowed_skill_ids.is_some() {
             updated = ChatSessionAgent::update_allowed_skill_ids(
                 &deployment.db().pool,
@@ -1841,7 +1875,6 @@ pub async fn create_session_agent(
             .await?;
             changed = true;
         }
-
         return Ok(ResponseJson(ApiResponse::success(if changed {
             updated
         } else {
@@ -1849,25 +1882,8 @@ pub async fn create_session_agent(
         })));
     }
 
-    let Some(agent) = ChatAgent::find_by_id(&deployment.db().pool, payload.agent_id).await? else {
-        return Err(ApiError::BadRequest("Chat agent not found".to_string()));
-    };
-
-    let project_name = session.title.as_deref().map(str::trim).unwrap_or("");
-    let agent_name = agent.name.trim();
-    if !project_name.is_empty() && project_name.to_lowercase() == agent_name.to_lowercase() {
-        return Err(ApiError::BadRequest(
-            "AI member name cannot match the project name.".to_string(),
-        ));
-    }
-
-    if session_has_duplicate_member_name(
-        &deployment.db().pool,
-        session.id,
-        payload.agent_id,
-        agent_name,
-    )
-    .await?
+    if session_has_duplicate_member_name(&deployment.db().pool, session.id, None, agent_name)
+        .await?
     {
         return Err(ApiError::BadRequest(
             "An AI member with this name already exists in this session.".to_string(),
@@ -1879,6 +1895,7 @@ pub async fn create_session_agent(
         &CreateChatSessionAgent {
             session_id: session.id,
             agent_id: payload.agent_id,
+            member_name: Some(member_name.clone()),
             workspace_path,
             allowed_skill_ids,
             project_member_id: None,
@@ -1887,7 +1904,6 @@ pub async fn create_session_agent(
         Uuid::new_v4(),
     )
     .await?;
-
     let user_id_hash = hash_user_id(deployment.user_id());
     workflow_analytics::track_agent_added(
         workflow_analytics::analytics_if_enabled(
@@ -1936,8 +1952,37 @@ pub async fn update_session_agent(
         .map(|skill_ids| normalize_allowed_skill_ids(Some(skill_ids)))
         .unwrap_or_else(|| existing.allowed_skill_ids.0.clone());
 
+    if payload.member_name.is_some() && existing.project_member_id.is_some() {
+        return Err(ApiError::BadRequest(
+            "Project-linked member names must be changed through the project member API."
+                .to_string(),
+        ));
+    }
+
     let workspace_changed = workspace_path != existing.workspace_path;
     let allowed_skills_changed = allowed_skill_ids != existing.allowed_skill_ids.0;
+    let member_name = payload
+        .member_name
+        .as_deref()
+        .map(utils::text::sanitize_member_handle)
+        .filter(|name| !name.is_empty());
+    let member_name_changed = member_name
+        .as_deref()
+        .is_some_and(|name| name != existing.member_name);
+
+    if let Some(member_name) = member_name.as_deref()
+        && session_has_duplicate_member_name(
+            &deployment.db().pool,
+            session.id,
+            Some(existing.id),
+            member_name,
+        )
+        .await?
+    {
+        return Err(ApiError::BadRequest(
+            "An AI member with this name already exists in this session.".to_string(),
+        ));
+    }
 
     let updated = if workspace_changed {
         ChatSessionAgent::update_workspace_path(&deployment.db().pool, existing.id, workspace_path)
@@ -1951,6 +1996,16 @@ pub async fn update_session_agent(
             &deployment.db().pool,
             updated.id,
             allowed_skill_ids,
+        )
+        .await?
+    } else {
+        updated
+    };
+    let updated = if member_name_changed {
+        ChatSessionAgent::update_member_name(
+            &deployment.db().pool,
+            updated.id,
+            member_name.expect("member name checked above"),
         )
         .await?
     } else {
@@ -1986,8 +2041,11 @@ pub async fn delete_session_agent(
         ));
     }
 
-    // If the removed agent was the lead, reset lead_agent_id to the first remaining agent
-    if session.lead_agent_id == Some(existing.agent_id) {
+    // If the removed member was the lead, reset both compatibility and authoritative IDs.
+    if session.lead_session_agent_id == Some(existing.id)
+        || (session.lead_session_agent_id.is_none()
+            && session.lead_agent_id == Some(existing.agent_id))
+    {
         let remaining_agents =
             ChatSessionAgent::find_all_for_session(&deployment.db().pool, session.id).await?;
         let new_lead_agent_id = remaining_agents.first().map(|sa| sa.agent_id);
@@ -1996,6 +2054,7 @@ pub async fn delete_session_agent(
             title: None,
             status: None,
             lead_agent_id: Some(new_lead_agent_id),
+            lead_session_agent_id: Some(remaining_agents.first().map(|sa| sa.id)),
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
@@ -2041,6 +2100,7 @@ pub async fn archive_session(
             title: None,
             status: Some(ChatSessionStatus::Archived),
             lead_agent_id: None,
+            lead_session_agent_id: None,
             summary_text: None,
             archive_ref: Some(archive_ref),
             last_seen_diff_key: None,
@@ -2082,6 +2142,7 @@ pub async fn restore_session(
             title: None,
             status: Some(ChatSessionStatus::Active),
             lead_agent_id: None,
+            lead_session_agent_id: None,
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
@@ -3199,6 +3260,7 @@ mod tests {
             title: Some("Test Session".to_string()),
             status: ChatSessionStatus::Active,
             lead_agent_id: None,
+            lead_session_agent_id: None,
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,

@@ -964,6 +964,7 @@ mod tests {
             title: Some("Delivery Team".to_string()),
             status: ChatSessionStatus::Active,
             lead_agent_id: None,
+            lead_session_agent_id: None,
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,

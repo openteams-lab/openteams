@@ -148,6 +148,7 @@ async fn seed_session_with_observed_source(
         &CreateChatSessionAgent {
             session_id: session.id,
             agent_id: agent.id,
+            member_name: None,
             workspace_path: Some(workspace_path.to_string_lossy().to_string()),
             allowed_skill_ids: Vec::new(),
             project_member_id: None,

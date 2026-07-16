@@ -180,6 +180,18 @@ check(
 );
 
 check(
+  'uses the analytics installation ID when no GitHub account is authorized',
+  settingsSource.includes(
+    'setAnalyticsUserId(info.analytics_user_id.trim() || null)',
+  ) &&
+    settingsSource.includes(
+      "githubAccount?.login ?? analyticsUserId ?? '-'",
+    ) &&
+    !mockSource.includes('mock-user@example.com'),
+  { mockSource, settingsSource },
+);
+
+check(
   'renders only the project-scoped archived sessions resource',
   settingsSource.includes('archivedSessionsAsync') &&
     settingsSource.includes('refreshArchivedSessions') &&

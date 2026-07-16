@@ -155,6 +155,7 @@ Open the page and inspect it carefully.
                 agent_session_id TEXT,
                 agent_message_id TEXT,
                 project_member_id TEXT,
+                member_name TEXT NOT NULL DEFAULT '',
                 execution_config TEXT NOT NULL DEFAULT '{}',
                 allowed_skill_ids TEXT NOT NULL DEFAULT '[]',
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -215,6 +216,7 @@ Open the page and inspect it carefully.
             &CreateChatSessionAgent {
                 session_id: Uuid::new_v4(),
                 agent_id: Uuid::new_v4(),
+                member_name: None,
                 workspace_path: None,
                 allowed_skill_ids: vec![
                     installed_skill.id.to_string(),
