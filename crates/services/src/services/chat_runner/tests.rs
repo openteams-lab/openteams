@@ -2545,6 +2545,12 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
     assert!(prompt.contains("### Rules"));
     assert!(prompt.contains("### Schema"));
     assert!(prompt.contains("send.to"));
+    assert!(prompt.contains(
+        "Emit at most one `send` item for each `send.to` value per response, including `\"you\"` and every agent."
+    ));
+    assert!(prompt.contains(
+        "Never emit multiple `send` items with the same `send.to`; combine their content into one complete Markdown message."
+    ));
     assert!(prompt.contains("record`: long-lived shared facts only."));
     assert!(prompt.contains("artifact.content`: a JSON array of file paths only."));
     assert!(prompt.contains("conclusion`: current-turn summary only"));
@@ -2621,6 +2627,12 @@ fn build_exact_markdown_prompt_restricts_send_targets_in_workflow_mode() {
     );
 
     assert!(prompt.contains("Workflow mode: `send.to` may only be `\"you\"`"));
+    assert!(prompt.contains(
+        "Emit at most one `send` item for each `send.to` value per response, including `\"you\"` and every agent."
+    ));
+    assert!(prompt.contains(
+        "Never emit multiple `send` items with the same `send.to`; combine their content into one complete Markdown message."
+    ));
     assert!(prompt.contains("do not send workflow-mode messages to other agents"));
     assert!(!prompt.contains("`send.to` must match a group member name"));
     assert!(prompt.contains("`workflow_generate`"));

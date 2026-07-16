@@ -918,13 +918,16 @@ impl ChatRunner {
             markdown
                 .push_str("3. `send.to` must match a group member name or `\"you\"` (the user).\n");
         }
-        markdown.push_str("4. `record`: long-lived shared facts only.\n");
-        markdown.push_str("5. `artifact.content`: a JSON array of file paths only. Include every file modified, added, or deleted in this turn. Paths may be workspace-relative or absolute, but must not include prose.\n");
         markdown.push_str(
-            "6. `conclusion`: current-turn summary only (completed work, blockers, next steps). Max 3 sentences.\n",
+            "4. Emit at most one `send` item for each `send.to` value per response, including `\"you\"` and every agent. Never emit multiple `send` items with the same `send.to`; combine their content into one complete Markdown message.\n",
+        );
+        markdown.push_str("5. `record`: long-lived shared facts only.\n");
+        markdown.push_str("6. `artifact.content`: a JSON array of file paths only. Include every file modified, added, or deleted in this turn. Paths may be workspace-relative or absolute, but must not include prose.\n");
+        markdown.push_str(
+            "7. `conclusion`: current-turn summary only (completed work, blockers, next steps). Max 3 sentences.\n",
         );
         if is_workflow_mode {
-            markdown.push_str("7. `workflow_generate`: \n");
+            markdown.push_str("8. `workflow_generate`: \n");
             markdown.push_str(
                 "- Emit `workflow_generate` only when the user explicitly asks to start generating an execution plan.\n",
             );
