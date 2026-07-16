@@ -123,8 +123,8 @@ pub enum AnalyticsEventPayload {
 
 impl AnalyticsEventPayload {
     pub const EVENT_NAMES: [&'static str; 27] = [
-        "workflow.session_created",
-        "workflow.agent_added",
+        "session_created",
+        "agent_added",
         "workflow.plan_generated",
         "workflow.plan_executed",
         "workflow.execution_state_changed",
@@ -154,8 +154,8 @@ impl AnalyticsEventPayload {
 
     pub fn event_name(&self) -> &'static str {
         match self {
-            Self::SessionCreated => "workflow.session_created",
-            Self::AgentAdded { .. } => "workflow.agent_added",
+            Self::SessionCreated => "session_created",
+            Self::AgentAdded { .. } => "agent_added",
             Self::PlanGenerated { .. } => "workflow.plan_generated",
             Self::PlanExecuted => "workflow.plan_executed",
             Self::ExecutionStateChanged { .. } => "workflow.execution_state_changed",
@@ -499,6 +499,16 @@ mod tests {
             attachment_count: 0,
         };
         assert_eq!(message.event_group(), Some("engagement"));
+
+        assert_eq!(AnalyticsEventPayload::SessionCreated.event_group(), None);
+        assert_eq!(
+            AnalyticsEventPayload::AgentAdded {
+                runner_type: None,
+                has_workspace: false,
+            }
+            .event_group(),
+            None
+        );
     }
 
     #[test]

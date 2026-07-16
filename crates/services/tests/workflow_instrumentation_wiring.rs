@@ -52,13 +52,15 @@ fn analytics_and_sentry_avoid_undisclosed_identity_and_device_metadata() {
 }
 
 #[test]
-fn posthog_event_group_mapping_is_complete_and_message_sent_is_engagement() {
+fn posthog_generic_event_names_and_event_group_mapping_are_correct() {
     for (event_name, expected) in [
         ("workflow.plan_executed", Some("process_funnel")),
         ("collaboration.approval_resolved", Some("collaboration")),
         ("engagement.message_sent", Some("engagement")),
         ("quality.review_decision_recorded", Some("quality")),
         ("risk.runner_interrupted", Some("risk")),
+        ("session_created", None),
+        ("agent_added", None),
         ("agent_run_complete", None),
     ] {
         assert_eq!(event_group_for_event_name(event_name), expected);
@@ -70,6 +72,17 @@ fn posthog_event_group_mapping_is_complete_and_message_sent_is_engagement() {
         attachment_count: 0,
     };
     assert_eq!(message.event_group(), Some("engagement"));
+
+    assert_eq!(
+        AnalyticsEventPayload::SessionCreated.event_name(),
+        "session_created"
+    );
+    let agent_added = AnalyticsEventPayload::AgentAdded {
+        runner_type: None,
+        has_workspace: false,
+    };
+    assert_eq!(agent_added.event_name(), "agent_added");
+    assert_eq!(agent_added.event_group(), None);
 }
 
 #[test]

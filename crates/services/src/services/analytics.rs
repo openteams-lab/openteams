@@ -591,7 +591,7 @@ mod tests {
         let session_id = uuid::Uuid::nil();
         let event = AnalyticsEventRecord {
             id: uuid::Uuid::nil(),
-            event_type: "workflow.session_created".to_string(),
+            event_type: "session_created".to_string(),
             session_id: Some(session_id),
             run_id: None,
             workflow_execution_id: None,
@@ -605,7 +605,7 @@ mod tests {
         let properties = analytics_posthog_properties_for_record(&event, "/chat/sessions");
 
         assert_eq!(properties["succeeded"], json!(true));
-        assert_eq!(properties["event_group"], json!("process_funnel"));
+        assert!(properties.get("event_group").is_none());
         assert_eq!(properties["$insert_id"], json!(event.id.to_string()));
         assert_eq!(properties["session_id"], json!(session_id.to_string()));
         assert_eq!(properties["ingest_path"], json!("/chat/sessions"));
