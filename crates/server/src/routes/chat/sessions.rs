@@ -15,7 +15,6 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use db::models::{
-    analytics::AnalyticsSessionStats,
     chat_agent::ChatAgent,
     chat_run::ChatRun,
     chat_session::{
@@ -33,10 +32,10 @@ use regex::Regex;
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use services::services::{
-    analytics_events::{AnalyticsProjector, DomainEvent},
+    analytics_events::{AnalyticsEvent, AnalyticsEventPayload, AnalyticsProjector},
     chat::create_session_with_project_members,
     session_worktree::SessionWorktreeService,
-    workflow::workflow_analytics::{self, hash_user_id},
+    workflow::workflow_analytics,
 };
 use sqlx::FromRow;
 use ts_rs::TS;
@@ -77,18 +76,14 @@ pub async fn create_session(
     let session =
         create_session_with_project_members(&deployment.db().pool, &payload, Uuid::new_v4())
             .await?;
-    let user_id_hash = hash_user_id(deployment.user_id());
     workflow_analytics::track_session_created(
         workflow_analytics::analytics_if_enabled(
             deployment.analytics().as_ref(),
             deployment.analytics_enabled(),
         ),
         session.id,
-        Some(&user_id_hash),
+        Some(deployment.user_id()),
     );
-
-    // Initialize session stats
-    let _ = AnalyticsSessionStats::upsert(&deployment.db().pool, session.id, None).await;
 
     Ok(ResponseJson(ApiResponse::success(session)))
 }
@@ -127,13 +122,12 @@ pub async fn delete_session(
     Extension(session): Extension<ChatSession>,
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<()>>, ApiError> {
-    // Check if session had messages before deletion
-    let had_messages = AnalyticsSessionStats::find_by_id(&deployment.db().pool, session.id)
-        .await
-        .ok()
-        .flatten()
-        .map(|stats| stats.message_count > 0)
-        .unwrap_or(false);
+    let had_messages = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM chat_messages WHERE session_id = ? LIMIT 1)",
+    )
+    .bind(session.id)
+    .fetch_one(&deployment.db().pool)
+    .await?;
 
     SessionWorktreeService::new(deployment.db().pool.clone())
         .force_cleanup_for_session_deletion(session.id)
@@ -154,11 +148,10 @@ pub async fn delete_session(
         deployment.analytics_enabled(),
     );
     analytics_projector
-        .project_or_warn(DomainEvent::SessionDeleted {
-            session_id: session.id,
-            actor_user_id: deployment.user_id().to_string(),
-            had_messages,
-        })
+        .record_or_warn(
+            AnalyticsEvent::new(AnalyticsEventPayload::SessionDeleted { had_messages })
+                .with_session(session.id),
+        )
         .await;
 
     Ok(ResponseJson(ApiResponse::success(())))
@@ -1656,19 +1649,7 @@ pub async fn get_session_workspace_changes(
 ) -> Result<ResponseJson<ApiResponse<WorkspaceChangesResponse>>, ApiError> {
     let workspace_path = query.path.trim();
     let include_diff = query.include_diff.unwrap_or(true);
-    let user_id_hash = hash_user_id(deployment.user_id());
     if workspace_path.is_empty() {
-        workflow_analytics::track_api_failure(
-            workflow_analytics::analytics_if_enabled(
-                deployment.analytics().as_ref(),
-                deployment.analytics_enabled(),
-            ),
-            Some(session.id),
-            Some(&user_id_hash),
-            "chat.sessions.workspace_changes",
-            400,
-            "workspace_path_required",
-        );
         return Err(ApiError::BadRequest(
             "Workspace path is required.".to_string(),
         ));
@@ -1686,17 +1667,6 @@ pub async fn get_session_workspace_changes(
                 deployment.analytics_enabled(),
             ),
             session.id,
-            "workspace_path_not_in_session",
-        );
-        workflow_analytics::track_api_failure(
-            workflow_analytics::analytics_if_enabled(
-                deployment.analytics().as_ref(),
-                deployment.analytics_enabled(),
-            ),
-            Some(session.id),
-            Some(&user_id_hash),
-            "chat.sessions.workspace_changes",
-            400,
             "workspace_path_not_in_session",
         );
         return Err(ApiError::BadRequest(
@@ -1746,20 +1716,7 @@ pub async fn get_session_workspace_changes(
         )
     })
     .await
-    .map_err(|err| {
-        workflow_analytics::track_api_failure(
-            workflow_analytics::analytics_if_enabled(
-                deployment.analytics().as_ref(),
-                deployment.analytics_enabled(),
-            ),
-            Some(session.id),
-            Some(&user_id_hash),
-            "chat.sessions.workspace_changes",
-            400,
-            "workspace_changes_task_failed",
-        );
-        ApiError::BadRequest(format!("Failed to inspect workspace changes: {err}"))
-    })?;
+    .map_err(|err| ApiError::BadRequest(format!("Failed to inspect workspace changes: {err}")))?;
 
     let (modified_count, added_count, deleted_count, untracked_count) = response
         .changes
@@ -1785,27 +1742,6 @@ pub async fn get_session_workspace_changes(
         untracked_count,
         error = ?response.error,
         "[chat_sessions] Returning session workspace changes"
-    );
-
-    let diff_file_count = response
-        .changes
-        .as_ref()
-        .map(|changes| {
-            changes.modified.len()
-                + changes.added.len()
-                + changes.deleted.len()
-                + changes.untracked.len()
-        })
-        .unwrap_or(0);
-    workflow_analytics::track_diff_viewed(
-        workflow_analytics::analytics_if_enabled(
-            deployment.analytics().as_ref(),
-            deployment.analytics_enabled(),
-        ),
-        session.id,
-        Some(&user_id_hash),
-        None,
-        diff_file_count,
     );
 
     Ok(ResponseJson(ApiResponse::success(response)))
@@ -1911,7 +1847,7 @@ pub async fn create_session_agent(
             deployment.analytics_enabled(),
         ),
         session.id,
-        Some(&user_id_hash),
+        Some(deployment.user_id()),
         Some(&agent.runner_type),
         created.workspace_path.is_some(),
     );
@@ -2076,12 +2012,6 @@ pub async fn archive_session(
         return Ok(ResponseJson(ApiResponse::success(session)));
     }
 
-    // Get session stats for analytics
-    let session_stats = AnalyticsSessionStats::find_by_id(&deployment.db().pool, session.id)
-        .await
-        .ok()
-        .flatten();
-
     let archive_dir = asset_dir()
         .join("chat")
         .join(format!("session_{}", session.id))
@@ -2111,18 +2041,15 @@ pub async fn archive_session(
     )
     .await?;
 
-    if session_stats.is_some() {
-        let user_id_hash = hash_user_id(deployment.user_id());
-        workflow_analytics::track_session_archived(
-            workflow_analytics::analytics_if_enabled(
-                deployment.analytics().as_ref(),
-                deployment.analytics_enabled(),
-            ),
-            session.id,
-            Some(&user_id_hash),
-            false,
-        );
-    }
+    workflow_analytics::track_session_archived(
+        workflow_analytics::analytics_if_enabled(
+            deployment.analytics().as_ref(),
+            deployment.analytics_enabled(),
+        ),
+        session.id,
+        Some(deployment.user_id()),
+        false,
+    );
 
     Ok(ResponseJson(ApiResponse::success(updated)))
 }
@@ -2153,14 +2080,13 @@ pub async fn restore_session(
     )
     .await?;
 
-    let user_id_hash = hash_user_id(deployment.user_id());
     workflow_analytics::track_session_archived(
         workflow_analytics::analytics_if_enabled(
             deployment.analytics().as_ref(),
             deployment.analytics_enabled(),
         ),
         session.id,
-        Some(&user_id_hash),
+        Some(deployment.user_id()),
         true,
     );
 
@@ -2200,14 +2126,6 @@ pub async fn stream_session_ws(
 
     Ok(ws.on_upgrade(move |socket| async move {
         if let Err(err) = handle_chat_stream_ws(socket, rx).await {
-            workflow_analytics::track_websocket_disconnected(
-                workflow_analytics::analytics_if_enabled(
-                    deployment.analytics().as_ref(),
-                    deployment.analytics_enabled(),
-                ),
-                session.id,
-                "chat_stream_closed",
-            );
             tracing::warn!("chat stream ws closed: {}", err);
         }
     }))

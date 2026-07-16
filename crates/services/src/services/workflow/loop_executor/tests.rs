@@ -101,18 +101,18 @@ mod tests {
         let plan_id = execution.plan_id.to_string();
         let task_id = step_id.to_string();
 
-        let (event, ctx, meta) = loop_lead_review_rejected_analytics_parts(&execution, step_id);
+        let event = loop_lead_review_rejected_analytics_parts(&execution, step_id);
 
-        assert_eq!(event.event_name(), "quality.review_decision_recorded");
-        assert_eq!(ctx.session_id.as_deref(), Some(session_id.as_str()));
-        assert_eq!(ctx.workflow_id.as_deref(), Some(execution_id.as_str()));
-        assert_eq!(ctx.plan_id.as_deref(), Some(plan_id.as_str()));
-        assert_eq!(ctx.task_id.as_deref(), Some(task_id.as_str()));
-        assert_eq!(ctx.status.as_deref(), Some("review_node_rejected"));
-        assert_eq!(meta["review_verdict"], serde_json::json!("rejected"));
-        assert_eq!(meta["reviewer_type"], serde_json::json!("lead"));
+        assert_eq!(event.payload.event_name(), "quality.review_decision_recorded");
+        assert_eq!(event.context.session_id.map(|id| id.to_string()).as_deref(), Some(session_id.as_str()));
+        assert_eq!(event.context.workflow_execution_id.map(|id| id.to_string()).as_deref(), Some(execution_id.as_str()));
+        assert_eq!(event.context.plan_id.map(|id| id.to_string()).as_deref(), Some(plan_id.as_str()));
+        assert_eq!(event.context.step_id.map(|id| id.to_string()).as_deref(), Some(task_id.as_str()));
+        let properties = event.payload.properties();
+        assert_eq!(properties["review_verdict"], serde_json::json!("rejected"));
+        assert_eq!(properties["reviewer_type"], serde_json::json!("lead"));
         assert_eq!(
-            meta["resolution"],
+            properties["resolution"],
             serde_json::json!("review_node_rejected")
         );
     }

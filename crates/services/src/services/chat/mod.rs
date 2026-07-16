@@ -37,10 +37,7 @@ use ts_rs::TS;
 use utils::{assets::config_path, log_msg::LogMsg, msg_store::MsgStore, utf8::Utf8LossyDecoder};
 use uuid::Uuid;
 
-use super::{
-    analytics::AnalyticsService,
-    workflow_analytics::{self, hash_user_id},
-};
+use super::{analytics::AnalyticsService, workflow_analytics};
 
 include!("dependencies.rs");
 include!("types.rs");

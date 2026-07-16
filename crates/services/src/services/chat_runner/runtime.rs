@@ -5,7 +5,7 @@ use tokio::{
 
 use crate::services::project::source_control::{SourceControlObservedPath, SourceControlService};
 
-use super::{super::workflow_analytics, startup_timing, *};
+use super::{startup_timing, *};
 
 pub(super) struct ExitWatcherArgs {
     pub(super) child: command_group::AsyncGroupChild,
@@ -1702,18 +1702,6 @@ impl ChatRunner {
                             observed_artifact_count,
                             "[chat_runner] Collected workspace observed paths for agent run"
                         );
-                        let diff_file_count = diff_info
-                            .as_ref()
-                            .map(|info| info.observed_paths.len())
-                            .unwrap_or(0)
-                            + untracked_files.len();
-                        if diff_file_count > 0 {
-                            workflow_analytics::track_diff_generated(
-                                runner.analytics_service(),
-                                session_id,
-                                diff_file_count,
-                            );
-                        }
                         let completion_status =
                             RunCompletionStatus::from_atomic(&completion_status);
                         let should_clear_agent_session = matches!(
@@ -2258,41 +2246,38 @@ impl ChatRunner {
 
                         runner
                             .analytics_projector()
-                            .project_or_warn(DomainEvent::AgentRunCompleted {
-                                session_id,
-                                agent_id,
-                                run_id,
-                                duration_ms,
-                                success: matches!(
-                                    completion_status,
-                                    RunCompletionStatus::Succeeded
-                                ),
-                            })
+                            .record_or_warn(
+                                AnalyticsEvent::new(AnalyticsEventPayload::AgentRunCompleted {
+                                    agent_id: Some(agent_id),
+                                    run_kind: "chat".to_string(),
+                                    outcome: match completion_status {
+                                        RunCompletionStatus::Succeeded => "succeeded",
+                                        RunCompletionStatus::Failed => "failed",
+                                        RunCompletionStatus::Stopped => "stopped",
+                                    }
+                                    .to_string(),
+                                    duration_bucket: duration_bucket(duration_ms).to_string(),
+                                })
+                                    .with_session(session_id)
+                                    .with_run(run_id),
+                            )
                             .await;
 
                         if matches!(completion_status, RunCompletionStatus::Failed) {
                             runner
                                 .analytics_projector()
-                                .project_or_warn(DomainEvent::AgentRunErrored {
-                                    session_id,
-                                    agent_id,
-                                    run_id,
-                                    error_type: Self::normalized_entry_error_name(
-                                        error_type.as_ref(),
-                                    ),
-                                    error_code: Self::normalized_entry_error_name(
-                                        error_type.as_ref(),
-                                    ),
-                                })
+                                .record_or_warn(
+                                    AnalyticsEvent::new(AnalyticsEventPayload::AgentError {
+                                        run_kind: Some("chat".to_string()),
+                                        phase: Some("exit".to_string()),
+                                        error_code: Self::normalized_entry_error_name(error_type.as_ref()),
+                                        agent_id: Some(agent_id),
+                                        agent_role: None,
+                                    })
+                                        .with_session(session_id)
+                                        .with_run(run_id),
+                                )
                                 .await;
-                            workflow_analytics::track_agent_error(
-                                runner.analytics_service(),
-                                session_id,
-                                None,
-                                None,
-                                &Self::normalized_entry_error_name(error_type.as_ref()),
-                                None,
-                            );
                             let failure_detail = visible_error_content
                                 .or_else(|| (!error_content.is_empty()).then_some(error_content.as_str()))
                                 .unwrap_or("Agent run failed.");
@@ -2364,19 +2349,6 @@ impl ChatRunner {
                             run_id: Some(run_id),
                             started_at: None,
                         });
-
-                        workflow_analytics::track_agent_state_changed(
-                            runner.analytics_service(),
-                            session_id,
-                            None,
-                            match final_state {
-                                ChatSessionAgentState::Idle => "idle",
-                                ChatSessionAgentState::Running => "running",
-                                ChatSessionAgentState::WaitingApproval => "waiting_approval",
-                                ChatSessionAgentState::Dead => "dead",
-                                ChatSessionAgentState::Stopping => "stopping",
-                            },
-                        );
 
                         if track_source_message && protocol_retry_request.is_none() {
                             // Emit MentionAcknowledged completed/failed event

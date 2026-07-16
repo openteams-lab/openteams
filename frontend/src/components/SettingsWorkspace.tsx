@@ -23,6 +23,7 @@ import {
   Monitor,
   Moon,
   Route,
+  ShieldCheck,
   SlidersHorizontal,
   Sun,
   Trash2,
@@ -58,6 +59,10 @@ type NotificationConfigField =
   | 'sound_enabled'
   | 'sound_file'
   | 'inbox_sources';
+
+type PrivacySettingField =
+  | 'analytics_enabled'
+  | 'error_reporting_enabled';
 
 const trimTrailingPathSeparators = (path: string): string =>
   path.replace(/[\\/]+$/, '');
@@ -298,6 +303,7 @@ export const SettingsWorkspace: React.FC = () => {
     setChatMessageFontSize,
     configAsync,
     refreshConfig,
+    saveConfigPatch,
     archivedSessionsAsync,
     refreshArchivedSessions,
     restoreSession,
@@ -313,6 +319,10 @@ export const SettingsWorkspace: React.FC = () => {
   const [notificationSavingField, setNotificationSavingField] =
     useState<NotificationConfigField | null>(null);
   const [notificationSettingsMessage, setNotificationSettingsMessage] =
+    useState<string | null>(null);
+  const [privacySavingField, setPrivacySavingField] =
+    useState<PrivacySettingField | null>(null);
+  const [privacySettingsMessage, setPrivacySettingsMessage] =
     useState<string | null>(null);
   const [restoringArchivedSessionId, setRestoringArchivedSessionId] =
     useState<string | null>(null);
@@ -357,6 +367,11 @@ export const SettingsWorkspace: React.FC = () => {
   );
   const notificationSettingsDisabled =
     !configAsync.data || Boolean(notificationSavingField);
+  const analyticsEnabled = configAsync.data?.analytics_enabled ?? true;
+  const errorReportingEnabled =
+    configAsync.data?.error_reporting_enabled ?? true;
+  const privacySettingsDisabled =
+    !configAsync.data || Boolean(privacySavingField);
 
   useEffect(() => {
     let cancelled = false;
@@ -505,6 +520,39 @@ export const SettingsWorkspace: React.FC = () => {
       );
     } finally {
       setNotificationSavingField(null);
+    }
+  };
+
+  const persistPrivacySetting = async (
+    field: PrivacySettingField,
+    enabled: boolean,
+  ) => {
+    if (!configAsync.data || privacySavingField) return;
+
+    setPrivacySavingField(field);
+    setPrivacySettingsMessage(null);
+    try {
+      await saveConfigPatch({ [field]: enabled });
+      if (field === 'error_reporting_enabled') {
+        setPrivacySettingsMessage(
+          translate(
+            'settings.privacy.errorReporting.restartNotice',
+            'Restart OpenTeams for the error reporting change to take effect.',
+          ),
+        );
+      }
+    } catch (error) {
+      setPrivacySettingsMessage(
+        sessionErrorMessage(
+          error,
+          translate(
+            'settings.privacy.saveFailed',
+            'Failed to save privacy settings.',
+          ),
+        ),
+      );
+    } finally {
+      setPrivacySavingField(null);
     }
   };
 
@@ -1173,6 +1221,79 @@ export const SettingsWorkspace: React.FC = () => {
         );
       }
 
+      case 'privacy':
+        return (
+          <div className="settings-content-panel space-y-8 text-sm">
+            <div>
+              <h3 className="text-sm font-semibold tracking-tight text-[var(--ink)]">
+                {t('settings.privacy.title')}
+              </h3>
+              <p className="mt-1 text-sm leading-relaxed text-[var(--ink-subtle)]">
+                {t('settings.privacy.desc')}
+              </p>
+            </div>
+
+            {privacySettingsMessage && (
+              <p
+                className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] px-3 py-2 text-sm text-[var(--ink-subtle)]"
+                role="status"
+              >
+                {privacySettingsMessage}
+              </p>
+            )}
+
+            <section className="space-y-2.5">
+              <h4 className="settings-section-header">
+                {t('settings.privacy.group.dataSharing')}
+              </h4>
+              <div className="settings-list-group overflow-hidden rounded-lg border">
+                <NotificationSettingRow
+                  title={t('settings.privacy.analytics.title')}
+                  description={t('settings.privacy.analytics.desc')}
+                  checked={analyticsEnabled}
+                  disabled={privacySettingsDisabled}
+                  onToggle={() =>
+                    void persistPrivacySetting(
+                      'analytics_enabled',
+                      !analyticsEnabled,
+                    )
+                  }
+                />
+                <NotificationSettingRow
+                  title={t('settings.privacy.errorReporting.title')}
+                  description={t('settings.privacy.errorReporting.desc')}
+                  checked={errorReportingEnabled}
+                  disabled={privacySettingsDisabled}
+                  divided={false}
+                  onToggle={() =>
+                    void persistPrivacySetting(
+                      'error_reporting_enabled',
+                      !errorReportingEnabled,
+                    )
+                  }
+                />
+              </div>
+            </section>
+
+            <section className="space-y-2.5">
+              <h4 className="settings-section-header">
+                {t('settings.privacy.group.collectedData')}
+              </h4>
+              <div className="rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] px-4 py-3.5">
+                <p className="settings-row-description leading-relaxed">
+                  {t('settings.privacy.collectedData')}
+                </p>
+                <p className="settings-row-description mt-2 leading-relaxed">
+                  {t('settings.privacy.excludedData')}
+                </p>
+                <p className="settings-row-description mt-2 leading-relaxed">
+                  {t('settings.privacy.backendOnly')}
+                </p>
+              </div>
+            </section>
+          </div>
+        );
+
       case 'archived-sessions':
         return (
           <div className="settings-content-panel space-y-4">
@@ -1315,6 +1436,7 @@ export const SettingsWorkspace: React.FC = () => {
       github: <Github {...iconProps} />,
       key: <Key {...iconProps} />,
       sliders: <SlidersHorizontal {...iconProps} />,
+      shield: <ShieldCheck {...iconProps} />,
       keyboard: <Keyboard {...iconProps} />,
       flask: <FlaskConical {...iconProps} />,
     };

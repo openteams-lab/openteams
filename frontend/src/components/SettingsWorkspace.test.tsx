@@ -72,6 +72,23 @@ const requiredNotificationLocaleKeys = [
   'settings.notifications.systemPermission.unsupported',
 ];
 
+const requiredPrivacyLocaleKeys = [
+  'settings.menu.item.privacy',
+  'settings.privacy.title',
+  'settings.privacy.desc',
+  'settings.privacy.group.dataSharing',
+  'settings.privacy.group.collectedData',
+  'settings.privacy.analytics.title',
+  'settings.privacy.analytics.desc',
+  'settings.privacy.errorReporting.title',
+  'settings.privacy.errorReporting.desc',
+  'settings.privacy.errorReporting.restartNotice',
+  'settings.privacy.collectedData',
+  'settings.privacy.excludedData',
+  'settings.privacy.backendOnly',
+  'settings.privacy.saveFailed',
+];
+
 const disallowedNotificationLocaleSnippets = [
   'NotificationService',
   'notifications.push_enabled',
@@ -229,6 +246,13 @@ for (const locale of ['en', 'zh', 'ja', 'ko', 'fr', 'es']) {
   check(
     `locale ${locale} contains persisted notification settings keys`,
     requiredNotificationLocaleKeys.every((key) =>
+      localeSource.includes(`"${key}"`),
+    ),
+    localeSource,
+  );
+  check(
+    `locale ${locale} contains privacy and diagnostics settings keys`,
+    requiredPrivacyLocaleKeys.every((key) =>
       localeSource.includes(`"${key}"`),
     ),
     localeSource,

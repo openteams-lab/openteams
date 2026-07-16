@@ -23,13 +23,9 @@ fn loop_lead_review_rejected_event(
 fn loop_lead_review_rejected_analytics_parts(
     execution: &WorkflowExecution,
     step_id: Uuid,
-) -> (
-    workflow_analytics::WorkflowAnalyticsEvent,
-    workflow_analytics::WorkflowEventContext,
-    serde_json::Map<String, serde_json::Value>,
-) {
+) -> crate::services::analytics_events::AnalyticsEvent {
     let rejected_event = loop_lead_review_rejected_event(execution, step_id);
-    workflow_analytics::review_node_rejected_event_parts(
+    workflow_analytics::review_node_rejected_event(
         rejected_event.session_id,
         rejected_event.execution_id,
         rejected_event.plan_id,

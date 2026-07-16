@@ -30,7 +30,7 @@ use services::services::{
         ProjectDetail,
         member::{ProjectMemberService, ProjectMemberUpdateInput},
     },
-    workflow::workflow_analytics::{self, hash_user_id},
+    workflow::workflow_analytics,
 };
 use ts_rs::TS;
 use utils::response::ApiResponse;
@@ -563,22 +563,14 @@ pub async fn create_project_session(
     )
     .await?;
 
-    let user_id_hash = hash_user_id(deployment.user_id());
     workflow_analytics::track_session_created(
         workflow_analytics::analytics_if_enabled(
             deployment.analytics().as_ref(),
             deployment.analytics_enabled(),
         ),
         session.id,
-        Some(&user_id_hash),
+        Some(deployment.user_id()),
     );
-
-    let _ = db::models::analytics::AnalyticsSessionStats::upsert(
-        &deployment.db().pool,
-        session.id,
-        None,
-    )
-    .await;
 
     Ok(ResponseJson(ApiResponse::success(session)))
 }

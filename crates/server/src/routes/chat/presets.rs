@@ -14,7 +14,7 @@ use executors::{
 };
 use serde::{Deserialize, Serialize};
 use services::services::{
-    analytics_events::{AnalyticsProjector, DomainEvent},
+    analytics_events::{AnalyticsEvent, AnalyticsEventPayload, AnalyticsProjector},
     config::{
         ChatMemberPreset, ChatPresetsConfig, ChatTeamPreset, ChatTeamTemplateTier,
         ChatWorkflowStep, Config, TeamTemplateCatalogService,
@@ -297,14 +297,14 @@ pub async fn create_preset_snapshot(
         deployment.analytics_enabled(),
     );
     analytics_projector
-        .project_or_warn(DomainEvent::PresetSnapshotCreated {
-            session_id: session.id,
-            actor_user_id: deployment.user_id().to_string(),
-            team_preset_id: response.team.id.clone(),
-            member_count: response.team.members.len(),
-            overwritten: response.overwritten,
-            overwrite_strategy: requested_overwrite_strategy.as_str().to_string(),
-        })
+        .record_or_warn(
+            AnalyticsEvent::new(AnalyticsEventPayload::PresetSnapshotCreated {
+                member_count: response.team.members.len().min(u32::MAX as usize) as u32,
+                overwritten: response.overwritten,
+                overwrite_strategy: requested_overwrite_strategy.as_str().to_string(),
+            })
+            .with_session(session.id),
+        )
         .await;
 
     Ok(ResponseJson(ApiResponse::success(response)))

@@ -57,25 +57,6 @@ pub fn init_once(source: SentrySource) {
     });
 }
 
-pub fn configure_user_scope(user_id: &str, username: Option<&str>, email: Option<&str>) {
-    let mut sentry_user = sentry::User {
-        id: Some(user_id.to_string()),
-        ..Default::default()
-    };
-
-    if let Some(username) = username {
-        sentry_user.username = Some(username.to_string());
-    }
-
-    if let Some(email) = email {
-        sentry_user.email = Some(email.to_string());
-    }
-
-    sentry::configure_scope(|scope| {
-        scope.set_user(Some(sentry_user));
-    });
-}
-
 pub fn sentry_layer<S>() -> SentryLayer<S>
 where
     S: tracing::Subscriber,

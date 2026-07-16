@@ -62,6 +62,8 @@ use super::{
     config::UiLanguage,
 };
 use crate::services::{
+    analytics::AnalyticsService,
+    analytics_events::{AnalyticsEvent, AnalyticsEventPayload, duration_bucket},
     member_execution::{
         build_effective_member_executor, refresh_session_agent_execution_config_before_run,
     },

@@ -9,7 +9,9 @@ use deployment::Deployment;
 use executors::executors::BaseCodingAgent;
 use serde::Deserialize;
 use services::services::{
-    analytics_events::{AnalyticsProjector, DomainEvent, SkillInstallSource},
+    analytics_events::{
+        AnalyticsEvent, AnalyticsEventPayload, AnalyticsProjector, SkillInstallSource,
+    },
     native_skills::{
         InstalledNativeSkill, NativeSkillError, list_native_skills_for_runner,
         update_native_skill_enabled_for_runner,
@@ -176,11 +178,10 @@ pub async fn assign_skill_to_agent(
         deployment.analytics_enabled(),
     );
     analytics_projector
-        .project_or_warn(DomainEvent::SkillAssigned {
-            actor_user_id: deployment.user_id().to_string(),
+        .record_or_warn(AnalyticsEvent::new(AnalyticsEventPayload::SkillAssigned {
             skill_id: payload.skill_id,
             agent_id: payload.agent_id,
-        })
+        }))
         .await;
 
     Ok(ResponseJson(ApiResponse::success(assignment)))
@@ -192,6 +193,9 @@ pub async fn update_agent_skill(
     axum::extract::Path((_agent_id, assignment_id)): axum::extract::Path<(Uuid, Uuid)>,
     Json(payload): Json<UpdateAgentSkill>,
 ) -> Result<ResponseJson<ApiResponse<ChatAgentSkill>>, ApiError> {
+    let previous = ChatAgentSkill::find_by_id(&deployment.db().pool, assignment_id)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)?;
     let assignment = ChatAgentSkill::update(&deployment.db().pool, assignment_id, &payload).await?;
 
     let analytics_projector = AnalyticsProjector::new(
@@ -199,22 +203,23 @@ pub async fn update_agent_skill(
         deployment.analytics().as_ref(),
         deployment.analytics_enabled(),
     );
-    if let Some(enabled) = payload.enabled {
+    if let Some(enabled) = payload
+        .enabled
+        .filter(|enabled| *enabled != previous.enabled)
+    {
         if enabled {
             analytics_projector
-                .project_or_warn(DomainEvent::SkillEnabled {
-                    actor_user_id: deployment.user_id().to_string(),
+                .record_or_warn(AnalyticsEvent::new(AnalyticsEventPayload::SkillEnabled {
                     skill_id: assignment.skill_id,
                     agent_id: assignment.agent_id,
-                })
+                }))
                 .await;
         } else {
             analytics_projector
-                .project_or_warn(DomainEvent::SkillDisabled {
-                    actor_user_id: deployment.user_id().to_string(),
+                .record_or_warn(AnalyticsEvent::new(AnalyticsEventPayload::SkillDisabled {
                     skill_id: assignment.skill_id,
                     agent_id: assignment.agent_id,
-                })
+                }))
                 .await;
         }
     }
@@ -303,12 +308,10 @@ pub async fn install_registry_skill(
         deployment.analytics_enabled(),
     );
     analytics_projector
-        .project_or_warn(DomainEvent::SkillInstalled {
-            actor_user_id: deployment.user_id().to_string(),
+        .record_or_warn(AnalyticsEvent::new(AnalyticsEventPayload::SkillInstalled {
             skill_id: installed.id,
-            skill_name: installed.name.clone(),
-            source: SkillInstallSource::Registry,
-        })
+            source: SkillInstallSource::Registry.as_str().to_string(),
+        }))
         .await;
 
     Ok(ResponseJson(ApiResponse::success(installed)))
@@ -397,12 +400,10 @@ pub async fn install_builtin_skill_api(
         deployment.analytics_enabled(),
     );
     analytics_projector
-        .project_or_warn(DomainEvent::SkillInstalled {
-            actor_user_id: deployment.user_id().to_string(),
+        .record_or_warn(AnalyticsEvent::new(AnalyticsEventPayload::SkillInstalled {
             skill_id: installed.id,
-            skill_name: installed.name.clone(),
-            source: SkillInstallSource::Builtin,
-        })
+            source: SkillInstallSource::Builtin.as_str().to_string(),
+        }))
         .await;
 
     Ok(ResponseJson(ApiResponse::success(installed)))

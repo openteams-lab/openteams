@@ -1731,6 +1731,7 @@ export interface Config {
     | 'px18';
   keyboard_shortcuts: KeyboardShortcutsConfig;
   analytics_enabled: boolean;
+  error_reporting_enabled: boolean;
   workspace_dir: string | null;
   worktree_sessions_dir: string | null;
   // The remaining backend fields are preserved verbatim for round-trip safety.

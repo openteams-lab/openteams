@@ -1627,13 +1627,6 @@ impl ChatRunner {
                 .map(|id| format!("client_message_id={id}")),
         );
 
-        workflow_analytics::track_agent_state_changed(
-            self.analytics_service(),
-            session_id,
-            None,
-            "running",
-        );
-
         if track_source_message {
             // Emit MentionAcknowledged running event
             self.emit(
@@ -2001,12 +1994,17 @@ impl ChatRunner {
             startup_timing.mark(startup_timing::StartupMilestoneName::RawLogSpoolReady, None);
 
             self.analytics_projector()
-                .project_or_warn(DomainEvent::AgentRunStarted {
-                    session_id,
-                    agent_id,
-                    run_id,
-                    executor_profile: Some(effective_execution.analytics_profile_label()),
-                })
+                .record_or_warn(
+                    AnalyticsEvent::new(AnalyticsEventPayload::AgentRunStarted {
+                        agent_id,
+                        run_kind: "chat".to_string(),
+                        executor_profile: Some(
+                            effective_execution.analytics_profile_label().to_string(),
+                        ),
+                    })
+                        .with_session(session_id)
+                        .with_run(run_id),
+                )
                 .await;
 
             let log_forwarders = self.spawn_log_forwarders(
@@ -2109,22 +2107,18 @@ impl ChatRunner {
             .await;
             if let Err(err) = &result {
                 self.analytics_projector()
-                    .project_or_warn(DomainEvent::AgentRunErrored {
-                        session_id,
-                        agent_id,
-                        run_id,
-                        error_type: "startup_failure".to_string(),
-                        error_code: "agent_startup_failed".to_string(),
-                    })
+                    .record_or_warn(
+                        AnalyticsEvent::new(AnalyticsEventPayload::AgentError {
+                            run_kind: Some("chat".to_string()),
+                            phase: Some("setup".to_string()),
+                            error_code: "agent_startup_failed".to_string(),
+                            agent_id: Some(agent_id),
+                            agent_role: None,
+                        })
+                            .with_session(session_id)
+                            .with_run(run_id),
+                    )
                     .await;
-                workflow_analytics::track_agent_error(
-                    self.analytics_service(),
-                    session_id,
-                    None,
-                    None,
-                    "agent_startup_failed",
-                    None,
-                );
                 let failure_detail = format!("Failed to start agent run: {err}");
                 InboxService::new()
                     .notify_chat_agent_failed(
@@ -2162,12 +2156,6 @@ impl ChatRunner {
                     run_id: Some(run_id),
                     started_at: None,
                 },
-            );
-            workflow_analytics::track_agent_state_changed(
-                self.analytics_service(),
-                session_id,
-                None,
-                "dead",
             );
         }
 
