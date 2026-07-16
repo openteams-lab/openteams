@@ -691,6 +691,7 @@ impl AppServerClient {
         raw: &str,
         notification: JSONRPCNotification,
     ) -> Result<bool, ExecutorError> {
+        let registered_thread_id = self.thread_id.lock().await.clone();
         let parsed_notification = ServerNotification::try_from(notification.clone())
             .ok()
             .or_else(|| serde_json::from_str::<ServerNotification>(raw).ok());
@@ -701,7 +702,7 @@ impl AppServerClient {
         let raw = Cow::Borrowed(raw);
         self.log_writer.log_raw(&raw).await?;
 
-        if is_raw_turn_started_notification(&notification) {
+        if is_raw_turn_started_notification(&notification, registered_thread_id.as_deref()) {
             self.turn_started.store(true, Ordering::SeqCst);
             tracing::debug!(
                 method = %notification.method,
@@ -711,12 +712,20 @@ impl AppServerClient {
 
         if let Some(server_notification) = parsed_notification {
             if let ServerNotification::TurnStarted(started) = &server_notification {
-                self.turn_started.store(true, Ordering::SeqCst);
-                tracing::debug!(
-                    thread_id = %started.thread_id,
-                    turn_id = %started.turn.id,
-                    "[codex-client] turn started"
-                );
+                if thread_matches_registered(registered_thread_id.as_deref(), &started.thread_id) {
+                    self.turn_started.store(true, Ordering::SeqCst);
+                    tracing::debug!(
+                        thread_id = %started.thread_id,
+                        turn_id = %started.turn.id,
+                        "[codex-client] turn started"
+                    );
+                } else {
+                    tracing::debug!(
+                        thread_id = %started.thread_id,
+                        registered_thread_id = ?registered_thread_id,
+                        "[codex-client] ignoring turn start for another thread"
+                    );
+                }
             }
 
             if let ServerNotification::TurnCompleted(TurnCompletedNotification {
@@ -724,6 +733,15 @@ impl AppServerClient {
                 turn,
             }) = server_notification
             {
+                if !thread_matches_registered(registered_thread_id.as_deref(), &thread_id) {
+                    tracing::debug!(
+                        thread_id = %thread_id,
+                        registered_thread_id = ?registered_thread_id,
+                        "[codex-client] ignoring turn completion for another thread"
+                    );
+                    return Ok(false);
+                }
+
                 let has_finished = matches!(
                     turn.status,
                     TurnStatus::Completed | TurnStatus::Interrupted | TurnStatus::Failed
@@ -772,6 +790,16 @@ impl AppServerClient {
             }
 
             if let ServerNotification::ThreadStatusChanged(status) = server_notification {
+                if !thread_matches_registered(registered_thread_id.as_deref(), &status.thread_id) {
+                    tracing::debug!(
+                        thread_id = %status.thread_id,
+                        registered_thread_id = ?registered_thread_id,
+                        status = ?status.status,
+                        "[codex-client] ignoring status change for another thread"
+                    );
+                    return Ok(false);
+                }
+
                 if matches!(status.status, codex_app_server_protocol::ThreadStatus::Idle)
                     && self.turn_started.load(Ordering::SeqCst)
                 {
@@ -796,6 +824,7 @@ impl AppServerClient {
         if is_terminal_app_server_notification(
             &notification,
             self.turn_started.load(Ordering::SeqCst),
+            registered_thread_id.as_deref(),
         ) {
             tracing::debug!(
                 method = %notification.method,
@@ -818,6 +847,21 @@ impl AppServerClient {
         let has_finished = method
             .strip_prefix("codex/event/")
             .is_some_and(|suffix| suffix == "task_complete");
+
+        if has_finished
+            && !legacy_codex_event_matches_registered_thread(
+                &notification,
+                registered_thread_id.as_deref(),
+            )
+        {
+            tracing::debug!(
+                method = %method,
+                registered_thread_id = ?registered_thread_id,
+                conversation_id = ?legacy_codex_event_thread_id(&notification),
+                "[codex-client] ignoring legacy completion for another thread"
+            );
+            return Ok(false);
+        }
 
         if has_finished
             && self.commit_reminder
@@ -845,7 +889,12 @@ impl AppServerClient {
 fn is_terminal_app_server_notification(
     notification: &JSONRPCNotification,
     turn_started: bool,
+    registered_thread_id: Option<&str>,
 ) -> bool {
+    if !raw_notification_matches_registered_thread(notification, registered_thread_id) {
+        return false;
+    }
+
     match notification.method.as_str() {
         "turn/completed" => notification
             .params
@@ -864,8 +913,50 @@ fn is_terminal_app_server_notification(
     }
 }
 
-fn is_raw_turn_started_notification(notification: &JSONRPCNotification) -> bool {
+fn is_raw_turn_started_notification(
+    notification: &JSONRPCNotification,
+    registered_thread_id: Option<&str>,
+) -> bool {
     notification.method == "turn/started"
+        && raw_notification_matches_registered_thread(notification, registered_thread_id)
+}
+
+fn raw_notification_matches_registered_thread(
+    notification: &JSONRPCNotification,
+    registered_thread_id: Option<&str>,
+) -> bool {
+    registered_thread_id.is_none_or(|registered| {
+        notification
+            .params
+            .as_ref()
+            .and_then(|params| params.get("threadId").or_else(|| params.get("thread_id")))
+            .and_then(Value::as_str)
+            == Some(registered)
+    })
+}
+
+fn thread_matches_registered(registered_thread_id: Option<&str>, thread_id: &str) -> bool {
+    registered_thread_id.is_none_or(|registered| registered == thread_id)
+}
+
+fn legacy_codex_event_matches_registered_thread(
+    notification: &JSONRPCNotification,
+    registered_thread_id: Option<&str>,
+) -> bool {
+    registered_thread_id
+        .is_none_or(|registered| legacy_codex_event_thread_id(notification) == Some(registered))
+}
+
+fn legacy_codex_event_thread_id(notification: &JSONRPCNotification) -> Option<&str> {
+    notification
+        .params
+        .as_ref()
+        .and_then(|params| {
+            params
+                .get("conversationId")
+                .or_else(|| params.get("conversation_id"))
+        })
+        .and_then(Value::as_str)
 }
 
 fn raw_status_type(status: &Value) -> Option<&str> {
@@ -1116,6 +1207,7 @@ mod tests {
     #[tokio::test]
     async fn turn_completed_finishes_stream() {
         let client = build_client();
+        client.register_session("thread-1").await.unwrap();
         let params = TurnCompletedNotification {
             thread_id: "thread-1".to_string(),
             turn: Turn {
@@ -1141,6 +1233,37 @@ mod tests {
             .unwrap();
 
         assert!(should_finish);
+    }
+
+    #[tokio::test]
+    async fn turn_completed_for_another_thread_does_not_finish_stream() {
+        let client = build_client();
+        client.register_session("thread-1").await.unwrap();
+        let params = TurnCompletedNotification {
+            thread_id: "child-thread".to_string(),
+            turn: Turn {
+                id: "child-turn".to_string(),
+                items: Vec::new(),
+                items_view: TurnItemsView::Full,
+                status: TurnStatus::Completed,
+                error: None,
+                started_at: None,
+                completed_at: None,
+                duration_ms: None,
+            },
+        };
+        let notification = JSONRPCNotification {
+            method: "turn/completed".to_string(),
+            params: Some(serde_json::to_value(params).unwrap()),
+        };
+        let raw = serde_json::to_string(&notification).unwrap();
+
+        let should_finish = client
+            .handle_notification(&raw, notification)
+            .await
+            .unwrap();
+
+        assert!(!should_finish);
     }
 
     #[tokio::test]
@@ -1197,6 +1320,7 @@ mod tests {
     #[tokio::test]
     async fn idle_thread_status_after_turn_start_finishes_stream() {
         let client = build_client();
+        client.register_session("thread-1").await.unwrap();
         let turn_started_raw = serde_json::json!({
             "method": "turn/started",
             "params": {
@@ -1240,8 +1364,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn child_thread_idle_after_main_turn_start_does_not_finish_stream() {
+        let client = build_client();
+        client.register_session("thread-1").await.unwrap();
+        let turn_started_raw = serde_json::json!({
+            "method": "turn/started",
+            "params": {
+                "threadId": "thread-1",
+                "turn": {
+                    "id": "turn-1",
+                    "items": [],
+                    "status": "inProgress",
+                    "error": null,
+                    "startedAt": 1,
+                    "completedAt": null,
+                    "durationMs": null
+                }
+            }
+        })
+        .to_string();
+        let turn_started_notification: JSONRPCNotification =
+            serde_json::from_str(&turn_started_raw).unwrap();
+        let started_should_finish = client
+            .handle_notification(&turn_started_raw, turn_started_notification)
+            .await
+            .unwrap();
+        assert!(!started_should_finish);
+
+        let child_idle_raw = serde_json::json!({
+            "method": "thread/status/changed",
+            "params": {
+                "threadId": "child-thread",
+                "status": { "type": "idle" }
+            }
+        })
+        .to_string();
+        let child_idle_notification: JSONRPCNotification =
+            serde_json::from_str(&child_idle_raw).unwrap();
+
+        let should_finish = client
+            .handle_notification(&child_idle_raw, child_idle_notification)
+            .await
+            .unwrap();
+
+        assert!(!should_finish);
+    }
+
+    #[tokio::test]
     async fn raw_turn_started_with_unknown_payload_allows_idle_to_finish_stream() {
         let client = build_client();
+        client.register_session("thread-1").await.unwrap();
         let turn_started_raw = serde_json::json!({
             "method": "turn/started",
             "params": {
@@ -1283,6 +1455,7 @@ mod tests {
     #[tokio::test]
     async fn raw_string_idle_status_after_turn_start_finishes_stream() {
         let client = build_client();
+        client.register_session("thread-1").await.unwrap();
         let turn_started_raw = serde_json::json!({
             "method": "turn/started",
             "params": {
@@ -1301,6 +1474,22 @@ mod tests {
             .await
             .unwrap();
         assert!(!started_should_finish);
+
+        let child_idle_raw = serde_json::json!({
+            "method": "thread/status/changed",
+            "params": {
+                "threadId": "child-thread",
+                "status": "idle"
+            }
+        })
+        .to_string();
+        let child_idle_notification: JSONRPCNotification =
+            serde_json::from_str(&child_idle_raw).unwrap();
+        let child_should_finish = client
+            .handle_notification(&child_idle_raw, child_idle_notification)
+            .await
+            .unwrap();
+        assert!(!child_should_finish);
 
         let raw = serde_json::json!({
             "method": "thread/status/changed",
@@ -1348,6 +1537,7 @@ mod tests {
     #[tokio::test]
     async fn task_complete_finishes_stream() {
         let client = build_client();
+        client.register_session("thread-1").await.unwrap();
         let raw = serde_json::json!({
             "method": "codex/event/task_complete",
             "params": {
@@ -1369,5 +1559,32 @@ mod tests {
             .unwrap();
 
         assert!(should_finish);
+    }
+
+    #[tokio::test]
+    async fn task_complete_for_another_thread_does_not_finish_stream() {
+        let client = build_client();
+        client.register_session("thread-1").await.unwrap();
+        let raw = serde_json::json!({
+            "method": "codex/event/task_complete",
+            "params": {
+                "id": "child-turn",
+                "msg": {
+                    "type": "task_complete",
+                    "turn_id": "child-turn",
+                    "last_agent_message": "child output"
+                },
+                "conversationId": "child-thread"
+            }
+        })
+        .to_string();
+        let notification: JSONRPCNotification = serde_json::from_str(&raw).unwrap();
+
+        let should_finish = client
+            .handle_notification(&raw, notification)
+            .await
+            .unwrap();
+
+        assert!(!should_finish);
     }
 }

@@ -1918,9 +1918,9 @@ mod tests {
 
     use super::{
         ConfigProvidersResponse, ControlEvent, ProviderInfo, build_default_headers, create_session,
-        extract_retry_status, is_retryable_openteams_cli_db_init_error, local_client_builder,
-        resolve_model_spec_from_config, resolve_session_id, run_request_with_control,
-        run_request_with_control_timeout,
+        event_matches_session, extract_retry_status, is_retryable_openteams_cli_db_init_error,
+        local_client_builder, resolve_model_spec_from_config, resolve_session_id,
+        run_request_with_control, run_request_with_control_timeout,
     };
     use crate::executors::{
         ExecutorError,
@@ -1957,6 +1957,29 @@ mod tests {
         });
 
         assert!(extract_retry_status(&payload).is_none());
+    }
+
+    #[test]
+    fn idle_events_only_match_the_active_session() {
+        let active = json!({
+            "type": "session.idle",
+            "properties": { "sessionID": "main-session" }
+        });
+        let child = json!({
+            "type": "session.idle",
+            "properties": { "sessionID": "child-session" }
+        });
+
+        assert!(event_matches_session(
+            "session.idle",
+            &active,
+            "main-session"
+        ));
+        assert!(!event_matches_session(
+            "session.idle",
+            &child,
+            "main-session"
+        ));
     }
 
     #[test]
