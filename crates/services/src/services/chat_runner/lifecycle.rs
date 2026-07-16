@@ -754,8 +754,11 @@ impl ChatRunner {
                 return;
             }
         };
-        let agent_name = match ChatAgent::find_by_id(&self.db.pool, entry.agent_id).await {
-            Ok(Some(agent)) => agent.name,
+        let agent_name = match self
+            .resolve_effective_agent_name(session_id, entry.agent_id)
+            .await
+        {
+            Ok(Some(agent_name)) => agent_name,
             other => {
                 if let Err(err) = other {
                     tracing::warn!(error = %err, "failed to load agent for queued message");
@@ -797,6 +800,22 @@ impl ChatRunner {
             )
             .await;
         }
+    }
+
+    async fn resolve_effective_agent_name(
+        &self,
+        session_id: Uuid,
+        agent_id: Uuid,
+    ) -> Result<Option<String>, ChatRunnerError> {
+        let Some(agent) = ChatAgent::find_by_id(&self.db.pool, agent_id).await? else {
+            return Ok(None);
+        };
+        let member_names =
+            chat::member_name_overrides_for_session(&self.db.pool, session_id).await?;
+        Ok(Some(chat::effective_agent_name(
+            &agent,
+            member_names.get(&agent.id).map(String::as_str),
+        )))
     }
 
     /// Mark the queue entry bound to a run as `completed` (success / normal stop).

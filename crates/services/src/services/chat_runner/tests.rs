@@ -751,6 +751,14 @@ async fn mention_resolution_uses_only_the_exact_member_name() {
         .expect("exact member exists");
     assert_eq!(resolved.1.id, lead_agent.id);
     assert_eq!(resolved.1.name, "CodexAgent");
+    assert_eq!(
+        runner
+            .resolve_effective_agent_name(session_id, lead_agent.id)
+            .await
+            .expect("resolve queued agent name")
+            .as_deref(),
+        Some("CodexAgent")
+    );
 
     assert!(
         runner
