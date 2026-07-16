@@ -13,9 +13,7 @@ use serde_json::{Value, json};
 use sqlx::SqlitePool;
 use tokio::sync::mpsc;
 
-use super::analytics_events::{
-    AnalyticsEvent, AnalyticsEventCategory, category_for_event_name, workflow_group_for_event_name,
-};
+use super::analytics_events::{AnalyticsEvent, event_group_for_event_name};
 
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -347,14 +345,6 @@ async fn run_posthog_worker(
     }
 }
 
-pub fn analytics_category_name(category: &AnalyticsEventCategory) -> &'static str {
-    match category {
-        AnalyticsEventCategory::UserAction => "user_action",
-        AnalyticsEventCategory::System => "system",
-        AnalyticsEventCategory::Conversion => "conversion",
-    }
-}
-
 pub fn analytics_posthog_properties_for_record(
     event: &AnalyticsEventRecord,
     ingest_path: &str,
@@ -368,14 +358,8 @@ pub fn analytics_posthog_properties_for_record(
         }
     };
 
-    properties.insert(
-        "event_category".to_string(),
-        json!(analytics_category_name(&category_for_event_name(
-            &event.event_type
-        ))),
-    );
-    if let Some(group) = workflow_group_for_event_name(&event.event_type) {
-        properties.insert("workflow_category".to_string(), json!(group));
+    if let Some(group) = event_group_for_event_name(&event.event_type) {
+        properties.insert("event_group".to_string(), json!(group));
     }
     properties.insert("$insert_id".to_string(), json!(event.id.to_string()));
 
@@ -418,13 +402,9 @@ fn analytics_posthog_properties_for_event(event: &AnalyticsEvent) -> Value {
         .as_object()
         .cloned()
         .unwrap_or_default();
-    if let Some(group) = event.payload.workflow_group() {
-        properties.insert("workflow_category".to_string(), json!(group));
+    if let Some(group) = event.payload.event_group() {
+        properties.insert("event_group".to_string(), json!(group));
     }
-    properties.insert(
-        "event_category".to_string(),
-        json!(analytics_category_name(&event.payload.category())),
-    );
     for (key, value) in [
         ("session_id", event.context.session_id),
         ("run_id", event.context.run_id),
@@ -625,8 +605,7 @@ mod tests {
         let properties = analytics_posthog_properties_for_record(&event, "/chat/sessions");
 
         assert_eq!(properties["succeeded"], json!(true));
-        assert_eq!(properties["event_category"], json!("user_action"));
-        assert_eq!(properties["workflow_category"], json!("process_funnel"));
+        assert_eq!(properties["event_group"], json!("process_funnel"));
         assert_eq!(properties["$insert_id"], json!(event.id.to_string()));
         assert_eq!(properties["session_id"], json!(session_id.to_string()));
         assert_eq!(properties["ingest_path"], json!("/chat/sessions"));

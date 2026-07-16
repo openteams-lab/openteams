@@ -7,13 +7,6 @@ use uuid::Uuid;
 
 use super::analytics::{AnalyticsService, forward_analytics_record_to_posthog};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AnalyticsEventCategory {
-    UserAction,
-    System,
-    Conversion,
-}
-
 /// The single business-event catalog. Variant fields are the only supported analytics payload;
 /// callers cannot attach arbitrary JSON metadata.
 #[derive(Debug, Clone, PartialEq)]
@@ -191,21 +184,8 @@ impl AnalyticsEventPayload {
         }
     }
 
-    pub fn category(&self) -> AnalyticsEventCategory {
-        match self {
-            Self::WorkflowCompleted { .. } => AnalyticsEventCategory::Conversion,
-            Self::AgentError { .. }
-            | Self::PermissionDenied { .. }
-            | Self::ApprovalTimeout { .. }
-            | Self::RunnerInterrupted { .. }
-            | Self::AgentRunStarted { .. }
-            | Self::AgentRunCompleted { .. } => AnalyticsEventCategory::System,
-            _ => AnalyticsEventCategory::UserAction,
-        }
-    }
-
-    pub fn workflow_group(&self) -> Option<&'static str> {
-        workflow_group_for_event_name(self.event_name())
+    pub fn event_group(&self) -> Option<&'static str> {
+        event_group_for_event_name(self.event_name())
     }
 
     pub fn properties(&self) -> Value {
@@ -341,17 +321,7 @@ fn compact_optional(value: Option<&str>) -> Option<String> {
     value.map(compact)
 }
 
-pub fn category_for_event_name(event_name: &str) -> AnalyticsEventCategory {
-    if event_name == "quality.workflow_completed" {
-        AnalyticsEventCategory::Conversion
-    } else if event_name.starts_with("risk.") || event_name.starts_with("agent_run_") {
-        AnalyticsEventCategory::System
-    } else {
-        AnalyticsEventCategory::UserAction
-    }
-}
-
-pub fn workflow_group_for_event_name(event_name: &str) -> Option<&'static str> {
+pub fn event_group_for_event_name(event_name: &str) -> Option<&'static str> {
     match event_name.split_once('.').map(|(prefix, _)| prefix) {
         Some("workflow") => Some("process_funnel"),
         Some("collaboration") => Some("collaboration"),
@@ -508,6 +478,27 @@ mod tests {
                 .len(),
             27
         );
+    }
+
+    #[test]
+    fn event_groups_follow_event_name_prefixes() {
+        for (event_name, expected) in [
+            ("workflow.step_started", Some("process_funnel")),
+            ("collaboration.approval_requested", Some("collaboration")),
+            ("engagement.message_sent", Some("engagement")),
+            ("quality.workflow_completed", Some("quality")),
+            ("risk.agent_error", Some("risk")),
+            ("skill_install", None),
+        ] {
+            assert_eq!(event_group_for_event_name(event_name), expected);
+        }
+
+        let message = AnalyticsEventPayload::MessageSent {
+            message_length_bucket: "short".to_string(),
+            mention_count: 0,
+            attachment_count: 0,
+        };
+        assert_eq!(message.event_group(), Some("engagement"));
     }
 
     #[test]

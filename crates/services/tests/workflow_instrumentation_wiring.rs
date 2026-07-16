@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use services::services::{analytics_events::AnalyticsEventPayload, config::Config};
+use services::services::{
+    analytics_events::{AnalyticsEventPayload, event_group_for_event_name},
+    config::Config,
+};
 
 fn repo_relative(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -49,6 +52,27 @@ fn analytics_and_sentry_avoid_undisclosed_identity_and_device_metadata() {
 }
 
 #[test]
+fn posthog_event_group_mapping_is_complete_and_message_sent_is_engagement() {
+    for (event_name, expected) in [
+        ("workflow.plan_executed", Some("process_funnel")),
+        ("collaboration.approval_resolved", Some("collaboration")),
+        ("engagement.message_sent", Some("engagement")),
+        ("quality.review_decision_recorded", Some("quality")),
+        ("risk.runner_interrupted", Some("risk")),
+        ("agent_run_complete", None),
+    ] {
+        assert_eq!(event_group_for_event_name(event_name), expected);
+    }
+
+    let message = AnalyticsEventPayload::MessageSent {
+        message_length_bucket: "short".to_string(),
+        mention_count: 0,
+        attachment_count: 0,
+    };
+    assert_eq!(message.event_group(), Some("engagement"));
+}
+
+#[test]
 fn sessions_route_uses_unified_workflow_analytics_events() {
     let content = read_repo_file("crates/server/src/routes/chat/sessions.rs");
 
@@ -80,10 +104,14 @@ fn guarded_transition_tracks_step_state_changes_for_running_path() {
 }
 
 #[test]
-fn workflow_step_properties_keep_category_and_fit_storage_limit() {
+fn workflow_step_properties_fit_storage_limit_without_legacy_dimensions() {
     let tracking = read_repo_file("crates/services/src/services/workflow/analytics/tracking.rs");
+    let events = read_repo_file("crates/services/src/services/analytics_events.rs");
+    let delivery = read_repo_file("crates/services/src/services/analytics.rs");
     assert!(!tracking.contains("step_key.to_string()"));
     assert!(!tracking.contains("record_workflow_analytics_event"));
+    assert!(events.contains("pub fn event_group(&self)"));
+    assert!(delivery.contains("properties.insert(\"event_group\""));
 
     let properties = AnalyticsEventPayload::StepCompleted {
         retry_count: 2,
