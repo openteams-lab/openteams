@@ -570,7 +570,7 @@ source_message_id: string,
  * Frontend-supplied id from the source message meta (`client_message_id`).
  * Lets the frontend correlate this run with its pending placeholder.
  */
-client_message_id: string | null, started_at: string | null, } | { "type": "agent_activity_line", line: ChatRunActivityLine, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState,
+client_message_id: string | null, started_at: string | null, } | { "type": "agent_activity_updated", session_id: string, run_id: string, latest_sequence: bigint, } | { "type": "agent_state", session_agent_id: string, agent_id: string, state: ChatSessionAgentState,
 /**
  * Run that triggered this state change. Run-scoped transitions
  * (running/idle/dead/stopping driven by a concrete run) carry the
@@ -703,7 +703,7 @@ export type ChatRunRetentionListQuery = { run_ids: string | null, limit: number 
 
 export type ChatRunRetentionListResponse = { runs: Array<ChatRunRetentionInfo>, };
 
-export type ChatRunActivityResponse = { run_id: string, lines: Array<ChatRunActivityLine>, next_offset: bigint | null, is_pruned: boolean, };
+export type ChatRunActivityResponse = { run_id: string, lines: Array<ChatRunActivityLine>, next_cursor: string, has_more: boolean, log_state: ChatRunLogState, };
 
 export type ChatRunFilesQuery = {
 /**
@@ -716,7 +716,7 @@ export type ChatRunFilesResponse = { run_id: string, workspace_path: string | nu
 
 export type ChatActiveRunStatus = "starting" | "running" | "stopping" | "waiting_approval";
 
-export type ChatActiveRun = { run_id: string, session_id: string, session_agent_id: string, agent_id: string, agent_name: string, display_name: string, avatar: string, model: string | null, status: ChatActiveRunStatus, source_message_id: string | null, client_message_id: string | null, activity_lines: Array<ChatRunActivityLine>, created_at: string, };
+export type ChatActiveRun = { run_id: string, session_id: string, session_agent_id: string, agent_id: string, agent_name: string, display_name: string, avatar: string, model: string | null, status: ChatActiveRunStatus, source_message_id: string | null, client_message_id: string | null, created_at: string, };
 
 export type ChatSessionRuntimeSnapshot = { session_id: string, messages: Array<ChatMessage> | null, active_runs: Array<ChatActiveRun>, queues: Array<MemberQueueSnapshot>, };
 

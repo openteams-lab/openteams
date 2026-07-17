@@ -103,8 +103,6 @@ export interface Message {
   sourceMessageId?: string;
   i18nKey?: string;
   i18nParams?: Record<string, string | number>;
-  activityLines?: ChatRunActivityLine[];
-  activityLoadState?: ActivityLoadState;
   workflowCard?: WorkflowCardMessageReference;
   /**
    * Derived display text for an agent reply parsed from the structured
@@ -186,8 +184,9 @@ export interface ChatRunActivityLine {
 export interface ChatRunActivityResponse {
   run_id: string;
   lines: ChatRunActivityLine[];
-  next_offset: number | null;
-  is_pruned: boolean;
+  next_cursor: string;
+  has_more: boolean;
+  log_state: 'live' | 'tail';
 }
 
 export interface ChatRunRetentionInfo {

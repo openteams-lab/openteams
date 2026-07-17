@@ -1378,26 +1378,6 @@ impl ChatRunner {
             startup_timing::StartupMilestoneName::AgentStateRunningEmitted,
             None,
         );
-        self.emit(
-            session_id,
-            ChatStreamEvent::AgentRunStarted {
-                session_id,
-                session_agent_id,
-                agent_id,
-                agent_name: agent.name.clone(),
-                model: run_model.clone(),
-                run_id,
-                source_message_id: source_message.id,
-                client_message_id: client_message_id.clone(),
-                started_at: Some(session_agent.updated_at),
-            },
-        );
-        startup_timing.mark(
-            startup_timing::StartupMilestoneName::AgentRunStartedEmitted,
-            client_message_id
-                .as_ref()
-                .map(|id| format!("client_message_id={id}")),
-        );
 
         workflow_analytics::track_agent_state_changed(
             self.analytics_service(),
@@ -1643,6 +1623,28 @@ impl ChatRunner {
             )
             .await?;
             startup_timing.mark(startup_timing::StartupMilestoneName::ChatRunCreated, None);
+            // The activity endpoint resolves `run_id` through `chat_runs`, so do not
+            // expose the run to clients until that row is queryable.
+            self.emit(
+                session_id,
+                ChatStreamEvent::AgentRunStarted {
+                    session_id,
+                    session_agent_id,
+                    agent_id,
+                    agent_name: agent.name.clone(),
+                    model: run_model.clone(),
+                    run_id,
+                    source_message_id: source_message.id,
+                    client_message_id: client_message_id.clone(),
+                    started_at: Some(session_agent.updated_at),
+                },
+            );
+            startup_timing.mark(
+                startup_timing::StartupMilestoneName::AgentRunStartedEmitted,
+                client_message_id
+                    .as_ref()
+                    .map(|id| format!("client_message_id={id}")),
+            );
 
             // Track this dispatch only after the chat_run row exists. `chat_message_queue.run_id`
             // has a real FK to `chat_runs(id)`, so binding earlier fails under foreign_keys=ON.

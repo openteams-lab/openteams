@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { WorkspaceProvider, useWorkspace } from "@/context/WorkspaceContext";
+import { RunActivityProvider } from "@/context/RunActivityContext";
 import { AppScaleContext } from "@/context/AppScaleContext";
 import { ShortcutProvider } from "@/shortcuts/ShortcutProvider";
 import { ShortcutOverlays } from "@/shortcuts/ShortcutOverlays";
@@ -2396,11 +2397,13 @@ export default function App() {
     <>
       <div className="macos-titlebar-drag-region" data-tauri-drag-region />
       <AppScaleFrame>
-        <WorkspaceProvider>
-          <ShortcutProviderBridge>
-            <WorkspaceLayout />
-          </ShortcutProviderBridge>
-        </WorkspaceProvider>
+        <RunActivityProvider>
+          <WorkspaceProvider>
+            <ShortcutProviderBridge>
+              <WorkspaceLayout />
+            </ShortcutProviderBridge>
+          </WorkspaceProvider>
+        </RunActivityProvider>
       </AppScaleFrame>
     </>
   );

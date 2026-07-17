@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use services::services::chat_runner::ChatRunActivityLine;
 use tokio::{
     fs::File,
-    io::{AsyncReadExt, AsyncSeekExt, SeekFrom},
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, BufReader, SeekFrom},
 };
 use ts_rs::TS;
 use utils::response::ApiResponse;
@@ -34,6 +34,7 @@ const MAX_LOG_CHUNK_BYTES: u64 = 2 * 1024 * 1024;
 const RUN_ACTIVITY_FILE_NAME: &str = "activity.jsonl";
 const DEFAULT_ACTIVITY_LIMIT: u64 = 1000;
 const MAX_ACTIVITY_LIMIT: u64 = 1000;
+const MAX_ACTIVITY_PAGE_BYTES: usize = 512 * 1024;
 const DEFAULT_RETENTION_LIST_LIMIT: u32 = 100;
 const MAX_RETENTION_LIST_LIMIT: u32 = 500;
 
@@ -46,7 +47,7 @@ pub struct RunLogQuery {
 
 #[derive(Debug, Deserialize)]
 pub struct RunActivityQuery {
-    offset: Option<u64>,
+    cursor: Option<String>,
     limit: Option<u64>,
 }
 
@@ -55,8 +56,9 @@ pub struct RunActivityQuery {
 pub struct ChatRunActivityResponse {
     pub run_id: Uuid,
     pub lines: Vec<ChatRunActivityLine>,
-    pub next_offset: Option<u64>,
-    pub is_pruned: bool,
+    pub next_cursor: String,
+    pub has_more: bool,
+    pub log_state: ChatRunLogState,
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -117,17 +119,43 @@ pub async fn get_session_runs_retention(
 
 async fn read_activity_file_page(
     activity_path: &StdPath,
-    offset: u64,
+    cursor: u64,
     limit: u64,
-) -> Result<(Vec<ChatRunActivityLine>, Option<u64>), std::io::Error> {
-    let content = tokio::fs::read_to_string(activity_path).await?;
+) -> Result<(Vec<ChatRunActivityLine>, u64, bool), std::io::Error> {
+    let file = File::open(activity_path).await?;
+    let file_size = file.metadata().await?.len();
+    if cursor > file_size {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "activity cursor exceeds file size",
+        ));
+    }
 
-    let raw_lines = content.lines().collect::<Vec<_>>();
-    let start = (offset as usize).min(raw_lines.len());
-    let end = start.saturating_add(limit as usize).min(raw_lines.len());
+    let mut reader = BufReader::new(file);
+    reader.seek(SeekFrom::Start(cursor)).await?;
     let mut lines = Vec::new();
-    for raw in &raw_lines[start..end] {
-        match serde_json::from_str::<ChatRunActivityLine>(raw) {
+    let mut next_cursor = cursor;
+    let mut page_bytes = 0_usize;
+    let mut records_read = 0_u64;
+    let mut buffer = Vec::new();
+
+    while records_read < limit && page_bytes < MAX_ACTIVITY_PAGE_BYTES {
+        let line_start = reader.stream_position().await?;
+        buffer.clear();
+        let bytes_read = reader.read_until(b'\n', &mut buffer).await?;
+        if bytes_read == 0 {
+            break;
+        }
+        if !buffer.ends_with(b"\n") {
+            reader.seek(SeekFrom::Start(line_start)).await?;
+            break;
+        }
+
+        records_read = records_read.saturating_add(1);
+        page_bytes = page_bytes.saturating_add(bytes_read);
+        next_cursor = line_start.saturating_add(bytes_read as u64);
+        let raw = &buffer[..buffer.len().saturating_sub(1)];
+        match serde_json::from_slice::<ChatRunActivityLine>(raw) {
             Ok(line) => lines.push(line),
             Err(error) => tracing::warn!(
                 activity_path = %activity_path.display(),
@@ -137,8 +165,9 @@ async fn read_activity_file_page(
         }
     }
 
-    let next_offset = (end < raw_lines.len()).then_some(end as u64);
-    Ok((lines, next_offset))
+    let stopped_at_limit = records_read >= limit || page_bytes >= MAX_ACTIVITY_PAGE_BYTES;
+    let has_more = stopped_at_limit && next_cursor < file_size;
+    Ok((lines, next_cursor, has_more))
 }
 
 pub async fn get_run_activity(
@@ -150,36 +179,72 @@ pub async fn get_run_activity(
         return Err(ApiError::BadRequest("Chat run not found".to_string()));
     };
 
+    if run.log_state == ChatRunLogState::Pruned {
+        return Ok((
+            StatusCode::GONE,
+            ResponseJson(ApiResponse::<()>::error("Chat run activity expired")),
+        )
+            .into_response());
+    }
+
     let activity_path = PathBuf::from(&run.run_dir).join(RUN_ACTIVITY_FILE_NAME);
-    let offset = query.offset.unwrap_or(0);
+    let cursor = match query.cursor.as_deref().map(str::trim) {
+        None | Some("") => 0,
+        Some(value) => value
+            .parse::<u64>()
+            .map_err(|_| ApiError::BadRequest("Invalid activity cursor".to_string()))?,
+    };
     let limit = query
         .limit
         .unwrap_or(DEFAULT_ACTIVITY_LIMIT)
         .clamp(1, MAX_ACTIVITY_LIMIT);
 
-    let (lines, next_offset) = match read_activity_file_page(&activity_path, offset, limit).await {
-        Ok(page) => page,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            return Ok((
-                StatusCode::GONE,
-                ResponseJson(ApiResponse::<()>::error("Chat run activity expired")),
-            )
-                .into_response());
-        }
-        Err(_) => {
-            return Err(ApiError::BadRequest(
-                "Chat run activity file not found".to_string(),
-            ));
-        }
-    };
+    let (lines, next_cursor, has_more) =
+        match read_activity_file_page(&activity_path, cursor, limit).await {
+            Ok(page) => page,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                if run.log_state == ChatRunLogState::Live {
+                    return Ok(
+                        ResponseJson(ApiResponse::<ChatRunActivityResponse>::success(
+                            ChatRunActivityResponse {
+                                run_id,
+                                lines: Vec::new(),
+                                next_cursor: cursor.to_string(),
+                                has_more: false,
+                                log_state: run.log_state.clone(),
+                            },
+                        ))
+                        .into_response(),
+                    );
+                }
+                return Ok((
+                    StatusCode::GONE,
+                    ResponseJson(ApiResponse::<()>::error("Chat run activity expired")),
+                )
+                    .into_response());
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::InvalidInput => {
+                return Ok((
+                    StatusCode::CONFLICT,
+                    ResponseJson(ApiResponse::<()>::error("cursor_invalid")),
+                )
+                    .into_response());
+            }
+            Err(_) => {
+                return Err(ApiError::BadRequest(
+                    "Chat run activity file not found".to_string(),
+                ));
+            }
+        };
 
     Ok(
         ResponseJson(ApiResponse::<ChatRunActivityResponse>::success(
             ChatRunActivityResponse {
                 run_id,
                 lines,
-                next_offset,
-                is_pruned: false,
+                next_cursor: next_cursor.to_string(),
+                has_more,
+                log_state: run.log_state,
             },
         ))
         .into_response(),
@@ -535,13 +600,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn read_activity_file_page_paginates_jsonl_lines() {
+    async fn read_activity_file_page_paginates_from_byte_cursor() {
         let tempdir = tempfile::tempdir().expect("create tempdir");
         let run_id = Uuid::new_v4();
         let path = tempdir.path().join(RUN_ACTIVITY_FILE_NAME);
         let lines = [
             activity_line(run_id, 0, "first"),
-            activity_line(run_id, 1, "second"),
+            activity_line(run_id, 1, "第二条"),
             activity_line(run_id, 2, "third"),
         ];
         let jsonl = lines
@@ -554,13 +619,62 @@ mod tests {
             .await
             .expect("write activity");
 
-        let (page, next_offset) = read_activity_file_page(&path, 1, 1)
+        let (first_page, next_cursor, has_more) = read_activity_file_page(&path, 0, 2)
+            .await
+            .expect("read first page");
+
+        assert_eq!(first_page.len(), 2);
+        assert_eq!(first_page[0].content, "first");
+        assert_eq!(first_page[1].content, "第二条");
+        assert!(next_cursor > 0);
+        assert!(has_more);
+
+        let (second_page, final_cursor, has_more) = read_activity_file_page(&path, next_cursor, 2)
+            .await
+            .expect("read second page");
+
+        assert_eq!(second_page.len(), 1);
+        assert_eq!(second_page[0].content, "third");
+        assert!(final_cursor > next_cursor);
+        assert!(!has_more);
+    }
+
+    #[tokio::test]
+    async fn read_activity_file_page_does_not_advance_past_partial_tail() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let run_id = Uuid::new_v4();
+        let path = tempdir.path().join(RUN_ACTIVITY_FILE_NAME);
+        let complete = serde_json::to_string(&activity_line(run_id, 0, "complete"))
+            .expect("serialize complete");
+        let partial =
+            serde_json::to_string(&activity_line(run_id, 1, "partial")).expect("serialize partial");
+        tokio::fs::write(&path, format!("{complete}\n{partial}"))
+            .await
+            .expect("write activity");
+
+        let (page, next_cursor, has_more) = read_activity_file_page(&path, 0, 10)
             .await
             .expect("read page");
 
         assert_eq!(page.len(), 1);
-        assert_eq!(page[0].content, "second");
-        assert_eq!(next_offset, Some(2));
+        assert_eq!(page[0].content, "complete");
+        assert_eq!(next_cursor, complete.len() as u64 + 1);
+        assert!(!has_more);
+    }
+
+    #[tokio::test]
+    async fn read_activity_file_page_rejects_cursor_past_end() {
+        let tempdir = tempfile::tempdir().expect("create tempdir");
+        let path = tempdir.path().join(RUN_ACTIVITY_FILE_NAME);
+        tokio::fs::write(&path, b"{}\n")
+            .await
+            .expect("write activity");
+
+        let err = read_activity_file_page(&path, 4, 10)
+            .await
+            .expect_err("cursor past end should fail");
+
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
     }
 
     #[tokio::test]

@@ -229,8 +229,7 @@ check(
 check(
   "delegates agent message rendering to an isolated component",
   source.includes("AgentMessageContent") &&
-    messageContentSource.includes("chatRunsApi") &&
-    messageContentSource.includes(".getActivity") &&
+    messageContentSource.includes("useRunActivity") &&
     messageContentSource.includes("AgentRunStatusPill") &&
     messageContentSource.includes("AgentActivityPanel") &&
     messageContentSource.includes("AgentMarkdown") &&
@@ -287,17 +286,18 @@ check(
   { source, markdownSource, activityPanelCssSource },
 );
 check(
-  "reloads historical activity when live stream lines are only partial",
-  messageContentSource.includes('loadState === "loaded"') &&
-    messageContentSource.includes("activityRequestIdRef") &&
-    messageContentSource.includes("mountedRef") &&
-    messageContentSource.includes("mountedRef.current = true") &&
-    messageContentSource.includes("ACTIVITY_LOAD_TIMEOUT_MS") &&
-    messageContentSource.includes(
-      "Promise.race([activityRequest, timeoutRequest])",
-    ) &&
-    messageContentSource.includes("[expanded, isRunning, message.runId]") &&
-    !messageContentSource.includes("if (activityLines ||"),
+  "loads activity through the run-scoped store",
+  messageContentSource.includes("useRunActivity(message.runId") &&
+    messageContentSource.includes("isRunning || expanded") &&
+    messageContentSource.includes("activity.lines") &&
+    !messageContentSource.includes("activityRequestIdRef") &&
+    !messageContentSource.includes("ACTIVITY_LOAD_TIMEOUT_MS") &&
+    !messageContentSource.includes("chatRunsApi.getActivity"),
+  messageContentSource,
+);
+check(
+  "keeps activity loading silent for live and historical agent messages",
+  /activity\.status === "loading"\s*\?\s*"idle"/.test(messageContentSource),
   messageContentSource,
 );
 check(

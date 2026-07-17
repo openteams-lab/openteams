@@ -5,14 +5,14 @@ import { AgentArtifactFileList } from "@/components/AgentArtifactFileList";
 import { AgentMarkdown } from "@/components/AgentMarkdown";
 import { AgentRunStatusPill } from "@/components/AgentRunStatusPill";
 import { WorkflowCard } from "@/components/workflow/WorkflowCard";
-import { ApiError, chatRunsApi } from "@/lib/api";
+import { chatRunsApi } from "@/lib/api";
 import {
   flattenRunFileChanges,
   type AgentFileRow,
 } from "@/lib/agentFileRows";
-import type { ActivityLoadState, ChatRunActivityLine, Message } from "@/types";
+import type { ActivityLoadState, Message } from "@/types";
+import { useRunActivity } from "@/context/RunActivityContext";
 
-const ACTIVITY_LOAD_TIMEOUT_MS = 15000;
 /**
  * Module-level cache of per-run changed-file rows keyed by session id + run id.
  * A run's captured diff is immutable once the run completes, so the rows are
@@ -38,16 +38,6 @@ interface AgentMessageContentProps {
   onOpenArtifact?: (file: AgentFileRow) => void;
 }
 
-const sortActivityLines = (
-  lines: ChatRunActivityLine[] | undefined,
-): ChatRunActivityLine[] | undefined =>
-  lines
-    ? [...lines].sort((a, b) => {
-        if (a.sequence !== b.sequence) return a.sequence - b.sequence;
-        return a.line_id.localeCompare(b.line_id);
-      })
-    : undefined;
-
 export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
   message,
   t,
@@ -55,29 +45,11 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
   onOpenArtifact,
 }) => {
   const isRunning = Boolean(message.isAgentRunning || message.isThinking);
-  const initialLines = useMemo(
-    () => sortActivityLines(message.activityLines),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [message.id, message.runId],
-  );
   const [expanded, setExpanded] = useState(isRunning);
-  const [activityLines, setActivityLines] = useState<
-    ChatRunActivityLine[] | undefined
-  >(initialLines);
-  const [loadState, setLoadState] = useState<ActivityLoadState>(
-    message.activityLoadState ?? (initialLines ? "loaded" : "idle"),
-  );
-  const mountedRef = useRef(true);
-  const activityRequestIdRef = useRef(0);
   const wasRunningRef = useRef(isRunning);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      activityRequestIdRef.current += 1;
-    };
-  }, []);
+  const activity = useRunActivity(message.runId, {
+    enabled: Boolean(message.runId) && (isRunning || expanded),
+  });
 
   useEffect(() => {
     if (isRunning) {
@@ -92,76 +64,26 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
     }
   }, [isRunning]);
 
-  useEffect(() => {
-    const sorted = sortActivityLines(message.activityLines);
-    if (sorted) {
-      setActivityLines(sorted);
-      setLoadState(message.activityLoadState ?? "loaded");
-    } else if (message.activityLoadState) {
-      setLoadState(message.activityLoadState);
-    }
-  }, [message.activityLines, message.activityLoadState]);
-
-  useEffect(() => {
-    if (!expanded || isRunning || !message.runId) return;
-    if (
-      loadState === "loaded" ||
-      loadState === "loading" ||
-      loadState === "pruned"
-    ) {
-      return;
-    }
-
-    const requestId = activityRequestIdRef.current + 1;
-    activityRequestIdRef.current = requestId;
-    setLoadState("loading");
-    let timeoutId: number | undefined;
-    const activityRequest = chatRunsApi.getActivity(message.runId, {
-      offset: 0,
-      limit: 1000,
-    });
-    const timeoutRequest = new Promise<never>((_, reject) => {
-      timeoutId = window.setTimeout(
-        () => reject(new Error("Agent activity load timed out")),
-        ACTIVITY_LOAD_TIMEOUT_MS,
-      );
-    });
-
-    Promise.race([activityRequest, timeoutRequest])
-      .then((response) => {
-        if (!mountedRef.current || activityRequestIdRef.current !== requestId) {
-          return;
-        }
-        setActivityLines(sortActivityLines(response.lines) ?? []);
-        setLoadState(response.is_pruned ? "pruned" : "loaded");
-      })
-      .catch((error) => {
-        if (!mountedRef.current || activityRequestIdRef.current !== requestId) {
-          return;
-        }
-        setLoadState(
-          error instanceof ApiError && error.status === 410
-            ? "pruned"
-            : "error",
-        );
-      })
-      .finally(() => {
-        if (timeoutId !== undefined) {
-          window.clearTimeout(timeoutId);
-        }
-      });
-  }, [expanded, isRunning, message.runId]);
-
   const visibleActivityLines = useMemo(
     () =>
       isRunning
-        ? (activityLines ?? [])
-        : (activityLines ?? []).filter((line) => line.line_type !== "assistant"),
-    [activityLines, isRunning],
+        ? activity.lines
+        : activity.lines.filter((line) => line.line_type !== "assistant"),
+    [activity.lines, isRunning],
   );
+  const loadState: ActivityLoadState =
+    activity.status === "pruned"
+      ? "pruned"
+      : activity.status === "error"
+        ? "error"
+        : activity.status === "loading"
+          ? "idle"
+          : activity.status === "idle"
+            ? "idle"
+            : "loaded";
   const hasVisibleActivityLines = visibleActivityLines.length > 0;
   const hasActivityPanelState =
-    loadState === "loading" || loadState === "pruned" || loadState === "error";
+    loadState === "pruned" || loadState === "error";
 
   // ---- Per-run changed files ------------------------------------------------
   // The file list pinned to the message bottom is sourced from the run's own

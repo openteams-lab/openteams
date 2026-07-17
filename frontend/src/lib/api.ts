@@ -1361,11 +1361,11 @@ export const chatRunsApi = {
   },
   getActivity: async (
     runId: string,
-    opts?: { offset?: number; limit?: number },
+    opts?: { cursor?: string; limit?: number },
   ): Promise<ChatRunActivityResponse> => {
     const r = await makeRequest(
       `/api/chat/runs/${encodeURIComponent(runId)}/activity${qs({
-        offset: opts?.offset,
+        cursor: opts?.cursor,
         limit: opts?.limit,
       })}`,
     );
