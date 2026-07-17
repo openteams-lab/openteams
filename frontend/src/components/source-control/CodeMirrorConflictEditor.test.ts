@@ -4,6 +4,7 @@ import {
   buildConflictPaneModel,
   getConflictPaneActions,
   getConflictSpacerLineCounts,
+  mergeConflictChoiceState,
 } from './CodeMirrorConflictEditor';
 import { parseConflictText } from './WorktreeMergeConflictsView';
 
@@ -67,6 +68,25 @@ const suppressedIncomingPane = buildConflictPaneModel(
 );
 assert.equal(acceptedCurrentPane.regions[0]?.resolutionState, 'accepted');
 assert.equal(suppressedIncomingPane.regions[0]?.resolutionState, 'suppressed');
+
+const firstChoice = mergeConflictChoiceState(
+  {},
+  {},
+  'hunk-1',
+  'session',
+  'incoming',
+);
+const secondChoice = mergeConflictChoiceState(
+  firstChoice.choices,
+  firstChoice.receivers,
+  'hunk-2',
+  'both',
+  'incoming',
+);
+assert.deepEqual(secondChoice, {
+  choices: { 'hunk-1': 'session', 'hunk-2': 'both' },
+  receivers: { 'hunk-1': 'incoming', 'hunk-2': 'incoming' },
+});
 
 assert.deepEqual(
   getConflictPaneActions('current', {

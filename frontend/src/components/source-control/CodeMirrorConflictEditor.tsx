@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { Extension, Range } from '@codemirror/state';
 import { languages } from '@codemirror/language-data';
 import { Decoration, EditorView, WidgetType } from '@codemirror/view';
@@ -49,6 +55,31 @@ const buildResult = (
       return joinAcceptedBoth(segment.hunk.current, segment.hunk.session);
     })
     .join('');
+
+export type ConflictReceiver = 'current' | 'incoming';
+
+const receiverForChoice = (
+  choice: ConflictHunkChoice,
+  origin: ConflictReceiver,
+): ConflictReceiver => {
+  if (choice === 'current') return 'current';
+  if (choice === 'session') return 'incoming';
+  return origin;
+};
+
+export const mergeConflictChoiceState = (
+  choices: Record<string, ConflictHunkChoice>,
+  receivers: Record<string, ConflictReceiver>,
+  hunkId: string,
+  choice: ConflictHunkChoice,
+  origin: ConflictReceiver,
+) => ({
+  choices: { ...choices, [hunkId]: choice },
+  receivers: {
+    ...receivers,
+    [hunkId]: receiverForChoice(choice, origin),
+  },
+});
 
 const newlineCount = (content: string) =>
   content.match(/\n/g)?.length ?? 0;
@@ -135,7 +166,15 @@ export const CodeMirrorConflictEditor: React.FC<
   const [receivers, setReceivers] = useState<Record<string, ConflictReceiver>>(
     {},
   );
+  const choicesRef = useRef(choices);
+  const receiversRef = useRef(receivers);
+  const parsedRef = useRef(parsed);
+  const onChangeRef = useRef(onChange);
   const selectedHunk = parsed.hunks[selectedHunkIndex] ?? null;
+  const selectedHunkIdRef = useRef<string | null>(selectedHunk?.id ?? null);
+  parsedRef.current = parsed;
+  onChangeRef.current = onChange;
+  selectedHunkIdRef.current = selectedHunk?.id ?? null;
   const unresolvedCount = parsed.hunks.filter(
     (hunk) => !choices[hunk.id],
   ).length;
@@ -163,6 +202,8 @@ export const CodeMirrorConflictEditor: React.FC<
   );
 
   useEffect(() => {
+    choicesRef.current = {};
+    receiversRef.current = {};
     setSelectedHunkIndex(0);
     setChoices({});
     setReceivers({});
@@ -209,35 +250,65 @@ export const CodeMirrorConflictEditor: React.FC<
     selectedIncomingFrom,
   ]);
 
-  const chooseHunk = (
-    choice: ConflictHunkChoice,
-    origin: ConflictReceiver = choice === 'session' ? 'incoming' : 'current',
-  ) => {
-    if (!selectedHunk) return;
-    const nextChoices = { ...choices, [selectedHunk.id]: choice };
-    setChoices(nextChoices);
-    setReceivers((current) => ({
-      ...current,
-      [selectedHunk.id]: receiverForChoice(choice, origin),
-    }));
-    onChange(buildResult(parsed, nextChoices));
-  };
+  const commitHunkChoice = useCallback(
+    (
+      hunkId: string,
+      choice: ConflictHunkChoice,
+      origin: ConflictReceiver,
+    ) => {
+      const next = mergeConflictChoiceState(
+        choicesRef.current,
+        receiversRef.current,
+        hunkId,
+        choice,
+        origin,
+      );
+      choicesRef.current = next.choices;
+      receiversRef.current = next.receivers;
+      setChoices(next.choices);
+      setReceivers(next.receivers);
+      onChangeRef.current(buildResult(parsedRef.current, next.choices));
+    },
+    [],
+  );
 
-  const choosePaneHunk = (
-    hunkId: string,
-    choice: ConflictHunkChoice,
-    origin: ConflictReceiver,
-  ) => {
-    const hunkIndex = parsed.hunks.findIndex((hunk) => hunk.id === hunkId);
-    if (hunkIndex >= 0) setSelectedHunkIndex(hunkIndex);
-    const nextChoices = { ...choices, [hunkId]: choice };
-    setChoices(nextChoices);
-    setReceivers((current) => ({
-      ...current,
-      [hunkId]: receiverForChoice(choice, origin),
-    }));
-    onChange(buildResult(parsed, nextChoices));
-  };
+  const chooseHunk = useCallback(
+    (
+      choice: ConflictHunkChoice,
+      origin: ConflictReceiver =
+        choice === 'session' ? 'incoming' : 'current',
+    ) => {
+      const hunkId = selectedHunkIdRef.current;
+      if (!hunkId) return;
+      commitHunkChoice(hunkId, choice, origin);
+    },
+    [commitHunkChoice],
+  );
+
+  const choosePaneHunk = useCallback(
+    (
+      hunkId: string,
+      choice: ConflictHunkChoice,
+      origin: ConflictReceiver,
+    ) => {
+      const hunkIndex = parsedRef.current.hunks.findIndex(
+        (hunk) => hunk.id === hunkId,
+      );
+      if (hunkIndex >= 0) setSelectedHunkIndex(hunkIndex);
+      commitHunkChoice(hunkId, choice, origin);
+    },
+    [commitHunkChoice],
+  );
+  const chooseCurrentPaneHunk = useCallback(
+    (hunkId: string, choice: ConflictHunkChoice) =>
+      choosePaneHunk(hunkId, choice, 'current'),
+    [choosePaneHunk],
+  );
+  const chooseIncomingPaneHunk = useCallback(
+    (hunkId: string, choice: ConflictHunkChoice) =>
+      choosePaneHunk(hunkId, choice, 'incoming'),
+    [choosePaneHunk],
+  );
 
   const moveHunk = (offset: number) => {
     setSelectedHunkIndex((index) =>
@@ -362,9 +433,7 @@ export const CodeMirrorConflictEditor: React.FC<
               both: tr('worktree.merge.acceptBoth', 'Accept both changes'),
               ignore: tr('worktree.merge.ignore', 'Ignore'),
             })}
-            onChooseConflict={(hunkId, choice) =>
-              choosePaneHunk(hunkId, choice, 'current')
-            }
+            onChooseConflict={chooseCurrentPaneHunk}
             onEditorReady={(view) => {
               currentEditorRef.current = view;
               setEditorMountVersion((version) => version + 1);
@@ -387,9 +456,7 @@ export const CodeMirrorConflictEditor: React.FC<
               both: tr('worktree.merge.acceptBoth', 'Accept both changes'),
               ignore: tr('worktree.merge.ignore', 'Ignore'),
             })}
-            onChooseConflict={(hunkId, choice) =>
-              choosePaneHunk(hunkId, choice, 'incoming')
-            }
+            onChooseConflict={chooseIncomingPaneHunk}
             onEditorReady={(view) => {
               incomingEditorRef.current = view;
               setEditorMountVersion((version) => version + 1);
@@ -452,17 +519,7 @@ interface ConflictRegion {
   resolutionState: ConflictResolutionState;
 }
 
-type ConflictReceiver = 'current' | 'incoming';
 type ConflictResolutionState = 'unresolved' | 'accepted' | 'suppressed';
-
-const receiverForChoice = (
-  choice: ConflictHunkChoice,
-  origin: ConflictReceiver,
-): ConflictReceiver => {
-  if (choice === 'current') return 'current';
-  if (choice === 'session') return 'incoming';
-  return origin;
-};
 
 interface ConflictPaneModel {
   content: string;
