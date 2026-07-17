@@ -11,6 +11,7 @@
     "npx/openteams-npx/dist/**"
   ],
   "scripts": {
+    "dev": "node scripts/dev.js",
     "lint": "pnpm run frontend:lint && pnpm run backend:lint",
     "format": "pnpm run backend:format",
     "format:check": "pnpm run backend:format:check",
