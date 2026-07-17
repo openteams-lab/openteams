@@ -46,6 +46,7 @@ import { ProjectBreadcrumbAvatar } from '@/components/ProjectBreadcrumbAvatar';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import {
   useCommandHandler,
+  useCommandPresentation,
   useShortcutScope,
 } from '@/shortcuts/ShortcutProvider';
 import {
@@ -2006,6 +2007,7 @@ function IssueEmptyState({
   tr: IssueTranslator;
 }) {
   const copy = emptyIssueCopy[filter];
+  const createIssuePresentation = useCommandPresentation('issue.create');
   const repositoryButtonLabel = tr(
     'issue.linkDialog.title',
     'Link external repository',
@@ -2026,7 +2028,11 @@ function IssueEmptyState({
         <div className="mt-[22px] flex items-center gap-[13px]">
           <button
             type="button"
+            data-command-id="issue.create"
             className="inline-flex h-[37px] items-center gap-2 rounded-full bg-[#5e6ad2] px-4 text-[15px] font-bold leading-none text-white transition hover:bg-[#6f78e2] active:scale-[0.99]"
+            aria-keyshortcuts={
+              createIssuePresentation.ariaKeyShortcuts || undefined
+            }
             onClick={() => {
               onCreateIssue();
               onAction(tr('issue.empty.createAction', 'Create issue opened'));
@@ -2035,9 +2041,11 @@ function IssueEmptyState({
             <span>
               {tr('issue.empty.createNew', 'Create new issue')}
             </span>
-            <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[7px] border border-white/25 bg-white/10 font-mono text-[14px] font-bold leading-none text-white">
-              C
-            </span>
+            {createIssuePresentation.sequence.length > 0 && (
+              <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-[7px] border border-white/25 bg-white/10 px-1.5 font-mono text-[14px] font-bold leading-none text-white">
+                {createIssuePresentation.label}
+              </span>
+            )}
           </button>
 
           <button
