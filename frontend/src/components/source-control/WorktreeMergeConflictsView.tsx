@@ -24,6 +24,7 @@ import {
   WorktreeMergeConflictFrame,
   WorktreeQuickActionButton,
 } from '@/components/worktree/WorktreeMergeConflictSurface';
+import { CodeMirrorConflictEditor } from './CodeMirrorConflictEditor';
 
 export interface WorktreeMergeConflictsViewProps {
   sessionId: string;
@@ -264,6 +265,8 @@ export const WorktreeMergeConflictsView: React.FC<
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState('');
+  const [currentBranch, setCurrentBranch] = useState('HEAD');
+  const [incomingBranch, setIncomingBranch] = useState('session');
 
   const refreshList = useCallback(async () => {
     setListLoading(true);
@@ -291,6 +294,23 @@ export const WorktreeMergeConflictsView: React.FC<
     void refreshList();
     // Only run on mount; subsequent refreshes are triggered after resolves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void chatSessionWorktreeApi
+      .getStatus(sessionId)
+      .then((worktree) => {
+        if (cancelled || !worktree) return;
+        setCurrentBranch(
+          worktree.merge_target_branch ?? worktree.base_branch ?? 'HEAD',
+        );
+        setIncomingBranch(worktree.branch_name || 'session');
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId]);
 
   useEffect(() => {
@@ -516,7 +536,7 @@ export const WorktreeMergeConflictsView: React.FC<
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-20">
         <div className="max-h-40 shrink-0 border-b border-[var(--hairline)]">
           <ScrollArea className="h-full">
             {files.length === 0 && !listLoading ? (
@@ -607,13 +627,22 @@ export const WorktreeMergeConflictsView: React.FC<
               onChoose={handleBinaryChoice}
             />
           ) : (
-            <TextConflictEditor
+            <CodeMirrorConflictEditor
+              key={selectedPath}
               path={selectedPath}
-              detail={detail}
-              resolution={currentResolution}
+              currentContent={detail.current ?? ''}
+              incomingContent={detail.session ?? ''}
+              resultContent={
+                currentResolution?.kind === 'text'
+                  ? currentResolution.content
+                  : detail.working_tree
+              }
+              parsed={parseConflictText(detail.working_tree)}
+              currentBranch={currentBranch}
+              incomingBranch={incomingBranch}
               tr={tr}
               onUseCurrent={handleUseCurrent}
-              onUseSession={handleUseSession}
+              onUseIncoming={handleUseSession}
               onAcceptBoth={handleAcceptBoth}
               onChange={(content) =>
                 setResolution(selectedPath, { kind: 'text', content })
@@ -623,8 +652,18 @@ export const WorktreeMergeConflictsView: React.FC<
         </div>
       </div>
 
-      <div className="shrink-0 space-y-2 border-t border-[var(--hairline)] px-3 py-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
+        <div className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-[var(--hairline)] bg-[color-mix(in_srgb,var(--surface-1)_94%,transparent)] p-1.5 shadow-[0_12px_38px_rgba(0,0,0,0.2)] backdrop-blur-md">
+          <input
+            type="text"
+            value={commitMessage}
+            onChange={(e) => setCommitMessage(e.target.value)}
+            placeholder={tr(
+              'worktree.merge.commitPlaceholder',
+              'Merge commit message (optional)',
+            )}
+            className="h-8 w-[min(280px,45vw)] rounded-xl border border-[var(--hairline)] bg-transparent px-2.5 text-[12px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-tertiary)] focus:border-[var(--ink-tertiary)]"
+          />
           <WorktreeConflictActionButton
             onClick={() => void handleAbort()}
             disabled={Boolean(pendingAction)}
@@ -632,73 +671,58 @@ export const WorktreeMergeConflictsView: React.FC<
           >
             {tr('worktree.merge.abort', 'Abort merge')}
           </WorktreeConflictActionButton>
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-            <WorktreeConflictActionButton
-              onClick={() => void handleMarkResolved()}
-              disabled={
-                !selectedPath ||
-                !currentResolution ||
-                currentTextHasMarkers ||
-                Boolean(pendingAction)
-              }
-              title={
-                currentTextHasMarkers
-                  ? tr(
-                      'worktree.merge.unresolvedMarkersHint',
-                      'Choose a resolution for every conflict point first',
-                    )
-                  : tr(
-                      'worktree.merge.markResolvedHint',
-                      'Save this file and mark it resolved',
-                    )
-              }
-              icon={
-                pendingAction === `resolve:${selectedPath}` ? (
-                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                ) : (
-                  <Check className="h-3 w-3" aria-hidden />
-                )
-              }
-            >
-              {tr('worktree.merge.markResolved', 'Mark resolved')}
-            </WorktreeConflictActionButton>
-            <WorktreeConflictActionButton
-              variant="primary"
-              onClick={() => void handleContinue()}
-              disabled={!canContinue || Boolean(pendingAction)}
-              title={
-                canContinue
-                  ? tr(
-                      'worktree.merge.continueHint',
-                      'Finish the merge',
-                    )
-                  : tr(
-                      'worktree.merge.continueDisabled',
-                      'Resolve all files to continue',
-                    )
-              }
-              icon={
-                pendingAction === 'continue' ? (
-                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                ) : (
-                  <ChevronRight className="h-3 w-3" aria-hidden />
-                )
-              }
-            >
-              {tr('worktree.merge.continue', 'Continue merge')}
-            </WorktreeConflictActionButton>
-          </div>
+          <WorktreeConflictActionButton
+            onClick={() => void handleMarkResolved()}
+            disabled={
+              !selectedPath ||
+              !currentResolution ||
+              currentTextHasMarkers ||
+              Boolean(pendingAction)
+            }
+            title={
+              currentTextHasMarkers
+                ? tr(
+                    'worktree.merge.unresolvedMarkersHint',
+                    'Choose a resolution for every conflict point first',
+                  )
+                : tr(
+                    'worktree.merge.markResolvedHint',
+                    'Save this file and mark it resolved',
+                  )
+            }
+            icon={
+              pendingAction === `resolve:${selectedPath}` ? (
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+              ) : (
+                <Check className="h-3 w-3" aria-hidden />
+              )
+            }
+          >
+            {tr('worktree.merge.markResolved', 'Mark resolved')}
+          </WorktreeConflictActionButton>
+          <WorktreeConflictActionButton
+            variant="primary"
+            onClick={() => void handleContinue()}
+            disabled={!canContinue || Boolean(pendingAction)}
+            title={
+              canContinue
+                ? tr('worktree.merge.continueHint', 'Finish the merge')
+                : tr(
+                    'worktree.merge.continueDisabled',
+                    'Resolve all files to continue',
+                  )
+            }
+            icon={
+              pendingAction === 'continue' ? (
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+              ) : (
+                <ChevronRight className="h-3 w-3" aria-hidden />
+              )
+            }
+          >
+            {tr('worktree.merge.continue', 'Continue merge')}
+          </WorktreeConflictActionButton>
         </div>
-        <input
-          type="text"
-          value={commitMessage}
-          onChange={(e) => setCommitMessage(e.target.value)}
-          placeholder={tr(
-            'worktree.merge.commitPlaceholder',
-            'Merge commit message (optional)',
-          )}
-          className="h-8 w-full rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] px-2 text-[12px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-tertiary)] focus:border-[var(--primary)]"
-        />
       </div>
     </WorktreeMergeConflictFrame>
   );

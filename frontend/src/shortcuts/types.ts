@@ -15,6 +15,7 @@ export type ShortcutContextId =
   | 'source-control-list'
   | 'source-control-commit'
   | 'worktree'
+  | 'worktree-merge-conflict'
   | 'issue-list'
   | 'issue-detail'
   | 'agent-runtime'

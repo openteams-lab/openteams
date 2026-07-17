@@ -12,7 +12,7 @@ export function WorktreeMergeConflictFrame({
   if (surface === 'page') {
     return (
       <section
-        className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-1)] text-[var(--ink)]"
+        className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-1)] text-[var(--ink)]"
         aria-label="Merge conflict resolver"
       >
         {children}
@@ -25,7 +25,7 @@ export function WorktreeMergeConflictFrame({
       <section
         role="dialog"
         aria-modal="true"
-        className="flex h-[min(820px,calc(100vh-24px))] w-[min(1180px,calc(100vw-24px))] min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--ink)] shadow-2xl"
+        className="relative flex h-[min(820px,calc(100vh-24px))] w-[min(1180px,calc(100vw-24px))] min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--hairline)] bg-[var(--surface-1)] text-[var(--ink)] shadow-2xl"
       >
         {children}
       </section>
@@ -57,7 +57,7 @@ export function WorktreeConflictActionButton({
       className={cn(
         'inline-flex h-8 max-w-full min-w-0 items-center gap-1 rounded-md px-2.5 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
         variant === 'primary'
-          ? 'bg-[var(--primary)] px-3 text-white hover:bg-[var(--primary-hover)]'
+          ? 'bg-[var(--ink)] px-3 text-[var(--surface-1)] hover:opacity-85'
           : 'border border-[var(--hairline)] text-[var(--ink-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--ink)]',
       )}
     >
