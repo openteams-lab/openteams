@@ -29,11 +29,14 @@ use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use services::services::{
     build_stats::token_cost_stats::TokenCostStatsService,
-    chat, config,
+    config,
     workflow::{
         workflow_analytics,
         workflow_compiler::WorkflowCompiler,
-        workflow_orchestrator::WorkflowOrchestrator,
+        workflow_orchestrator::{
+            WorkflowOrchestrator, workflow_agent_id_map, workflow_plan_agent_id,
+            workflow_valid_agent_ids,
+        },
         workflow_runtime::{
             WorkflowCardAgent, WorkflowCardProjection, build_plan_generation_prompt,
             extract_json_payload, resolve_lead_agent, resolve_workflow_goal,
@@ -375,16 +378,11 @@ pub async fn generate_plan_and_run(
 
     let available_agents = session_agents
         .iter()
-        .filter_map(|session_agent| {
-            let agent = agents
-                .iter()
-                .find(|agent| agent.id == session_agent.agent_id)?;
-            Some(WorkflowCardAgent {
-                session_agent_id: session_agent.id.to_string(),
-                workflow_agent_session_id: None,
-                agent_id: agent.id.to_string(),
-                name: agent.name.clone(),
-            })
+        .map(|session_agent| WorkflowCardAgent {
+            session_agent_id: session_agent.id.to_string(),
+            workflow_agent_session_id: None,
+            agent_id: workflow_plan_agent_id(session_agent),
+            name: session_agent.member_name.clone(),
         })
         .collect::<Vec<_>>();
 
@@ -393,7 +391,7 @@ pub async fn generate_plan_and_run(
         resolve_workflow_response_language_instruction(&ui_config.language);
     let prompt = build_plan_generation_prompt(
         &user_goal,
-        &lead_agent.id.to_string(),
+        &workflow_plan_agent_id(lead_session_agent),
         &available_agents,
         None,
         None,
@@ -442,10 +440,7 @@ pub async fn generate_plan_and_run(
             track_plan_generation_failure();
             ApiError::BadRequest(format!("Lead agent returned invalid workflow JSON: {err}"))
         })?;
-    let valid_agent_ids = agents
-        .iter()
-        .map(|agent| agent.id.to_string())
-        .collect::<Vec<_>>();
+    let valid_agent_ids = workflow_valid_agent_ids(&session_agents);
     let validation = workflow_validator::validate_plan(&parsed_plan, &valid_agent_ids);
     if !validation.is_valid {
         track_plan_generation_failure();
@@ -491,10 +486,7 @@ pub async fn generate_plan_and_run(
             ApiError::BadRequest(err.to_string())
         })?;
 
-    let agent_id_map = session_agents
-        .iter()
-        .map(|session_agent| (session_agent.agent_id.to_string(), session_agent.id))
-        .collect::<HashMap<_, _>>();
+    let agent_id_map = workflow_agent_id_map(&session_agents);
     let bootstrap = WorkflowOrchestrator::bootstrap_execution(
         pool,
         &plan,
@@ -1804,10 +1796,9 @@ pub async fn resolve_approval(
 
 async fn load_effective_agents_for_route(
     pool: &sqlx::SqlitePool,
-    session_id: Uuid,
+    _session_id: Uuid,
     session_agents: &[ChatSessionAgent],
 ) -> Result<Vec<ChatAgent>, ApiError> {
-    let member_names = chat::member_name_overrides_for_session(pool, session_id).await?;
     let mut agents = Vec::with_capacity(session_agents.len());
     for sa in session_agents {
         let mut agent = ChatAgent::find_by_id(pool, sa.agent_id)
@@ -1815,7 +1806,7 @@ async fn load_effective_agents_for_route(
             .ok_or_else(|| {
                 ApiError::BadRequest("Session agent is missing its agent record.".to_string())
             })?;
-        chat::apply_effective_agent_name(&mut agent, &member_names);
+        agent.name = sa.member_name.clone();
         agents.push(agent);
     }
     Ok(agents)

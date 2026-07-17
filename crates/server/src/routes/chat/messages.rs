@@ -25,7 +25,9 @@ use services::services::{
     chat::{ChatAttachmentMeta, emit_user_message_workflow_analytics},
     workflow::{
         workflow_analytics,
-        workflow_orchestrator::WorkflowOrchestrator,
+        workflow_orchestrator::{
+            WorkflowOrchestrator, workflow_agent_name_lookup, workflow_plan_agent_id,
+        },
         workflow_runtime::{
             WorkflowCardProjection, WorkflowCardState, WorkflowCardStep,
             build_workflow_card_projection, build_workflow_card_projection_lightweight,
@@ -646,27 +648,18 @@ async fn build_plan_workflow_card_projection(
     let parsed_plan: WorkflowPlanJson = serde_json::from_str(&revision.plan_json)
         .map_err(|err| ApiError::BadRequest(err.to_string()))?;
     let session_agents = ChatSessionAgent::find_all_for_session(pool, message.session_id).await?;
-    let agents = load_effective_agents_for_route(pool, message.session_id, &session_agents).await?;
     let agent_views = session_agents
         .iter()
-        .filter_map(|session_agent| {
-            let agent = agents
-                .iter()
-                .find(|item| item.id == session_agent.agent_id)?;
-            Some(
-                services::services::workflow::workflow_runtime::WorkflowCardAgent {
-                    session_agent_id: session_agent.id.to_string(),
-                    workflow_agent_session_id: None,
-                    agent_id: agent.id.to_string(),
-                    name: agent.name.clone(),
-                },
-            )
-        })
+        .map(
+            |session_agent| services::services::workflow::workflow_runtime::WorkflowCardAgent {
+                session_agent_id: session_agent.id.to_string(),
+                workflow_agent_session_id: None,
+                agent_id: workflow_plan_agent_id(session_agent),
+                name: session_agent.member_name.clone(),
+            },
+        )
         .collect::<Vec<_>>();
-    let agent_name_by_id: std::collections::HashMap<String, String> = agent_views
-        .iter()
-        .map(|agent| (agent.agent_id.clone(), agent.name.clone()))
-        .collect();
+    let agent_name_by_id = workflow_agent_name_lookup(&session_agents);
     let step_views: Vec<WorkflowCardStep> = parsed_plan
         .nodes
         .iter()
@@ -736,15 +729,13 @@ async fn build_plan_workflow_card_projection(
 
 async fn load_effective_agents_for_route(
     pool: &sqlx::SqlitePool,
-    session_id: Uuid,
+    _session_id: Uuid,
     session_agents: &[ChatSessionAgent],
 ) -> Result<Vec<ChatAgent>, ApiError> {
-    let member_names =
-        services::services::chat::member_name_overrides_for_session(pool, session_id).await?;
     let mut agents = Vec::with_capacity(session_agents.len());
     for session_agent in session_agents {
         if let Some(mut agent) = ChatAgent::find_by_id(pool, session_agent.agent_id).await? {
-            services::services::chat::apply_effective_agent_name(&mut agent, &member_names);
+            agent.name = session_agent.member_name.clone();
             agents.push(agent);
         }
     }

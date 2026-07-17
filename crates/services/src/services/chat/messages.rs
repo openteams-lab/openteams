@@ -61,14 +61,11 @@ pub async fn create_message_with_id(
         .and_then(|value| value.as_str())
         .map(|value| value.to_string());
     let sender_name = if matches!(sender_type, ChatSenderType::Agent) {
-        if let Some(agent_id) = sender_id {
-            let member_names = member_name_overrides_for_session(pool, session_id).await?;
-            ChatAgent::find_by_id(pool, agent_id)
-                .await?
-                .map(|agent| effective_agent_name(&agent, member_names.get(&agent_id).map(String::as_str)))
-        } else {
-            None
-        }
+        let sender_session_agent_id = meta
+            .get("session_agent_id")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
+        resolve_sender_member_name(pool, session_id, sender_session_agent_id, sender_id).await?
     } else {
         None
     };
@@ -140,15 +137,12 @@ pub async fn build_structured_messages(
         .filter(should_include_message_in_history)
         .collect::<Vec<_>>();
     let member_names = member_name_overrides_for_session(pool, session_id).await?;
+    let legacy_member_names =
+        unambiguous_member_names_by_agent_for_session(pool, session_id).await?;
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
-        .map(|agent| {
-            (
-                agent.id,
-                effective_agent_name(&agent, member_names.get(&agent.id).map(String::as_str)),
-            )
-        })
+        .map(|agent| (agent.id, agent.name))
         .collect();
 
     let mut result = Vec::with_capacity(messages.len());
@@ -160,7 +154,15 @@ pub async fn build_structured_messages(
             .get("sender_handle")
             .and_then(|value| value.as_str())
             .map(|value| value.to_string());
-        let sender_name = message.sender_id.and_then(|id| agent_map.get(&id).cloned());
+        let sender_name = message
+            .sender_session_agent_id
+            .and_then(|id| member_names.get(&id).cloned())
+            .or_else(|| {
+                message
+                    .sender_id
+                    .and_then(|id| legacy_member_names.get(&id).cloned())
+            })
+            .or_else(|| message.sender_id.and_then(|id| agent_map.get(&id).cloned()));
         let sender_label = match message.sender_type {
             ChatSenderType::User => sender_handle.clone().unwrap_or_else(|| "user".to_string()),
             ChatSenderType::Agent => sender_name

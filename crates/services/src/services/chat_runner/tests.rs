@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     path::Path,
     sync::{Arc, atomic::AtomicU8},
 };
@@ -33,7 +34,11 @@ use super::{
     RUNS_PRUNE_TARGET_BYTES_PER_WORKSPACE, ResolvedPromptLanguage, RunCompletionStatus,
     TokenUsageInfo, runtime::RunLogForwarders,
 };
-use crate::services::{config::UiLanguage, session_worktree::SessionWorktreeService};
+use crate::services::{
+    config::UiLanguage,
+    queued_message::{CreateQueuedMessage, QueuedMessageService},
+    session_worktree::SessionWorktreeService,
+};
 
 fn test_message_with_sender(
     sender_type: ChatSenderType,
@@ -46,6 +51,7 @@ fn test_message_with_sender(
         session_id: Uuid::new_v4(),
         sender_type,
         sender_id,
+        sender_session_agent_id: None,
         content: content.to_string(),
         mentions: sqlx::types::Json(Vec::new()),
         meta: sqlx::types::Json(meta),
@@ -144,6 +150,7 @@ async fn setup_chat_runner_db() -> DBService {
                 chat_input_mode TEXT,
                 project_id BLOB,
                 lead_agent_id TEXT,
+                lead_session_agent_id BLOB,
                 worktree_mode TEXT NOT NULL DEFAULT 'inherit'
                     CHECK (worktree_mode IN ('inherit', 'disabled', 'isolated')),
                 pinned_at TEXT,
@@ -207,6 +214,7 @@ async fn setup_chat_runner_db() -> DBService {
                 agent_session_id TEXT,
                 agent_message_id TEXT,
                 project_member_id BLOB,
+                member_name TEXT NOT NULL DEFAULT '',
                 execution_config TEXT NOT NULL DEFAULT '{}',
                 allowed_skill_ids TEXT NOT NULL DEFAULT '[]',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
@@ -233,11 +241,28 @@ async fn setup_chat_runner_db() -> DBService {
                 sender_type TEXT NOT NULL
                     CHECK (sender_type IN ('user','agent','system')),
                 sender_id BLOB,
+                sender_session_agent_id BLOB,
                 content TEXT NOT NULL,
                 mentions TEXT NOT NULL DEFAULT '[]',
                 meta TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+            )
+            "#,
+        r#"
+            CREATE TABLE chat_message_targets (
+                message_id BLOB NOT NULL,
+                ordinal INTEGER NOT NULL,
+                session_id BLOB NOT NULL,
+                session_agent_id BLOB,
+                project_member_id BLOB,
+                agent_id BLOB NOT NULL,
+                member_name_snapshot TEXT NOT NULL,
+                route_kind TEXT NOT NULL,
+                resolution_status TEXT NOT NULL DEFAULT 'resolved',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                PRIMARY KEY (message_id, ordinal),
+                UNIQUE (message_id, session_agent_id)
             )
             "#,
         r#"
@@ -252,6 +277,62 @@ async fn setup_chat_runner_db() -> DBService {
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
             )
+            "#,
+        r#"
+            CREATE TABLE project_team_protocols (
+                project_id BLOB PRIMARY KEY,
+                content TEXT NOT NULL DEFAULT '',
+                enabled BOOLEAN NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+        r#"
+            CREATE TABLE chat_runs (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                session_agent_id BLOB NOT NULL,
+                workspace_path TEXT,
+                run_index INTEGER NOT NULL,
+                run_dir TEXT NOT NULL,
+                input_path TEXT,
+                output_path TEXT,
+                raw_log_path TEXT,
+                meta_path TEXT,
+                log_state TEXT NOT NULL DEFAULT 'live',
+                artifact_state TEXT NOT NULL DEFAULT 'full',
+                log_truncated BOOLEAN NOT NULL DEFAULT 0,
+                log_capture_degraded BOOLEAN NOT NULL DEFAULT 0,
+                pruned_at TEXT,
+                prune_reason TEXT,
+                retention_summary_json TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+        r#"
+            CREATE UNIQUE INDEX idx_chat_runs_unique
+                ON chat_runs(session_agent_id, run_index)
+            "#,
+        r#"
+            CREATE TABLE chat_message_queue (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                session_agent_id BLOB NOT NULL,
+                agent_id BLOB NOT NULL,
+                chat_message_id BLOB NOT NULL,
+                status TEXT NOT NULL DEFAULT 'queued'
+                    CHECK (status IN ('queued','processing','running','failed','skipped','completed')),
+                processing_started_at TEXT,
+                run_id BLOB,
+                failure_reason TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+        r#"
+            CREATE UNIQUE INDEX idx_chat_message_queue_one_active
+                ON chat_message_queue(session_agent_id)
+                WHERE status IN ('processing', 'running')
             "#,
     ] {
         sqlx::query(statement)
@@ -310,6 +391,7 @@ async fn insert_test_session_agent(
         &db::models::chat_session_agent::CreateChatSessionAgent {
             session_id,
             agent_id,
+            member_name: None,
             workspace_path: None,
             allowed_skill_ids: Vec::new(),
             project_member_id: None,
@@ -385,6 +467,7 @@ async fn refreshes_workflow_member_execution_config_before_run() {
         &db::models::chat_session_agent::CreateChatSessionAgent {
             session_id,
             agent_id: agent.id,
+            member_name: None,
             workspace_path: None,
             allowed_skill_ids: Vec::new(),
             project_member_id: None,
@@ -542,6 +625,7 @@ async fn leaves_non_project_session_execution_config_unchanged_before_run() {
         &db::models::chat_session_agent::CreateChatSessionAgent {
             session_id,
             agent_id: agent.id,
+            member_name: None,
             workspace_path: None,
             allowed_skill_ids: Vec::new(),
             project_member_id: None,
@@ -651,16 +735,19 @@ async fn mention_resolution_auto_configures_project_member_for_new_session() {
     .await
     .expect("insert project member");
 
-    let (session_agent, resolved_agent) = runner
+    let resolved = runner
         .resolve_session_agent_for_mention(session_id, "OpencodeAgent")
         .await
         .expect("resolve mention")
         .expect("project member is materialized");
 
-    assert_eq!(resolved_agent.id, agent.id);
-    assert_eq!(resolved_agent.name, "OpencodeAgent");
-    assert_eq!(session_agent.agent_id, agent.id);
-    assert_eq!(session_agent.project_member_id, Some(member.id));
+    assert_eq!(resolved.agent_id, agent.id);
+    assert_eq!(resolved.member_name, "OpencodeAgent");
+    assert_eq!(resolved.project_member_id, Some(member.id));
+    let session_agent = ChatSessionAgent::find_by_id(&db.pool, resolved.session_agent_id)
+        .await
+        .expect("load materialized session member")
+        .expect("materialized session member exists");
     assert_eq!(
         session_agent.workspace_path.as_deref(),
         Some("/tmp/member-workspace")
@@ -724,15 +811,17 @@ async fn mention_resolution_uses_only_the_exact_member_name() {
     .await
     .expect("create second member");
 
+    let mut session_agent_ids = HashMap::new();
     for (agent_id, project_member_id) in [
         (lead_agent.id, lead_member.id),
         (second_agent.id, second_member.id),
     ] {
-        ChatSessionAgent::create(
+        let session_agent = ChatSessionAgent::create(
             &db.pool,
             &db::models::chat_session_agent::CreateChatSessionAgent {
                 session_id,
                 agent_id,
+                member_name: None,
                 workspace_path: Some("/tmp/project-default".to_string()),
                 allowed_skill_ids: Vec::new(),
                 project_member_id: Some(project_member_id),
@@ -742,6 +831,7 @@ async fn mention_resolution_uses_only_the_exact_member_name() {
         )
         .await
         .expect("create session member");
+        session_agent_ids.insert(agent_id, session_agent.id);
     }
 
     let resolved = runner
@@ -749,8 +839,18 @@ async fn mention_resolution_uses_only_the_exact_member_name() {
         .await
         .expect("resolve exact member")
         .expect("exact member exists");
-    assert_eq!(resolved.1.id, lead_agent.id);
-    assert_eq!(resolved.1.name, "CodexAgent");
+    assert_eq!(resolved.agent_id, lead_agent.id);
+    assert_eq!(resolved.member_name, "CodexAgent");
+
+    let second_session_agent_id = session_agent_ids[&second_agent.id];
+    let resolved_by_id = runner
+        .resolve_session_agent_by_id(session_id, second_session_agent_id)
+        .await
+        .expect("resolve session agent id")
+        .expect("session member exists");
+    assert_eq!(resolved_by_id.session_agent_id, second_session_agent_id);
+    assert_eq!(resolved_by_id.agent_id, second_agent.id);
+    assert_eq!(resolved_by_id.member_name, "CodexAgent2");
 
     assert!(
         runner
@@ -765,6 +865,402 @@ async fn mention_resolution_uses_only_the_exact_member_name() {
             .await
             .expect("resolve template name")
             .is_none()
+    );
+}
+
+#[tokio::test]
+async fn mention_resolution_distinguishes_members_sharing_one_backing_agent() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    let project_id = Uuid::new_v4();
+    insert_test_project(&db.pool, project_id).await;
+    sqlx::query(
+        "INSERT INTO chat_sessions (id, title, status, project_id) VALUES (?1, 'shared-config-session', 'active', ?2)",
+    )
+        .bind(session_id)
+        .bind(project_id)
+        .execute(&db.pool)
+        .await
+        .expect("insert project session");
+    let backing_agent = insert_test_chat_agent(&db, "SharedTemplate").await;
+
+    for (ordinal, member_name) in [(1, "BackendMember"), (2, "ReviewMember")] {
+        let member = ProjectMember::create(
+            &db.pool,
+            project_id,
+            ProjectMemberType::Agent,
+            None,
+            Some(backing_agent.id),
+            Some(member_name.to_string()),
+            Some("member".to_string()),
+            ordinal,
+            None,
+            Vec::new(),
+            MemberExecutionConfig::default(),
+            true,
+        )
+        .await
+        .expect("create project member");
+        ChatSessionAgent::create(
+            &db.pool,
+            &db::models::chat_session_agent::CreateChatSessionAgent {
+                session_id,
+                agent_id: backing_agent.id,
+                member_name: Some(member_name.to_string()),
+                workspace_path: Some("/tmp/shared-config".to_string()),
+                allowed_skill_ids: Vec::new(),
+                project_member_id: Some(member.id),
+                execution_config: MemberExecutionConfig::default(),
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create session member");
+    }
+
+    let backend = runner
+        .resolve_session_agent_for_mention(session_id, "BackendMember")
+        .await
+        .expect("resolve backend")
+        .expect("backend member exists");
+    let reviewer = runner
+        .resolve_session_agent_for_mention(session_id, "ReviewMember")
+        .await
+        .expect("resolve reviewer")
+        .expect("review member exists");
+
+    assert_eq!(backend.agent_id, backing_agent.id);
+    assert_eq!(reviewer.agent_id, backing_agent.id);
+    assert_ne!(backend.session_agent_id, reviewer.session_agent_id);
+    assert_eq!(backend.member_name, "BackendMember");
+    assert_eq!(reviewer.member_name, "ReviewMember");
+    let member_names = crate::services::chat::member_name_overrides_for_session(
+        &db.pool,
+        session_id,
+    )
+    .await
+    .expect("load member names by session identity");
+    assert_eq!(
+        member_names.get(&backend.session_agent_id).map(String::as_str),
+        Some("BackendMember")
+    );
+    assert_eq!(
+        member_names
+            .get(&reviewer.session_agent_id)
+            .map(String::as_str),
+        Some("ReviewMember")
+    );
+    assert!(
+        !crate::services::chat::unambiguous_member_names_by_agent_for_session(
+            &db.pool,
+            session_id,
+        )
+        .await
+        .expect("load legacy member names")
+        .contains_key(&backing_agent.id)
+    );
+}
+
+#[tokio::test]
+async fn session_member_creation_writes_requested_name_before_unique_check() {
+    let db = setup_chat_runner_db().await;
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+    let backing_agent = insert_test_chat_agent(&db, "SharedTemplate").await;
+    sqlx::query(
+        "CREATE UNIQUE INDEX test_session_member_name_once ON chat_session_agents(session_id, lower(member_name))",
+    )
+    .execute(&db.pool)
+    .await
+    .expect("create member name constraint");
+
+    let template_named = ChatSessionAgent::create(
+        &db.pool,
+        &db::models::chat_session_agent::CreateChatSessionAgent {
+            session_id,
+            agent_id: backing_agent.id,
+            member_name: None,
+            workspace_path: None,
+            allowed_skill_ids: Vec::new(),
+            project_member_id: None,
+            execution_config: MemberExecutionConfig::default(),
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("create template-named member");
+    let requested = ChatSessionAgent::create(
+        &db.pool,
+        &db::models::chat_session_agent::CreateChatSessionAgent {
+            session_id,
+            agent_id: backing_agent.id,
+            member_name: Some("ReviewMember".to_string()),
+            workspace_path: None,
+            allowed_skill_ids: Vec::new(),
+            project_member_id: None,
+            execution_config: MemberExecutionConfig::default(),
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("create requested-name member in one insert");
+
+    assert_eq!(template_named.member_name, "SharedTemplate");
+    assert_eq!(requested.member_name, "ReviewMember");
+}
+
+#[tokio::test]
+async fn self_mention_is_rejected_by_session_member_id_and_persisted() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+    let agent = insert_test_chat_agent(&db, "SharedTemplate").await;
+    let session_member = ChatSessionAgent::create(
+        &db.pool,
+        &db::models::chat_session_agent::CreateChatSessionAgent {
+            session_id,
+            agent_id: agent.id,
+            member_name: None,
+            workspace_path: Some("/tmp/self-mention".to_string()),
+            allowed_skill_ids: Vec::new(),
+            project_member_id: None,
+            execution_config: MemberExecutionConfig::default(),
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("create session member");
+    let message_id = Uuid::new_v4();
+    sqlx::query(
+        r#"INSERT INTO chat_messages (
+               id, session_id, sender_type, sender_id, sender_session_agent_id,
+               content, mentions, meta
+           ) VALUES (?1, ?2, 'agent', ?3, ?4, 'self ping', '["SharedTemplate"]', '{}')"#,
+    )
+    .bind(message_id)
+    .bind(session_id)
+    .bind(agent.id)
+    .bind(session_member.id)
+    .execute(&db.pool)
+    .await
+    .expect("insert self mention");
+    let message = ChatMessage::find_by_id(&db.pool, message_id)
+        .await
+        .expect("load self mention")
+        .expect("self mention exists");
+
+    let outcome = runner
+        .run_agent_for_mention(session_id, "SharedTemplate", 0, &message)
+        .await
+        .expect("route self mention");
+    assert!(matches!(
+        outcome,
+        super::DispatchOutcome::Rejected { ref reason } if reason == "self_mention"
+    ));
+    let targets = db::models::chat_message_target::ChatMessageTarget::find_by_message(
+        &db.pool,
+        message_id,
+    )
+    .await
+    .expect("load targets");
+    assert_eq!(targets.len(), 1);
+    assert_eq!(targets[0].session_agent_id, Some(session_member.id));
+    assert_eq!(
+        targets[0].resolution_status,
+        db::models::chat_message_target::ChatMessageTargetResolutionStatus::Rejected
+    );
+}
+
+#[tokio::test]
+async fn queued_dispatch_keeps_claimed_session_agent_when_backing_names_collide() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    runner
+        .stop_after_queue_binding
+        .store(true, std::sync::atomic::Ordering::Relaxed);
+    let workspace = tempfile::tempdir().expect("create temp workspace");
+    let workspace_path = workspace.path().to_string_lossy().to_string();
+    let project_id = Uuid::new_v4();
+    let session_id = Uuid::new_v4();
+    insert_test_project(&db.pool, project_id).await;
+    sqlx::query("UPDATE projects SET default_workspace_path = ?2 WHERE id = ?1")
+        .bind(project_id)
+        .bind(&workspace_path)
+        .execute(&db.pool)
+        .await
+        .expect("set temp project workspace");
+    sqlx::query(
+        r#"
+        INSERT INTO chat_sessions (id, title, status, project_id, default_workspace_path)
+        VALUES (?1, 'queue identity regression', 'active', ?2, ?3)
+        "#,
+    )
+    .bind(session_id)
+    .bind(project_id)
+    .bind(&workspace_path)
+    .execute(&db.pool)
+    .await
+    .expect("insert project session");
+
+    let lead_agent = insert_test_chat_agent(&db, "CodexAgent").await;
+    let second_agent = insert_test_chat_agent(&db, "CodexAgent").await;
+    let lead_member = ProjectMember::create(
+        &db.pool,
+        project_id,
+        ProjectMemberType::Agent,
+        None,
+        Some(lead_agent.id),
+        Some("CodexAgent".to_string()),
+        Some("lead".to_string()),
+        1,
+        Some(workspace_path.clone()),
+        Vec::new(),
+        MemberExecutionConfig::default(),
+        true,
+    )
+    .await
+    .expect("create lead project member");
+    let second_member = ProjectMember::create(
+        &db.pool,
+        project_id,
+        ProjectMemberType::Agent,
+        None,
+        Some(second_agent.id),
+        Some("CodexAgent2".to_string()),
+        Some("backend".to_string()),
+        2,
+        Some(workspace_path.clone()),
+        Vec::new(),
+        MemberExecutionConfig::default(),
+        true,
+    )
+    .await
+    .expect("create second project member");
+    let lead_session_agent = ChatSessionAgent::create(
+        &db.pool,
+        &db::models::chat_session_agent::CreateChatSessionAgent {
+            session_id,
+            agent_id: lead_agent.id,
+            member_name: Some("CodexAgent".to_string()),
+            workspace_path: Some(workspace_path.clone()),
+            allowed_skill_ids: Vec::new(),
+            project_member_id: Some(lead_member.id),
+            execution_config: MemberExecutionConfig::default(),
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("create lead session member");
+    let second_session_agent = ChatSessionAgent::create(
+        &db.pool,
+        &db::models::chat_session_agent::CreateChatSessionAgent {
+            session_id,
+            agent_id: second_agent.id,
+            member_name: Some("CodexAgent2".to_string()),
+            workspace_path: Some(workspace_path),
+            allowed_skill_ids: Vec::new(),
+            project_member_id: Some(second_member.id),
+            execution_config: MemberExecutionConfig::default(),
+        },
+        Uuid::new_v4(),
+    )
+    .await
+    .expect("create second session member");
+
+    let source_message_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO chat_messages (
+            id, session_id, sender_type, sender_id, content, mentions, meta
+        )
+        VALUES (?1, ?2, 'agent', ?3, 'queued for CodexAgent2', '["CodexAgent2"]', '{}')
+        "#,
+    )
+    .bind(source_message_id)
+    .bind(session_id)
+    .bind(lead_agent.id)
+    .execute(&db.pool)
+    .await
+    .expect("insert source agent message");
+    let source_message = ChatMessage::find_by_id(&db.pool, source_message_id)
+        .await
+        .expect("load source message")
+        .expect("source message exists");
+    let queue = QueuedMessageService::new()
+        .create_queued(
+            &db.pool,
+            &CreateQueuedMessage {
+                session_id,
+                session_agent_id: second_session_agent.id,
+                agent_id: second_agent.id,
+                chat_message_id: source_message.id,
+            },
+        )
+        .await
+        .expect("queue message for second member");
+    let claimed = QueuedMessageService::new()
+        .claim_next(&db.pool, second_session_agent.id)
+        .await
+        .expect("claim second member queue")
+        .expect("claimed queue exists");
+    assert_eq!(claimed.id, queue.id);
+
+    let mut events = runner.subscribe(session_id);
+    runner
+        .dispatch_queued_entry(session_id, second_session_agent.id, claimed)
+        .await;
+
+    let bound = QueuedMessageService::new()
+        .find_by_id(&db.pool, queue.id)
+        .await
+        .expect("load bound queue")
+        .expect("bound queue exists");
+    assert_eq!(bound.id, queue.id);
+    assert_eq!(
+        bound.status,
+        db::models::chat_message_queue::QueuedMessageStatus::Running
+    );
+    let run_id = bound.run_id.expect("claimed queue is bound to a run");
+    let run = db::models::chat_run::ChatRun::find_by_id(&db.pool, run_id)
+        .await
+        .expect("load bound run")
+        .expect("bound run exists");
+    assert_eq!(run.session_agent_id, second_session_agent.id);
+
+    let lead_after = ChatSessionAgent::find_by_id(&db.pool, lead_session_agent.id)
+        .await
+        .expect("load lead session member")
+        .expect("lead session member exists");
+    let second_after = ChatSessionAgent::find_by_id(&db.pool, second_session_agent.id)
+        .await
+        .expect("load second session member")
+        .expect("second session member exists");
+    assert_eq!(lead_after.state, ChatSessionAgentState::Idle);
+    assert_eq!(second_after.state, ChatSessionAgentState::Running);
+    let mut started_targets = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        if let ChatStreamEvent::AgentRunStarted {
+            session_agent_id,
+            agent_name,
+            ..
+        } = event
+        {
+            started_targets.push((session_agent_id, agent_name));
+        }
+    }
+    assert_eq!(
+        started_targets,
+        vec![(second_session_agent.id, "CodexAgent2".to_string())]
+    );
+    assert_eq!(
+        QueuedMessageService::new()
+            .list_for_member(&db.pool, second_session_agent.id)
+            .await
+            .expect("list second member queue")
+            .len(),
+        1
     );
 }
 
@@ -786,7 +1282,10 @@ async fn default_route_for_unmentioned_workflow_message_uses_lead_agent() {
         .await
         .expect("resolve default mention");
 
-    assert_eq!(default_mention.as_deref(), Some("first"));
+    assert_eq!(
+        default_mention.map(|member| member.member_name),
+        Some("first".to_string())
+    );
 }
 
 #[tokio::test]
@@ -904,7 +1403,7 @@ fn select_workspace_path_falls_back_to_session_default_before_generated_path() {
 }
 
 #[tokio::test]
-async fn resolve_workspace_path_for_merged_isolated_session_returns_worktree_workspace() {
+async fn resolve_workspace_path_for_merged_isolated_session_returns_base_workspace() {
     let db = setup_chat_runner_db().await;
     let runner = ChatRunner::new(db.clone());
     let session_id = Uuid::new_v4();
@@ -954,7 +1453,7 @@ async fn resolve_workspace_path_for_merged_isolated_session_returns_worktree_wor
         .await
         .expect("resolve workspace");
 
-    assert_eq!(resolved, worktree_workspace);
+    assert_eq!(resolved, base_workspace);
 
     let active_rows: i64 = sqlx::query_scalar(
         r#"
@@ -1120,7 +1619,7 @@ fn parse_agent_protocol_messages_supports_relaxed_message_type_shorthand() {
 "#;
 
     let messages = ChatRunner::parse_agent_protocol_messages(content).expect("messages");
-    assert_eq!(messages.len(), 4);
+    assert_eq!(messages.len(), 3);
     assert!(matches!(
         messages[0].message_type,
         AgentProtocolMessageType::Send
@@ -1129,10 +1628,6 @@ fn parse_agent_protocol_messages_supports_relaxed_message_type_shorthand() {
     assert_eq!(messages[0].intent.as_deref(), Some("reply"));
     assert!(matches!(
         messages[1].message_type,
-        AgentProtocolMessageType::Artifact
-    ));
-    assert!(matches!(
-        messages[2].message_type,
         AgentProtocolMessageType::Record
     ));
     assert_eq!(messages[1].content, "hero grid restored to idle");
@@ -1499,6 +1994,82 @@ async fn recover_orphaned_session_agents_resets_active_agents() {
     assert!(idle.pty_session_key.is_some());
     assert!(idle.agent_session_id.is_some());
     assert!(idle.agent_message_id.is_some());
+}
+
+#[tokio::test]
+async fn recover_orphaned_session_agents_finds_dead_member_with_unbound_processing_queue() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    let session_agent_id = Uuid::new_v4();
+    let agent_id = Uuid::new_v4();
+    let processing_queue_id = Uuid::new_v4();
+
+    sqlx::query(
+        r#"
+        INSERT INTO chat_session_agents (
+            id, session_id, agent_id, state, pty_session_key,
+            agent_session_id, agent_message_id, allowed_skill_ids
+        )
+        VALUES (?1, ?2, ?3, 'dead', 'stale-pty', 'stale-session', 'stale-message', '[]')
+        "#,
+    )
+    .bind(session_agent_id)
+    .bind(session_id)
+    .bind(agent_id)
+    .execute(&db.pool)
+    .await
+    .expect("insert dead session agent");
+
+    sqlx::query(
+        r#"
+        INSERT INTO chat_message_queue (
+            id, session_id, session_agent_id, agent_id, chat_message_id,
+            status, processing_started_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, 'processing', datetime('now', 'subsec'))
+        "#,
+    )
+    .bind(processing_queue_id)
+    .bind(session_id)
+    .bind(session_agent_id)
+    .bind(agent_id)
+    .bind(Uuid::new_v4())
+    .execute(&db.pool)
+    .await
+    .expect("insert unbound processing queue row");
+
+    let recovered = runner
+        .recover_orphaned_session_agents()
+        .await
+        .expect("recover unbound processing queue");
+    assert_eq!(recovered, 1);
+
+    let session_agent = ChatSessionAgent::find_by_id(&db.pool, session_agent_id)
+        .await
+        .expect("lookup recovered member")
+        .expect("recovered member exists");
+    assert_eq!(session_agent.state, ChatSessionAgentState::Idle);
+    assert_eq!(session_agent.pty_session_key, None);
+    assert_eq!(session_agent.agent_session_id, None);
+    assert_eq!(session_agent.agent_message_id, None);
+
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        loop {
+            let queue_status: String =
+                sqlx::query_scalar("SELECT status FROM chat_message_queue WHERE id = ?1")
+                    .bind(processing_queue_id)
+                    .fetch_one(&db.pool)
+                    .await
+                    .expect("lookup recovered queue row");
+            if queue_status == "skipped" {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("recovered queue is automatically dispatched and finalized");
 }
 
 #[test]
@@ -2511,6 +3082,7 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
         session_id,
         sender_type: ChatSenderType::User,
         sender_id: None,
+        sender_session_agent_id: None,
         content: "@fullstack ".to_string(),
         mentions: sqlx::types::Json(vec!["fullstack".to_string()]),
         meta: sqlx::types::Json(json!({})),
@@ -2537,6 +3109,8 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
     );
 
     // Verify key sections exist instead of exact string match
+    assert!(prompt.starts_with("[OPENTEAMS_SOURCE=openteams]\n\n"));
+    assert_eq!(prompt.matches("[OPENTEAMS_SOURCE=openteams]").count(), 1);
     assert!(prompt.contains("# Chat Message"));
     assert!(prompt.contains("## Input Message"));
     assert!(prompt.contains("- sender: you"));
@@ -2545,6 +3119,12 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
     assert!(prompt.contains("### Rules"));
     assert!(prompt.contains("### Schema"));
     assert!(prompt.contains("send.to"));
+    assert!(prompt.contains(
+        "Emit at most one `send` item for each `send.to` value per response, including `\"you\"` and every agent."
+    ));
+    assert!(prompt.contains(
+        "Never emit multiple `send` items with the same `send.to`; combine their content into one complete Markdown message."
+    ));
     assert!(prompt.contains("record`: long-lived shared facts only."));
     assert!(prompt.contains("artifact.content`: a JSON array of file paths only."));
     assert!(prompt.contains("conclusion`: current-turn summary only"));
@@ -2621,6 +3201,12 @@ fn build_exact_markdown_prompt_restricts_send_targets_in_workflow_mode() {
     );
 
     assert!(prompt.contains("Workflow mode: `send.to` may only be `\"you\"`"));
+    assert!(prompt.contains(
+        "Emit at most one `send` item for each `send.to` value per response, including `\"you\"` and every agent."
+    ));
+    assert!(prompt.contains(
+        "Never emit multiple `send` items with the same `send.to`; combine their content into one complete Markdown message."
+    ));
     assert!(prompt.contains("do not send workflow-mode messages to other agents"));
     assert!(!prompt.contains("`send.to` must match a group member name"));
     assert!(prompt.contains("`workflow_generate`"));

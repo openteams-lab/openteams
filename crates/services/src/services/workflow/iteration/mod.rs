@@ -34,7 +34,10 @@ use super::{
     chat_runner::ChatRunner,
     config,
     workflow_compiler::WorkflowCompiler,
-    workflow_orchestrator::{OrchestratorError, WorkflowOrchestrator, reducer},
+    workflow_orchestrator::{
+        OrchestratorError, WorkflowOrchestrator, reducer, workflow_agent_id_map,
+        workflow_plan_agent_id, workflow_valid_agent_ids,
+    },
     workflow_runtime::{
         SummaryPayload, WorkflowCardAgent, extract_json_payload, parse_summary_payload,
         resolve_workflow_response_language_instruction, run_workflow_agent_prompt,

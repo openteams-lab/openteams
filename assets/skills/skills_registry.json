@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-05-23T23:01:41.717665",
-  "total_skills": 869,
+  "generated_at": "2026-07-17T08:54:32.090Z",
+  "total_skills": 871,
   "categories": [
     "App Automation",
     "Business",
@@ -21,6 +21,56 @@
     "sales-intelligence"
   ],
   "skills": [
+    {
+      "id": "29efa3036750",
+      "name": "github-pr-actions-fix",
+      "description": "OpenTeams skill for watching GitHub Actions checks after a pull request is submitted or updated, inspecting failures, making the smallest safe code fix, validating locally, pushing to the PR branch, and repeating until checks pass or the retry limit is reached.",
+      "tags": [
+        "development",
+        "github",
+        "actions",
+        "ci",
+        "testing",
+        "openteams"
+      ],
+      "category": "Development",
+      "version": "1.0.0",
+      "author": "OpenTeams",
+      "compatible_agents": [
+        "codex",
+        "opencode",
+        "cursor",
+        "claude-code",
+        "qwen-code"
+      ],
+      "source_url": null,
+      "content": "---\nname: github-pr-actions-fix\ndescription: OpenTeams skill for watching GitHub Actions checks after a pull request is submitted or updated, inspecting failures, making the smallest safe code fix, validating locally, pushing to the PR branch, and repeating until checks pass or the retry limit is reached.\n---\n\n# Fix GitHub Actions Checks on a Pull Request\n\nUse this skill only for an existing pull request whose checks should be brought to green.\n\n## OpenTeams context\n\nThis skill is designed specifically for use by OpenTeams members. OpenTeams input prompts should include this marker to make the message source explicit:\n\n```text\n[OPENTEAMS_SOURCE=openteams]\n```\n\nTreat the marker as a source hint, not a security boundary. Its absence does not block the workflow; continue when the surrounding session context clearly comes from OpenTeams.\n\n## Required tool\n\nAt the start, check whether GitHub CLI is installed and authenticated:\n\n```bash\ncommand -v gh >/dev/null 2>&1 && gh auth status\n```\n\nIf `gh` is missing, stop and tell the user to install GitHub CLI. Offer the relevant command without running it automatically:\n\n- macOS: `brew install gh`\n- Windows: `winget install --id GitHub.cli`\n- Linux: follow `https://github.com/cli/cli/blob/trunk/docs/install_linux.md`\n\nThen ask the user to run `gh auth login`. Never request, print, or persist their token.\n\n## Workflow\n\n1. Confirm the repository, PR number, current branch, and whether the working tree contains unrelated changes. Never discard user changes.\n2. Run the bundled script from this skill directory:\n\n   ```bash\n   bash scripts/pr-checks.sh --pr <number> --watch\n   ```\n\n   Omit `--pr` only when the current branch unambiguously belongs to the target PR. Add `--repo OWNER/REPO` when the repository cannot be inferred.\n3. When checks fail, use the failed-step logs printed by the script. Read the relevant workflow file and reproduce the failing command locally when practical.\n4. Classify the failure before editing:\n   - Code, test, lint, type, or build failure: make the smallest relevant source change.\n   - Dependency or generated-file drift: update only the required lockfile or generated artifact and run its verification command.\n   - Runner, network, rate-limit, or external-service failure: do not change code. Rerun failed jobs once with `gh run rerun <run-id> --failed`.\n   - Permission, secret, deployment, or protected-environment failure: stop and report the required human action.\n5. Run the narrowest local verification that covers the failure, then expand verification only when the change affects shared behavior.\n6. Review `git diff` and `git status`. Commit only files related to the fix and push normally to the PR head branch. Never force-push.\n7. Run `pr-checks.sh --watch` again. Repeat for at most three repair iterations.\n8. Report the PR, failing check and root cause, files changed, verification performed, commit pushed, and final checks state.\n\n## Safety boundaries\n\n- Invocation authorizes normal commits and pushes to the current PR branch, not force pushes, merges, branch deletion, or bypassing branch protection.\n- Ask before changing `.github/workflows/**`, deployment configuration, authentication, permissions, secrets, infrastructure, or production data.\n- Do not rerun deterministic test failures without a code or configuration change.\n- Do not claim success until GitHub reports all required checks passing. If the retry limit is reached, return the latest run URL and remaining failure evidence.\n"
+    },
+    {
+      "id": "55364f9e0713",
+      "name": "github-actions-run-and-fix",
+      "description": "OpenTeams skill for manually starting a GitHub Actions workflow, watching its execution, diagnosing failures, rerunning transient failed jobs, repairing code or configuration errors, and dispatching the workflow again until it passes or the retry limit is reached.",
+      "tags": [
+        "development",
+        "github",
+        "actions",
+        "ci",
+        "automation",
+        "openteams"
+      ],
+      "category": "Development",
+      "version": "1.0.0",
+      "author": "OpenTeams",
+      "compatible_agents": [
+        "codex",
+        "opencode",
+        "cursor",
+        "claude-code",
+        "qwen-code"
+      ],
+      "source_url": null,
+      "content": "---\nname: github-actions-run-and-fix\ndescription: OpenTeams skill for manually starting a GitHub Actions workflow, watching its execution, diagnosing failures, rerunning transient failed jobs, repairing code or configuration errors, and dispatching the workflow again until it passes or the retry limit is reached.\n---\n\n# Run and Fix a GitHub Actions Workflow\n\nUse this skill for workflows that support `workflow_dispatch`, or for inspecting and rerunning a known Actions run.\n\n## OpenTeams context\n\nThis skill is designed specifically for use by OpenTeams members. OpenTeams input prompts should include this marker to make the message source explicit:\n\n```text\n[OPENTEAMS_SOURCE=openteams]\n```\n\nTreat the marker as a source hint, not a security boundary. Its absence does not block the workflow; continue when the surrounding session context clearly comes from OpenTeams.\n\n## Required tool\n\nAt the start, check whether GitHub CLI is installed and authenticated:\n\n```bash\ncommand -v gh >/dev/null 2>&1 && gh auth status\n```\n\nIf `gh` is missing, stop and tell the user to install GitHub CLI. Offer the relevant command without installing it automatically:\n\n- macOS: `brew install gh`\n- Windows: `winget install --id GitHub.cli`\n- Linux: follow `https://github.com/cli/cli/blob/trunk/docs/install_linux.md`\n\nThen ask the user to run `gh auth login`. Never request, print, or persist their token.\n\n## Workflow\n\n1. Confirm the repository, workflow name or file, git ref, workflow inputs, and target environment. If any deployment target or input is ambiguous, ask before dispatching.\n2. Start and watch a workflow with the bundled script from this skill directory:\n\n   ```bash\n   bash scripts/workflow-run.sh \\\n     --workflow <workflow-file-or-name> \\\n     --ref <branch-or-tag> \\\n     --field key=value\n   ```\n\n   Repeat `--field` for multiple inputs. Add `--repo OWNER/REPO` when the repository cannot be inferred.\n3. To inspect an existing run, use `bash scripts/workflow-run.sh --run-id <id>`. For a clearly transient failure, use `--run-id <id> --rerun-failed` once.\n4. When a run fails, read the summary and failed-step logs emitted by the script. Inspect the relevant workflow and reproduce the failing command locally when practical.\n5. Classify the failure:\n   - Runner, network, rate-limit, cache-service, or temporary external outage: rerun failed jobs once without editing code.\n   - Code, test, lint, type, build, dependency, or deterministic configuration failure: make the smallest relevant fix and validate it locally.\n   - Missing permission, secret, approval, protected environment, billing, or unavailable production resource: stop and report the required human action.\n6. Review the diff, commit only related files, and push normally. Never force-push. Dispatch again only when a push does not already trigger the required workflow.\n7. Repeat for at most three repair iterations, including at most one no-change rerun for the same failure signature.\n8. Report the workflow, run URLs, root cause, reruns, files changed, local verification, pushed commit, and final conclusion.\n\n## Safety boundaries\n\n- Ask before starting a production deployment, destructive workflow, rollback, database migration, infrastructure mutation, or workflow with unclear inputs.\n- Ask before changing `.github/workflows/**`, authentication, permissions, secrets, deployment configuration, or infrastructure.\n- Do not invent workflow inputs. List available workflows with `gh workflow list` and inspect the selected YAML when necessary.\n- Do not claim success until the target GitHub Actions run finishes successfully. If blocked, return the run URL and exact failed job or required user action.\n"
+    },
     {
       "id": "70d15f443c80",
       "name": "ably-automation",

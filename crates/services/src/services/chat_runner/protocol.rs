@@ -1286,11 +1286,10 @@ impl ChatRunner {
             return Ok(());
         }
 
-        let member_names = chat::member_name_overrides_for_session(pool, session_id).await?;
         let mut agents = Vec::with_capacity(session_agents.len());
         for session_agent in &session_agents {
             if let Some(mut agent) = ChatAgent::find_by_id(pool, session_agent.agent_id).await? {
-                chat::apply_effective_agent_name(&mut agent, &member_names);
+                agent.name = session_agent.member_name.clone();
                 agents.push(agent);
             }
         }
@@ -1311,16 +1310,13 @@ impl ChatRunner {
             .await?;
         let available_agents: Vec<WorkflowCardAgent> = session_agents
             .iter()
-            .filter_map(|session_agent| {
-                let agent = agents
-                    .iter()
-                    .find(|item| item.id == session_agent.agent_id)?;
-                Some(WorkflowCardAgent {
+            .map(|session_agent| {
+                WorkflowCardAgent {
                     session_agent_id: session_agent.id.to_string(),
                     workflow_agent_session_id: None,
-                    agent_id: agent.id.to_string(),
-                    name: agent.name.clone(),
-                })
+                    agent_id: session_agent.agent_id.to_string(),
+                    name: session_agent.member_name.clone(),
+                }
             })
             .collect();
 

@@ -413,14 +413,6 @@ impl WorkflowOrchestrator {
         let updated_transcript =
             WorkflowTranscript::update_meta_json(pool, transcript.id, &updated_meta_json).await?;
 
-        workflow_analytics::track_approval_resolved(
-            chat_runner.analytics_service(),
-            execution.session_id,
-            execution.id,
-            step.id,
-            resolved_action,
-        );
-
         match resolved_action {
             "approved" | "approve" => {
                 let approved_feedback =
@@ -434,14 +426,6 @@ impl WorkflowOrchestrator {
                     &approved_feedback,
                 )
                 .await?;
-                workflow_analytics::track_step_reviewed(
-                    chat_runner.analytics_service(),
-                    execution.session_id,
-                    execution.id,
-                    step.id,
-                    "approved",
-                    "user",
-                );
                 workflow_analytics::track_review_decision_recorded(
                     chat_runner.analytics_service(),
                     execution.session_id,
@@ -529,14 +513,6 @@ impl WorkflowOrchestrator {
                     &rejected_feedback,
                 )
                 .await?;
-                workflow_analytics::track_step_reviewed(
-                    chat_runner.analytics_service(),
-                    execution.session_id,
-                    execution.id,
-                    step.id,
-                    "rejected",
-                    "user",
-                );
                 workflow_analytics::track_review_decision_recorded(
                     chat_runner.analytics_service(),
                     execution.session_id,
@@ -695,14 +671,6 @@ impl WorkflowOrchestrator {
         let updated_transcript =
             WorkflowTranscript::update_meta_json(pool, transcript.id, &updated_meta_json).await?;
 
-        workflow_analytics::track_approval_resolved(
-            chat_runner.analytics_service(),
-            execution.session_id,
-            execution.id,
-            step.id,
-            resolved_action,
-        );
-
         match resolved_action {
             "approved" | "approve" => {
                 let default_approved_feedback =
@@ -717,14 +685,6 @@ impl WorkflowOrchestrator {
                     &approved_feedback,
                 )
                 .await?;
-                workflow_analytics::track_step_reviewed(
-                    chat_runner.analytics_service(),
-                    execution.session_id,
-                    execution.id,
-                    step.id,
-                    "approved",
-                    "user",
-                );
                 workflow_analytics::track_review_decision_recorded(
                     chat_runner.analytics_service(),
                     execution.session_id,
@@ -819,14 +779,6 @@ impl WorkflowOrchestrator {
                     &rejected_feedback,
                 )
                 .await?;
-                workflow_analytics::track_step_reviewed(
-                    chat_runner.analytics_service(),
-                    execution.session_id,
-                    execution.id,
-                    step.id,
-                    "rejected",
-                    "user",
-                );
                 workflow_analytics::track_review_decision_recorded(
                     chat_runner.analytics_service(),
                     execution.session_id,

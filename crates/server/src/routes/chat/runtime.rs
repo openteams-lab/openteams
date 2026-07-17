@@ -222,9 +222,7 @@ fn active_run_status(state: &ChatSessionAgentState) -> Option<ChatActiveRunStatu
 }
 
 fn active_run_model(agent: Option<&ChatAgent>, session_agent: &ChatSessionAgent) -> Option<String> {
-    let Some(agent) = agent else {
-        return None;
-    };
+    let agent = agent?;
     match resolve_effective_member_execution_config(agent, session_agent) {
         Ok(config) => config.model_name,
         Err(err) => {

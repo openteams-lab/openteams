@@ -38,6 +38,7 @@ pub struct ChatSession {
     pub title: Option<String>,
     pub status: ChatSessionStatus,
     pub lead_agent_id: Option<Uuid>,
+    pub lead_session_agent_id: Option<Uuid>,
     pub summary_text: Option<String>,
     pub archive_ref: Option<String>,
     pub last_seen_diff_key: Option<String>,
@@ -72,6 +73,13 @@ pub struct UpdateChatSession {
     )]
     #[ts(optional, type = "string | null")]
     pub lead_agent_id: Option<Option<Uuid>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "double_option"
+    )]
+    #[ts(optional, type = "string | null")]
+    pub lead_session_agent_id: Option<Option<Uuid>>,
     pub summary_text: Option<String>,
     pub archive_ref: Option<String>,
     pub last_seen_diff_key: Option<String>,
@@ -108,6 +116,7 @@ impl ChatSession {
                           title,
                           status,
                           lead_agent_id,
+                          lead_session_agent_id,
                           summary_text,
                           archive_ref,
                           last_seen_diff_key,
@@ -135,6 +144,7 @@ impl ChatSession {
                           title,
                           status,
                           lead_agent_id,
+                          lead_session_agent_id,
                           summary_text,
                           archive_ref,
                           last_seen_diff_key,
@@ -165,6 +175,7 @@ impl ChatSession {
                       title,
                       status,
                       lead_agent_id,
+                      lead_session_agent_id,
                       summary_text,
                       archive_ref,
                       last_seen_diff_key,
@@ -193,6 +204,7 @@ impl ChatSession {
                       title,
                       status,
                       lead_agent_id,
+                      lead_session_agent_id,
                       summary_text,
                       archive_ref,
                       last_seen_diff_key,
@@ -229,6 +241,7 @@ impl ChatSession {
                          title,
                          status,
                          lead_agent_id,
+                         lead_session_agent_id,
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
@@ -262,10 +275,37 @@ impl ChatSession {
 
         let title = data.title.clone().or(existing.title);
         let status = data.status.clone().unwrap_or(existing.status);
-        let lead_agent_id = match &data.lead_agent_id {
+        let mut lead_agent_id = match &data.lead_agent_id {
             Some(value) => *value,          // Some(Some(uuid)) = set, Some(None) = clear
             None => existing.lead_agent_id, // Not provided, keep existing
         };
+        let mut lead_session_agent_id = match &data.lead_session_agent_id {
+            Some(value) => *value,
+            None => existing.lead_session_agent_id,
+        };
+        if let Some(value) = &data.lead_session_agent_id {
+            lead_agent_id = match value {
+                Some(session_agent_id) => {
+                    super::chat_session_agent::ChatSessionAgent::find_by_id(pool, *session_agent_id)
+                        .await?
+                        .filter(|session_agent| session_agent.session_id == id)
+                        .map(|session_agent| session_agent.agent_id)
+                }
+                None => None,
+            };
+        } else if data.lead_agent_id.is_some() {
+            lead_session_agent_id = match lead_agent_id {
+                Some(agent_id) => {
+                    let matches =
+                        super::chat_session_agent::ChatSessionAgent::find_all_by_session_and_agent(
+                            pool, id, agent_id,
+                        )
+                        .await?;
+                    (matches.len() == 1).then(|| matches[0].id)
+                }
+                None => None,
+            };
+        }
         let summary_text = data.summary_text.clone().or(existing.summary_text);
         let archive_ref = data.archive_ref.clone().or(existing.archive_ref);
         let last_seen_diff_key = data
@@ -293,19 +333,21 @@ impl ChatSession {
                SET title = $2,
                    status = $3,
                    lead_agent_id = $4,
-                   summary_text = $5,
-                   archive_ref = $6,
-                   last_seen_diff_key = $7,
-                   archived_at = $8,
-                   default_workspace_path = $9,
-                   chat_input_mode = $10,
-                   worktree_mode = $11,
+                   lead_session_agent_id = $5,
+                   summary_text = $6,
+                   archive_ref = $7,
+                   last_seen_diff_key = $8,
+                   archived_at = $9,
+                   default_workspace_path = $10,
+                   chat_input_mode = $11,
+                   worktree_mode = $12,
                    updated_at = datetime('now', 'subsec')
                WHERE id = $1
                RETURNING id,
                          title,
                          status,
                          lead_agent_id,
+                         lead_session_agent_id,
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
@@ -322,6 +364,7 @@ impl ChatSession {
         .bind(title)
         .bind(status)
         .bind(lead_agent_id)
+        .bind(lead_session_agent_id)
         .bind(summary_text)
         .bind(archive_ref)
         .bind(last_seen_diff_key)
@@ -348,6 +391,7 @@ impl ChatSession {
                          title,
                          status,
                          lead_agent_id,
+                         lead_session_agent_id,
                          summary_text,
                          archive_ref,
                          last_seen_diff_key,
@@ -424,6 +468,7 @@ mod tests {
                 title TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
                 lead_agent_id BLOB,
+                lead_session_agent_id BLOB,
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,

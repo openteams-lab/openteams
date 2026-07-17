@@ -14,7 +14,6 @@ use db::models::{
     chat_message::{ChatMessage, ChatSenderType, CreateChatMessage},
     chat_session::{ChatSession, ChatSessionStatus},
     chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
-    project_member::{ProjectMember, ProjectMemberType},
 };
 use executors::{
     approvals::NoopExecutorApprovalService,
@@ -38,10 +37,7 @@ use ts_rs::TS;
 use utils::{assets::config_path, log_msg::LogMsg, msg_store::MsgStore, utf8::Utf8LossyDecoder};
 use uuid::Uuid;
 
-use super::{
-    analytics::AnalyticsService,
-    workflow_analytics::{self, hash_user_id},
-};
+use super::{analytics::AnalyticsService, workflow_analytics};
 
 include!("dependencies.rs");
 include!("types.rs");

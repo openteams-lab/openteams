@@ -148,6 +148,7 @@ async fn seed_session_with_observed_source(
         &CreateChatSessionAgent {
             session_id: session.id,
             agent_id: agent.id,
+            member_name: None,
             workspace_path: Some(workspace_path.to_string_lossy().to_string()),
             allowed_skill_ids: Vec::new(),
             project_member_id: None,
@@ -1612,7 +1613,7 @@ async fn source_control_uses_worktree_path_for_active_worktree() {
 }
 
 #[tokio::test]
-async fn source_control_uses_worktree_path_after_merge() {
+async fn source_control_uses_base_workspace_after_merge() {
     let pool = setup_pool().await;
     let (_tempdir, repo_path) = setup_git_workspace();
     let project = seed_project(&pool, &repo_path).await;
@@ -1622,8 +1623,8 @@ async fn source_control_uses_worktree_path_after_merge() {
     let worktree_path = worktree_dir.path();
     fs::create_dir_all(worktree_path).unwrap();
 
-    // Seed a merged worktree: source-control should keep using worktree_path,
-    // matching runner workspace routing for follow-up session commits.
+    // Seed a merged worktree: source-control should switch back to the base
+    // workspace while preserving the worktree row for explicit discard.
     seed_worktree_row(
         &pool,
         session_id,
@@ -1642,7 +1643,7 @@ async fn source_control_uses_worktree_path_after_merge() {
     match status {
         SessionSourceControlStatus::Git { workspace_path, .. }
         | SessionSourceControlStatus::Plain { workspace_path, .. } => {
-            assert_eq!(workspace_path, worktree_path.to_string_lossy());
+            assert_eq!(workspace_path, repo_path.to_string_lossy());
         }
     }
 }

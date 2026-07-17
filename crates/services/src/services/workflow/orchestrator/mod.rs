@@ -1,4 +1,4 @@
-﻿//! Workflow Orchestrator 骨架
+//! Workflow Orchestrator 骨架
 //!
 //! 核心职责：
 //! - command handler: 接收 bootstrap 命令并创建 execution 图
@@ -54,7 +54,6 @@ use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use super::{
-    chat,
     chat_runner::{ChatRunner, ChatRunnerError},
     workflow_analytics,
     workflow_compiler::WorkflowCompiler,
@@ -154,6 +153,61 @@ enum SchedulerWorkOutcome {
 
 /// Orchestrator 是 workflow mode 的核心调度组件
 pub struct WorkflowOrchestrator;
+
+pub fn workflow_plan_agent_id(session_agent: &ChatSessionAgent) -> String {
+    session_agent.id.to_string()
+}
+
+pub fn workflow_valid_agent_ids(session_agents: &[ChatSessionAgent]) -> Vec<String> {
+    let mut valid_agent_ids = Vec::with_capacity(session_agents.len() * 2);
+    let mut agent_counts = HashMap::<Uuid, usize>::new();
+    for session_agent in session_agents {
+        valid_agent_ids.push(workflow_plan_agent_id(session_agent));
+        *agent_counts.entry(session_agent.agent_id).or_default() += 1;
+    }
+    for session_agent in session_agents {
+        if agent_counts.get(&session_agent.agent_id).copied() == Some(1) {
+            valid_agent_ids.push(session_agent.agent_id.to_string());
+        }
+    }
+    valid_agent_ids
+}
+
+pub fn workflow_agent_id_map(session_agents: &[ChatSessionAgent]) -> HashMap<String, Uuid> {
+    let mut agent_id_map = HashMap::with_capacity(session_agents.len() * 2);
+    let mut agent_counts = HashMap::<Uuid, usize>::new();
+    for session_agent in session_agents {
+        *agent_counts.entry(session_agent.agent_id).or_default() += 1;
+    }
+    for session_agent in session_agents {
+        agent_id_map.insert(workflow_plan_agent_id(session_agent), session_agent.id);
+        if agent_counts.get(&session_agent.agent_id).copied() == Some(1) {
+            agent_id_map.insert(session_agent.agent_id.to_string(), session_agent.id);
+        }
+    }
+    agent_id_map
+}
+
+pub fn workflow_agent_name_lookup(session_agents: &[ChatSessionAgent]) -> HashMap<String, String> {
+    let mut lookup = HashMap::with_capacity(session_agents.len() * 2);
+    let mut agent_counts = HashMap::<Uuid, usize>::new();
+    for session_agent in session_agents {
+        *agent_counts.entry(session_agent.agent_id).or_default() += 1;
+    }
+    for session_agent in session_agents {
+        lookup.insert(
+            workflow_plan_agent_id(session_agent),
+            session_agent.member_name.clone(),
+        );
+        if agent_counts.get(&session_agent.agent_id).copied() == Some(1) {
+            lookup.insert(
+                session_agent.agent_id.to_string(),
+                session_agent.member_name.clone(),
+            );
+        }
+    }
+    lookup
+}
 
 impl WorkflowOrchestrator {
     // -----------------------------------------------------------------------
@@ -549,10 +603,7 @@ impl WorkflowOrchestrator {
             } else {
                 WorkflowLoop::find_by_execution(pool, execution.id).await?
             };
-            let valid_agent_ids = agents
-                .iter()
-                .map(|agent| agent.id.to_string())
-                .collect::<Vec<_>>();
+            let valid_agent_ids = workflow_valid_agent_ids(&session_agents);
             let compiled_graph =
                 WorkflowCompiler::compile_from_json(&revision.plan_json, &valid_agent_ids)?;
 
@@ -1394,7 +1445,7 @@ impl WorkflowOrchestrator {
             execution.id,
             execution.plan_id,
             step.id,
-            &step.step_key,
+            transitioned.retry_count,
             &from_status,
             &to_status,
             None,
@@ -1455,7 +1506,7 @@ impl WorkflowOrchestrator {
                     execution.id,
                     execution.plan_id,
                     step.id,
-                    &step.step_key,
+                    transitioned.retry_count,
                     &from_status,
                     &to_status,
                     None,
@@ -1837,10 +1888,9 @@ pub(crate) async fn load_agents_for_session(
     pool: &SqlitePool,
     session_agents: &[ChatSessionAgent],
 ) -> Result<Vec<ChatAgent>, OrchestratorError> {
-    let Some(session_id) = session_agents.first().map(|agent| agent.session_id) else {
+    if session_agents.is_empty() {
         return Ok(Vec::new());
-    };
-    let member_names = chat::member_name_overrides_for_session(pool, session_id).await?;
+    }
     let mut agents = Vec::new();
     for session_agent in session_agents {
         let mut agent = ChatAgent::find_by_id(pool, session_agent.agent_id)
@@ -1848,7 +1898,7 @@ pub(crate) async fn load_agents_for_session(
             .ok_or_else(|| {
                 OrchestratorError::NotFound(format!("agent {} 未找到", session_agent.agent_id))
             })?;
-        chat::apply_effective_agent_name(&mut agent, &member_names);
+        agent.name = session_agent.member_name.clone();
         agents.push(agent);
     }
     Ok(agents)

@@ -509,6 +509,8 @@ check(
   'supports following the operating system theme preference',
   source.includes('ThemePreference') &&
     source.includes('const resolveSystemTheme =') &&
+    source.includes("useState<ThemePreference>('system')") &&
+    source.includes('useState<Locale>(resolveBrowserLocale)') &&
     source.includes("'(prefers-color-scheme: light)'") &&
     source.includes('themePreference ===') &&
     source.includes('setThemePreferenceState(t)') &&

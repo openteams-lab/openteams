@@ -6487,7 +6487,6 @@ dependencies = [
  "notify-debouncer-full",
  "notify-rust",
  "once_cell",
- "os_info",
  "pathdiff",
  "regex",
  "reqwest",

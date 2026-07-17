@@ -491,7 +491,7 @@ impl ModelPricingSyncService {
 /// Validate that a price is within acceptable bounds.
 /// Only accept prices > 0 and < 10000.
 fn is_valid_price(price: f64) -> bool {
-    price >= 0.0 && price < MAX_PRICE_PER_1M
+    (0.0..MAX_PRICE_PER_1M).contains(&price)
 }
 
 fn is_valid_optional_price(price: Option<f64>) -> bool {

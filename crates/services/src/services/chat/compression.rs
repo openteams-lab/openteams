@@ -10,7 +10,7 @@ Return only the summary body. Do not ask follow-up questions. Do not run any too
         prompt.push_str(&format!("{}: {}\n", msg.sender, msg.content));
     }
 
-    prompt
+    crate::services::mark_openteams_prompt(&prompt)
 }
 
 fn limit_summary_input_messages(
@@ -150,25 +150,13 @@ async fn try_summarize_with_agents(
         return None;
     }
 
-    let member_names = match member_name_overrides_for_session(pool, session_id).await {
-        Ok(names) => names,
-        Err(err) => {
-            tracing::warn!(
-                session_id = %session_id,
-                error = %err,
-                "Failed to load project member names for summarization; using agent template names"
-            );
-            HashMap::new()
-        }
-    };
-
     for session_agent in prioritize_summary_agents(&candidate_agents) {
         // Get the agent details
         let mut agent = match ChatAgent::find_by_id(pool, session_agent.agent_id).await {
             Ok(Some(agent)) => agent,
             _ => continue,
         };
-        apply_effective_agent_name(&mut agent, &member_names);
+        agent.name = session_agent.member_name.clone();
 
         tracing::debug!(
             "Attempting to summarize with agent: {} ({})",

@@ -428,9 +428,8 @@ pub async fn detect_default_branch(repo_path: &Path) -> Option<String> {
     None
 }
 
-/// Resolve HEAD commit sha for `branch` in `repo_path`. Used to stamp
-/// `base_commit` so future diffs can re-derive the exact starting point even
-/// if the branch moves underneath us. Returns `None` if git is unavailable.
+/// Resolve HEAD commit sha for `branch` in `repo_path`. Used to initialize the
+/// worktree integration cursor. Returns `None` if git is unavailable.
 pub async fn detect_branch_head(repo_path: &Path, branch: &str) -> Option<String> {
     let output = Command::new("git")
         .arg("-C")
@@ -453,7 +452,14 @@ pub async fn detect_branch_head(repo_path: &Path, branch: &str) -> Option<String
 /// the `merge-conflicts/{path}` route.
 fn validate_conflict_path(path: &str) -> Result<(), SessionWorktreeError> {
     let p = Path::new(path);
+    let bytes = path.as_bytes();
+    let has_windows_drive_prefix = bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && matches!(bytes[2], b'/' | b'\\');
     if p.is_absolute()
+        || has_windows_drive_prefix
+        || path.starts_with("\\\\")
         || p.components().any(|c| {
             matches!(
                 c,
@@ -782,6 +788,8 @@ impl SessionWorktreeService {
         )
         .await?;
         SessionWorktree::record_merged_at(&self.pool, updated.id).await?;
+        self.sync_session_agent_workspace_paths(session_id, &updated.base_workspace_path)
+            .await?;
         Ok(updated)
     }
 
@@ -852,8 +860,9 @@ impl SessionWorktreeService {
     /// 1. Transition to `merging` (via `merge_session_changes`).
     /// 2. Verify the base workspace is on the base branch and has no
     ///    in-progress merge/rebase.
-    /// 3. Run `git merge --no-ff --no-commit <session-branch>` in the base
-    ///    workspace so the original session commits remain in history.
+    /// 3. Apply the requested integration strategy in the base workspace.
+    ///    The route-facing default is cherry-pick so session commit messages
+    ///    are retained without an additional merge commit.
     /// 4. If conflicts are detected: transition to `needs_conflict_resolution`
     ///    and persist the conflict file list. The worktree is NOT deleted.
     /// 5. If no conflicts: `git commit`, transition to `merged`.
@@ -888,7 +897,14 @@ impl SessionWorktreeService {
             .await
         {
             Ok(MergeOutcome::Success) => {
-                let merged = self.mark_merged(session_id).await?;
+                let merged = if merging_row.merge_operation
+                    == Some(SessionWorktreeMergeOperation::CherryPick)
+                {
+                    self.mark_cherry_pick_merged(session_id, &merging_row)
+                        .await?
+                } else {
+                    self.mark_merged(session_id).await?
+                };
                 Ok(MergeResult {
                     worktree: merged,
                     has_conflicts: false,
@@ -950,6 +966,10 @@ impl SessionWorktreeService {
         row: &SessionWorktree,
         commit_message: Option<&str>,
     ) -> Result<MergeOutcome, SessionWorktreeError> {
+        if row.merge_operation == Some(SessionWorktreeMergeOperation::CherryPick) {
+            return self.execute_cherry_pick(row).await;
+        }
+
         let base_workspace = PathBuf::from(&row.base_workspace_path);
         let session_branch = &row.branch_name;
         let pre_merge_dirty_paths = self.dirty_tracked_paths(&base_workspace).await?;
@@ -989,6 +1009,87 @@ impl SessionWorktreeService {
         }
 
         Ok(MergeOutcome::Success)
+    }
+
+    /// Apply commits after the worktree's integration cursor. The cursor is
+    /// advanced after a successful run so repeat merges only apply commits
+    /// created since the previous integration.
+    async fn execute_cherry_pick(
+        &self,
+        row: &SessionWorktree,
+    ) -> Result<MergeOutcome, SessionWorktreeError> {
+        self.execute_cherry_pick_after(row, row.base_commit.as_deref())
+            .await
+    }
+
+    async fn execute_cherry_pick_after(
+        &self,
+        row: &SessionWorktree,
+        cursor: Option<&str>,
+    ) -> Result<MergeOutcome, SessionWorktreeError> {
+        let base_workspace = PathBuf::from(&row.base_workspace_path);
+        for commit in self.pending_cherry_pick_commits(row, cursor).await? {
+            let result = self
+                .run_git(&base_workspace, &["cherry-pick", commit.as_str()])
+                .await;
+            if let Err(err) = result {
+                let conflicts = self.list_unmerged_paths(&base_workspace).await?;
+                if !conflicts.is_empty() {
+                    return Ok(MergeOutcome::Conflicts(conflicts));
+                }
+                return Err(err);
+            }
+        }
+        Ok(MergeOutcome::Success)
+    }
+
+    async fn pending_cherry_pick_commits(
+        &self,
+        row: &SessionWorktree,
+        cursor: Option<&str>,
+    ) -> Result<Vec<String>, SessionWorktreeError> {
+        let base_workspace = PathBuf::from(&row.base_workspace_path);
+        let cursor = match cursor {
+            Some(value) => value.to_string(),
+            None => self
+                .run_git(
+                    &base_workspace,
+                    &[
+                        "merge-base",
+                        row.base_branch.as_str(),
+                        row.branch_name.as_str(),
+                    ],
+                )
+                .await?
+                .trim()
+                .to_string(),
+        };
+        let range = format!("{cursor}..{}", row.branch_name);
+        let output = self
+            .run_git(&base_workspace, &["rev-list", "--reverse", range.as_str()])
+            .await?;
+        Ok(output
+            .lines()
+            .filter(|line| !line.is_empty())
+            .map(str::to_owned)
+            .collect())
+    }
+
+    async fn mark_cherry_pick_merged(
+        &self,
+        session_id: Uuid,
+        row: &SessionWorktree,
+    ) -> Result<SessionWorktree, SessionWorktreeError> {
+        let base_workspace = PathBuf::from(&row.base_workspace_path);
+        let integrated_tip = self
+            .run_git(&base_workspace, &["rev-parse", row.branch_name.as_str()])
+            .await?
+            .trim()
+            .to_string();
+        let merged = self.mark_merged(session_id).await?;
+        SessionWorktree::record_base_commit(&self.pool, merged.id, Some(&integrated_tip))
+            .await
+            .map_err(Into::into)
     }
 
     /// List conflicted (unmerged) files for a session whose worktree is in
@@ -1109,9 +1210,10 @@ impl SessionWorktreeService {
         Ok(())
     }
 
-    /// Complete a merge after all conflicts have been resolved. Checks that
-    /// no unmerged paths remain, commits the merge, and transitions the
-    /// worktree to `merged`.
+    /// Complete an integration after all conflicts have been resolved. A
+    /// cherry-pick continues the original session commit (and therefore does
+    /// not create a synthetic merge commit); legacy merge strategies still
+    /// complete their pending merge commit.
     pub async fn continue_merge(
         &self,
         session_id: Uuid,
@@ -1123,6 +1225,51 @@ impl SessionWorktreeService {
         let unmerged = self.list_unmerged_paths(&base_workspace).await?;
         if !unmerged.is_empty() {
             return Err(SessionWorktreeError::UnresolvedConflicts(unmerged));
+        }
+
+        if row.merge_operation == Some(SessionWorktreeMergeOperation::CherryPick) {
+            let cherry_pick_head = self
+                .run_git(&base_workspace, &["rev-parse", "CHERRY_PICK_HEAD"])
+                .await?
+                .trim()
+                .to_string();
+            let staged_paths = self
+                .run_git_nul_paths(&base_workspace, &["diff", "--cached", "--name-only", "-z"])
+                .await?;
+            if staged_paths.is_empty() {
+                // Resolving every conflict to the current/base side can make
+                // the cherry-pick empty. Skip it instead of manufacturing an
+                // empty replacement commit.
+                self.run_git(&base_workspace, &["cherry-pick", "--skip"])
+                    .await?;
+            } else {
+                // Avoid opening an editor while retaining the original commit
+                // message recorded by CHERRY_PICK_HEAD.
+                self.run_git(
+                    &base_workspace,
+                    &["-c", "core.editor=true", "cherry-pick", "--continue"],
+                )
+                .await?;
+                if let Some(message) = commit_message
+                    .as_deref()
+                    .filter(|value| !value.trim().is_empty())
+                {
+                    self.run_git(&base_workspace, &["commit", "--amend", "-m", message])
+                        .await?;
+                }
+            }
+
+            return match self
+                .execute_cherry_pick_after(&row, Some(&cherry_pick_head))
+                .await?
+            {
+                MergeOutcome::Success => self.mark_cherry_pick_merged(session_id, &row).await,
+                MergeOutcome::Conflicts(files) => {
+                    SessionWorktree::set_conflict_files(&self.pool, row.id, &files)
+                        .await
+                        .map_err(Into::into)
+                }
+            };
         }
 
         let message = commit_message
@@ -1153,9 +1300,15 @@ impl SessionWorktreeService {
         }
 
         let base_workspace = PathBuf::from(&row.base_workspace_path);
-        // Prefer Git's merge abort path. The hard reset fallback restores the
-        // clean base workspace if merge metadata is already gone.
-        let _ = self.run_git(&base_workspace, &["merge", "--abort"]).await;
+        // Abort the operation that was persisted when the integration began.
+        // The hard reset fallback restores the base workspace if operation
+        // metadata is already gone.
+        let abort_args = if row.merge_operation == Some(SessionWorktreeMergeOperation::CherryPick) {
+            ["cherry-pick", "--abort"]
+        } else {
+            ["merge", "--abort"]
+        };
+        let _ = self.run_git(&base_workspace, &abort_args).await;
         let _ = self
             .run_git(&base_workspace, &["reset", "--hard", "HEAD"])
             .await;
@@ -1235,6 +1388,13 @@ impl SessionWorktreeService {
             .is_err()
         {
             return Ok(false);
+        }
+
+        if row.merge_operation == Some(SessionWorktreeMergeOperation::CherryPick) {
+            return Ok(!self
+                .pending_cherry_pick_commits(row, row.base_commit.as_deref())
+                .await?
+                .is_empty());
         }
 
         let output = Command::new("git")

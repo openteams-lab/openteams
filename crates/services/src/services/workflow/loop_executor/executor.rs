@@ -371,16 +371,13 @@ impl<'a> LoopExecutor<'a> {
                 Ok(LoopReviewDecision::Passed)
             }
             ReviewVerdict::Rejected => {
-                let (event, ctx, meta) = loop_lead_review_rejected_analytics_parts(
+                let event = loop_lead_review_rejected_analytics_parts(
                     self.execution,
                     recorded_review_step.id,
                 );
-                workflow_analytics::record_workflow_analytics_event(
-                    self.chat_runner.analytics_service(),
-                    event,
-                    &ctx,
-                    meta,
-                );
+                if let Some(analytics) = self.chat_runner.analytics_service() {
+                    analytics.record_event(event);
+                }
                 let _ = WorkflowOrchestrator::transition_step_and_sync(
                     self.pool,
                     self.chat_runner,

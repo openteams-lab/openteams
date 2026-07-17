@@ -24,6 +24,7 @@ impl ProjectDeliveryService {
         Ok(ProjectDeliveryRecord::create(pool, input).await?)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_commit_records(
         &self,
         pool: &SqlitePool,

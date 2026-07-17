@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::rust::double_option;
-use sqlx::{FromRow, SqlitePool, Type, types::Json};
+use sqlx::{FromRow, Sqlite, SqliteConnection, SqlitePool, Transaction, Type, types::Json};
 use ts_rs::TS;
 use utils::text::sanitize_member_handle;
 use uuid::Uuid;
@@ -217,10 +217,27 @@ impl ProjectMember {
         id: Uuid,
         data: &UpdateProjectMember,
     ) -> Result<Self, sqlx::Error> {
+        let mut connection = pool.acquire().await?;
+        Self::update_on_connection(&mut connection, id, data).await
+    }
+
+    pub async fn update_in_transaction(
+        transaction: &mut Transaction<'_, Sqlite>,
+        id: Uuid,
+        data: &UpdateProjectMember,
+    ) -> Result<Self, sqlx::Error> {
+        Self::update_on_connection(&mut *transaction, id, data).await
+    }
+
+    async fn update_on_connection(
+        connection: &mut SqliteConnection,
+        id: Uuid,
+        data: &UpdateProjectMember,
+    ) -> Result<Self, sqlx::Error> {
         let existing =
             sqlx::query_as::<_, ProjectMember>(&format!("{PROJECT_MEMBER_SELECT}\nWHERE id = ?1"))
                 .bind(id)
-                .fetch_optional(pool)
+                .fetch_optional(&mut *connection)
                 .await?
                 .ok_or(sqlx::Error::RowNotFound)?;
 
@@ -288,7 +305,7 @@ impl ProjectMember {
         .bind(allowed_skill_ids)
         .bind(execution_config)
         .bind(is_default)
-        .fetch_one(pool)
+        .fetch_one(&mut *connection)
         .await
     }
 

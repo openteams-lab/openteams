@@ -5,7 +5,7 @@ use tokio::{
 
 use crate::services::project::source_control::{SourceControlObservedPath, SourceControlService};
 
-use super::{super::workflow_analytics, startup_timing, *};
+use super::{startup_timing, *};
 
 pub(super) struct ExitWatcherArgs {
     pub(super) child: command_group::AsyncGroupChild,
@@ -1702,18 +1702,6 @@ impl ChatRunner {
                             observed_artifact_count,
                             "[chat_runner] Collected workspace observed paths for agent run"
                         );
-                        let diff_file_count = diff_info
-                            .as_ref()
-                            .map(|info| info.observed_paths.len())
-                            .unwrap_or(0)
-                            + untracked_files.len();
-                        if diff_file_count > 0 {
-                            workflow_analytics::track_diff_generated(
-                                runner.analytics_service(),
-                                session_id,
-                                diff_file_count,
-                            );
-                        }
                         let completion_status =
                             RunCompletionStatus::from_atomic(&completion_status);
                         let should_clear_agent_session = matches!(
@@ -2192,6 +2180,7 @@ impl ChatRunner {
                                         session_id,
                                         sender_type: ChatSenderType::System,
                                         sender_id: None,
+                                        sender_session_agent_id: None,
                                         content: retry_content,
                                         mentions: sqlx::types::Json(vec![agent_name.clone()]),
                                         meta: retry_meta,
@@ -2257,41 +2246,38 @@ impl ChatRunner {
 
                         runner
                             .analytics_projector()
-                            .project_or_warn(DomainEvent::AgentRunCompleted {
-                                session_id,
-                                agent_id,
-                                run_id,
-                                duration_ms,
-                                success: matches!(
-                                    completion_status,
-                                    RunCompletionStatus::Succeeded
-                                ),
-                            })
+                            .record_or_warn(
+                                AnalyticsEvent::new(AnalyticsEventPayload::AgentRunCompleted {
+                                    agent_id: Some(agent_id),
+                                    run_kind: "chat".to_string(),
+                                    outcome: match completion_status {
+                                        RunCompletionStatus::Succeeded => "succeeded",
+                                        RunCompletionStatus::Failed => "failed",
+                                        RunCompletionStatus::Stopped => "stopped",
+                                    }
+                                    .to_string(),
+                                    duration_bucket: duration_bucket(duration_ms).to_string(),
+                                })
+                                    .with_session(session_id)
+                                    .with_run(run_id),
+                            )
                             .await;
 
                         if matches!(completion_status, RunCompletionStatus::Failed) {
                             runner
                                 .analytics_projector()
-                                .project_or_warn(DomainEvent::AgentRunErrored {
-                                    session_id,
-                                    agent_id,
-                                    run_id,
-                                    error_type: Self::normalized_entry_error_name(
-                                        error_type.as_ref(),
-                                    ),
-                                    error_code: Self::normalized_entry_error_name(
-                                        error_type.as_ref(),
-                                    ),
-                                })
+                                .record_or_warn(
+                                    AnalyticsEvent::new(AnalyticsEventPayload::AgentError {
+                                        run_kind: Some("chat".to_string()),
+                                        phase: Some("exit".to_string()),
+                                        error_code: Self::normalized_entry_error_name(error_type.as_ref()),
+                                        agent_id: Some(agent_id),
+                                        agent_role: None,
+                                    })
+                                        .with_session(session_id)
+                                        .with_run(run_id),
+                                )
                                 .await;
-                            workflow_analytics::track_agent_error(
-                                runner.analytics_service(),
-                                session_id,
-                                None,
-                                None,
-                                &Self::normalized_entry_error_name(error_type.as_ref()),
-                                None,
-                            );
                             let failure_detail = visible_error_content
                                 .or_else(|| (!error_content.is_empty()).then_some(error_content.as_str()))
                                 .unwrap_or("Agent run failed.");
@@ -2364,19 +2350,6 @@ impl ChatRunner {
                             started_at: None,
                         });
 
-                        workflow_analytics::track_agent_state_changed(
-                            runner.analytics_service(),
-                            session_id,
-                            None,
-                            match final_state {
-                                ChatSessionAgentState::Idle => "idle",
-                                ChatSessionAgentState::Running => "running",
-                                ChatSessionAgentState::WaitingApproval => "waiting_approval",
-                                ChatSessionAgentState::Dead => "dead",
-                                ChatSessionAgentState::Stopping => "stopping",
-                            },
-                        );
-
                         if track_source_message && protocol_retry_request.is_none() {
                             // Emit MentionAcknowledged completed/failed event
                             let mention_status = match completion_status {
@@ -2392,9 +2365,19 @@ impl ChatRunner {
                                 mention_status = ?mention_status,
                                 "mention status: "
                             );
+                            let project_member_id = ChatSessionAgent::find_by_id(
+                                &db.pool,
+                                session_agent_id,
+                            )
+                            .await
+                            .ok()
+                            .flatten()
+                            .and_then(|member| member.project_member_id);
                             let _ = sender.send(ChatStreamEvent::MentionAcknowledged {
                                 session_id,
                                 message_id: source_message_id,
+                                session_agent_id: Some(session_agent_id),
+                                project_member_id,
                                 mentioned_agent: agent_name.clone(),
                                 agent_id,
                                 status: mention_status.clone(),
@@ -2424,6 +2407,23 @@ impl ChatRunner {
                                         .insert(agent_name.clone(), serde_json::json!(status_str));
                                     meta["mention_statuses"] =
                                         serde_json::Value::Object(new_statuses);
+                                }
+                                if let Some(meta_object) = meta.as_object_mut() {
+                                    let targets = meta_object
+                                        .entry("mention_targets")
+                                        .or_insert_with(|| serde_json::json!({}));
+                                    if let Some(targets) = targets.as_object_mut() {
+                                        targets.insert(
+                                            session_agent_id.to_string(),
+                                            serde_json::json!({
+                                                "agent_id": agent_id,
+                                                "project_member_id": project_member_id,
+                                                "member_name": agent_name,
+                                                "status": status_str,
+                                                "error": null,
+                                            }),
+                                        );
+                                    }
                                 }
 
                                 let _ = ChatMessage::update_meta(&db.pool, source_message_id, meta)
@@ -2490,15 +2490,45 @@ impl ChatRunner {
                                     agent_name = %retry_agent_name,
                                     "dispatching protocol retry after current run reached idle"
                                 );
-                                if let Err(err) = runner
-                                    .run_agent_for_mention_internal(
-                                        session_id,
-                                        &retry_agent_name,
-                                        &retry_message,
-                                        retry_track_source,
-                                    )
-                                    .await
-                                {
+                                let retry_member = runner
+                                    .resolve_session_agent_by_id(session_id, session_agent_id)
+                                    .await;
+                                let retry_result = match retry_member {
+                                    Ok(Some(member)) => {
+                                        let target_result = db::models::chat_message_target::ChatMessageTarget::record_protocol_retry(
+                                            &runner.db.pool,
+                                            &db::models::chat_message_target::CreateChatMessageTarget {
+                                                message_id: retry_message.id,
+                                                ordinal: 0,
+                                                session_id,
+                                                session_agent_id: Some(member.session_agent_id),
+                                                project_member_id: member.project_member_id,
+                                                agent_id: member.agent_id,
+                                                member_name_snapshot: member.member_name.clone(),
+                                                route_kind: db::models::chat_message_target::ChatMessageTargetRouteKind::ProtocolRetry,
+                                                resolution_status: db::models::chat_message_target::ChatMessageTargetResolutionStatus::Resolved,
+                                            },
+                                        )
+                                        .await;
+                                        match target_result {
+                                            Ok(_) => runner.run_agent_internal(
+                                            AgentRunTarget {
+                                                member,
+                                                claimed_queue_id: None,
+                                            },
+                                            &retry_message,
+                                            retry_track_source,
+                                        )
+                                        .await,
+                                            Err(err) => Err(ChatRunnerError::Database(err)),
+                                        }
+                                    }
+                                    Ok(None) => Err(ChatRunnerError::AgentNotFound(
+                                        session_agent_id.to_string(),
+                                    )),
+                                    Err(err) => Err(err),
+                                };
+                                if let Err(err) = retry_result {
                                     tracing::warn!(
                                         session_id = %session_id,
                                         agent_name = %retry_agent_name,

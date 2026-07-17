@@ -22,14 +22,55 @@ function assertConditionalLinuxBuilds(source, workflowName) {
   );
 }
 
+function assertUnsignedMacDistribution(source, workflowName) {
+  assert.match(
+    source,
+    /ENABLE_MACOS_DMG: "true"/,
+    `${workflowName} must build a macOS DMG`
+  );
+  assert.match(
+    source,
+    /UNSIGNED-MACOS-README\.txt/,
+    `${workflowName} must include unsigned macOS launch instructions`
+  );
+  assert.match(
+    source,
+    /SHA256SUMS-macos\.txt/,
+    `${workflowName} must include checksums for macOS artifacts`
+  );
+  assert.match(
+    source,
+    /\$\{dmg%\.dmg\}-unsigned\.dmg/,
+    `${workflowName} must label unsigned DMG filenames`
+  );
+}
+
 test('desktop-build workflow gates Linux AppImage updater bundles behind policy', async () => {
   const source = await readWorkflow('desktop-build.yml');
   assertConditionalLinuxBuilds(source, 'desktop-build.yml');
 });
 
+test('desktop-build defaults to a clearly labelled unsigned macOS DMG', async () => {
+  const source = await readWorkflow('desktop-build.yml');
+  assert.match(
+    source,
+    /macos_sign_and_notarize:[\s\S]*default: false/,
+    'desktop-build.yml must work without paid Apple signing credentials by default'
+  );
+  assert.match(source, /name=desktop-macos-unsigned/);
+  assertUnsignedMacDistribution(source, 'desktop-build.yml');
+});
+
 test('pre-release workflow gates Linux AppImage updater bundles behind policy', async () => {
   const source = await readWorkflow('pre-release.yml');
   assertConditionalLinuxBuilds(source, 'pre-release.yml');
+});
+
+test('pre-release falls back to a documented unsigned macOS DMG', async () => {
+  const source = await readWorkflow('pre-release.yml');
+  assert.match(source, /artifact_name=desktop-installer-macos-unsigned/);
+  assert.match(source, /## macOS unsigned build/);
+  assertUnsignedMacDistribution(source, 'pre-release.yml');
 });
 
 test('pre-release workflow validates release assets before creating the GitHub release', async () => {

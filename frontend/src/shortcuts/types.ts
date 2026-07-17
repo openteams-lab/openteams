@@ -15,6 +15,7 @@ export type ShortcutContextId =
   | 'source-control-list'
   | 'source-control-commit'
   | 'worktree'
+  | 'worktree-merge-conflict'
   | 'issue-list'
   | 'issue-detail'
   | 'agent-runtime'
@@ -140,7 +141,5 @@ export type CommandPresentation = {
   sequence: ShortcutSequence;
   label: string;
   ariaKeyShortcuts: string;
-  tooltipShortcut: string;
-  tooltip: string;
   disabledReason?: string;
 };

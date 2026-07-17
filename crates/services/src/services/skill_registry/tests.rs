@@ -155,6 +155,7 @@ Open the page and inspect it carefully.
                 agent_session_id TEXT,
                 agent_message_id TEXT,
                 project_member_id TEXT,
+                member_name TEXT NOT NULL DEFAULT '',
                 execution_config TEXT NOT NULL DEFAULT '{}',
                 allowed_skill_ids TEXT NOT NULL DEFAULT '[]',
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -164,6 +165,15 @@ Open the page and inspect it carefully.
         .execute(&pool)
         .await
         .expect("create chat_session_agents table");
+        for statement in [
+            "CREATE TABLE project_members (id TEXT PRIMARY KEY, member_name TEXT)",
+            "CREATE TABLE chat_agents (id TEXT PRIMARY KEY, name TEXT)",
+        ] {
+            sqlx::query(statement)
+                .execute(&pool)
+                .await
+                .expect("create session agent lookup table");
+        }
 
         let installed_skill = ChatSkill::create(
             &pool,
@@ -215,6 +225,7 @@ Open the page and inspect it carefully.
             &CreateChatSessionAgent {
                 session_id: Uuid::new_v4(),
                 agent_id: Uuid::new_v4(),
+                member_name: None,
                 workspace_path: None,
                 allowed_skill_ids: vec![
                     installed_skill.id.to_string(),

@@ -25,5 +25,5 @@ assert.ok(englishKeys.includes('shortcuts.recorder.recording'));
 for (const dictionary of dictionaries) {
   assert.ok(dictionary['shortcuts.tooltip.shortcut'].includes('{shortcut}'));
 }
-assert.equal(englishKeys.length, 88);
+assert.equal(englishKeys.length, 93);
 console.log('Shortcut translations: PASS');

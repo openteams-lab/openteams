@@ -968,32 +968,32 @@ fn find_effective_price<'a>(
     }
 
     let lower_model_id = record.model_id.to_ascii_lowercase();
-    if lower_model_id != record.model_id {
-        if let Some(price) = prices.get(&lower_model_id) {
-            return Some(price);
-        }
+    if lower_model_id != record.model_id
+        && let Some(price) = prices.get(&lower_model_id)
+    {
+        return Some(price);
     }
 
     let canonical_model_id = resolve_canonical_id(&record.model_id);
-    if canonical_model_id != record.model_id {
-        if let Some(price) = prices.get(&canonical_model_id) {
-            return Some(price);
-        }
+    if canonical_model_id != record.model_id
+        && let Some(price) = prices.get(&canonical_model_id)
+    {
+        return Some(price);
     }
 
     let canonical_lower_model_id = canonical_model_id.to_ascii_lowercase();
-    if canonical_lower_model_id != canonical_model_id && canonical_lower_model_id != lower_model_id
+    if canonical_lower_model_id != canonical_model_id
+        && canonical_lower_model_id != lower_model_id
+        && let Some(price) = prices.get(&canonical_lower_model_id)
     {
-        if let Some(price) = prices.get(&canonical_lower_model_id) {
-            return Some(price);
-        }
+        return Some(price);
     }
 
     let target_bare = bare_model_id(&record.model_id);
-    if target_bare != lower_model_id {
-        if let Some(price) = prices.get(&target_bare) {
-            return Some(price);
-        }
+    if target_bare != lower_model_id
+        && let Some(price) = prices.get(&target_bare)
+    {
+        return Some(price);
     }
 
     let target_canonical = canonical_lookup_id(&record.model_id);

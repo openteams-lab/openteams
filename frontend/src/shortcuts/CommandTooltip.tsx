@@ -88,7 +88,15 @@ export function CommandTooltip({ commandId, children }: Props) {
           role="tooltip"
           className="app-tooltip command-tooltip absolute bottom-full left-1/2 z-[80] mb-2 -translate-x-1/2 whitespace-nowrap px-2 py-1"
         >
-          {presentation.tooltip}
+          <span>{presentation.title}</span>
+          {presentation.sequence.length > 0 && (
+            <>
+              {' '}
+              <span className="ml-3 font-mono text-[10px] text-[var(--ink-tertiary)]">
+                {presentation.label}
+              </span>
+            </>
+          )}
         </span>
       )}
     </span>

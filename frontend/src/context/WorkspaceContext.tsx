@@ -1561,12 +1561,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [themePreference, setThemePreferenceState] =
-    useState<ThemePreference>('dark');
+    useState<ThemePreference>('system');
   const [systemTheme, setSystemTheme] = useState<Theme>(resolveSystemTheme);
   const theme: Theme =
     themePreference === 'system' ? systemTheme : themePreference;
 
-  const [locale, setLocaleState] = useState<Locale>('zh');
+  const [locale, setLocaleState] = useState<Locale>(resolveBrowserLocale);
   const [chatMessageFontSize, setChatMessageFontSizeState] =
     useState<number>(CHAT_MESSAGE_FONT_SIZE_DEFAULT);
   const [activeSessionId, setActiveSessionId] = useState<string>(() => {

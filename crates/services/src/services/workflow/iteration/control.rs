@@ -102,21 +102,17 @@ impl<'a> IterationManager<'a> {
         let available_agents = self
             .session_agents
             .iter()
-            .filter_map(|session_agent| {
-                let agent = self
-                    .agents
-                    .iter()
-                    .find(|agent| agent.id == session_agent.agent_id)?;
+            .map(|session_agent| {
                 let workflow_agent_session = workflow_sessions
                     .iter()
                     .find(|item| item.session_agent_id == session_agent.id);
-                Some(WorkflowCardAgent {
+                WorkflowCardAgent {
                     session_agent_id: session_agent.id.to_string(),
                     workflow_agent_session_id: workflow_agent_session
                         .map(|item| item.id.to_string()),
-                    agent_id: agent.id.to_string(),
-                    name: agent.name.clone(),
-                })
+                    agent_id: workflow_plan_agent_id(session_agent),
+                    name: session_agent.member_name.clone(),
+                }
             })
             .collect::<Vec<_>>();
         let history = WorkflowIterationFeedback::find_by_execution(self.pool, execution.id).await?;
@@ -134,7 +130,7 @@ impl<'a> IterationManager<'a> {
             &feedback.user_feedback_json,
             from_round.round_index,
             &history,
-            &lead_agent.id.to_string(),
+            &workflow_plan_agent_id(lead_session_agent),
             &available_agents,
             &original_plan,
             response_language_instruction,
@@ -159,11 +155,7 @@ impl<'a> IterationManager<'a> {
         );
         let payload = extract_json_payload(&raw_output).unwrap_or(raw_output);
         let plan_json: WorkflowPlanJson = serde_json::from_str(&payload)?;
-        let valid_agent_ids = self
-            .agents
-            .iter()
-            .map(|agent| agent.id.to_string())
-            .collect::<Vec<_>>();
+        let valid_agent_ids = workflow_valid_agent_ids(self.session_agents);
         WorkflowCompiler::compile(&plan_json, &valid_agent_ids)?;
 
         Ok(plan_json)
@@ -179,11 +171,7 @@ impl<'a> IterationManager<'a> {
         new_plan_json: &WorkflowPlanJson,
     ) -> Result<IterationRoundCreation, OrchestratorError> {
         let new_plan_string = serde_json::to_string(new_plan_json)?;
-        let valid_agent_ids = self
-            .agents
-            .iter()
-            .map(|agent| agent.id.to_string())
-            .collect::<Vec<_>>();
+        let valid_agent_ids = workflow_valid_agent_ids(self.session_agents);
         let compiled = WorkflowCompiler::compile(new_plan_json, &valid_agent_ids)?;
         let latest_revision = WorkflowPlanRevision::find_latest_by_plan(self.pool, plan.id)
             .await?
@@ -239,11 +227,7 @@ impl<'a> IterationManager<'a> {
             .iter()
             .map(|session| (session.session_agent_id, session.id))
             .collect::<HashMap<_, _>>();
-        let agent_id_map = self
-            .session_agents
-            .iter()
-            .map(|session_agent| (session_agent.agent_id.to_string(), session_agent.id))
-            .collect::<HashMap<_, _>>();
+        let agent_id_map = workflow_agent_id_map(self.session_agents);
 
         for compiled_step in &compiled.steps {
             let Some(agent_id) = compiled_step.assigned_agent_id.as_ref() else {

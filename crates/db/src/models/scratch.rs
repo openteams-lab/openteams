@@ -90,6 +90,7 @@ pub struct UiPreferencesData {
 #[strum_discriminants(ts(use_ts_enum))]
 #[strum_discriminants(serde(rename_all = "SCREAMING_SNAKE_CASE"))]
 #[strum_discriminants(strum(serialize_all = "SCREAMING_SNAKE_CASE"))]
+#[allow(clippy::large_enum_variant)]
 pub enum ScratchPayload {
     DraftFollowUp(DraftFollowUpData),
     /// A follow-up that has been submitted and is waiting for the active run to finish.

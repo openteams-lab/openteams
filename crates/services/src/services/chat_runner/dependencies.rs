@@ -1,7 +1,9 @@
 use crate::services::{
     agent_activity_stream::{AgentActivityEntryLine, AgentActivityStreamState},
     analytics::AnalyticsService,
-    analytics_events::{AnalyticsProjector, DomainEvent},
+    analytics_events::{
+        AnalyticsEvent, AnalyticsEventPayload, AnalyticsProjector, duration_bucket,
+    },
     chat::{self, ChatServiceError, is_workflow_chat_input_mode},
     config::{self, UiLanguage},
     native_skills::{

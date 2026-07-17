@@ -131,7 +131,7 @@ impl ProjectMemberService {
 
         let mut created = 0;
         for session in ChatSession::find_by_project(pool, member.project_id).await? {
-            if ChatSessionAgent::find_by_session_and_agent(pool, session.id, agent_id)
+            if ChatSessionAgent::find_by_session_and_project_member(pool, session.id, member.id)
                 .await?
                 .is_some()
             {
@@ -143,6 +143,7 @@ impl ProjectMemberService {
                 &CreateChatSessionAgent {
                     session_id: session.id,
                     agent_id,
+                    member_name: member.member_name.clone(),
                     workspace_path: member.default_workspace_path.clone(),
                     allowed_skill_ids: member.allowed_skill_ids.0.clone(),
                     project_member_id: Some(member.id),
@@ -185,25 +186,47 @@ impl ProjectMemberService {
         }
 
         let promote_to_lead = input.role.as_deref() == Some("lead");
+        let should_sync_member_name = input.member_name.is_some();
         let should_sync_execution_config = input.execution_config.is_some();
         let should_sync_allowed_skill_ids = input.allowed_skill_ids.is_some();
-        let mut member = ProjectMember::update(
-            pool,
-            id,
-            &UpdateProjectMember {
-                member_type: None,
-                user_id: None,
-                agent_id: None,
-                member_name: input.member_name,
-                role: input.role,
-                display_order: input.display_order,
-                default_workspace_path: input.default_workspace_path,
-                allowed_skill_ids: input.allowed_skill_ids,
-                execution_config: input.execution_config,
-                is_default: input.is_default,
-            },
-        )
-        .await?;
+        let update = UpdateProjectMember {
+            member_type: None,
+            user_id: None,
+            agent_id: None,
+            member_name: input.member_name,
+            role: input.role,
+            display_order: input.display_order,
+            default_workspace_path: input.default_workspace_path,
+            allowed_skill_ids: input.allowed_skill_ids,
+            execution_config: input.execution_config,
+            is_default: input.is_default,
+        };
+        let mut transaction = pool.begin().await?;
+        let mut member =
+            ProjectMember::update_in_transaction(&mut transaction, id, &update).await?;
+        let synced_member_names = if should_sync_member_name {
+            if let Some(member_name) = member.member_name.as_deref() {
+                ChatSessionAgent::sync_member_name_for_project_member_in_transaction(
+                    &mut transaction,
+                    member.id,
+                    member_name,
+                )
+                .await?
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+        transaction.commit().await?;
+
+        if should_sync_member_name {
+            tracing::info!(
+                project_member_id = %member.id,
+                synced_session_agents = synced_member_names,
+                "Synced project member name to session agents transactionally"
+            );
+        }
 
         if promote_to_lead && member.member_type == ProjectMemberType::Agent {
             member = ProjectMember::set_only_project_lead(pool, member.id, "member").await?;
@@ -447,9 +470,9 @@ async fn chat_agents_has_column(pool: &SqlitePool, column_name: &str) -> Result<
 mod tests {
     use db::models::{
         chat_agent::{ChatAgent, CreateChatAgent},
-        chat_session_agent::ChatSessionAgent,
+        chat_session_agent::{ChatSessionAgent, CreateChatSessionAgent},
         member_execution_config::MemberExecutionConfig,
-        project_member::ProjectMemberType,
+        project_member::{ProjectMember, ProjectMemberType},
     };
     use sqlx::SqlitePool;
     use uuid::Uuid;
@@ -513,6 +536,7 @@ mod tests {
                 title TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
                 lead_agent_id BLOB,
+                lead_session_agent_id BLOB,
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,
@@ -538,6 +562,7 @@ mod tests {
                 agent_session_id TEXT,
                 agent_message_id TEXT,
                 project_member_id BLOB,
+                member_name TEXT NOT NULL DEFAULT '',
                 execution_config TEXT NOT NULL DEFAULT '{}',
                 allowed_skill_ids TEXT NOT NULL DEFAULT '[]',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
@@ -685,7 +710,7 @@ mod tests {
             .expect("add project member");
 
         let session_agent =
-            ChatSessionAgent::find_by_session_and_agent(&pool, session_id, agent.id)
+            ChatSessionAgent::find_by_session_and_project_member(&pool, session_id, member.id)
                 .await
                 .expect("find session agent")
                 .expect("session agent exists");
@@ -1074,7 +1099,7 @@ mod tests {
                 &pool,
                 member.id,
                 super::ProjectMemberUpdateInput {
-                    member_name: None,
+                    member_name: Some(Some("RenamedMember".to_string())),
                     role: None,
                     display_order: None,
                     default_workspace_path: None,
@@ -1097,6 +1122,13 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .expect("read synced config");
+        let synced_member_name: String =
+            sqlx::query_scalar("SELECT member_name FROM chat_session_agents WHERE id = ?1")
+                .bind(synced_session_agent_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read synced member name");
+        assert_eq!(synced_member_name, "RenamedMember");
         let running_config: String =
             sqlx::query_scalar("SELECT execution_config FROM chat_session_agents WHERE id = ?1")
                 .bind(running_session_agent_id)
@@ -1257,6 +1289,89 @@ mod tests {
                 Some("active-workflow-message".to_string())
             )
         );
+    }
+
+    #[tokio::test]
+    async fn member_name_sync_conflict_rolls_back_project_member_update() {
+        let pool = setup_pool().await;
+        let service = ProjectMemberService::new();
+        let project_id = Uuid::new_v4();
+        let primary_agent = create_named_agent(&pool, "primary-template").await;
+        let conflicting_agent = create_named_agent(&pool, "conflicting-template").await;
+        let member = service
+            .add_member(
+                &pool,
+                project_id,
+                ProjectMemberType::Agent,
+                None,
+                Some(primary_agent.id),
+                Some("Alpha".to_string()),
+                Some("member".to_string()),
+                1,
+                None,
+                Vec::new(),
+                false,
+                MemberExecutionConfig::default(),
+            )
+            .await
+            .expect("create project member");
+        let session_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO chat_sessions (id, title, status, project_id) VALUES (?1, 'session', 'active', ?2)",
+        )
+        .bind(session_id)
+        .bind(project_id)
+        .execute(&pool)
+        .await
+        .expect("create session");
+        for (agent_id, project_member_id, member_name) in [
+            (primary_agent.id, Some(member.id), "Alpha"),
+            (conflicting_agent.id, None, "Beta"),
+        ] {
+            ChatSessionAgent::create(
+                &pool,
+                &CreateChatSessionAgent {
+                    session_id,
+                    agent_id,
+                    member_name: Some(member_name.to_string()),
+                    workspace_path: None,
+                    allowed_skill_ids: Vec::new(),
+                    project_member_id,
+                    execution_config: MemberExecutionConfig::default(),
+                },
+                Uuid::new_v4(),
+            )
+            .await
+            .expect("create session member");
+        }
+        sqlx::query(
+            "CREATE UNIQUE INDEX test_unique_session_member_name ON chat_session_agents(session_id, lower(member_name))",
+        )
+        .execute(&pool)
+        .await
+        .expect("create member name constraint");
+
+        let result = service
+            .update_member(
+                &pool,
+                member.id,
+                super::ProjectMemberUpdateInput {
+                    member_name: Some(Some("Beta".to_string())),
+                    role: None,
+                    display_order: None,
+                    default_workspace_path: None,
+                    is_default: None,
+                    allowed_skill_ids: None,
+                    execution_config: None,
+                },
+            )
+            .await;
+        assert!(result.is_err());
+        let persisted = ProjectMember::find_by_id(&pool, member.id)
+            .await
+            .expect("load member")
+            .expect("member exists");
+        assert_eq!(persisted.member_name.as_deref(), Some("Alpha"));
     }
 
     #[tokio::test]

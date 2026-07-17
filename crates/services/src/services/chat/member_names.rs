@@ -13,48 +13,60 @@ pub fn effective_agent_name(agent: &ChatAgent, member_name: Option<&str>) -> Str
         .unwrap_or_else(|| agent.name.clone())
 }
 
-pub fn apply_effective_agent_name(agent: &mut ChatAgent, member_names: &HashMap<Uuid, String>) {
-    agent.name = effective_agent_name(agent, member_names.get(&agent.id).map(String::as_str));
-}
-
 pub async fn member_name_overrides_for_session(
     pool: &SqlitePool,
     session_id: Uuid,
 ) -> Result<HashMap<Uuid, String>, sqlx::Error> {
-    let session = ChatSession::find_by_id(pool, session_id).await?;
     let session_agents = ChatSessionAgent::find_all_for_session(pool, session_id).await?;
     if session_agents.is_empty() {
         return Ok(HashMap::new());
     }
 
     let mut overrides = HashMap::new();
-    let project_members = if let Some(project_id) = session.and_then(|item| item.project_id) {
-        ProjectMember::find_by_project(pool, project_id).await?
-    } else {
-        Vec::new()
-    };
-
-    let member_by_id: HashMap<Uuid, &ProjectMember> =
-        project_members.iter().map(|member| (member.id, member)).collect();
-    let mut member_by_agent_id: HashMap<Uuid, &ProjectMember> = HashMap::new();
-    for member in &project_members {
-        if member.member_type == ProjectMemberType::Agent
-            && let Some(agent_id) = member.agent_id
-        {
-            member_by_agent_id.entry(agent_id).or_insert(member);
-        }
-    }
-
     for session_agent in session_agents {
-        let member = session_agent
-            .project_member_id
-            .and_then(|id| member_by_id.get(&id).copied())
-            .or_else(|| member_by_agent_id.get(&session_agent.agent_id).copied());
-        if let Some(name) = normalized_member_name(member.and_then(|item| item.member_name.as_deref()))
-        {
-            overrides.insert(session_agent.agent_id, name);
+        if let Some(name) = normalized_member_name(Some(&session_agent.member_name)) {
+            overrides.insert(session_agent.id, name);
         }
     }
 
     Ok(overrides)
+}
+
+/// Compatibility map for legacy messages that have only `sender_id`.
+/// A backing agent maps to a member name only when it identifies exactly one
+/// session member; shared execution profiles deliberately have no fallback.
+pub async fn unambiguous_member_names_by_agent_for_session(
+    pool: &SqlitePool,
+    session_id: Uuid,
+) -> Result<HashMap<Uuid, String>, sqlx::Error> {
+    let mut grouped = HashMap::<Uuid, Vec<String>>::new();
+    for session_agent in ChatSessionAgent::find_all_for_session(pool, session_id).await? {
+        if let Some(name) = normalized_member_name(Some(&session_agent.member_name)) {
+            grouped.entry(session_agent.agent_id).or_default().push(name);
+        }
+    }
+    Ok(grouped
+        .into_iter()
+        .filter_map(|(agent_id, names)| (names.len() == 1).then(|| (agent_id, names[0].clone())))
+        .collect())
+}
+
+pub async fn resolve_sender_member_name(
+    pool: &SqlitePool,
+    session_id: Uuid,
+    sender_session_agent_id: Option<Uuid>,
+    sender_agent_id: Option<Uuid>,
+) -> Result<Option<String>, sqlx::Error> {
+    if let Some(session_agent_id) = sender_session_agent_id
+        && let Some(member) = ChatSessionAgent::find_by_id(pool, session_agent_id).await?
+        && member.session_id == session_id
+    {
+        return Ok(Some(member.member_name));
+    }
+    let Some(agent_id) = sender_agent_id else {
+        return Ok(None);
+    };
+    Ok(unambiguous_member_names_by_agent_for_session(pool, session_id)
+        .await?
+        .remove(&agent_id))
 }

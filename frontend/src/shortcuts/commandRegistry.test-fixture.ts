@@ -6,6 +6,7 @@ type ShortcutContextId =
   | 'source-control-list'
   | 'source-control-commit'
   | 'worktree'
+  | 'worktree-merge-conflict'
   | 'issue-list'
   | 'issue-detail'
   | 'agent-runtime'
@@ -85,6 +86,11 @@ export const expectedCommandRegistry = [
   expectedCommand('source-control.commit', 7, 'sourceControl', split([sequence('meta+enter')], [sequence('ctrl+enter')]), ['source-control-commit'], 'guarded', 'commit-message-input'),
   expectedCommand('worktree.merge', 8, 'sourceControl', same(), ['worktree'], 'confirmation_required', 'worktree-merge-confirmation'),
   expectedCommand('worktree.discard', 9, 'sourceControl', same(), ['worktree'], 'confirmation_required', 'worktree-discard-confirmation'),
+  expectedCommand('worktree.conflict.previous', 8, 'sourceControl', same(sequence('alt+arrowup')), ['worktree-merge-conflict'], 'safe', 'previous-merge-conflict'),
+  expectedCommand('worktree.conflict.next', 8, 'sourceControl', same(sequence('alt+arrowdown')), ['worktree-merge-conflict'], 'safe', 'next-merge-conflict'),
+  expectedCommand('worktree.conflict.accept-current', 8, 'sourceControl', split([sequence('meta+1')], [sequence('ctrl+1')]), ['worktree-merge-conflict'], 'guarded', 'merge-conflict-result'),
+  expectedCommand('worktree.conflict.accept-incoming', 8, 'sourceControl', split([sequence('meta+2')], [sequence('ctrl+2')]), ['worktree-merge-conflict'], 'guarded', 'merge-conflict-result'),
+  expectedCommand('worktree.conflict.accept-both', 8, 'sourceControl', split([sequence('meta+3')], [sequence('ctrl+3')]), ['worktree-merge-conflict'], 'guarded', 'merge-conflict-result'),
   expectedCommand('issue.create', 10, 'issues', same(sequence('c', 'i')), ['global'], 'safe', 'issue-title-input'),
   expectedCommand('issue.open-list', 11, 'issues', same(sequence('g', 'i')), ['global'], 'safe', 'selected-or-first-issue-row'),
   expectedCommand('issue.selection.next', 11, 'issues', same(sequence('j'), sequence('arrowdown')), ['issue-list'], 'safe', 'next-issue-row'),

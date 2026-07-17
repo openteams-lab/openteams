@@ -257,6 +257,7 @@ impl WorkflowTranscript {
         .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn find_by_execution_filtered(
         pool: &SqlitePool,
         execution_id: Uuid,

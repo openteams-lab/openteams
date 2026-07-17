@@ -12,6 +12,7 @@ import { useShortcuts } from '@/shortcuts/ShortcutProvider';
 type ActiveTooltip = {
   anchor: HTMLElement;
   text: string;
+  shortcut?: string;
 };
 
 type StoredTitle = ActiveTooltip & {
@@ -72,7 +73,11 @@ export function GlobalTooltip() {
             window.clearTimeout(hoverTimeoutRef.current);
             hoverTimeoutRef.current = null;
           }
-          setActive({ anchor, text: current.text });
+          setActive({
+            anchor,
+            text: current.text,
+            shortcut: current.shortcut,
+          });
         }
         return;
       }
@@ -80,17 +85,15 @@ export function GlobalTooltip() {
 
       const originalTitle = anchor.getAttribute('title')?.trim();
       if (!originalTitle) return;
+      const text = originalTitle;
       const commandElement = anchor.closest<HTMLElement>('[data-command-id]');
       const commandId = commandElement?.dataset.commandId;
-      let text = originalTitle;
+      let shortcut: string | undefined;
       if (commandId) {
         try {
           const presentation = presentationFor(commandId);
-          if (
-            presentation.tooltipShortcut &&
-            !text.includes(presentation.label)
-          ) {
-            text = `${text} (${presentation.tooltipShortcut})`;
+          if (presentation.sequence.length > 0) {
+            shortcut = presentation.label;
           }
         } catch {
           // A stale or extension-owned command id should not break its tooltip.
@@ -103,18 +106,24 @@ export function GlobalTooltip() {
 
       anchor.removeAttribute('title');
       anchor.setAttribute('aria-describedby', tooltipDescription);
-      storedTitleRef.current = { anchor, text, describedBy, originalTitle };
+      storedTitleRef.current = {
+        anchor,
+        text,
+        shortcut,
+        describedBy,
+        originalTitle,
+      };
       setPosition(null);
 
       if (delayMs > 0) {
         hoverTimeoutRef.current = window.setTimeout(() => {
           hoverTimeoutRef.current = null;
           if (storedTitleRef.current?.anchor === anchor) {
-            setActive({ anchor, text });
+            setActive({ anchor, text, shortcut });
           }
         }, delayMs);
       } else {
-        setActive({ anchor, text });
+        setActive({ anchor, text, shortcut });
       }
     },
     [closeTooltip, presentationFor, tooltipId],
@@ -234,7 +243,15 @@ export function GlobalTooltip() {
         visibility: position ? 'visible' : 'hidden',
       }}
     >
-      {active.text}
+      <span>{active.text}</span>
+      {active.shortcut && (
+        <>
+          {' '}
+          <span className="ml-3 font-mono text-[10px] text-[var(--ink-tertiary)]">
+            {active.shortcut}
+          </span>
+        </>
+      )}
     </div>,
     document.body,
   );

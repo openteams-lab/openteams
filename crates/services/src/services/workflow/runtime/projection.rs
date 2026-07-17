@@ -12,7 +12,7 @@ pub fn build_workflow_card_projection(
     transcripts: &[WorkflowTranscript],
     workflow_agent_sessions: &[WorkflowAgentSession],
     session_agents: &[ChatSessionAgent],
-    agents: &[ChatAgent],
+    _agents: &[ChatAgent],
     stopped_by_user: bool,
     error_message: Option<String>,
 ) -> Result<WorkflowCardProjection, WorkflowRuntimeError> {
@@ -21,13 +21,7 @@ pub fn build_workflow_card_projection(
 
     let session_agent_name_by_id: HashMap<Uuid, String> = session_agents
         .iter()
-        .filter_map(|session_agent| {
-            let agent_name = agents
-                .iter()
-                .find(|agent| agent.id == session_agent.agent_id)
-                .map(|agent| agent.name.clone())?;
-            Some((session_agent.id, agent_name))
-        })
+        .map(|session_agent| (session_agent.id, session_agent.member_name.clone()))
         .collect();
 
     let workflow_agent_name_by_id: HashMap<Uuid, String> = workflow_agent_sessions
@@ -78,19 +72,16 @@ pub fn build_workflow_card_projection(
 
     let agent_views = session_agents
         .iter()
-        .filter_map(|session_agent| {
-            let agent = agents
-                .iter()
-                .find(|agent| agent.id == session_agent.agent_id)?;
-            Some(WorkflowCardAgent {
+        .map(|session_agent| {
+            WorkflowCardAgent {
                 session_agent_id: session_agent.id.to_string(),
                 workflow_agent_session_id: workflow_agent_sessions
                     .iter()
                     .find(|workflow_session| workflow_session.session_agent_id == session_agent.id)
                     .map(|workflow_session| workflow_session.id.to_string()),
-                agent_id: agent.id.to_string(),
-                name: agent.name.clone(),
-            })
+                agent_id: session_agent.id.to_string(),
+                name: session_agent.member_name.clone(),
+            }
         })
         .collect::<Vec<_>>();
 
@@ -181,7 +172,7 @@ pub fn build_workflow_card_projection_lightweight(
     transcripts: &[WorkflowTranscript],
     workflow_agent_sessions: &[WorkflowAgentSession],
     session_agents: &[ChatSessionAgent],
-    agents: &[ChatAgent],
+    _agents: &[ChatAgent],
     transcript_count: Option<i64>,
     stopped_by_user: bool,
     error_message: Option<String>,
@@ -191,13 +182,7 @@ pub fn build_workflow_card_projection_lightweight(
 
     let session_agent_name_by_id: HashMap<Uuid, String> = session_agents
         .iter()
-        .filter_map(|session_agent| {
-            let agent_name = agents
-                .iter()
-                .find(|agent| agent.id == session_agent.agent_id)
-                .map(|agent| agent.name.clone())?;
-            Some((session_agent.id, agent_name))
-        })
+        .map(|session_agent| (session_agent.id, session_agent.member_name.clone()))
         .collect();
 
     let workflow_agent_name_by_id: HashMap<Uuid, String> = workflow_agent_sessions
@@ -248,19 +233,16 @@ pub fn build_workflow_card_projection_lightweight(
 
     let agent_views = session_agents
         .iter()
-        .filter_map(|session_agent| {
-            let agent = agents
-                .iter()
-                .find(|agent| agent.id == session_agent.agent_id)?;
-            Some(WorkflowCardAgent {
+        .map(|session_agent| {
+            WorkflowCardAgent {
                 session_agent_id: session_agent.id.to_string(),
                 workflow_agent_session_id: workflow_agent_sessions
                     .iter()
                     .find(|workflow_session| workflow_session.session_agent_id == session_agent.id)
                     .map(|workflow_session| workflow_session.id.to_string()),
-                agent_id: agent.id.to_string(),
-                name: agent.name.clone(),
-            })
+                agent_id: session_agent.id.to_string(),
+                name: session_agent.member_name.clone(),
+            }
         })
         .collect::<Vec<_>>();
 

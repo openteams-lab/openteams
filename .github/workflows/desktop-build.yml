@@ -14,9 +14,9 @@ on:
           - windows
           - linux
       macos_sign_and_notarize:
-        description: 'Sign and notarize macOS build'
+        description: 'Sign and notarize macOS build (requires Apple secrets)'
         required: true
-        default: true
+        default: false
         type: boolean
 
 concurrency:
@@ -31,12 +31,10 @@ env:
   PNPM_VERSION: 10.13.1
   RUST_TOOLCHAIN: nightly-2025-12-04
   CARGO_TERM_COLOR: always
-  ENABLE_MACOS_DMG: "false"
+  ENABLE_MACOS_DMG: "true"
   ENABLE_LINUX_APPIMAGE_UPDATER: ${{ vars.ENABLE_LINUX_APPIMAGE_UPDATER == 'true' }}
   POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
   POSTHOG_API_ENDPOINT: ${{ secrets.POSTHOG_API_ENDPOINT }}
-  VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
-  VITE_POSTHOG_API_ENDPOINT: ${{ secrets.POSTHOG_API_ENDPOINT }}
   OPENTEAMS_GITHUB_CLIENT_ID: ${{ vars.OPENTEAMS_GITHUB_CLIENT_ID }}
 
 jobs:
@@ -67,7 +65,11 @@ jobs:
           set -euo pipefail
           case "${{ matrix.platform }}" in
             macos)
-              echo "name=desktop-macos" >> "$GITHUB_OUTPUT"
+              if [ "${{ inputs.macos_sign_and_notarize }}" = "true" ]; then
+                echo "name=desktop-macos-signed" >> "$GITHUB_OUTPUT"
+              else
+                echo "name=desktop-macos-unsigned" >> "$GITHUB_OUTPUT"
+              fi
               ;;
             windows)
               echo "name=desktop-windows" >> "$GITHUB_OUTPUT"
@@ -120,7 +122,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for key in POSTHOG_API_KEY POSTHOG_API_ENDPOINT VITE_POSTHOG_API_KEY VITE_POSTHOG_API_ENDPOINT; do
+          for key in POSTHOG_API_KEY POSTHOG_API_ENDPOINT; do
             if [ -z "${!key:-}" ]; then
               echo "::error::Missing GitHub Secret-backed desktop build env: $key"
               exit 1
@@ -450,6 +452,53 @@ jobs:
 
           echo "bundle=$updater_bundle" >> "$GITHUB_OUTPUT"
 
+      - name: Prepare macOS distribution metadata
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          checksum_file='src-tauri/target/release/bundle/SHA256SUMS-macos.txt'
+          : > "$checksum_file"
+
+          if [ "${{ inputs.macos_sign_and_notarize }}" = "true" ]; then
+            artifacts=(
+              '${{ steps.signed_dmg.outputs.signed_dmg }}'
+              '${{ steps.signed_macos_updater.outputs.bundle }}'
+            )
+          else
+            shopt -s nullglob
+            unsigned_dmgs=(src-tauri/target/release/bundle/dmg/*.dmg)
+            for dmg in "${unsigned_dmgs[@]}"; do
+              if [[ "$dmg" != *-unsigned.dmg ]]; then
+                mv "$dmg" "${dmg%.dmg}-unsigned.dmg"
+              fi
+            done
+            artifacts=(
+              src-tauri/target/release/bundle/dmg/*.dmg
+              src-tauri/target/release/bundle/macos/*.app.tar.gz
+            )
+            cat > src-tauri/target/release/bundle/UNSIGNED-MACOS-README.txt <<'EOF'
+          This macOS build is not signed or notarized by Apple.
+          After copying openteams.app to Applications, Control-click the app and choose Open.
+          If macOS still blocks it, use System Settings > Privacy & Security > Open Anyway.
+          Do not disable Gatekeeper globally.
+          EOF
+          fi
+
+          if [ "${#artifacts[@]}" -eq 0 ]; then
+            echo "::error::No macOS artifacts found for checksum generation"
+            exit 1
+          fi
+
+          for artifact in "${artifacts[@]}"; do
+            if [ ! -f "$artifact" ]; then
+              echo "::error::Missing macOS artifact: $artifact"
+              exit 1
+            fi
+            digest=$(shasum -a 256 "$artifact" | awk '{print $1}')
+            printf '%s  %s\n' "$digest" "$(basename "$artifact")" >> "$checksum_file"
+          done
+
       - name: Upload signed desktop artifacts (macOS)
         if: runner.os == 'macOS' && inputs.macos_sign_and_notarize == 'true' && env.ENABLE_MACOS_DMG == 'true'
         uses: actions/upload-artifact@v6
@@ -459,6 +508,7 @@ jobs:
             src-tauri/target/release/bundle/dmg/openteams-signed.dmg
             ${{ steps.signed_macos_updater.outputs.bundle }}
             ${{ steps.signed_macos_updater.outputs.bundle }}.sig
+            src-tauri/target/release/bundle/SHA256SUMS-macos.txt
           if-no-files-found: error
           retention-days: 7
 
@@ -470,6 +520,7 @@ jobs:
           path: |
             ${{ steps.signed_macos_updater.outputs.bundle }}
             ${{ steps.signed_macos_updater.outputs.bundle }}.sig
+            src-tauri/target/release/bundle/SHA256SUMS-macos.txt
           if-no-files-found: error
           retention-days: 7
 
@@ -516,6 +567,8 @@ jobs:
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/macos/*.app.tar.gz
             src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+            src-tauri/target/release/bundle/SHA256SUMS-macos.txt
+            src-tauri/target/release/bundle/UNSIGNED-MACOS-README.txt
           if-no-files-found: error
           retention-days: 7
 
@@ -527,6 +580,8 @@ jobs:
           path: |
             src-tauri/target/release/bundle/macos/*.app.tar.gz
             src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+            src-tauri/target/release/bundle/SHA256SUMS-macos.txt
+            src-tauri/target/release/bundle/UNSIGNED-MACOS-README.txt
           if-no-files-found: error
           retention-days: 7
 
@@ -539,8 +594,13 @@ jobs:
 
           if [[ "${{ matrix.platform }}" == "macos" && "${{ inputs.macos_sign_and_notarize }}" == "true" && "${ENABLE_MACOS_DMG}" == "true" ]]; then
             cp src-tauri/target/release/bundle/dmg/openteams-signed.dmg gh-package/files/
+            cp "${{ steps.signed_macos_updater.outputs.bundle }}" gh-package/files/
+            cp "${{ steps.signed_macos_updater.outputs.bundle }}.sig" gh-package/files/
+            cp src-tauri/target/release/bundle/SHA256SUMS-macos.txt gh-package/files/
           elif [[ "${{ matrix.platform }}" == "macos" && "${{ inputs.macos_sign_and_notarize }}" == "true" ]]; then
             cp "${{ steps.signed_macos_updater.outputs.bundle }}" gh-package/files/
+            cp "${{ steps.signed_macos_updater.outputs.bundle }}.sig" gh-package/files/
+            cp src-tauri/target/release/bundle/SHA256SUMS-macos.txt gh-package/files/
           elif [[ "${{ matrix.platform }}" == "linux" ]]; then
             cp src-tauri/target/release/bundle/deb/*.deb gh-package/files/
             if [ "$ENABLE_LINUX_APPIMAGE_UPDATER" = "true" ]; then
@@ -551,7 +611,11 @@ jobs:
           elif [[ "${{ matrix.platform }}" == "windows" ]]; then
             cp src-tauri/target/release/bundle/msi/*.msi gh-package/files/
           else
+            cp src-tauri/target/release/bundle/dmg/*.dmg gh-package/files/
             cp src-tauri/target/release/bundle/macos/*.app.tar.gz gh-package/files/
+            cp src-tauri/target/release/bundle/macos/*.app.tar.gz.sig gh-package/files/
+            cp src-tauri/target/release/bundle/SHA256SUMS-macos.txt gh-package/files/
+            cp src-tauri/target/release/bundle/UNSIGNED-MACOS-README.txt gh-package/files/
           fi
 
           if ! compgen -G "gh-package/files/*" > /dev/null; then

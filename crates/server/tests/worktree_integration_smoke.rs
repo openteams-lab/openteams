@@ -226,6 +226,8 @@ async fn session_worktree_routes_cover_main_merge_conflict_and_cleanup_flows() -
     assert!(clean_path.exists());
     assert_ne!(clean_path, base);
     fs::write(clean_path.join("session.txt"), "from isolated worktree\n")?;
+    git(&clean_path, &["add", "session.txt"])?;
+    git(&clean_path, &["commit", "-m", "smoke session change"])?;
     fs::create_dir_all(base.join(".openteams/context"))?;
     fs::write(
         base.join(".openteams/context/runtime.jsonl"),
@@ -265,7 +267,7 @@ async fn session_worktree_routes_cover_main_merge_conflict_and_cleanup_flows() -
     let (status, cleanup_response) = api(
         &app,
         Method::POST,
-        format!("/api/chat/sessions/{clean_id}/worktree/cleanup"),
+        format!("/api/chat/sessions/{clean_id}/worktree/discard"),
         Some(json!({})),
     )
     .await?;
@@ -284,6 +286,11 @@ async fn session_worktree_routes_cover_main_merge_conflict_and_cleanup_flows() -
     let conflict_worktree = prepare_worktree(&app, conflict_id).await?;
     let conflict_path = PathBuf::from(str_field(&conflict_worktree, "worktree_path")?);
     fs::write(conflict_path.join("conflict.txt"), "session side\n")?;
+    git(&conflict_path, &["add", "conflict.txt"])?;
+    git(
+        &conflict_path,
+        &["commit", "-m", "smoke session conflict change"],
+    )?;
     fs::write(base.join("conflict.txt"), "current side\n")?;
     git(&base, &["add", "conflict.txt"])?;
     git(&base, &["commit", "-m", "base conflict change"])?;
@@ -353,6 +360,18 @@ async fn session_worktree_routes_cover_main_merge_conflict_and_cleanup_flows() -
         fs::read_to_string(base.join("conflict.txt"))?,
         "resolved smoke\n"
     );
+    assert_eq!(
+        git(&base, &["log", "-1", "--format=%s"])?,
+        "smoke conflict resolved"
+    );
+    assert!(!git(&base, &["log", "--format=%s"])?.contains("Merge OpenTeams session changes"));
+    assert_eq!(
+        git(&base, &["rev-list", "--parents", "-n", "1", "HEAD"])?
+            .split_whitespace()
+            .count(),
+        2,
+        "conflict resolution must not create a merge commit"
+    );
 
     let aborting =
         create_session(&app, project_id, "conflict abort", &base, Some("isolated")).await?;
@@ -360,6 +379,11 @@ async fn session_worktree_routes_cover_main_merge_conflict_and_cleanup_flows() -
     let abort_worktree = prepare_worktree(&app, abort_id).await?;
     let abort_path = PathBuf::from(str_field(&abort_worktree, "worktree_path")?);
     fs::write(abort_path.join("conflict.txt"), "abort session side\n")?;
+    git(&abort_path, &["add", "conflict.txt"])?;
+    git(
+        &abort_path,
+        &["commit", "-m", "smoke abort session conflict change"],
+    )?;
     fs::write(base.join("conflict.txt"), "abort current side\n")?;
     git(&base, &["add", "conflict.txt"])?;
     git(&base, &["commit", "-m", "base abort conflict change"])?;

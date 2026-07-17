@@ -28,6 +28,10 @@ fn default_commit_reminder_enabled() -> bool {
     true
 }
 
+fn default_error_reporting_enabled() -> bool {
+    true
+}
+
 fn default_max_agent_chain_depth() -> u32 {
     8
 }
@@ -361,6 +365,8 @@ pub struct Config {
     pub editor: EditorConfig,
     pub github: GitHubConfig,
     pub analytics_enabled: bool,
+    #[serde(default = "default_error_reporting_enabled")]
+    pub error_reporting_enabled: bool,
     pub workspace_dir: Option<String>,
     #[serde(default)]
     pub worktree_sessions_dir: Option<String>,
@@ -418,6 +424,7 @@ impl Config {
             editor: old.editor,
             github: old.github,
             analytics_enabled: old.analytics_enabled,
+            error_reporting_enabled: true,
             workspace_dir: old.workspace_dir,
             worktree_sessions_dir: old.worktree_sessions_dir,
             last_app_version: old.last_app_version,
@@ -484,7 +491,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             config_version: "v10".to_string(),
-            theme: ThemeMode::Light,
+            theme: ThemeMode::System,
             executor_profile: ExecutorProfileId::new(BaseCodingAgent::OpenTeamsCli),
             disclaimer_acknowledged: false,
             onboarding_acknowledged: false,
@@ -492,6 +499,7 @@ impl Default for Config {
             editor: EditorConfig::default(),
             github: GitHubConfig::default(),
             analytics_enabled: true,
+            error_reporting_enabled: true,
             workspace_dir: None,
             worktree_sessions_dir: None,
             last_app_version: None,
@@ -512,5 +520,18 @@ impl Default for Config {
             max_agent_chain_depth: default_max_agent_chain_depth(),
             keyboard_shortcuts: KeyboardShortcutsConfig::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Config;
+
+    #[test]
+    fn new_config_follows_system_appearance_and_browser_language() {
+        let config = serde_json::to_value(Config::default()).expect("serialize default config");
+
+        assert_eq!(config["theme"], "SYSTEM");
+        assert_eq!(config["language"], "BROWSER");
     }
 }

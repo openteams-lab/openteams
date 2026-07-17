@@ -51,3 +51,16 @@ pub use workflow::{
 };
 pub mod workspace_change_capture;
 pub mod worktree_manager;
+
+pub(crate) const OPENTEAMS_PROMPT_SOURCE_MARKER: &str = "[OPENTEAMS_SOURCE=openteams]";
+
+pub(crate) fn mark_openteams_prompt(prompt: &str) -> String {
+    if prompt
+        .trim_start()
+        .starts_with(OPENTEAMS_PROMPT_SOURCE_MARKER)
+    {
+        prompt.to_string()
+    } else {
+        format!("{OPENTEAMS_PROMPT_SOURCE_MARKER}\n\n{prompt}")
+    }
+}

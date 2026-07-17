@@ -3,6 +3,8 @@ use db::{
     DBService,
     models::{
         chat_session::{ChatSession, CreateChatSession},
+        chat_session_agent::{ChatSessionAgent, ChatSessionAgentState},
+        member_execution_config::MemberExecutionConfig,
         workflow_event::WorkflowEvent,
         workflow_execution::{CreateWorkflowExecution, WorkflowExecution},
         workflow_plan::{CreateWorkflowPlan, WorkflowPlan},
@@ -14,12 +16,68 @@ use db::{
         workflow_types::*,
     },
 };
-use sqlx::SqlitePool;
+use sqlx::{SqlitePool, types::Json};
 use uuid::Uuid;
 
 use super::{
     super::workflow_runtime::WorkflowRevisionFeedbackSource, step_input::StepFollowUpMode, *,
 };
+
+fn test_session_agent(agent_id: Uuid, member_name: &str) -> ChatSessionAgent {
+    ChatSessionAgent {
+        id: Uuid::new_v4(),
+        session_id: Uuid::new_v4(),
+        agent_id,
+        state: ChatSessionAgentState::Idle,
+        workspace_path: None,
+        pty_session_key: None,
+        agent_session_id: None,
+        agent_message_id: None,
+        project_member_id: None,
+        member_name: member_name.to_string(),
+        execution_config: Json(MemberExecutionConfig::default()),
+        allowed_skill_ids: Json(Vec::new()),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    }
+}
+
+#[test]
+fn workflow_agent_identity_helpers_keep_shared_execution_profiles_distinct() {
+    let shared_agent_id = Uuid::new_v4();
+    let solo_agent_id = Uuid::new_v4();
+    let backend = test_session_agent(shared_agent_id, "BackendMember");
+    let reviewer = test_session_agent(shared_agent_id, "ReviewMember");
+    let solo = test_session_agent(solo_agent_id, "SoloMember");
+    let session_agents = vec![backend.clone(), reviewer.clone(), solo.clone()];
+
+    let valid_agent_ids = workflow_valid_agent_ids(&session_agents);
+    assert!(valid_agent_ids.contains(&backend.id.to_string()));
+    assert!(valid_agent_ids.contains(&reviewer.id.to_string()));
+    assert!(valid_agent_ids.contains(&solo.id.to_string()));
+    assert!(!valid_agent_ids.contains(&shared_agent_id.to_string()));
+    assert!(valid_agent_ids.contains(&solo_agent_id.to_string()));
+
+    let agent_id_map = workflow_agent_id_map(&session_agents);
+    assert_eq!(agent_id_map.get(&backend.id.to_string()), Some(&backend.id));
+    assert_eq!(
+        agent_id_map.get(&reviewer.id.to_string()),
+        Some(&reviewer.id)
+    );
+    assert!(!agent_id_map.contains_key(&shared_agent_id.to_string()));
+    assert_eq!(agent_id_map.get(&solo_agent_id.to_string()), Some(&solo.id));
+
+    let names = workflow_agent_name_lookup(&session_agents);
+    assert_eq!(
+        names.get(&backend.id.to_string()).map(String::as_str),
+        Some("BackendMember")
+    );
+    assert_eq!(
+        names.get(&reviewer.id.to_string()).map(String::as_str),
+        Some("ReviewMember")
+    );
+    assert!(!names.contains_key(&shared_agent_id.to_string()));
+}
 
 struct StopFixture {
     db: DBService,

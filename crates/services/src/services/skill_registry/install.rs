@@ -142,7 +142,7 @@ async fn uninstall_skill_files_from_global_directory_at_paths(
         let relative = sanitize_skill_relative_path(&identifier)?;
         for root in &base_roots {
             let target_dir = root.join(&relative);
-            if is_openteams_managed_link(&target_dir, &app_data).await {
+            if is_openteams_managed_link(&target_dir, app_data).await {
                 remove_skill_link(&target_dir).await?;
             } else {
                 tracing::info!(
@@ -154,7 +154,7 @@ async fn uninstall_skill_files_from_global_directory_at_paths(
     }
 
     for identifier in skill_uninstall_identifiers(skill) {
-        let data_dir = openteams_skill_data_dir(&identifier, &app_data);
+        let data_dir = openteams_skill_data_dir(&identifier, app_data);
         match tokio::fs::remove_dir_all(&data_dir).await {
             Ok(_) => {}
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}

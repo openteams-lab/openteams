@@ -1487,6 +1487,7 @@ async fn write_github_issue_detail_cache(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn issue_write_with_after<T, F, Fut, A, AFut>(
     deployment: DeploymentImpl,
     project_id: Uuid,

@@ -23,6 +23,8 @@ assert.ok(page.includes("useShortcutScope('issue-list'"));
 assert.ok(page.includes('active: activeIssue === null'));
 assert.ok(page.includes("useShortcutScope('issue-detail'"));
 assert.ok(page.includes('active: activeIssue !== null'));
+assert.ok(page.includes("useCommandPresentation('issue.create')"));
+assert.ok(page.includes('{createIssuePresentation.label}'));
 assert.ok(page.includes('data-issue-row-id={issue.id}'));
 assert.ok(page.includes('tabIndex={selected ? 0 : -1}'));
 assert.ok(page.includes("scrollIntoView({ block:"));

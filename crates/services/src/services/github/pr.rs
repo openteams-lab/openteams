@@ -158,6 +158,7 @@ impl GitHubPrService {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn push_head(
         &self,
         pool: &SqlitePool,
@@ -921,6 +922,7 @@ fn remote_head_matches_local_output(remote_output: &str, local_output: &str) -> 
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use chrono::Utc;
     use db::models::{

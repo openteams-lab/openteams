@@ -102,6 +102,22 @@ impl ChatMessageQueue {
         .await
     }
 
+    /// Processing entries that were claimed but never bound to a run.
+    ///
+    /// These rows can survive a backend interruption even when the session-agent state was
+    /// already persisted as `idle` or `dead`, so recovery cannot discover them from agent state
+    /// alone.
+    pub async fn list_unbound_processing(pool: &SqlitePool) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(&format!(
+            "SELECT {CHAT_MESSAGE_QUEUE_COLUMNS}
+             FROM chat_message_queue
+             WHERE status = 'processing' AND run_id IS NULL
+             ORDER BY created_at ASC, id ASC"
+        ))
+        .fetch_all(pool)
+        .await
+    }
+
     pub async fn count_queued_for_member(
         pool: &SqlitePool,
         session_agent_id: Uuid,
@@ -1111,6 +1127,36 @@ mod tests {
             .expect("reclaim after requeue");
         assert_eq!(reclaimed.id, claimed.id);
         assert!(reclaimed.run_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn list_unbound_processing_excludes_rows_already_bound_to_runs() {
+        let pool = setup_pool().await;
+        let unbound_member = Uuid::new_v4();
+        let bound_member = Uuid::new_v4();
+        let unbound = enqueue(&pool, unbound_member, 1).await;
+        let bound = enqueue(&pool, bound_member, 2).await;
+
+        let claimed_unbound = ChatMessageQueue::claim_next(&pool, unbound_member)
+            .await
+            .unwrap()
+            .unwrap();
+        let claimed_bound = ChatMessageQueue::claim_next(&pool, bound_member)
+            .await
+            .unwrap()
+            .unwrap();
+        ChatMessageQueue::bind_run(&pool, claimed_bound.id, Uuid::new_v4())
+            .await
+            .unwrap()
+            .expect("bind second row");
+
+        let rows = ChatMessageQueue::list_unbound_processing(&pool)
+            .await
+            .expect("list unbound processing");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, claimed_unbound.id);
+        assert_eq!(rows[0].id, unbound.id);
+        assert_ne!(rows[0].id, bound.id);
     }
 
     #[tokio::test]

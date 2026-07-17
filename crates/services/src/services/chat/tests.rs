@@ -10,13 +10,14 @@ mod tests {
         project::CreateProject,
         project_member::{ProjectMember, ProjectMemberType},
     };
-    use sqlx::SqlitePool;
+    use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
     use uuid::Uuid;
 
     use super::{
         CompressionType, SimplifiedMessage, all_agents_running, build_message_analytics_metrics,
-        compress_messages_if_needed, create_message, create_session_with_project_members,
-        effective_agent_name, is_protocol_notice_history_message, is_workflow_chat_input_mode,
+        build_summarization_prompt, compress_messages_if_needed, create_message,
+        create_session_with_project_members, effective_agent_name,
+        is_protocol_notice_history_message, is_workflow_chat_input_mode,
         limit_summary_input_messages, member_name_overrides_for_session, normalized_member_name,
         parse_agent_send_mentions, parse_mentions, parse_user_message_mentions,
         prioritize_summary_agents, select_messages_to_compress_by_token,
@@ -119,6 +120,7 @@ mod tests {
             session_id: Uuid::new_v4(),
             sender_type: ChatSenderType::User,
             sender_id: None,
+            sender_session_agent_id: None,
             content: "hello @planner with file".to_string(),
             mentions: sqlx::types::Json(vec!["planner".to_string()]),
             meta: sqlx::types::Json(serde_json::json!({
@@ -153,7 +155,9 @@ mod tests {
     }
 
     async fn setup_chat_message_pool() -> SqlitePool {
-        let pool = SqlitePool::connect("sqlite::memory:")
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
             .await
             .expect("create sqlite memory pool");
 
@@ -186,6 +190,7 @@ mod tests {
                 chat_input_mode TEXT,
                 project_id BLOB,
                 lead_agent_id TEXT,
+                lead_session_agent_id BLOB,
                 worktree_mode TEXT NOT NULL DEFAULT 'inherit'
                     CHECK (worktree_mode IN ('inherit', 'disabled', 'isolated')),
                 pinned_at TEXT,
@@ -207,12 +212,32 @@ mod tests {
             )
             "#,
             r#"
+            CREATE TABLE chat_session_agents (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                agent_id BLOB NOT NULL,
+                state TEXT NOT NULL DEFAULT 'idle'
+                    CHECK (state IN ('idle','running','stopping','waitingapproval','dead')),
+                workspace_path TEXT,
+                pty_session_key TEXT,
+                agent_session_id TEXT,
+                agent_message_id TEXT,
+                project_member_id BLOB,
+                member_name TEXT NOT NULL DEFAULT '',
+                execution_config TEXT NOT NULL DEFAULT '{}',
+                allowed_skill_ids TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+            r#"
             CREATE TABLE chat_messages (
                 id BLOB PRIMARY KEY,
                 session_id BLOB NOT NULL,
                 sender_type TEXT NOT NULL
                     CHECK (sender_type IN ('user','agent','system')),
                 sender_id BLOB,
+                sender_session_agent_id BLOB,
                 content TEXT NOT NULL,
                 mentions TEXT NOT NULL DEFAULT '[]',
                 meta TEXT NOT NULL DEFAULT '{}',
@@ -263,7 +288,9 @@ mod tests {
     }
 
     async fn setup_project_session_pool() -> SqlitePool {
-        let pool = SqlitePool::connect("sqlite::memory:")
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
             .await
             .expect("create sqlite memory pool");
 
@@ -290,6 +317,7 @@ mod tests {
                 status TEXT NOT NULL DEFAULT 'active'
                     CHECK (status IN ('active','archived')),
                 lead_agent_id BLOB,
+                lead_session_agent_id BLOB,
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,
@@ -346,6 +374,7 @@ mod tests {
                 agent_session_id TEXT,
                 agent_message_id TEXT,
                 project_member_id BLOB,
+                member_name TEXT NOT NULL DEFAULT '',
                 execution_config TEXT NOT NULL DEFAULT '{}',
                 allowed_skill_ids TEXT NOT NULL DEFAULT '[]',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
@@ -453,7 +482,16 @@ mod tests {
     #[tokio::test]
     async fn create_project_session_snapshots_agents_initialized_from_global_agents() {
         let pool = setup_project_session_pool().await;
+        sqlx::query("ALTER TABLE chat_agents ADD COLUMN is_default BOOLEAN DEFAULT 0")
+            .execute(&pool)
+            .await
+            .expect("add global default marker");
         let agent = create_agent_member(&pool, "coder").await;
+        sqlx::query("UPDATE chat_agents SET is_default = 1 WHERE id = ?1")
+            .bind(agent.id)
+            .execute(&pool)
+            .await
+            .expect("mark global agent as default");
 
         let project = ProjectService::new()
             .create_project(
@@ -538,13 +576,22 @@ mod tests {
         let overrides = member_name_overrides_for_session(&pool, session.id)
             .await
             .expect("load member name overrides");
+        let session_agent = ChatSessionAgent::find_all_for_session(&pool, session.id)
+            .await
+            .expect("load session members")
+            .into_iter()
+            .next()
+            .expect("session member exists");
 
         assert_eq!(
-            overrides.get(&agent.id).map(String::as_str),
+            overrides.get(&session_agent.id).map(String::as_str),
             Some("backend-lead")
         );
         assert_eq!(
-            effective_agent_name(&agent, overrides.get(&agent.id).map(String::as_str)),
+            effective_agent_name(
+                &agent,
+                overrides.get(&session_agent.id).map(String::as_str)
+            ),
             "backend-lead"
         );
     }
@@ -741,6 +788,7 @@ mod tests {
             agent_session_id: None,
             agent_message_id: None,
             project_member_id: None,
+            member_name: "member".to_string(),
             execution_config: sqlx::types::Json(MemberExecutionConfig::default()),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
@@ -835,6 +883,18 @@ mod tests {
     }
 
     #[test]
+    fn summarization_prompt_identifies_openteams_as_source() {
+        let prompt = build_summarization_prompt(&[SimplifiedMessage {
+            sender: "user:alice".to_string(),
+            content: "Summarize this message.".to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        }]);
+
+        assert!(prompt.starts_with("[OPENTEAMS_SOURCE=openteams]\n\n"));
+        assert_eq!(prompt.matches("[OPENTEAMS_SOURCE=openteams]").count(), 1);
+    }
+
+    #[test]
     fn limit_summary_input_messages_keeps_recent_slice_when_over_limit() {
         let messages = vec![
             SimplifiedMessage {
@@ -885,6 +945,7 @@ mod tests {
             session_id: Uuid::new_v4(),
             sender_type,
             sender_id: None,
+            sender_session_agent_id: None,
             content: "message".to_string(),
             mentions: sqlx::types::Json(Vec::new()),
             meta: sqlx::types::Json(meta),

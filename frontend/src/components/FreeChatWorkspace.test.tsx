@@ -380,7 +380,7 @@ check(
   source,
 );
 check(
-  "quoted agent message summary is shown above the composer",
+  "quoted agent message summary is shown above the composer and jumps to its source",
   source.includes("quotedMessage") &&
     source.includes("message.quotePrefix") &&
     source.includes("message.dismissQuote") &&
@@ -390,6 +390,7 @@ check(
     source.includes("chatInputMode,") &&
     source.includes("...(quotedMessage ? { quotedMessage } : {})") &&
     source.includes("msg.quotedMessage") &&
+    source.includes("handleJumpToMessage(msg.quotedMessage!.id)") &&
     !source.includes("> ${quotedMessage.sender}:"),
   source,
 );

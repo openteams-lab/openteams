@@ -56,6 +56,7 @@ import type {
   GitignoreTemplateSummary,
   Locale,
   Theme,
+  ThemePreference,
   ValidateWorkspacePathResponse,
 } from '@/types';
 import {
@@ -91,6 +92,7 @@ interface OnboardingGuideProps {
   initialState: OnboardingState | null;
   locale: Locale;
   theme: Theme;
+  themePreference: ThemePreference;
   t: TranslateFn;
   teamPresets: ChatTeamPreset[];
   onCreateProjectFromOnboarding: (input: {
@@ -169,13 +171,13 @@ const onboardingSansFont = {
 } as CSSProperties;
 
 const executorSelectClassName =
-  'w-full [&>button]:h-7 [&>button]:rounded-[3px] [&>button]:border-transparent [&>button]:bg-transparent [&>button]:px-1.5 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[13px] [&>button]:text-[#d4d4d8] [&>button]:shadow-none [&>button]:transition-colors [&>button]:duration-100 [&>button:hover]:border-transparent [&>button:hover]:bg-white/[0.035] [&>button:focus-visible]:border-white/[0.14] [&>button:focus-visible]:bg-white/[0.045] [&>button:focus-visible]:outline-none [&>button[aria-expanded=true]]:border-white/[0.14] [&>button[aria-expanded=true]]:bg-white/[0.045] [&>button[data-placeholder=true]>span]:text-[#6f6f76] [&>button>svg:last-child]:h-3 [&>button>svg:last-child]:w-3 [&>button>svg:last-child]:text-[var(--ink-tertiary)] [&>button:hover>svg:last-child]:text-[#a1a1aa]';
+  'w-full [&>button]:h-7 [&>button]:rounded-[7px] [&>button]:border-transparent [&>button]:bg-transparent [&>button]:px-1.5 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[13px] [&>button]:text-[#d4d4d8] [&>button]:shadow-none [&>button]:transition-colors [&>button]:duration-100 [&>button:hover]:border-transparent [&>button:hover]:bg-white/[0.035] [&>button:focus-visible]:border-white/[0.14] [&>button:focus-visible]:bg-white/[0.045] [&>button:focus-visible]:outline-none [&>button[aria-expanded=true]]:border-white/[0.14] [&>button[aria-expanded=true]]:bg-white/[0.045] [&>button[data-placeholder=true]>span]:text-[#6f6f76] [&>button>svg:last-child]:h-3 [&>button>svg:last-child]:w-3 [&>button>svg:last-child]:text-[var(--ink-tertiary)] [&>button:hover>svg:last-child]:text-[#a1a1aa]';
 
 const onboardingProjectInputClassName =
   'mt-2 w-full rounded-[5px] border border-white/[0.08] bg-[var(--onboarding-panel)] px-3 font-mono shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] outline-none transition-[background-color,border-color,box-shadow] placeholder:text-[#5F6672] focus:border-white/[0.24] focus:bg-[#171819] focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.04)]';
 
 const onboardingProjectSelectClassName =
-  'mt-2 w-full [&>button]:h-7 [&>button]:rounded-[5px] [&>button]:border-white/[0.08] [&>button]:bg-[var(--onboarding-panel)] [&>button]:px-1.5 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[12px] [&>button]:text-[#c9d2df] [&>button]:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] [&>button]:outline-none [&>button:hover]:border-white/[0.16] [&>button:hover]:bg-white/[0.045] [&>button:focus-visible]:border-white/[0.24] [&>button:focus-visible]:bg-[#171819] [&>button:focus-visible]:outline-none [&>button[aria-expanded=true]]:border-white/[0.24] [&>button[aria-expanded=true]]:bg-[#171819] [&>button>svg:last-child]:h-3 [&>button>svg:last-child]:w-3 [&>button>svg:last-child]:text-[#768295]';
+  'mt-2 w-full [&>button]:h-7 [&>button]:rounded-[8px] [&>button]:border-white/[0.08] [&>button]:bg-[var(--onboarding-panel)] [&>button]:px-1.5 [&>button]:py-0 [&>button]:font-mono [&>button]:text-[12px] [&>button]:text-[#c9d2df] [&>button]:shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] [&>button]:outline-none [&>button:hover]:border-white/[0.16] [&>button:hover]:bg-white/[0.045] [&>button:focus-visible]:border-white/[0.24] [&>button:focus-visible]:bg-[#171819] [&>button:focus-visible]:outline-none [&>button[aria-expanded=true]]:border-white/[0.24] [&>button[aria-expanded=true]]:bg-[#171819] [&>button>svg:last-child]:h-3 [&>button>svg:last-child]:w-3 [&>button>svg:last-child]:text-[#768295]';
 
 const onboardingNoiseTextureStyle = {
   backgroundImage:
@@ -215,12 +217,12 @@ const scenarioDefinitions: ScenarioDefinition[] = [
   {
     key: OnboardingScenario.design,
     titleKey: 'onboarding.scenario.design.title',
-    titleFallback: 'Design implementation',
+    titleFallback: 'Prototype design',
     descKey: 'onboarding.scenario.design.desc',
     descFallback:
-      'Translate product screens, interaction states, and visual details into implementation tasks while keeping fidelity and quality aligned.',
+      'Turn product ideas, user flows, interaction states, and visual details into testable prototypes before implementation.',
     teamKey: 'onboarding.scenario.design.team',
-    teamFallback: 'Design implementation team',
+    teamFallback: 'Prototype design team',
     Icon: Sparkles,
     members: [
       { member: 'UX Lead', runner_type: 'claude_code', model_name: 'claude-sonnet' },
@@ -354,6 +356,19 @@ const onboardingLanguageToLocale = (
   }
 };
 
+const themePreferenceToOnboardingAppearance = (
+  preference: ThemePreference,
+): OnboardingAppearance => {
+  switch (preference) {
+    case 'light':
+      return OnboardingAppearance.light;
+    case 'dark':
+      return OnboardingAppearance.dark;
+    case 'system':
+      return OnboardingAppearance.system;
+  }
+};
+
 const directoryEntryTime = (entry: DirectoryEntry): number =>
   typeof entry.last_modified === 'number' ? entry.last_modified : 0;
 
@@ -441,6 +456,7 @@ export function OnboardingGuide({
   initialState,
   locale,
   theme,
+  themePreference,
   t,
   teamPresets,
   onCreateProjectFromOnboarding,
@@ -500,7 +516,7 @@ export function OnboardingGuide({
   const [selectedAppearance, setSelectedAppearance] =
     useState<OnboardingAppearance>(
       initialState?.appearance ??
-        (theme === 'light' ? OnboardingAppearance.light : OnboardingAppearance.dark),
+        themePreferenceToOnboardingAppearance(themePreference),
     );
   const [runtimes, setRuntimes] = useState<AgentRuntimeStatus[]>([]);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -779,9 +795,7 @@ export function OnboardingGuide({
     setSelectedLocale(onboardingLanguageToLocale(nextInitialState?.language, locale));
     setSelectedAppearance(
       nextInitialState?.appearance ??
-        (theme === 'light'
-          ? OnboardingAppearance.light
-          : OnboardingAppearance.dark),
+        themePreferenceToOnboardingAppearance(themePreference),
     );
   };
 
@@ -1427,7 +1441,7 @@ export function OnboardingGuide({
                 type="button"
                 onClick={() => handleScenarioSelect(scenario.key)}
                 className={cn(
-                  'group min-h-[104px] cursor-pointer rounded-[8px] border p-3 text-left transition-[background-color,border-color,box-shadow,color] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/[0.35] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--onboarding-stage)]',
+                  'group min-h-[104px] cursor-pointer rounded-[12px] border p-3 text-left transition-[background-color,border-color,box-shadow,color] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/[0.35] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--onboarding-stage)]',
                   selected
                     ? 'border-white/[0.18] bg-white/[0.065] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_1px_0_rgba(0,0,0,0.55)]'
                     : 'border-transparent bg-transparent',
@@ -1527,7 +1541,7 @@ export function OnboardingGuide({
                 <button
                   type="button"
                   onClick={() => void loadRoots()}
-                  className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"
+                  className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"
                   aria-label={t('onboarding.project.roots')}
                   title={t('onboarding.project.roots')}
                 >
@@ -1540,7 +1554,7 @@ export function OnboardingGuide({
                     const parent = getParentPath(currentPath);
                     if (parent) void loadDirectory(parent);
                   }}
-                  className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-35"
+                  className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-35"
                   aria-label={t('onboarding.project.up')}
                   title={t('onboarding.project.up')}
                 >
@@ -1550,7 +1564,7 @@ export function OnboardingGuide({
                   type="button"
                   disabled={!currentPath || pathLoading || directoryMutating}
                   onClick={() => void createProjectDirectory()}
-                  className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-35"
+                  className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-35"
                   aria-label={t('sidebar.newFolder')}
                   title={t('sidebar.newFolder')}
                 >
@@ -1604,7 +1618,7 @@ export function OnboardingGuide({
                               type="button"
                               onClick={() => void commitDirectoryRename()}
                               disabled={directoryMutating}
-                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-45"
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-45"
                               aria-label={t('sidebar.saveFolderName')}
                               title={t('sidebar.saveFolderName')}
                             >
@@ -1614,7 +1628,7 @@ export function OnboardingGuide({
                               type="button"
                               onClick={resetDirectoryRename}
                               disabled={directoryMutating}
-                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-45"
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-45"
                               aria-label={t('sidebar.cancelFolderRename')}
                               title={t('sidebar.cancelFolderRename')}
                             >
@@ -1652,7 +1666,7 @@ export function OnboardingGuide({
                                   void validateProjectPath(entry.path);
                                 }}
                                 className={cn(
-                                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-[#768295] opacity-0 transition hover:bg-white/[0.05] hover:text-[#f5f5f5] group-hover/path-entry:opacity-100',
+                                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] text-[#768295] opacity-0 transition hover:bg-white/[0.05] hover:text-[#f5f5f5] group-hover/path-entry:opacity-100',
                                   selected && '!opacity-100',
                                 )}
                                 aria-label={t('onboarding.project.select')}
@@ -1812,7 +1826,7 @@ export function OnboardingGuide({
                   type="button"
                   onClick={() => void handleInitializeProjectGit()}
                   disabled={saving || pathDetecting}
-                  className="inline-flex h-7 shrink-0 cursor-pointer items-center justify-center rounded-[4px] border border-white/[0.14] bg-white/[0.06] px-3 font-mono text-[11px] font-medium tracking-[0.03em] text-[#d4d4d8] transition hover:border-white/[0.24] hover:bg-white/[0.1] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-7 shrink-0 cursor-pointer items-center justify-center rounded-[8px] border border-white/[0.14] bg-white/[0.06] px-3 font-mono text-[11px] font-medium tracking-[0.03em] text-[#d4d4d8] transition hover:border-white/[0.24] hover:bg-white/[0.1] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t('onboarding.project.initializeAction')}
                 </button>
@@ -1923,7 +1937,7 @@ export function OnboardingGuide({
                       type="button"
                       onClick={() => handleAppearanceSelect(option)}
                       className={cn(
-                        'cursor-pointer rounded-[8px] border p-2 text-left transition',
+                        'cursor-pointer rounded-[12px] border p-2 text-left transition',
                         selected
                           ? 'border-[#d4d4d8]/80 bg-white/[0.07] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05),inset_0_1px_18px_rgba(255,255,255,0.025)]'
                           : 'border-white/[0.07] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]',
@@ -2155,8 +2169,8 @@ export function OnboardingGuide({
                 disabled={saving}
                 className={cn(
                   stepKey === finalOnboardingStep
-                    ? 'inline-flex min-h-10 cursor-pointer items-center justify-center gap-2.5 rounded-[4px] border border-white bg-[linear-gradient(180deg,#FFFFFF_0%,#F2F2F2_100%)] px-6 py-2 text-[13px] font-semibold text-black shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.28)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-[linear-gradient(180deg,#FFFFFF_0%,#EDEDED_100%)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60'
-                    : 'inline-flex min-h-10 cursor-pointer items-center justify-center gap-2.5 rounded-[4px] border border-white bg-white px-6 py-2 text-[13px] font-semibold text-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.92)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-[#f2f2f2] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60',
+                    ? 'inline-flex min-h-10 cursor-pointer items-center justify-center gap-2.5 rounded-[9px] border border-white bg-[linear-gradient(180deg,#FFFFFF_0%,#F2F2F2_100%)] px-6 py-2 text-[13px] font-semibold text-black shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.28)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-[linear-gradient(180deg,#FFFFFF_0%,#EDEDED_100%)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60'
+                    : 'inline-flex min-h-10 cursor-pointer items-center justify-center gap-2.5 rounded-[9px] border border-white bg-white px-6 py-2 text-[13px] font-semibold text-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.92)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-[#f2f2f2] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60',
                   stepKey === 'scenario' &&
                     'origin-center will-change-transform hover:-translate-y-[2px] hover:scale-[1.02] hover:shadow-[0_12px_30px_rgba(255,255,255,0.18)] active:translate-y-[1px] active:scale-[0.98] motion-reduce:transform-none',
                 )}
@@ -2183,9 +2197,9 @@ export function OnboardingGuide({
           <div className="pointer-events-none absolute inset-0 bg-[var(--onboarding-stage)]" />
 
           <div
-            className="relative z-10 flex h-full max-h-[860px] w-full max-w-[1200px] flex-col items-center overflow-y-auto overflow-x-hidden pb-4 pt-4 sm:pb-8 sm:pt-8 lg:pb-10 lg:pt-10"
+            className="relative z-10 flex h-full max-h-[820px] w-full max-w-[1200px] flex-col items-center justify-center overflow-hidden py-4 sm:py-6 lg:py-8"
           >
-            <div className="mt-2 max-w-4xl shrink-0 sm:mt-8 lg:mt-16">
+            <div className="max-w-4xl shrink-0">
               <h1 className="font-sans text-[28px] font-semibold leading-[1.08] tracking-[0] text-[#f5f5f5] sm:text-[40px] sm:leading-[1.07] lg:text-[48px] lg:leading-[1.06]">
                 {t('onboarding.welcome.title')}
               </h1>
@@ -2194,7 +2208,7 @@ export function OnboardingGuide({
               </p>
             </div>
 
-            <div className="relative mt-4 flex min-h-[220px] w-full max-w-5xl flex-col overflow-hidden rounded-[8px] border border-white/[0.12] bg-[var(--onboarding-card)] p-px shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] sm:mt-8 sm:min-h-[320px] lg:mt-14 lg:min-h-[440px]">
+            <div className="relative mt-4 flex h-[clamp(240px,48vh,440px)] min-h-0 w-full max-w-5xl shrink-0 flex-col overflow-hidden rounded-[8px] border border-white/[0.12] bg-[var(--onboarding-card)] p-px shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] sm:mt-6 lg:mt-8">
               <div
                 className="pointer-events-none absolute inset-0 opacity-[0.025]"
                 style={onboardingNoiseTextureStyle}
@@ -2207,7 +2221,7 @@ export function OnboardingGuide({
               </div>
 
               <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-3 py-4 sm:px-12 sm:py-8 lg:px-20 lg:py-10">
-                <div className="w-full max-w-sm overflow-hidden rounded-[6px] border border-white/[0.12] bg-[var(--onboarding-panel)] text-left sm:max-w-md sm:-translate-y-2 lg:-translate-y-4">
+                <div className="w-full max-w-sm overflow-hidden rounded-[6px] border border-white/[0.12] bg-[var(--onboarding-panel)] text-left sm:max-w-md">
                   <div className="flex items-center border-b border-white/[0.08] p-3 sm:p-4">
                     <span className="mr-3 font-mono text-[15px] text-[#a8b3c2]">/</span>
                     <span className="min-w-0 flex-1 truncate text-[14px] text-[#f5f5f5]">
@@ -2226,7 +2240,7 @@ export function OnboardingGuide({
                           onMouseEnter={() => setSelectedWelcomeCommandId(id)}
                           aria-pressed={active}
                           className={cn(
-                            'relative flex w-full cursor-pointer items-center justify-between rounded-[5px] border px-3 py-1.5 text-left text-[13px] transition sm:py-2 sm:text-[14px]',
+                            'relative flex w-full cursor-pointer items-center justify-between rounded-[9px] border px-3 py-1.5 text-left text-[13px] transition sm:py-2 sm:text-[14px]',
                             active
                               ? 'border-white/[0.1] bg-white/[0.065] text-white'
                               : 'border-transparent text-[#8792a3] hover:border-white/[0.08] hover:bg-white/[0.035] hover:text-[#f5f5f5]',
@@ -2260,12 +2274,12 @@ export function OnboardingGuide({
               </div>
             </div>
 
-            <div className="mt-4 flex w-full shrink-0 flex-col items-center gap-2 sm:mt-9 sm:gap-3 lg:mt-12 lg:gap-4">
+            <div className="mt-4 flex w-full shrink-0 flex-col items-center gap-2 sm:mt-6 sm:gap-3 lg:mt-8 lg:gap-4">
               <button
                 type="button"
                 onClick={() => void handleWelcomeNext()}
                 disabled={saving}
-                className="inline-flex min-h-10 w-full max-w-[280px] origin-center cursor-pointer items-center justify-center gap-3 rounded-[6px] border border-white bg-white px-5 py-2 text-[13px] font-semibold text-black shadow-[inset_0_-1px_0_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.35)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform hover:-translate-y-[2px] hover:scale-[1.012] hover:bg-[#f7f7f7] hover:shadow-[inset_0_-1px_0_rgba(0,0,0,0.18),0_0_0_1px_rgba(255,255,255,0.55),0_14px_34px_rgba(255,255,255,0.11)] active:translate-y-[1px] active:scale-[0.988] active:bg-[#e7e7e7] active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.22),0_1px_2px_rgba(0,0,0,0.28)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-12 sm:w-auto sm:max-w-[320px] sm:px-9 sm:py-3 sm:text-[14px]"
+                className="inline-flex min-h-10 w-full max-w-[280px] origin-center cursor-pointer items-center justify-center gap-3 rounded-[10px] border border-white bg-white px-5 py-2 text-[13px] font-semibold text-black shadow-[inset_0_-1px_0_rgba(0,0,0,0.18),0_1px_2px_rgba(0,0,0,0.35)] transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform hover:-translate-y-[2px] hover:scale-[1.012] hover:bg-[#f7f7f7] hover:shadow-[inset_0_-1px_0_rgba(0,0,0,0.18),0_0_0_1px_rgba(255,255,255,0.55),0_14px_34px_rgba(255,255,255,0.11)] active:translate-y-[1px] active:scale-[0.988] active:bg-[#e7e7e7] active:shadow-[inset_0_1px_2px_rgba(0,0,0,0.22),0_1px_2px_rgba(0,0,0,0.28)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-12 sm:w-auto sm:max-w-[320px] sm:px-9 sm:py-3 sm:text-[14px]"
               >
                 {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
                 {t('onboarding.welcome.next')}

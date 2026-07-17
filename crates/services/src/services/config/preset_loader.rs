@@ -890,8 +890,7 @@ impl PresetLoader {
                             .get(&localized_path)
                             .map(|raw| (localized_path, raw))
                     })
-                    .into_iter()
-                    .map(|(path, raw)| format!("{path}\n{}\n", normalize_newlines(&raw)))
+                    .map(|(path, raw)| format!("{path}\n{}\n", normalize_newlines(raw)))
                     .collect::<String>();
                 Ok(BuiltinTeamTemplateCatalogEntry {
                     template_id: parsed.id,
@@ -1295,7 +1294,7 @@ mod tests {
             .iter()
             .find(|preset| preset.id == "blank_team")
             .expect("blank team preset should exist");
-        assert_eq!(blank_team.name, "Blank team");
+        assert_eq!(blank_team.name, "Blank Team");
         assert_eq!(blank_team.members.len(), 1);
         assert_eq!(blank_team.members[0].id, "fullstack_engineer");
         assert_eq!(
@@ -1455,15 +1454,16 @@ Follow the team protocol.
 
         assert!(file_names.contains(&"en/fullstack_delivery_team.md"));
         assert!(file_names.contains(&"zh/rapid_bugfix_team.md"));
-        assert!(file_names.contains(&"blank_team.md"));
+        assert!(file_names.contains(&"en/blank_team.md"));
+        assert!(file_names.contains(&"zh/blank_team.md"));
         assert!(!file_names.contains(&TEAM_COLLABORATION_PROTOCOL_FILE));
     }
 
     #[test]
-    fn load_builtin_presets_parses_ten_english_team_templates_with_tiers() {
+    fn load_builtin_presets_parses_eleven_english_team_templates_with_tiers() {
         let presets = PresetLoader::load_builtin_presets_for_locale(Some("en-US"));
 
-        assert_eq!(presets.teams.len(), 10);
+        assert_eq!(presets.teams.len(), 11);
         let advanced = presets
             .teams
             .iter()
@@ -1478,9 +1478,15 @@ Follow the team protocol.
             !team.name.trim().is_empty()
                 && !team.description.trim().is_empty()
                 && !team.members.is_empty()
-                && !team.workflow_steps.is_empty()
                 && !team.team_protocol.trim().is_empty()
         }));
+        assert!(
+            presets
+                .teams
+                .iter()
+                .filter(|team| team.id != "blank_team")
+                .all(|team| !team.workflow_steps.is_empty())
+        );
     }
 
     #[test]
@@ -1515,6 +1521,14 @@ Follow the team protocol.
             assert_eq!(member_ids, english_member_ids, "{locale}");
             assert_eq!(fullstack.lead_member_id, english_fullstack.lead_member_id);
             assert_eq!(fullstack.tier, english_fullstack.tier);
+
+            let blank_team = localized
+                .teams
+                .iter()
+                .find(|team| team.id == "blank_team")
+                .expect("localized blank team template exists");
+            assert_ne!(blank_team.name, "Blank Team", "{locale}");
+            assert_eq!(blank_team.members.len(), 1, "{locale}");
         }
     }
 

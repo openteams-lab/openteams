@@ -26,6 +26,15 @@ pub struct UpdateAgentSkill {
 }
 
 impl ChatAgentSkill {
+    pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(
+            "SELECT id, agent_id, skill_id, enabled, created_at FROM chat_agent_skills WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    }
+
     pub async fn find_by_agent_id(
         pool: &SqlitePool,
         agent_id: Uuid,

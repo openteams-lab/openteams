@@ -225,7 +225,7 @@ impl RepoIntegrationService {
             }
         };
 
-        let role = requested_role.or_else(|| {
+        let role = requested_role.or({
             Some(if connected_count == 0 {
                 RepoIntegrationRole::Primary
             } else {

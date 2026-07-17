@@ -1,3 +1,8 @@
+#[cfg(all(not(windows), test))]
+use std::{
+    collections::HashMap,
+    sync::{Mutex, OnceLock},
+};
 use std::{
     fs, io,
     path::{Path, PathBuf},
@@ -192,7 +197,7 @@ fn unprotect_token(_store_path: &Path, input: &[u8]) -> Result<Vec<u8>, GitHubTo
     Ok(bytes)
 }
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), not(test)))]
 fn protect_token(store_path: &Path, input: &[u8]) -> Result<Vec<u8>, GitHubTokenStoreError> {
     const KEYRING_MARKER: &[u8] = b"openteams-github-keyring:v1";
 
@@ -203,7 +208,7 @@ fn protect_token(store_path: &Path, input: &[u8]) -> Result<Vec<u8>, GitHubToken
     Ok(KEYRING_MARKER.to_vec())
 }
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), not(test)))]
 fn unprotect_token(store_path: &Path, input: &[u8]) -> Result<Vec<u8>, GitHubTokenStoreError> {
     const KEYRING_MARKER: &[u8] = b"openteams-github-keyring:v1";
 
@@ -221,7 +226,7 @@ fn clear_secure_token(_store_path: &Path) -> Result<(), GitHubTokenStoreError> {
     Ok(())
 }
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), not(test)))]
 fn clear_secure_token(store_path: &Path) -> Result<(), GitHubTokenStoreError> {
     let entry = keyring_entry(store_path)?;
     match entry.delete_credential() {
@@ -230,14 +235,14 @@ fn clear_secure_token(store_path: &Path) -> Result<(), GitHubTokenStoreError> {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), not(test)))]
 fn keyring_entry(store_path: &Path) -> Result<keyring::Entry, GitHubTokenStoreError> {
     const KEYRING_SERVICE: &str = "openteams.github";
 
     keyring::Entry::new(KEYRING_SERVICE, &keyring_account(store_path)).map_err(map_keyring_error)
 }
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), not(test)))]
 fn keyring_account(store_path: &Path) -> String {
     use sha2::{Digest, Sha256};
 
@@ -249,11 +254,52 @@ fn keyring_account(store_path: &Path) -> String {
     format!("github-device-flow:{hex}")
 }
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), not(test)))]
 fn map_keyring_error(err: keyring::Error) -> GitHubTokenStoreError {
     GitHubTokenStoreError::Io(io::Error::other(format!(
         "secure token storage failed: {err}"
     )))
+}
+
+#[cfg(all(not(windows), test))]
+fn test_secure_tokens() -> &'static Mutex<HashMap<PathBuf, Vec<u8>>> {
+    static TOKENS: OnceLock<Mutex<HashMap<PathBuf, Vec<u8>>>> = OnceLock::new();
+    TOKENS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(all(not(windows), test))]
+fn protect_token(store_path: &Path, input: &[u8]) -> Result<Vec<u8>, GitHubTokenStoreError> {
+    const KEYRING_MARKER: &[u8] = b"openteams-github-keyring:v1";
+
+    test_secure_tokens()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .insert(store_path.to_path_buf(), input.to_vec());
+    Ok(KEYRING_MARKER.to_vec())
+}
+
+#[cfg(all(not(windows), test))]
+fn unprotect_token(store_path: &Path, input: &[u8]) -> Result<Vec<u8>, GitHubTokenStoreError> {
+    const KEYRING_MARKER: &[u8] = b"openteams-github-keyring:v1";
+
+    if input != KEYRING_MARKER {
+        return Err(GitHubTokenStoreError::InvalidStore);
+    }
+    test_secure_tokens()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .get(store_path)
+        .cloned()
+        .ok_or(GitHubTokenStoreError::InvalidStore)
+}
+
+#[cfg(all(not(windows), test))]
+fn clear_secure_token(store_path: &Path) -> Result<(), GitHubTokenStoreError> {
+    test_secure_tokens()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(store_path);
+    Ok(())
 }
 
 #[cfg(test)]

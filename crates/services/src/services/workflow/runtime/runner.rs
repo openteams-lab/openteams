@@ -30,6 +30,9 @@ struct WorkflowRuntimeRunRecord {
     workflow_agent_session_id: Option<Uuid>,
     step_id: Uuid,
     step_key: String,
+    started_at: chrono::DateTime<Utc>,
+    analytics: Option<AnalyticsService>,
+    analytics_started: bool,
 }
 
 struct WorkflowNodeIoLogContext {
@@ -86,7 +89,7 @@ async fn start_workflow_runtime_run_record(
     db: &DBService,
     session: &ChatSession,
     session_agent: &ChatSessionAgent,
-    workspace_path: &PathBuf,
+    workspace_path: &std::path::Path,
     prompt: &str,
     stream_context: Option<&WorkflowRuntimeStreamContext>,
 ) -> Result<Option<WorkflowRuntimeRunRecord>, WorkflowRuntimeError> {
@@ -136,6 +139,9 @@ async fn start_workflow_runtime_run_record(
         workflow_agent_session_id: context.workflow_agent_session_id,
         step_id: context.step_id,
         step_key: context.step_key.clone(),
+        started_at: Utc::now(),
+        analytics: context.chat_runner.analytics_service().cloned(),
+        analytics_started: false,
     }))
 }
 
@@ -144,7 +150,7 @@ async fn finish_workflow_runtime_run_record(
     session: &ChatSession,
     agent: &ChatAgent,
     session_agent: &ChatSessionAgent,
-    workspace_path: &PathBuf,
+    workspace_path: &std::path::Path,
     record: Option<&WorkflowRuntimeRunRecord>,
     io_log: &WorkflowNodeIoLogContext,
     assistant_output: &str,
@@ -224,6 +230,40 @@ async fn finish_workflow_runtime_run_record(
         serde_json::to_string(&retention_summary).ok(),
     )
     .await?;
+
+    let duration_ms = (finished_at - record.started_at).num_milliseconds().max(0);
+    if let Some(analytics) = &record.analytics {
+        if record.analytics_started {
+            analytics.record_event(
+                AnalyticsEvent::new(AnalyticsEventPayload::AgentRunCompleted {
+                    agent_id: None,
+                    run_kind: "workflow".to_string(),
+                    outcome: if error_summary.is_some() { "failed" } else { "succeeded" }
+                        .to_string(),
+                    duration_bucket: duration_bucket(duration_ms).to_string(),
+                })
+                .with_session(session.id)
+                .with_run(record.run_id)
+                .with_workflow(record.execution_id, Some(record.step_id)),
+            );
+        }
+        if error_summary.is_some() {
+            analytics.record_event(
+                AnalyticsEvent::new(AnalyticsEventPayload::AgentError {
+                    run_kind: Some("workflow".to_string()),
+                    phase: Some(
+                        if record.analytics_started { "exit" } else { "spawn" }.to_string(),
+                    ),
+                    error_code: "workflow_runtime_error".to_string(),
+                    agent_id: None,
+                    agent_role: None,
+                })
+                .with_session(session.id)
+                .with_run(record.run_id)
+                .with_workflow(record.execution_id, Some(record.step_id)),
+            );
+        }
+    }
 
     Ok(())
 }
@@ -348,11 +388,11 @@ fn build_workspace_scoped_workflow_prompt(
     prompt: &str,
     workspace_path: &std::path::Path,
 ) -> String {
-    format!(
+    crate::services::mark_openteams_prompt(&format!(
         "## Workspace\n- Active workspace path: `{}`.\n- Treat this active workspace path as the project repository for this turn. Run file reads, writes, and shell commands there unless the user explicitly asks for another path.\n\n{}",
         workspace_path.display(),
         prompt
-    )
+    ))
 }
 
 fn resolve_workflow_resume<'a>(
@@ -461,7 +501,7 @@ async fn run_workflow_agent_prompt_inner(
     )
     .await?;
 
-    let runtime_run_record = start_workflow_runtime_run_record(
+    let mut runtime_run_record = start_workflow_runtime_run_record(
         db,
         session,
         &effective_session_agent,
@@ -510,6 +550,19 @@ async fn run_workflow_agent_prompt_inner(
                 let error = WorkflowRuntimeError::Io(std::io::Error::other(error.to_string()));
                 let message = error.to_string();
                 io_log.log_output("", Some(&message));
+                let _ = finish_workflow_runtime_run_record(
+                    db,
+                    session,
+                    agent,
+                    &effective_session_agent,
+                    &workspace_path,
+                    runtime_run_record.as_ref(),
+                    &io_log,
+                    "",
+                    None,
+                    Some(&message),
+                )
+                .await;
                 return Err(error);
             }
         };
@@ -534,6 +587,19 @@ async fn run_workflow_agent_prompt_inner(
         Err(error) => {
             let message = error.to_string();
             io_log.log_output("", Some(&message));
+            let _ = finish_workflow_runtime_run_record(
+                db,
+                session,
+                agent,
+                &effective_session_agent,
+                &workspace_path,
+                runtime_run_record.as_ref(),
+                &io_log,
+                "",
+                None,
+                Some(&message),
+            )
+            .await;
             return Err(error.into());
         }
     };
@@ -547,7 +613,35 @@ async fn run_workflow_agent_prompt_inner(
     if let Err(error) = spawn_log_forwarders(&mut spawned.child, msg_store.clone()) {
         let message = error.to_string();
         io_log.log_output("", Some(&message));
+        let _ = finish_workflow_runtime_run_record(
+            db,
+            session,
+            agent,
+            &effective_session_agent,
+            &workspace_path,
+            runtime_run_record.as_ref(),
+            &io_log,
+            "",
+            None,
+            Some(&message),
+        )
+        .await;
         return Err(error);
+    }
+    if let Some(record) = runtime_run_record.as_mut() {
+        record.analytics_started = true;
+        if let Some(analytics) = &record.analytics {
+            analytics.record_event(
+                AnalyticsEvent::new(AnalyticsEventPayload::AgentRunStarted {
+                    agent_id: agent.id,
+                    run_kind: "workflow".to_string(),
+                    executor_profile: None,
+                })
+                .with_session(session.id)
+                .with_run(record.run_id)
+                .with_workflow(record.execution_id, Some(record.step_id)),
+            );
+        }
     }
     executor.normalize_logs(msg_store.clone(), workspace_path.as_path());
     let mut session_id_task = Some(spawn_workflow_runtime_session_id_persistor(
@@ -596,11 +690,27 @@ async fn run_workflow_agent_prompt_inner(
                 match wait_for_process_exit(&mut spawned, &agent.name).await {
                     Ok(exit_status) => status = Some(exit_status),
                     Err(error) => {
+                        terminate_child(&mut spawned).await;
+                        clear_running_step(step_id);
+                        finish_workflow_runtime_stream(&msg_store, &mut workflow_stream_task).await;
+                        finish_workflow_runtime_session_id_persistor(&mut session_id_task).await;
                         let history = msg_store.get_history();
                         let latest_assistant =
                             extract_latest_assistant_from_history(&history).unwrap_or_default();
                         let message = error.to_string();
-                        io_log.log_output(&latest_assistant, Some(&message));
+                        finish_workflow_runtime_run_record(
+                            db,
+                            session,
+                            agent,
+                            session_agent,
+                            &workspace_path,
+                            runtime_run_record.as_ref(),
+                            &io_log,
+                            &latest_assistant,
+                            None,
+                            Some(&message),
+                        )
+                        .await?;
                         return Err(error);
                     }
                 }
@@ -669,11 +779,27 @@ async fn run_workflow_agent_prompt_inner(
         match wait_for_process_exit(&mut spawned, &agent.name).await {
             Ok(exit_status) => status = Some(exit_status),
             Err(error) => {
+                terminate_child(&mut spawned).await;
+                clear_running_step(step_id);
+                finish_workflow_runtime_stream(&msg_store, &mut workflow_stream_task).await;
+                finish_workflow_runtime_session_id_persistor(&mut session_id_task).await;
                 let history = msg_store.get_history();
                 let latest_assistant =
                     extract_latest_assistant_from_history(&history).unwrap_or_default();
                 let message = error.to_string();
-                io_log.log_output(&latest_assistant, Some(&message));
+                finish_workflow_runtime_run_record(
+                    db,
+                    session,
+                    agent,
+                    session_agent,
+                    &workspace_path,
+                    runtime_run_record.as_ref(),
+                    &io_log,
+                    &latest_assistant,
+                    None,
+                    Some(&message),
+                )
+                .await?;
                 return Err(error);
             }
         }
@@ -778,17 +904,55 @@ async fn run_workflow_agent_prompt_inner(
     }
 
     let history = msg_store.get_history();
-    persist_workflow_runtime_session_ids(&db.pool, session_agent.id, workflow_session, &history)
+    if let Err(error) =
+        persist_workflow_runtime_session_ids(&db.pool, session_agent.id, workflow_session, &history)
+            .await
+    {
+        let message = error.to_string();
+        let latest_assistant =
+            extract_latest_assistant_from_history(&history).unwrap_or_default();
+        finish_workflow_runtime_run_record(
+            db,
+            session,
+            agent,
+            session_agent,
+            &workspace_path,
+            runtime_run_record.as_ref(),
+            &io_log,
+            &latest_assistant,
+            None,
+            Some(&message),
+        )
         .await?;
-    if let Some(context) = stream_context.as_ref() {
-        persist_missing_workflow_runtime_activity_transcripts(
+        return Err(error);
+    }
+    if let Some(context) = stream_context.as_ref()
+        && let Err(error) = persist_missing_workflow_runtime_activity_transcripts(
             &context.pool,
             context.execution_id,
             context.workflow_agent_session_id,
             context.step_id,
             &history,
         )
+        .await
+    {
+        let message = error.to_string();
+        let latest_assistant =
+            extract_latest_assistant_from_history(&history).unwrap_or_default();
+        finish_workflow_runtime_run_record(
+            db,
+            session,
+            agent,
+            session_agent,
+            &workspace_path,
+            runtime_run_record.as_ref(),
+            &io_log,
+            &latest_assistant,
+            None,
+            Some(&message),
+        )
         .await?;
+        return Err(error);
     }
     let Some(latest_assistant) = extract_latest_assistant_from_history(&history) else {
         let message = workflow_executor_failure_message(

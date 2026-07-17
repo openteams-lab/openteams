@@ -117,7 +117,7 @@ check(
     guideSource.includes("'--ink-muted': '#a1a1aa'") &&
     guideSource.includes("'--ink-subtle': '#8a8f98'") &&
     guideSource.includes('text-[#a8b3c2]') &&
-    guideSource.includes('rounded-[6px] border border-white bg-white') &&
+    guideSource.includes('rounded-[10px] border border-white bg-white') &&
     guideSource.includes('px-5 py-2 text-[13px]') &&
     guideSource.includes('sm:min-h-12 sm:w-auto sm:max-w-[320px] sm:px-9 sm:py-3 sm:text-[14px]') &&
     guideSource.includes('transition-[background-color,box-shadow,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]') &&
@@ -134,34 +134,35 @@ check(
     guideSource.includes('pointer-events-none absolute inset-0 bg-[var(--onboarding-stage)]') &&
     guideSource.includes('px-4 text-center sm:px-6') &&
     guideSource.includes('items-center justify-center overflow-hidden px-4 text-center sm:px-6') &&
-    guideSource.includes('h-full max-h-[860px] w-full max-w-[1200px] flex-col items-center overflow-y-auto overflow-x-hidden') &&
+    guideSource.includes('h-full max-h-[820px] w-full max-w-[1200px] flex-col items-center justify-center overflow-hidden') &&
     !guideSource.includes('useAppScale') &&
     !guideSource.includes('welcomeStageStyle') &&
     !guideSource.includes('transform: `scale(${welcomeStageScale})`') &&
     !guideSource.includes('zoom: welcomeVisualScale') &&
     !guideSource.includes('calculateWelcomeViewportScale') &&
     !guideSource.includes('setWelcomeViewportScale') &&
-    guideSource.includes('overflow-y-auto overflow-x-hidden pb-4 pt-4 sm:pb-8 sm:pt-8 lg:pb-10 lg:pt-10') &&
+    guideSource.includes('justify-center overflow-hidden py-4 sm:py-6 lg:py-8') &&
     guideSource.includes('text-[28px] font-semibold leading-[1.08]') &&
     guideSource.includes('sm:text-[40px]') &&
     guideSource.includes('lg:text-[48px]') &&
     guideSource.includes('text-[13px] leading-5 text-[#a8b3c2]') &&
-    guideSource.includes('mt-2 max-w-4xl shrink-0 sm:mt-8 lg:mt-16') &&
-    guideSource.includes('mt-4 flex min-h-[220px] w-full max-w-5xl flex-col overflow-hidden rounded-[8px] border border-white/[0.12] bg-[var(--onboarding-card)]') &&
-    guideSource.includes('sm:mt-8 sm:min-h-[320px] lg:mt-14 lg:min-h-[440px]') &&
+    guideSource.includes('max-w-4xl shrink-0') &&
+    guideSource.includes('mt-4 flex h-[clamp(240px,48vh,440px)] min-h-0 w-full max-w-5xl shrink-0 flex-col overflow-hidden rounded-[8px] border border-white/[0.12] bg-[var(--onboarding-card)]') &&
+    guideSource.includes('sm:mt-6 lg:mt-8') &&
     guideSource.includes('border-b border-white/[0.08] bg-[var(--onboarding-card)] px-3 py-2.5 sm:px-4 sm:py-3') &&
     guideSource.includes('h-2 w-2 rounded-full border border-white/[0.18] bg-white/[0.065]') &&
     guideSource.includes('ml-2 h-3 w-24 rounded-[3px] border border-white/[0.08] bg-white/[0.065] sm:ml-4 sm:w-32') &&
     guideSource.includes('flex min-h-0 flex-1 items-center justify-center px-3 py-4 sm:px-12 sm:py-8 lg:px-20 lg:py-10') &&
     guideSource.includes('max-w-sm overflow-hidden rounded-[6px] border border-white/[0.12] bg-[var(--onboarding-panel)]') &&
-    guideSource.includes('sm:max-w-md sm:-translate-y-2 lg:-translate-y-4') &&
+    guideSource.includes('text-left sm:max-w-md') &&
+    !guideSource.includes('sm:-translate-y-2 lg:-translate-y-4') &&
     guideSource.includes('border-b border-white/[0.08] p-3 sm:p-4') &&
-    guideSource.includes('relative flex w-full cursor-pointer items-center justify-between rounded-[5px] border px-3 py-1.5 text-left text-[13px] transition sm:py-2 sm:text-[14px]') &&
+    guideSource.includes('relative flex w-full cursor-pointer items-center justify-between rounded-[9px] border px-3 py-1.5 text-left text-[13px] transition sm:py-2 sm:text-[14px]') &&
     guideSource.includes('min-w-6 rounded-[3px] border border-white/[0.18] bg-[#0c0c0c]') &&
     guideSource.includes("active ? 'text-white' : 'text-[#8792a3]'") &&
     guideSource.includes('absolute bottom-2 left-0 top-2 w-px') &&
     guideSource.includes('text-current opacity-55') &&
-    guideSource.includes('mt-4 flex w-full shrink-0 flex-col items-center gap-2 sm:mt-9 sm:gap-3 lg:mt-12 lg:gap-4') &&
+    guideSource.includes('mt-4 flex w-full shrink-0 flex-col items-center gap-2 sm:mt-6 sm:gap-3 lg:mt-8 lg:gap-4') &&
     guideSource.includes('tracking-[0.14em] text-[#8f9aaa] sm:text-[10px] sm:tracking-[0.22em]') &&
     guideSource.includes("t('onboarding.welcome.footerSteps'") &&
     !guideSource.includes('ALL 4 STEPS TO FINISH CONFIGURATION') &&
@@ -207,6 +208,16 @@ check(
 );
 
 check(
+  'recommended teams reuse locale-aware team template data',
+  appSource.includes('teamPresetsApi') &&
+    appSource.includes('.list(locale)') &&
+    appSource.includes('localizedTeamPresetSummaries') &&
+    appSource.includes('name: localized.name') &&
+    guideSource.includes('recommendOnboardingTeamTemplate(selectedScenario, teamPresets)'),
+  { appSource, guideSource },
+);
+
+check(
   'executor and model configuration reuses DropdownSelect',
   guideSource.includes('import { DropdownSelect') &&
     guideSource.includes('runnerOptions') &&
@@ -245,7 +256,7 @@ check(
     guideSource.includes('workspaceGitApiErrorI18nKey') &&
     guideSource.includes('workspaceGitValidationErrorI18nKey') &&
     guideSource.includes('normalizeGitignoreTemplateSelection') &&
-    guideSource.includes('className="flex h-6 w-6 items-center justify-center rounded-[4px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"') &&
+    guideSource.includes('className="flex h-6 w-6 items-center justify-center rounded-[7px] text-[#768295] transition hover:bg-white/[0.05] hover:text-[#f5f5f5]"') &&
     guideSource.includes('rounded-[6px] border border-white/[0.08] bg-[var(--onboarding-panel)]') &&
     guideSource.includes('focus:bg-[#171819]') &&
     !guideSource.includes('bg-[#111214]') &&
@@ -338,7 +349,7 @@ check(
     guideSource.includes('shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.28)]') &&
     guideSource.includes('flex h-full min-h-0 flex-col overflow-hidden rounded-[6px] bg-transparent') &&
     !guideSource.includes('bg-[#0a0a0a]/30') &&
-    guideSource.includes('[&>button]:h-7 [&>button]:rounded-[3px]') &&
+    guideSource.includes('[&>button]:h-7 [&>button]:rounded-[7px]') &&
     guideSource.includes('[&>button]:border-transparent [&>button]:bg-transparent') &&
     guideSource.includes('[&>button:hover]:border-transparent [&>button:hover]:bg-white/[0.035]') &&
     guideSource.includes('[&>button[data-placeholder=true]>span]:text-[#6f6f76]') &&
@@ -350,7 +361,7 @@ check(
     !guideSource.includes("index < teamMembers.length - 1 && 'border-b border-white/[0.08]'") &&
     guideSource.includes('lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.84fr)] lg:gap-10') &&
     guideSource.includes('mx-auto grid w-full max-w-[760px] gap-3 sm:grid-cols-2') &&
-    guideSource.includes('group min-h-[104px] cursor-pointer rounded-[8px] border p-3') &&
+    guideSource.includes('group min-h-[104px] cursor-pointer rounded-[12px] border p-3') &&
     guideSource.includes('hover:bg-white/[0.04] focus-visible:outline-none') &&
     guideSource.includes('border-white/[0.18] bg-white/[0.065]') &&
     guideSource.includes('inset_0_1px_0_rgba(255,255,255,0.05)') &&
@@ -363,7 +374,7 @@ check(
     guideSource.includes('Icon: Sun') &&
     guideSource.includes('Icon: Monitor') &&
     guideSource.includes('Icon: Ellipsis') &&
-    guideSource.includes('cursor-pointer rounded-[8px] border p-2 text-left transition') &&
+    guideSource.includes('cursor-pointer rounded-[12px] border p-2 text-left transition') &&
     guideSource.includes('flex h-8 items-center justify-between rounded-[8px] border px-2.5') &&
     guideSource.includes('mt-1.5 text-[12px] font-semibold') &&
     guideSource.includes('border-[#d4d4d8]/80 bg-white/[0.07]') &&
@@ -629,6 +640,15 @@ check(
   { guideSource, appSource },
 );
 
+check(
+  'first-run language and appearance inherit browser and system preferences',
+  guideSource.includes('themePreference: ThemePreference') &&
+    guideSource.includes('themePreferenceToOnboardingAppearance(themePreference)') &&
+    guideSource.includes('onboardingLanguageToLocale(initialState?.language, locale)') &&
+    appSource.includes('themePreference={themePreference}'),
+  { guideSource, appSource },
+);
+
 for (const locale of ['en', 'zh', 'ja', 'ko', 'fr', 'es']) {
   const commonSource = read(`../../locales/${locale}/common.json`);
   const settingsLocaleSource = read(`../../locales/${locale}/settings.json`);
@@ -683,6 +703,38 @@ const localizedAppearancePageKeys = [
   'onboarding.step.appearance.title',
   'onboarding.steps.title',
 ] as const;
+const localizedWelcomePageKeys = [
+  'onboarding.welcome.desc',
+  'onboarding.welcome.command.agentTeam',
+  'onboarding.welcome.command.localWorkspace',
+  'onboarding.welcome.command.projectManagement',
+  'onboarding.welcome.command.workflowExecution',
+  'onboarding.welcome.footerSteps',
+  'onboarding.welcome.next',
+  'onboarding.welcome.pointLocal',
+  'onboarding.welcome.pointTeams',
+  'onboarding.welcome.pointWorkflow',
+  'onboarding.welcome.title',
+] as const;
+const localizedScenarioPageKeys = [
+  'onboarding.scenario.desc',
+  'onboarding.scenario.design.desc',
+  'onboarding.scenario.design.team',
+  'onboarding.scenario.design.title',
+  'onboarding.scenario.memberDetailsHint',
+  'onboarding.scenario.other.desc',
+  'onboarding.scenario.other.team',
+  'onboarding.scenario.other.title',
+  'onboarding.scenario.recommendedTeam',
+  'onboarding.scenario.recommendedTemplate',
+  'onboarding.scenario.research.desc',
+  'onboarding.scenario.research.team',
+  'onboarding.scenario.research.title',
+  'onboarding.scenario.software.desc',
+  'onboarding.scenario.software.team',
+  'onboarding.scenario.software.title',
+  'onboarding.scenario.title',
+] as const;
 
 for (const locale of ['ja', 'ko', 'fr', 'es'] as const) {
   const englishValues = localizedAppearancePageKeys.filter(
@@ -695,7 +747,43 @@ for (const locale of ['ja', 'ko', 'fr', 'es'] as const) {
     englishValues.length === 0,
     englishValues,
   );
+
+  const englishWelcomeValues = localizedWelcomePageKeys.filter(
+    (key) =>
+      onboardingLocaleDictionaries[locale][key] ===
+      onboardingLocaleDictionaries.en[key],
+  );
+  check(
+    `locale ${locale} localizes the Chinese-aligned welcome page`,
+    englishWelcomeValues.length === 0,
+    englishWelcomeValues,
+  );
+
+  const englishScenarioValues = localizedScenarioPageKeys.filter(
+    (key) =>
+      onboardingLocaleDictionaries[locale][key] ===
+      onboardingLocaleDictionaries.en[key],
+  );
+  check(
+    `locale ${locale} localizes the scenario onboarding page`,
+    englishScenarioValues.length === 0,
+    englishScenarioValues,
+  );
 }
+
+check(
+  'prototype design replaces design implementation in English and Chinese',
+  onboardingLocaleDictionaries.en['onboarding.scenario.design.title'] ===
+    'Prototype design' &&
+    onboardingLocaleDictionaries.zh['onboarding.scenario.design.title'] ===
+      '原型设计' &&
+    guideSource.includes("titleFallback: 'Prototype design'") &&
+    !guideSource.includes("titleFallback: 'Design implementation'"),
+  {
+    en: onboardingLocaleDictionaries.en['onboarding.scenario.design.title'],
+    zh: onboardingLocaleDictionaries.zh['onboarding.scenario.design.title'],
+  },
+);
 
 for (const locale of localeNames) {
   const localeKeys = onboardingLocaleKeys(onboardingLocaleDictionaries[locale]);

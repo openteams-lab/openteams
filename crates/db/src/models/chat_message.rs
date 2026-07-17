@@ -20,6 +20,7 @@ pub struct ChatMessage {
     pub session_id: Uuid,
     pub sender_type: ChatSenderType,
     pub sender_id: Option<Uuid>,
+    pub sender_session_agent_id: Option<Uuid>,
     pub content: String,
     #[ts(type = "string[]")]
     pub mentions: sqlx::types::Json<Vec<String>>,
@@ -40,20 +41,20 @@ pub struct CreateChatMessage {
 
 impl ChatMessage {
     pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            ChatMessage,
-            r#"SELECT id as "id!: Uuid",
-                      session_id as "session_id!: Uuid",
-                      sender_type as "sender_type!: ChatSenderType",
-                      sender_id as "sender_id: Uuid",
+        sqlx::query_as::<_, ChatMessage>(
+            r#"SELECT id,
+                      session_id,
+                      sender_type,
+                      sender_id,
+                      sender_session_agent_id,
                       content,
-                      mentions as "mentions!: sqlx::types::Json<Vec<String>>",
-                      meta as "meta!: sqlx::types::Json<serde_json::Value>",
-                      created_at as "created_at!: DateTime<Utc>"
+                      mentions,
+                      meta,
+                      created_at
                FROM chat_messages
                WHERE id = $1"#,
-            id
         )
+        .bind(id)
         .fetch_optional(pool)
         .await
     }
@@ -64,41 +65,41 @@ impl ChatMessage {
         limit: Option<i64>,
     ) -> Result<Vec<Self>, sqlx::Error> {
         if let Some(limit) = limit {
-            sqlx::query_as!(
-                ChatMessage,
-                r#"SELECT id as "id!: Uuid",
-                          session_id as "session_id!: Uuid",
-                          sender_type as "sender_type!: ChatSenderType",
-                          sender_id as "sender_id: Uuid",
+            sqlx::query_as::<_, ChatMessage>(
+                r#"SELECT id,
+                          session_id,
+                          sender_type,
+                          sender_id,
+                          sender_session_agent_id,
                           content,
-                          mentions as "mentions!: sqlx::types::Json<Vec<String>>",
-                          meta as "meta!: sqlx::types::Json<serde_json::Value>",
-                          created_at as "created_at!: DateTime<Utc>"
+                          mentions,
+                          meta,
+                          created_at
                    FROM chat_messages
                    WHERE session_id = $1
                    ORDER BY created_at ASC
                    LIMIT $2"#,
-                session_id,
-                limit
             )
+            .bind(session_id)
+            .bind(limit)
             .fetch_all(pool)
             .await
         } else {
-            sqlx::query_as!(
-                ChatMessage,
-                r#"SELECT id as "id!: Uuid",
-                          session_id as "session_id!: Uuid",
-                          sender_type as "sender_type!: ChatSenderType",
-                          sender_id as "sender_id: Uuid",
+            sqlx::query_as::<_, ChatMessage>(
+                r#"SELECT id,
+                          session_id,
+                          sender_type,
+                          sender_id,
+                          sender_session_agent_id,
                           content,
-                          mentions as "mentions!: sqlx::types::Json<Vec<String>>",
-                          meta as "meta!: sqlx::types::Json<serde_json::Value>",
-                          created_at as "created_at!: DateTime<Utc>"
+                          mentions,
+                          meta,
+                          created_at
                    FROM chat_messages
                    WHERE session_id = $1
                    ORDER BY created_at ASC"#,
-                session_id
             )
+            .bind(session_id)
             .fetch_all(pool)
             .await
         }
@@ -110,7 +111,7 @@ impl ChatMessage {
         limit: Option<i64>,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let base_sql = r#"
-            SELECT id, session_id, sender_type, sender_id, content, mentions,
+            SELECT id, session_id, sender_type, sender_id, sender_session_agent_id, content, mentions,
                 CASE
                     WHEN json_valid(meta)
                          AND json_extract(meta, '$.card_type') IN ('workflow_execution', 'workflow_plan_generation')
@@ -155,27 +156,36 @@ impl ChatMessage {
     ) -> Result<Self, sqlx::Error> {
         let mentions_json = sqlx::types::Json(data.mentions.clone());
         let meta_json = sqlx::types::Json(data.meta.clone());
+        let sender_session_agent_id = data
+            .meta
+            .get("session_agent_id")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|value| Uuid::parse_str(value).ok());
 
-        sqlx::query_as!(
-            ChatMessage,
-            r#"INSERT INTO chat_messages (id, session_id, sender_type, sender_id, content, mentions, meta)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)
-               RETURNING id as "id!: Uuid",
-                         session_id as "session_id!: Uuid",
-                         sender_type as "sender_type!: ChatSenderType",
-                         sender_id as "sender_id: Uuid",
+        sqlx::query_as::<_, ChatMessage>(
+            r#"INSERT INTO chat_messages (
+                   id, session_id, sender_type, sender_id, sender_session_agent_id,
+                   content, mentions, meta
+               )
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+               RETURNING id,
+                         session_id,
+                         sender_type,
+                         sender_id,
+                         sender_session_agent_id,
                          content,
-                         mentions as "mentions!: sqlx::types::Json<Vec<String>>",
-                         meta as "meta!: sqlx::types::Json<serde_json::Value>",
-                         created_at as "created_at!: DateTime<Utc>""#,
-            id,
-            data.session_id,
-            data.sender_type,
-            data.sender_id,
-            data.content,
-            mentions_json,
-            meta_json
+                         mentions,
+                         meta,
+                         created_at"#,
         )
+        .bind(id)
+        .bind(data.session_id)
+        .bind(data.sender_type.clone())
+        .bind(data.sender_id)
+        .bind(sender_session_agent_id)
+        .bind(&data.content)
+        .bind(mentions_json)
+        .bind(meta_json)
         .fetch_one(pool)
         .await
     }
@@ -193,10 +203,9 @@ impl ChatMessage {
         meta: serde_json::Value,
     ) -> Result<u64, sqlx::Error> {
         let meta_str = serde_json::to_string(&meta).unwrap_or_default();
-        let id_str = id.to_string();
         let result = sqlx::query("UPDATE chat_messages SET meta = $1 WHERE id = $2")
             .bind(meta_str)
-            .bind(id_str)
+            .bind(id)
             .execute(pool)
             .await?;
         Ok(result.rows_affected())
@@ -213,7 +222,8 @@ impl ChatMessage {
             r#"UPDATE chat_messages
                SET content = ?1, meta = ?2
                WHERE id = ?3
-               RETURNING id, session_id, sender_type, sender_id, content, mentions, meta, created_at"#,
+               RETURNING id, session_id, sender_type, sender_id, sender_session_agent_id,
+                         content, mentions, meta, created_at"#,
         )
         .bind(content)
         .bind(meta_str)

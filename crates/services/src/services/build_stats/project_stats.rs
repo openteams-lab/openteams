@@ -108,13 +108,15 @@ impl ProjectStatsService {
 mod tests {
     use chrono::Utc;
     use db::models::project_delivery_event::ProjectDeliveryEventType;
-    use sqlx::SqlitePool;
+    use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
     use uuid::Uuid;
 
     use super::ProjectStatsService;
 
     async fn setup_pool() -> SqlitePool {
-        let pool = SqlitePool::connect("sqlite::memory:")
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
             .await
             .expect("create sqlite memory pool");
 
@@ -216,6 +218,28 @@ mod tests {
                 sender_id BLOB,
                 content TEXT NOT NULL,
                 meta TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+            r#"
+            CREATE TABLE chat_session_agents (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                agent_id BLOB NOT NULL
+            )
+            "#,
+            r#"
+            CREATE TABLE chat_workflow_steps (
+                id BLOB PRIMARY KEY,
+                title TEXT
+            )
+            "#,
+            r#"
+            CREATE TABLE chat_runs (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                session_agent_id BLOB NOT NULL,
+                retention_summary_json TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
             )
             "#,

@@ -2,28 +2,47 @@
 /// Returns (lead_agent, lead_session_agent) or error if no agents exist.
 ///
 /// Resolution logic:
-/// 1. If `session.lead_agent_id` is set and references a valid agent in the session, use it.
-/// 2. Otherwise, fall back to the first session agent.
-/// 3. Return an error if the session has no agents.
+/// 1. If `session.lead_session_agent_id` references a valid session member, use it.
+/// 2. During the compatibility window, fall back to `lead_agent_id`.
+/// 3. Otherwise, fall back to the first session agent.
 pub fn resolve_lead_agent<'a>(
     session: &ChatSession,
     session_agents: &'a [ChatSessionAgent],
     agents: &'a [ChatAgent],
 ) -> Result<(&'a ChatAgent, &'a ChatSessionAgent), WorkflowRuntimeError> {
-    // 1. Try explicit lead_agent_id
-    if let Some(lead_id) = session.lead_agent_id
-        && let Some(sa) = session_agents.iter().find(|sa| sa.agent_id == lead_id)
-        && let Some(agent) = agents.iter().find(|a| a.id == lead_id)
+    let agent_for_member = |session_agent: &ChatSessionAgent| {
+        session_agents
+            .iter()
+            .position(|candidate| candidate.id == session_agent.id)
+            .and_then(|index| agents.get(index))
+            .filter(|agent| agent.id == session_agent.agent_id)
+            .or_else(|| agents.iter().find(|agent| agent.id == session_agent.agent_id))
+    };
+    if let Some(lead_session_agent_id) = session.lead_session_agent_id
+        && let Some(sa) = session_agents
+            .iter()
+            .find(|sa| sa.id == lead_session_agent_id)
+        && let Some(agent) = agent_for_member(sa)
     {
         return Ok((agent, sa));
+    }
+    // Compatibility fallback for sessions not yet migrated.
+    if let Some(lead_id) = session.lead_agent_id {
+        let mut matching_members = session_agents
+            .iter()
+            .filter(|session_agent| session_agent.agent_id == lead_id);
+        if let Some(session_agent) = matching_members.next()
+            && matching_members.next().is_none()
+            && let Some(agent) = agent_for_member(session_agent)
+        {
+            return Ok((agent, session_agent));
+        }
     }
     // 2. Fallback to first session agent
     let first_sa = session_agents
         .first()
         .ok_or_else(|| WorkflowRuntimeError::Validation("No agents in session".into()))?;
-    let agent = agents
-        .iter()
-        .find(|a| a.id == first_sa.agent_id)
+    let agent = agent_for_member(first_sa)
         .ok_or_else(|| WorkflowRuntimeError::Validation("Lead agent record not found".into()))?;
     Ok((agent, first_sa))
 }

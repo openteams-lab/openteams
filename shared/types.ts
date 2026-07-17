@@ -274,7 +274,7 @@ export type CreateScratch = { payload: ScratchPayload, };
 
 export type UpdateScratch = { payload: ScratchPayload, };
 
-export type ChatSession = { id: string, title: string | null, status: ChatSessionStatus, lead_agent_id: string | null, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, default_workspace_path: string | null, chat_input_mode: string | null, project_id: string | null, worktree_mode: ChatSessionWorktreeMode, pinned_at: string | null, created_at: string, updated_at: string, archived_at: string | null, };
+export type ChatSession = { id: string, title: string | null, status: ChatSessionStatus, lead_agent_id: string | null, lead_session_agent_id: string | null, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, default_workspace_path: string | null, chat_input_mode: string | null, project_id: string | null, worktree_mode: ChatSessionWorktreeMode, pinned_at: string | null, created_at: string, updated_at: string, archived_at: string | null, };
 
 export enum ChatSessionStatus { active = "active", archived = "archived" }
 
@@ -282,7 +282,7 @@ export enum ChatSessionWorktreeMode { inherit = "inherit", disabled = "disabled"
 
 export type CreateChatSession = { title: string | null, workspace_path: string | null, project_id: string | null, worktree_mode?: ChatSessionWorktreeMode, };
 
-export type UpdateChatSession = { title: string | null, status: ChatSessionStatus | null, lead_agent_id?: string | null, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, default_workspace_path: string | null, chat_input_mode?: string | null, worktree_mode?: ChatSessionWorktreeMode, };
+export type UpdateChatSession = { title: string | null, status: ChatSessionStatus | null, lead_agent_id?: string | null, lead_session_agent_id?: string | null, summary_text: string | null, archive_ref: string | null, last_seen_diff_key: string | null, default_workspace_path: string | null, chat_input_mode?: string | null, worktree_mode?: ChatSessionWorktreeMode, };
 
 export type ChatAgent = { id: string, name: string, runner_type: string, system_prompt: string, tools_enabled: JsonValue, model_name: string | null, owner_project_id: string | null, created_at: string, updated_at: string, };
 
@@ -290,11 +290,17 @@ export type CreateChatAgent = { name: string, runner_type: string, system_prompt
 
 export type UpdateChatAgent = { name: string | null, runner_type: string | null, system_prompt: string | null, tools_enabled: JsonValue | null, model_name: string | null, };
 
-export type ChatMessage = { id: string, session_id: string, sender_type: ChatSenderType, sender_id: string | null, content: string, mentions: string[], meta: JsonValue, created_at: string, };
+export type ChatMessage = { id: string, session_id: string, sender_type: ChatSenderType, sender_id: string | null, sender_session_agent_id: string | null, content: string, mentions: string[], meta: JsonValue, created_at: string, };
+
+export type ChatMessageTarget = { message_id: string, ordinal: bigint, session_id: string, session_agent_id: string | null, project_member_id: string | null, agent_id: string, member_name_snapshot: string, route_kind: ChatMessageTargetRouteKind, resolution_status: ChatMessageTargetResolutionStatus, created_at: string, };
+
+export enum ChatMessageTargetRouteKind { explicit_mention = "explicit_mention", selected_member = "selected_member", default_lead = "default_lead", agent_protocol = "agent_protocol", protocol_retry = "protocol_retry" }
+
+export enum ChatMessageTargetResolutionStatus { resolved = "resolved", missing = "missing", removed = "removed", rejected = "rejected" }
 
 export enum ChatSenderType { user = "user", agent = "agent", system = "system" }
 
-export type ChatSessionAgent = { id: string, session_id: string, agent_id: string, state: ChatSessionAgentState, workspace_path: string | null, pty_session_key: string | null, agent_session_id: string | null, agent_message_id: string | null, project_member_id: string | null, execution_config: MemberExecutionConfig, allowed_skill_ids: string[], created_at: string, updated_at: string, };
+export type ChatSessionAgent = { id: string, session_id: string, agent_id: string, state: ChatSessionAgentState, workspace_path: string | null, pty_session_key: string | null, agent_session_id: string | null, agent_message_id: string | null, project_member_id: string | null, member_name: string, execution_config: MemberExecutionConfig, allowed_skill_ids: string[], created_at: string, updated_at: string, };
 
 export enum ChatSessionAgentState { idle = "idle", running = "running", stopping = "stopping", waitingapproval = "waitingapproval", dead = "dead" }
 
@@ -577,7 +583,7 @@ client_message_id: string | null, started_at: string | null, } | { "type": "agen
  * active run id; states with no associated run (e.g. orphan
  * recovery) leave this `None`.
  */
-run_id: string | null, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "queue_updated", session_id: string, session_agent_id: string, queue: MemberQueueSnapshot, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, } | { "type": "protocol_notice", session_id: string, session_agent_id: string, agent_id: string, run_id: string, agent_name: string, code: ChatProtocolNoticeCode, target: string | null, detail: string | null, output_is_empty: boolean, } | { "type": "mention_error", session_id: string, message_id: string, agent_name: string, agent_id: string | null, reason: string, } | { "type": "workflow_generate_detected", session_id: string, session_agent_id: string, run_id: string, } | { "type": "workflow_plan_preview_ready", session_id: string, plan_id: string, workflow_card_message: ChatMessage, } | { "type": "workflow_execution_updated", session_id: string, execution_id: string, } | { "type": "workflow_graph_updated", session_id: string, execution_id: string, graph_version: string, reason: string, nodes: Array<WorkflowPlanNode>, edges: Array<WorkflowPlanEdge>, changed_step_ids: Array<string>, } | { "type": "workflow_runtime_line", line_id: string, session_id: string, execution_id: string, workflow_agent_session_id: string | null, step_id: string, step_key: string, agent_id: string, agent_name: string, stream_type: ChatStreamDeltaType, content: string, created_at: string, } | { "type": "file_change_refresh", session_id: string, session_agent_id: string, agent_id: string, run_id: string,
+run_id: string | null, started_at: string | null, } | { "type": "mention_acknowledged", session_id: string, message_id: string, session_agent_id: string | null, project_member_id: string | null, mentioned_agent: string, agent_id: string, status: MentionStatus, } | { "type": "queue_updated", session_id: string, session_agent_id: string, queue: MemberQueueSnapshot, } | { "type": "compression_warning", session_id: string, warning: CompressionWarning, } | { "type": "protocol_notice", session_id: string, session_agent_id: string, agent_id: string, run_id: string, agent_name: string, code: ChatProtocolNoticeCode, target: string | null, detail: string | null, output_is_empty: boolean, } | { "type": "mention_error", session_id: string, message_id: string, session_agent_id: string | null, project_member_id: string | null, agent_name: string, agent_id: string | null, reason: string, } | { "type": "workflow_generate_detected", session_id: string, session_agent_id: string, run_id: string, } | { "type": "workflow_plan_preview_ready", session_id: string, plan_id: string, workflow_card_message: ChatMessage, } | { "type": "workflow_execution_updated", session_id: string, execution_id: string, } | { "type": "workflow_graph_updated", session_id: string, execution_id: string, graph_version: string, reason: string, nodes: Array<WorkflowPlanNode>, edges: Array<WorkflowPlanEdge>, changed_step_ids: Array<string>, } | { "type": "workflow_runtime_line", line_id: string, session_id: string, execution_id: string, workflow_agent_session_id: string | null, step_id: string, step_key: string, agent_id: string, agent_name: string, stream_type: ChatStreamDeltaType, content: string, created_at: string, } | { "type": "file_change_refresh", session_id: string, session_agent_id: string, agent_id: string, run_id: string,
 /**
  * Source message whose processing triggered this run.
  */
@@ -677,9 +683,9 @@ export type ChatSearchResult = { "type": "session", session_id: string, title: s
 
 export type ChatSearchResponse = { results: Array<ChatSearchResult>, };
 
-export type CreateChatSessionAgentRequest = { agent_id: string, workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
+export type CreateChatSessionAgentRequest = { agent_id: string, member_name?: string, workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
 
-export type UpdateChatSessionAgentRequest = { workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
+export type UpdateChatSessionAgentRequest = { member_name?: string, workspace_path: string | null, allowed_skill_ids: Array<string> | null, };
 
 export type SessionWorkspace = { workspace_path: string, agent_ids: Array<string>, agent_names: Array<string>, is_git_repo: boolean, };
 
@@ -875,7 +881,7 @@ export type UserIterationFeedbackDetail = { what_wrong: string, expected: string
 
 export type UserIterationFeedback = { execution_id: string, round_id: string, action: string, feedback: UserIterationFeedbackDetail | null, };
 
-export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, workspace_dir: string | null, worktree_sessions_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, commit_reminder_enabled: boolean, commit_reminder_prompt: string | null, send_message_shortcut: SendMessageShortcut, chat_presets: ChatPresetsConfig, chat_bubble_font_size: ChatBubbleFontSize, chat_compression: ChatCompressionConfig, max_agent_chain_depth: number, keyboard_shortcuts: KeyboardShortcutsConfig, };
+export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, error_reporting_enabled: boolean, workspace_dir: string | null, worktree_sessions_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, commit_reminder_enabled: boolean, commit_reminder_prompt: string | null, send_message_shortcut: SendMessageShortcut, chat_presets: ChatPresetsConfig, chat_bubble_font_size: ChatBubbleFontSize, chat_compression: ChatCompressionConfig, max_agent_chain_depth: number, keyboard_shortcuts: KeyboardShortcutsConfig, };
 
 export type KeyboardShortcutsConfig = { schema_version: number, platform_overrides: { [key in string]?: { [key in string]?: KeyboardShortcutOverride } }, };
 

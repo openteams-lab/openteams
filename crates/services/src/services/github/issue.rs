@@ -139,6 +139,7 @@ impl GitHubIssueService {
         self.detail(pool, client, repo_integration_id, number).await
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_comment(
         &self,
         pool: &SqlitePool,
@@ -299,6 +300,7 @@ impl GitHubIssueService {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn audit(
         &self,
         pool: &SqlitePool,

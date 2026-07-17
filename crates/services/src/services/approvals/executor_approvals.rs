@@ -155,6 +155,7 @@ mod tests {
             &CreateChatSessionAgent {
                 session_id: session.id,
                 agent_id: agent.id,
+                member_name: None,
                 workspace_path: None,
                 allowed_skill_ids: Vec::new(),
                 project_member_id: None,

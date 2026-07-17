@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { commandRegistry } from './commandRegistry';
 import { expectedCommandRegistry } from './commandRegistry.test-fixture';
 
-assert.equal(expectedCommandRegistry.length, 52);
-assert.equal(new Set(expectedCommandRegistry.map((item) => item.id)).size, 52);
+assert.equal(expectedCommandRegistry.length, 57);
+assert.equal(new Set(expectedCommandRegistry.map((item) => item.id)).size, 57);
 assert.deepEqual(commandRegistry, expectedCommandRegistry);
-assert.equal(new Set(commandRegistry.map((item) => item.id)).size, 52);
+assert.equal(new Set(commandRegistry.map((item) => item.id)).size, 57);
 assert.deepEqual(
   [
     ...new Set(

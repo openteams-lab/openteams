@@ -13,6 +13,7 @@ const localeFiles = [
   "issue",
   "settings",
   "team",
+  "team-templates",
   "workflow",
 ] as const;
 

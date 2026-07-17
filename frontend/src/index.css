@@ -32,6 +32,20 @@
   --inbox-bell-unread-filter: drop-shadow(0 0 6px rgba(248, 250, 252, 0.55));
   --inbox-bell-unread-badge-text: #f3f4f6;
   --inbox-bell-unread-badge-filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.75));
+  --merge-conflict-highlight: rgba(86, 146, 98, 0.1);
+  --merge-conflict-highlight-selected: rgba(92, 158, 106, 0.16);
+  --merge-conflict-accepted-bg: rgba(104, 177, 119, 0.12);
+  --merge-conflict-accepted-border: #82c991;
+  --merge-conflict-spacer: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--ink) 10%, transparent) 0 1px,
+    transparent 1px 5px
+  );
+  --merge-conflict-spacer-selected: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--ink) 14%, transparent) 0 1px,
+    transparent 1px 5px
+  );
 }
 
 body[data-mode="light"] {
@@ -61,6 +75,20 @@ body[data-mode="light"] {
     drop-shadow(0 0 3px rgba(15, 23, 42, 0.22));
   --inbox-bell-unread-badge-text: #111827;
   --inbox-bell-unread-badge-filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.95));
+  --merge-conflict-highlight: rgba(170, 216, 174, 0.22);
+  --merge-conflict-highlight-selected: rgba(150, 210, 160, 0.3);
+  --merge-conflict-accepted-bg: rgba(150, 210, 160, 0.18);
+  --merge-conflict-accepted-border: #72bd82;
+  --merge-conflict-spacer: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--ink) 18%, transparent) 0 1px,
+    transparent 1px 5px
+  );
+  --merge-conflict-spacer-selected: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--ink) 25%, transparent) 0 1px,
+    transparent 1px 5px
+  );
 }
 
 body[data-mode="light"] .diff-view-tab {

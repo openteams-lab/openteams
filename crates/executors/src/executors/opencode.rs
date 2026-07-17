@@ -617,7 +617,8 @@ fn opencode_auth_provider_ids(value: &Value) -> HashSet<String> {
         .as_object()
         .into_iter()
         .flatten()
-        .filter_map(|(provider_id, auth)| valid_opencode_auth(auth).then(|| provider_id.clone()))
+        .filter(|(_, auth)| valid_opencode_auth(auth))
+        .map(|(provider_id, _)| provider_id.clone())
         .collect()
 }
 
@@ -735,7 +736,7 @@ fn opencode_server_error(
     ExecutorError::Io(io::Error::other(message))
 }
 
-fn format_command_for_log(program: &PathBuf, args: &[String]) -> String {
+fn format_command_for_log(program: &Path, args: &[String]) -> String {
     let mut parts = Vec::with_capacity(args.len() + 1);
     parts.push(quote_command_part(&program.display().to_string()));
 

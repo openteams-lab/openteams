@@ -18,6 +18,7 @@ pub async fn create_session_with_project_members(
                   title,
                   status,
                   lead_agent_id,
+                  lead_session_agent_id,
                   summary_text,
                   archive_ref,
                   last_seen_diff_key,
@@ -44,6 +45,7 @@ pub async fn create_session_with_project_members(
         r#"
         SELECT id AS project_member_id,
                agent_id,
+               member_name,
                default_workspace_path,
                COALESCE(allowed_skill_ids, '[]') AS allowed_skill_ids,
                COALESCE(execution_config, '{}') AS execution_config
@@ -62,6 +64,7 @@ pub async fn create_session_with_project_members(
     for member in default_members {
         let project_member_id: Uuid = member.try_get("project_member_id")?;
         let agent_id: Uuid = member.try_get("agent_id")?;
+        let member_name: String = member.try_get("member_name")?;
         // For isolated sessions, do NOT backfill workspace_path from
         // project member or session defaults. Keeping it None ensures the
         // ChatRunner resolver always runs worktree resolution (lazy-create
@@ -88,18 +91,20 @@ pub async fn create_session_with_project_members(
                 id,
                 session_id,
                 agent_id,
+                member_name,
                 workspace_path,
                 allowed_skill_ids,
                 project_member_id,
                 execution_config,
                 state
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'idle')
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'idle')
             "#,
         )
         .bind(Uuid::new_v4())
         .bind(session.id)
         .bind(agent_id)
+        .bind(member_name)
         .bind(workspace_path)
         .bind(allowed_skill_ids)
         .bind(project_member_id)
@@ -135,6 +140,7 @@ mod session_creation_tests {
                 title TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
                 lead_agent_id BLOB,
+                lead_session_agent_id BLOB,
                 summary_text TEXT,
                 archive_ref TEXT,
                 last_seen_diff_key TEXT,
@@ -160,6 +166,7 @@ mod session_creation_tests {
                 agent_session_id TEXT,
                 agent_message_id TEXT,
                 project_member_id BLOB,
+                member_name TEXT NOT NULL DEFAULT '',
                 execution_config TEXT NOT NULL DEFAULT '{}',
                 allowed_skill_ids TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
@@ -210,6 +217,7 @@ mod session_creation_tests {
                 project_id,
                 member_type,
                 agent_id,
+                member_name,
                 role,
                 display_order,
                 default_workspace_path,
@@ -217,7 +225,7 @@ mod session_creation_tests {
                 execution_config,
                 is_default
             )
-            VALUES (?1, ?2, 'agent', ?3, 'agent', 0, ?4, ?5, ?6, ?7)
+            VALUES (?1, ?2, 'agent', ?3, 'member_' || LOWER(SUBSTR(HEX(?3), 1, 8)), 'agent', 0, ?4, ?5, ?6, ?7)
             "#,
         )
         .bind(Uuid::new_v4())
@@ -292,7 +300,7 @@ mod session_creation_tests {
             Some("/agent/workspace")
         );
         assert_eq!(session_agents[0].allowed_skill_ids.0, vec!["shell"]);
-        assert_eq!(session_agents[0].project_member_id.is_some(), true);
+        assert!(session_agents[0].project_member_id.is_some());
         assert_eq!(
             session_agents[0].execution_config.0.model_name.as_deref(),
             Some("gpt-5.2-codex")

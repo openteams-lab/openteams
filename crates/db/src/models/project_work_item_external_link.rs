@@ -176,6 +176,7 @@ impl ProjectWorkItemExternalLink {
         .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_cache_by_external(
         pool: &SqlitePool,
         provider: &str,

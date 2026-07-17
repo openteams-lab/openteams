@@ -24,32 +24,13 @@ pub fn emit_user_message_workflow_analytics(
     }
 
     let metrics = build_message_analytics_metrics(message);
-    let user_id_hash = user_id.map(hash_user_id);
-
     workflow_analytics::track_message_sent(
         analytics,
         session_id,
-        user_id_hash.as_deref(),
+        user_id,
         message.content.len(),
         metrics.mention_count,
         metrics.attachment_count,
     );
 
-    if metrics.mention_count > 0 {
-        workflow_analytics::track_agent_mentioned(
-            analytics,
-            session_id,
-            metrics.mention_count,
-            None,
-        );
-    }
-
-    if metrics.attachment_count > 0 {
-        workflow_analytics::track_attachment_added(
-            analytics,
-            session_id,
-            metrics.attachment_count,
-            metrics.attachment_total_size_bytes,
-        );
-    }
 }

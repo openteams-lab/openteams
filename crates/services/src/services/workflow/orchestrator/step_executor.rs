@@ -29,7 +29,6 @@ use uuid::Uuid;
 use super::{
     super::{
         chat_runner::ChatRunner,
-        workflow_analytics,
         workflow_runtime::{
             self, SummaryPayload, WORKFLOW_PROTOCOL_PARSE_MAX_RETRIES, WorkflowAgentRunOutput,
             WorkflowReviewProtocolMessage, WorkflowRevisionFeedbackSource, WorkflowRuntimeError,
@@ -152,7 +151,7 @@ fn detect_active_frontier_workspace_conflicts(
             .or_insert_with(|| ActiveFrontierWorkspaceMember {
                 session_agent_id: session_agent.id,
                 agent_id: agent.id,
-                agent_name: agent.name.clone(),
+                agent_name: session_agent.member_name.clone(),
                 step_key: step.step_key.clone(),
             });
     }
@@ -940,7 +939,7 @@ Read this file before writing the final result. Do not rely on the workflow plan
                     }
                 }
 
-                let completed_step = Self::transition_step_and_sync(
+                Self::transition_step_and_sync(
                     pool,
                     chat_runner,
                     execution,
@@ -949,12 +948,6 @@ Read this file before writing the final result. Do not rely on the workflow plan
                     "step_completed",
                 )
                 .await?;
-                workflow_analytics::track_handoff_completed(
-                    chat_runner.analytics_service(),
-                    execution.session_id,
-                    execution.id,
-                    completed_step.id,
-                );
                 return Ok(StepOutcome::Completed);
             }
 
@@ -1258,7 +1251,7 @@ Read this file before writing the final result. Do not rely on the workflow plan
                         }
                     }
 
-                    let completed_step = Self::transition_step_and_sync(
+                    Self::transition_step_and_sync(
                         pool,
                         chat_runner,
                         execution,
@@ -1267,12 +1260,6 @@ Read this file before writing the final result. Do not rely on the workflow plan
                         "step_completed",
                     )
                     .await?;
-                    workflow_analytics::track_handoff_completed(
-                        chat_runner.analytics_service(),
-                        execution.session_id,
-                        execution.id,
-                        completed_step.id,
-                    );
                     return Ok(StepOutcome::Completed);
                 }
                 ReviewVerdict::Rejected => {
@@ -1616,7 +1603,7 @@ Read this file before writing the final result. Do not rely on the workflow plan
                     ),
                 )
                 .await;
-                let completed_step = Self::transition_step_and_sync(
+                Self::transition_step_and_sync(
                     pool,
                     chat_runner,
                     execution,
@@ -1625,12 +1612,6 @@ Read this file before writing the final result. Do not rely on the workflow plan
                     "step_completed",
                 )
                 .await?;
-                workflow_analytics::track_handoff_completed(
-                    chat_runner.analytics_service(),
-                    execution.session_id,
-                    execution.id,
-                    completed_step.id,
-                );
                 Ok(StepOutcome::Completed)
             }
         }

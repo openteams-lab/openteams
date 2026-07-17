@@ -67,7 +67,7 @@ const CHAT_SESSION_WORKTREE_RETURNING: &str = r#"
 /// - `dirty`    -> `active` | `merging` | `cleanup_pending` | `archived`
 /// - `merging`  -> `merged` | `needs_conflict_resolution` | `dirty` | `active` | `cleanup_pending`
 /// - `needs_conflict_resolution` -> `merged` | `dirty` | `merging`
-/// - `merged`   -> `dirty` | `cleanup_pending` | `archived` (still uses the isolated workspace)
+/// - `merged`   -> `dirty` | `cleanup_pending` | `archived`
 /// - `cleanup_pending` -> `archived` | `cleanup_failed`
 /// - `cleanup_failed`  -> `cleanup_pending` | `archived`
 /// - `archived` is terminal.
@@ -102,7 +102,8 @@ impl SessionWorktreeStatus {
     /// new runs must fall back to the base workspace instead of recreating an
     /// empty directory.
     ///
-    /// Terminal/audit states (`archived`, `cleanup_failed`) return
+    /// Post-merge and terminal/audit states (`merged`, `archived`,
+    /// `cleanup_failed`) return
     /// `false` — the caller should switch to the worktree row's
     /// `base_workspace_path` instead.
     pub fn is_active_for_workspace(self) -> bool {
@@ -113,7 +114,6 @@ impl SessionWorktreeStatus {
                 | Self::Dirty
                 | Self::Merging
                 | Self::NeedsConflictResolution
-                | Self::Merged
         )
     }
 
@@ -566,9 +566,9 @@ impl SessionWorktree {
         .await
     }
 
-    /// Record the base commit (HEAD of `base_branch` at worktree creation)
-    /// for later diff baseline computation. Best-effort: callers may pass
-    /// `None` if the commit could not be resolved.
+    /// Record the integration cursor. It starts as the HEAD of `base_branch`
+    /// when the worktree is created and advances to the latest integrated
+    /// session commit after a cherry-pick merge.
     pub async fn record_base_commit(
         pool: &SqlitePool,
         id: Uuid,

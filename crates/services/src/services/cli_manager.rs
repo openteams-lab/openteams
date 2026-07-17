@@ -224,7 +224,7 @@ impl CliManager {
             if let Some(macos_dir) = exe_dir
                 .to_str()
                 .filter(|s| s.contains(".app/Contents/"))
-                .and_then(|_| Some(exe_dir))
+                .map(|_| exe_dir)
             {
                 // Already checked exe_dir above; also try Resources sibling
                 let resources_dir = macos_dir

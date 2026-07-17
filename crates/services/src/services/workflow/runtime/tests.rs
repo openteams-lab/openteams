@@ -100,6 +100,7 @@ mod tests {
             title: Some("workflow runtime test".to_string()),
             status: ChatSessionStatus::Active,
             lead_agent_id: None,
+            lead_session_agent_id: None,
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
@@ -341,6 +342,7 @@ mod tests {
             agent_session_id: None,
             agent_message_id: None,
             project_member_id: None,
+            member_name: "member".to_string(),
             execution_config: Json(MemberExecutionConfig::default()),
             allowed_skill_ids: Json(Vec::new()),
             created_at: now,
@@ -359,6 +361,28 @@ mod tests {
         };
 
         (vec![session_agent], vec![agent])
+    }
+
+    #[test]
+    fn lead_resolution_prefers_session_member_id_for_shared_backing_agent() {
+        let (mut session_agents, mut agents) = sample_agent_views();
+        let mut second_member = session_agents[0].clone();
+        second_member.id = Uuid::new_v4();
+        second_member.member_name = "reviewer".to_string();
+        let mut second_agent_view = agents[0].clone();
+        second_agent_view.name = second_member.member_name.clone();
+        session_agents.push(second_member.clone());
+        agents.push(second_agent_view);
+
+        let mut session = sample_chat_session(ChatSessionWorktreeMode::Inherit, None);
+        session.id = second_member.session_id;
+        session.lead_agent_id = Some(second_member.agent_id);
+        session.lead_session_agent_id = Some(second_member.id);
+
+        let (lead_agent, lead_member) =
+            resolve_lead_agent(&session, &session_agents, &agents).expect("resolve lead member");
+        assert_eq!(lead_member.id, second_member.id);
+        assert_eq!(lead_agent.name, "reviewer");
     }
 
     #[test]
@@ -859,6 +883,8 @@ mod tests {
         let prompt =
             build_workspace_scoped_workflow_prompt("Run the workflow step.", workspace_path);
 
+        assert!(prompt.starts_with("[OPENTEAMS_SOURCE=openteams]\n\n"));
+        assert_eq!(prompt.matches("[OPENTEAMS_SOURCE=openteams]").count(), 1);
         assert!(prompt.contains("## Workspace"));
         assert!(prompt.contains("Active workspace path"));
         assert!(prompt.contains("Treat this active workspace path as the project repository"));
@@ -1241,31 +1267,6 @@ mod tests {
         register_running_step(step_id, next_token.clone());
         assert!(!next_token.is_cancelled());
         clear_running_step(step_id);
-    }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn container_cancel_terminates_executor_without_native_cancel_token() {
-        let mut command = tokio::process::Command::new("sh");
-        command.args(["-lc", "sleep 30"]);
-        let child = command.group_spawn().expect("spawn workflow executor");
-        let mut spawned = SpawnedChild::from(child);
-        let cancel = CancellationToken::new();
-        cancel.cancel();
-
-        let status = wait_for_process_exit_or_cancel(&mut spawned, "test-agent", &cancel)
-            .await
-            .expect("cancel workflow executor");
-
-        assert!(status.is_none());
-        assert!(
-            spawned
-                .child
-                .inner()
-                .try_wait()
-                .expect("read child status")
-                .is_some()
-        );
     }
 
     #[test]

@@ -2599,7 +2599,12 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                   </div>
 
                   {msg.quotedMessage && (
-                    <div className="mb-2 flex items-start gap-2 rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] px-2.5 py-1.5 text-[11px] text-[var(--ink-muted)]">
+                    <button
+                      type="button"
+                      onClick={() => handleJumpToMessage(msg.quotedMessage!.id)}
+                      className="mb-2 flex w-full items-start gap-2 rounded-md border border-[var(--hairline)] bg-[var(--surface-1)] px-2.5 py-1.5 text-left text-[11px] text-[var(--ink-muted)] transition-colors hover:border-[var(--primary)] hover:bg-[var(--primary-tint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-focus)]"
+                      title={msg.quotedMessage.content}
+                    >
                       <Quote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ink-tertiary)]" />
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-semibold text-[var(--ink)]">
@@ -2611,7 +2616,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
                           {msg.quotedMessage.summary}
                         </div>
                       </div>
-                    </div>
+                    </button>
                   )}
 
                   {msg.agentSourceMessage && (

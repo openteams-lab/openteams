@@ -14,7 +14,7 @@ use executors::{
 };
 use serde::{Deserialize, Serialize};
 use services::services::{
-    analytics_events::{AnalyticsProjector, DomainEvent},
+    analytics_events::{AnalyticsEvent, AnalyticsEventPayload, AnalyticsProjector},
     config::{
         ChatMemberPreset, ChatPresetsConfig, ChatTeamPreset, ChatTeamTemplateTier,
         ChatWorkflowStep, Config, TeamTemplateCatalogService,
@@ -297,14 +297,14 @@ pub async fn create_preset_snapshot(
         deployment.analytics_enabled(),
     );
     analytics_projector
-        .project_or_warn(DomainEvent::PresetSnapshotCreated {
-            session_id: session.id,
-            actor_user_id: deployment.user_id().to_string(),
-            team_preset_id: response.team.id.clone(),
-            member_count: response.team.members.len(),
-            overwritten: response.overwritten,
-            overwrite_strategy: requested_overwrite_strategy.as_str().to_string(),
-        })
+        .record_or_warn(
+            AnalyticsEvent::new(AnalyticsEventPayload::PresetSnapshotCreated {
+                member_count: response.team.members.len().min(u32::MAX as usize) as u32,
+                overwritten: response.overwritten,
+                overwrite_strategy: requested_overwrite_strategy.as_str().to_string(),
+            })
+            .with_session(session.id),
+        )
         .await;
 
     Ok(ResponseJson(ApiResponse::success(response)))
@@ -964,6 +964,7 @@ mod tests {
             title: Some("Delivery Team".to_string()),
             status: ChatSessionStatus::Active,
             lead_agent_id: None,
+            lead_session_agent_id: None,
             summary_text: None,
             archive_ref: None,
             last_seen_diff_key: None,
@@ -1339,7 +1340,7 @@ mod tests {
                 .expect("localized template exists");
             let response = list_team_presets_from_templates(&templates);
 
-            assert_eq!(response.teams.len(), 10, "{locale}");
+            assert_eq!(response.teams.len(), 11, "{locale}");
             assert!(response.teams.iter().any(|team| {
                 team.id == "advanced-growth-ops" && team.tier == ChatTeamTemplateTier::Advanced
             }));
@@ -1364,7 +1365,7 @@ mod tests {
 
         assert_ne!(localized["name"], english["name"]);
         assert_ne!(localized["team_protocol"], english["team_protocol"]);
-        assert_eq!(list["teams"].as_array().expect("teams array").len(), 10);
+        assert_eq!(list["teams"].as_array().expect("teams array").len(), 11);
         assert!(
             list["teams"]
                 .as_array()

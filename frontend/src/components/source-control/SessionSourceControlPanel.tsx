@@ -71,6 +71,7 @@ interface SourceControlConfirmDialogState {
   title: string;
   description: string;
   confirmLabel: string;
+  cancelLabel?: string;
   tone: "warning" | "danger";
   resolve: (confirmed: boolean) => void;
 }
@@ -651,7 +652,42 @@ export const SessionSourceControlPanel: React.FC<
           await prepare();
           break;
         case "merge":
-          await mergeWorktree();
+          {
+            const result = await mergeWorktree();
+            if (!result.has_conflicts || !isCurrentScope(actionScopeKey)) {
+              break;
+            }
+            const conflictCount = result.conflict_files.length;
+            const openResolver = await requestConfirm({
+              title: tr(
+                "worktree.confirm.conflictTitle",
+                "Merge conflicts detected",
+              ),
+              description:
+                conflictCount > 0
+                  ? tr(
+                      "worktree.confirm.conflictDescription",
+                      "{count} files have merge conflicts. Open the conflict resolver to finish the merge.",
+                      { count: conflictCount },
+                    )
+                  : tr(
+                      "worktree.confirm.conflictDescriptionUnknown",
+                      "The merge has conflicts. Open the conflict resolver to finish the merge.",
+                    ),
+              confirmLabel: tr(
+                "worktree.confirm.conflictResolve",
+                "Resolve conflicts",
+              ),
+              cancelLabel: tr(
+                "worktree.confirm.conflictLater",
+                "Later",
+              ),
+              tone: "warning",
+            });
+            if (openResolver && isCurrentScope(actionScopeKey)) {
+              onOpenConflictResolver(projectId, sessionId);
+            }
+          }
           break;
         case "discard":
           await discardWorktree();
@@ -1246,7 +1282,7 @@ export const SessionSourceControlPanel: React.FC<
           title={confirmDialog.title}
           description={confirmDialog.description}
           confirmLabel={confirmDialog.confirmLabel}
-          cancelLabel={t("cancel")}
+          cancelLabel={confirmDialog.cancelLabel ?? t("cancel")}
           escLabel={t("escToCancel")}
           tone={confirmDialog.tone}
           idPrefix="source-control-confirm"

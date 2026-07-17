@@ -1652,7 +1652,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::{
-        ControlEvent, extract_retry_status, run_request_with_control,
+        ControlEvent, event_matches_session, extract_retry_status, run_request_with_control,
         run_request_with_control_timeout,
     };
     use crate::executors::ExecutorError;
@@ -1687,6 +1687,29 @@ mod tests {
         });
 
         assert!(extract_retry_status(&payload).is_none());
+    }
+
+    #[test]
+    fn idle_events_only_match_the_active_session() {
+        let active = json!({
+            "type": "session.idle",
+            "properties": { "sessionID": "main-session" }
+        });
+        let child = json!({
+            "type": "session.idle",
+            "properties": { "sessionID": "child-session" }
+        });
+
+        assert!(event_matches_session(
+            "session.idle",
+            &active,
+            "main-session"
+        ));
+        assert!(!event_matches_session(
+            "session.idle",
+            &child,
+            "main-session"
+        ));
     }
 
     #[tokio::test]

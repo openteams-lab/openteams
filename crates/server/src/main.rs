@@ -6,7 +6,7 @@ use server::{DeploymentImpl, npx_browser_lifecycle, routes};
 use services::services::{
     agent_runtime::refresh_runtime_discovery,
     build_stats::model_pricing_sync::ModelPricingSyncService,
-    config::{TeamTemplateCatalogService, TeamTemplateCatalogSyncResult},
+    config::{TeamTemplateCatalogService, TeamTemplateCatalogSyncResult, load_config_from_file},
     container::ContainerService,
     project::migration::ProjectMigrationService,
 };
@@ -57,7 +57,10 @@ async fn main() -> Result<(), OpenTeamsError> {
         .install_default()
         .expect("Failed to install rustls crypto provider");
 
-    sentry_utils::init_once(SentrySource::Backend);
+    let startup_config = load_config_from_file(&config_path().to_path_buf()).await;
+    if startup_config.error_reporting_enabled {
+        sentry_utils::init_once(SentrySource::Backend);
+    }
 
     let default_log_level = if cfg!(debug_assertions) {
         "info"
@@ -129,7 +132,6 @@ async fn main() -> Result<(), OpenTeamsError> {
     }
 
     let deployment = DeploymentImpl::new().await?;
-    deployment.update_sentry_scope().await?;
     let _ = sync_team_template_catalog_on_server_startup(
         deployment.db().pool.clone(),
         config_path().to_path_buf(),
@@ -385,12 +387,12 @@ mod tests {
         let rows = ChatTeamTemplateCatalog::list_stable_sorted(&pool)
             .await
             .expect("list catalog");
-        assert_eq!(rows.len(), 10);
+        assert_eq!(rows.len(), 11);
         assert_eq!(
             rows.iter()
                 .filter(|row| row.source == TeamTemplateCatalogSource::Builtin)
                 .count(),
-            10
+            11
         );
     }
 }

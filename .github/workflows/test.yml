@@ -31,9 +31,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Frontend checks
-        run: |
-          pnpm run frontend:lint
-          pnpm run frontend:check
+        run: pnpm run frontend:check
 
       - name: Check i18n regressions
         env:

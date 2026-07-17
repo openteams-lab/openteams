@@ -4,13 +4,13 @@ const { spawn } = require("child_process");
 const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..");
-const frontendPort = process.env.FRONTEND_PORT || "3003";
+const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
 const child = spawn(
-  `pnpm --dir frontend run dev -- --host --port ${frontendPort}`,
+  pnpm,
+  ["--dir", "frontend", "exec", "vite", "--strictPort"],
   {
     cwd: repoRoot,
-    shell: true,
     stdio: "inherit",
   },
 );

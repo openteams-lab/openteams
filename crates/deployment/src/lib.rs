@@ -32,7 +32,6 @@ use services::services::{
 use sqlx::Error as SqlxError;
 use thiserror::Error;
 use tokio::sync::RwLock;
-use utils::sentry as sentry_utils;
 
 #[derive(Debug, Clone, Copy, Error)]
 #[error("Remote client not configured")]
@@ -99,16 +98,6 @@ pub trait Deployment: Clone + Send + Sync + 'static {
     fn chat_runner(&self) -> &ChatRunner;
 
     fn queued_message_service(&self) -> &QueuedMessageService;
-
-    async fn update_sentry_scope(&self) -> Result<(), DeploymentError> {
-        let user_id = self.user_id();
-        let config = self.config().read().await;
-        let username = config.github.username.as_deref();
-        let email = config.github.primary_email.as_deref();
-        sentry_utils::configure_user_scope(user_id, username, email);
-
-        Ok(())
-    }
 
     /// Trigger background auto-setup of default projects for new users
     async fn trigger_auto_project_setup(&self) {

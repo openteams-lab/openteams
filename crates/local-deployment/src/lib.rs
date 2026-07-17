@@ -108,7 +108,6 @@ impl Deployment for LocalDeployment {
         let config = Arc::new(RwLock::new(raw_config));
         let analytics_enabled = Arc::new(AtomicBool::new(config.read().await.analytics_enabled));
         let user_id = generate_user_id();
-        let analytics = AnalyticsConfig::new().map(AnalyticsService::new);
         let git = GitService::new();
         let project = ProjectService::new();
         let repo = RepoService::new();
@@ -128,6 +127,14 @@ impl Deployment for LocalDeployment {
             );
             DBService::new_with_after_connect(hook).await?
         };
+        let analytics = AnalyticsConfig::new().map(|analytics_config| {
+            AnalyticsService::with_persistence(
+                analytics_config,
+                db.pool.clone(),
+                user_id.clone(),
+                analytics_enabled.clone(),
+            )
+        });
         let image = ImageService::new(db.clone().pool)?;
         {
             let image_service = image.clone();

@@ -2173,9 +2173,7 @@ fn handle_jsonrpc_thread_response_value(
     msg_store: &Arc<MsgStore>,
     entry_index: &EntryIndexProvider,
 ) -> Option<ModelRuntimeContext> {
-    let Some(thread) = result.get("thread") else {
-        return None;
-    };
+    let thread = result.get("thread")?;
 
     let thread_id = thread
         .get("id")

@@ -55,19 +55,14 @@ pub enum AgentRuntimeError {
     Profile(#[from] ProfileError),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
 pub enum AgentRunMode {
+    #[default]
     Auto,
     Local,
     Disabled,
-}
-
-impl Default for AgentRunMode {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]

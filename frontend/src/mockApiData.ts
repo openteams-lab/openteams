@@ -66,11 +66,6 @@ export interface DialogOptionsMock {
 
 export interface SettingsOptionsMock {
   languages: Array<{ code: Locale; label: string }>;
-  account: {
-    email: string;
-    roleLevel: string;
-    keyStatus: string;
-  };
   menu: Array<{
     section: string;
     items: Array<{ id: string; label: string; icon: string; disabled?: boolean }>;
@@ -457,11 +452,6 @@ export const mockSettingsOptions: SettingsOptionsMock = {
     { code: 'fr', label: 'Francais' },
     { code: 'es', label: 'Espanol' },
   ],
-  account: {
-    email: 'mock-user@example.com',
-    roleLevel: 'Workspace Creator',
-    keyStatus: 'Active - Secured',
-  },
   menu: [
     {
       section: 'Personal',
@@ -469,6 +459,7 @@ export const mockSettingsOptions: SettingsOptionsMock = {
         { id: 'account', label: 'Account', icon: 'user' },
         { id: 'appearance', label: 'Perferences', icon: 'sliders' },
         { id: 'notifications', label: 'Notifications', icon: 'bell' },
+        { id: 'privacy', label: 'Privacy', icon: 'shield' },
         { id: 'archived-sessions', label: 'Archived sessions', icon: 'archive' },
       ],
     },

@@ -370,18 +370,6 @@ impl StandardCodingAgentExecutor for Codex {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::CODEX_MODEL_FALLBACKS;
-
-    #[test]
-    fn codex_model_fallbacks_include_latest_gpt_5_6_models() {
-        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-sol"));
-        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-terra"));
-        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-luna"));
-    }
-}
-
 impl Codex {
     const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.144.1";
 
@@ -696,5 +684,17 @@ impl Codex {
             exit_signal: Some(exit_signal_rx),
             cancel: Some(cancel),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CODEX_MODEL_FALLBACKS;
+
+    #[test]
+    fn codex_model_fallbacks_include_latest_gpt_5_6_models() {
+        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-sol"));
+        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-terra"));
+        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-luna"));
     }
 }

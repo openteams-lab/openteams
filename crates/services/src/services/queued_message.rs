@@ -231,6 +231,28 @@ impl QueuedMessageService {
         Ok(rows.into_iter().map(Self::from_row).collect())
     }
 
+    /// Return claimed rows that never reached run binding, regardless of member runtime state.
+    pub async fn list_unbound_processing(
+        &self,
+        pool: &SqlitePool,
+    ) -> Result<Vec<QueuedMessage>, sqlx::Error> {
+        let rows = ChatMessageQueue::list_unbound_processing(pool).await?;
+        Ok(rows.into_iter().map(Self::from_row).collect())
+    }
+
+    /// Return the member's currently claimed or running queue row, if one exists.
+    pub async fn find_active_for_member(
+        &self,
+        pool: &SqlitePool,
+        session_agent_id: Uuid,
+    ) -> Result<Option<QueuedMessage>, sqlx::Error> {
+        Ok(
+            ChatMessageQueue::find_active_for_member(pool, session_agent_id)
+                .await?
+                .map(Self::from_row),
+        )
+    }
+
     /// Check whether a member has queued rows that have not started yet.
     pub async fn has_queued(
         &self,
@@ -266,11 +288,9 @@ impl QueuedMessageService {
         id: Uuid,
         run_id: Uuid,
     ) -> Result<QueuedMessage, sqlx::Error> {
-        Ok(
-            ChatMessageQueue::start_or_create_running(pool, &Self::create_data(data), id, run_id)
-                .await
-                .map(Self::from_row)?,
-        )
+        ChatMessageQueue::start_or_create_running(pool, &Self::create_data(data), id, run_id)
+            .await
+            .map(Self::from_row)
     }
 
     pub async fn find_by_run_id(

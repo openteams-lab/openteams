@@ -202,6 +202,7 @@ async fn prune_stale_session_agent_skill_ids(
         r#"SELECT id,
                   session_id,
                   agent_id,
+                  member_name,
                   state,
                   workspace_path,
                   pty_session_key,

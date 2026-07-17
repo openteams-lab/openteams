@@ -25,6 +25,11 @@ const prefixes = [
   "queue.",
   "relatedFiles.",
   "sourceControl.",
+  "worktree.",
+] as const;
+const requiredWorktreeKeys = [
+  "worktree.confirm.mergeDescription",
+  "worktree.confirm.mergeTitle",
 ] as const;
 
 type Locale = (typeof locales)[number];
@@ -88,8 +93,12 @@ const usedKeys = usedSessionKeys();
 
 check(
   "en defines every session workspace key used by session components",
-  usedKeys.every((key) => baselineKeys.includes(key)),
-  usedKeys.filter((key) => !baselineKeys.includes(key)),
+  [...usedKeys, ...requiredWorktreeKeys].every((key) =>
+    baselineKeys.includes(key),
+  ),
+  [...usedKeys, ...requiredWorktreeKeys].filter(
+    (key) => !baselineKeys.includes(key),
+  ),
 );
 
 for (const locale of locales) {

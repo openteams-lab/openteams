@@ -18,8 +18,8 @@ impl ChatRunner {
         //    even if a historical worktree row exists.
         let worktree_service = SessionWorktreeService::new(self.db.pool.clone());
         if session.worktree_mode == ChatSessionWorktreeMode::Isolated {
-            // First check for an existing worktree row. Merged rows keep using
-            // the isolated path so follow-up commits can be merged again.
+            // First check for an existing worktree row. Merged rows switch
+            // back to the recorded base workspace.
             if let Some(worktree) = worktree_service.get_latest_for_session(session_id).await? {
                 if worktree.status.is_active_for_workspace() {
                     return Ok(worktree.worktree_path);
@@ -802,8 +802,6 @@ impl ChatRunner {
         }
 
         let agents = ChatAgent::find_all(&self.db.pool).await?;
-        let member_names =
-            chat::member_name_overrides_for_session(&self.db.pool, session_id).await?;
         let agent_map: HashMap<Uuid, ChatAgent> =
             agents.into_iter().map(|agent| (agent.id, agent)).collect();
 
@@ -840,10 +838,7 @@ impl ChatRunner {
             summaries.push(SessionAgentSummary {
                 session_agent_id: session_agent.id,
                 agent_id: agent.id,
-                name: chat::effective_agent_name(
-                    agent,
-                    member_names.get(&agent.id).map(String::as_str),
-                ),
+                name: session_agent.member_name.clone(),
                 runner_type: agent.runner_type.clone(),
                 state: session_agent.state,
                 description,
@@ -918,13 +913,16 @@ impl ChatRunner {
             markdown
                 .push_str("3. `send.to` must match a group member name or `\"you\"` (the user).\n");
         }
-        markdown.push_str("4. `record`: long-lived shared facts only.\n");
-        markdown.push_str("5. `artifact.content`: a JSON array of file paths only. Include every file modified, added, or deleted in this turn. Paths may be workspace-relative or absolute, but must not include prose.\n");
         markdown.push_str(
-            "6. `conclusion`: current-turn summary only (completed work, blockers, next steps). Max 3 sentences.\n",
+            "4. Emit at most one `send` item for each `send.to` value per response, including `\"you\"` and every agent. Never emit multiple `send` items with the same `send.to`; combine their content into one complete Markdown message.\n",
+        );
+        markdown.push_str("5. `record`: long-lived shared facts only.\n");
+        markdown.push_str("6. `artifact.content`: a JSON array of file paths only. Include every file modified, added, or deleted in this turn. Paths may be workspace-relative or absolute, but must not include prose.\n");
+        markdown.push_str(
+            "7. `conclusion`: current-turn summary only (completed work, blockers, next steps). Max 3 sentences.\n",
         );
         if is_workflow_mode {
-            markdown.push_str("7. `workflow_generate`: \n");
+            markdown.push_str("8. `workflow_generate`: \n");
             markdown.push_str(
                 "- Emit `workflow_generate` only when the user explicitly asks to start generating an execution plan.\n",
             );
@@ -1161,7 +1159,7 @@ impl ChatRunner {
         markdown.push_str(&message.created_at.to_string());
         markdown.push('\n');
 
-        markdown
+        crate::services::mark_openteams_prompt(&markdown)
     }
 
     pub(super) fn resolve_prompt_language(

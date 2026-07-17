@@ -46,7 +46,12 @@ pub async fn build_full_context(
         .into_iter()
         .filter(should_include_message_in_history)
         .collect::<Vec<_>>();
-    let member_names = member_name_overrides_for_session(pool, session_id).await?;
+    let session_member_names = ChatSessionAgent::find_all_for_session(pool, session_id)
+        .await?
+        .into_iter()
+        .map(|member| (member.id, member.member_name))
+        .collect::<HashMap<_, _>>();
+    let member_names = unambiguous_member_names_by_agent_for_session(pool, session_id).await?;
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
@@ -60,7 +65,7 @@ pub async fn build_full_context(
 
     let simplified_messages: Vec<SimplifiedMessage> = all_messages
         .iter()
-        .map(|message| to_simplified_message(message, &agent_map))
+        .map(|message| to_simplified_message(message, &session_member_names, &agent_map))
         .collect();
 
     // Enforce hard token limit to prevent model input errors
@@ -159,7 +164,12 @@ pub async fn build_compacted_context(
         .into_iter()
         .filter(should_include_message_in_history)
         .collect::<Vec<_>>();
-    let member_names = member_name_overrides_for_session(pool, session_id).await?;
+    let session_member_names = ChatSessionAgent::find_all_for_session(pool, session_id)
+        .await?
+        .into_iter()
+        .map(|member| (member.id, member.member_name))
+        .collect::<HashMap<_, _>>();
+    let member_names = unambiguous_member_names_by_agent_for_session(pool, session_id).await?;
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
@@ -173,7 +183,7 @@ pub async fn build_compacted_context(
 
     let simplified_messages: Vec<SimplifiedMessage> = all_messages
         .iter()
-        .map(|message| to_simplified_message(message, &agent_map))
+        .map(|message| to_simplified_message(message, &session_member_names, &agent_map))
         .collect();
     let session_agents = ChatSessionAgent::find_all_for_session(pool, session_id).await?;
     let (token_threshold, compression_percentage) = load_chat_compression_settings().await;
@@ -204,14 +214,22 @@ pub async fn build_compacted_context(
 /// Convert ChatMessage to SimplifiedMessage format (sender + content only)
 pub fn to_simplified_message(
     message: &ChatMessage,
-    agent_map: &HashMap<Uuid, String>,
+    session_member_names: &HashMap<Uuid, String>,
+    legacy_agent_names: &HashMap<Uuid, String>,
 ) -> SimplifiedMessage {
     let sender_handle = message
         .meta
         .0
         .get("sender_handle")
         .and_then(|value| value.as_str());
-    let sender_name = message.sender_id.and_then(|id| agent_map.get(&id).cloned());
+    let sender_name = message
+        .sender_session_agent_id
+        .and_then(|id| session_member_names.get(&id).cloned())
+        .or_else(|| {
+            message
+                .sender_id
+                .and_then(|id| legacy_agent_names.get(&id).cloned())
+        });
 
     let sender = match message.sender_type {
         ChatSenderType::User => format!("user:{}", sender_handle.unwrap_or("user")),
@@ -239,7 +257,12 @@ pub async fn build_simplified_messages(
         .into_iter()
         .filter(should_include_message_in_history)
         .collect::<Vec<_>>();
-    let member_names = member_name_overrides_for_session(pool, session_id).await?;
+    let session_member_names = ChatSessionAgent::find_all_for_session(pool, session_id)
+        .await?
+        .into_iter()
+        .map(|member| (member.id, member.member_name))
+        .collect::<HashMap<_, _>>();
+    let member_names = unambiguous_member_names_by_agent_for_session(pool, session_id).await?;
     let agents = ChatAgent::find_all(pool).await?;
     let agent_map: HashMap<Uuid, String> = agents
         .into_iter()
@@ -253,6 +276,6 @@ pub async fn build_simplified_messages(
 
     Ok(messages
         .iter()
-        .map(|msg| to_simplified_message(msg, &agent_map))
+        .map(|msg| to_simplified_message(msg, &session_member_names, &agent_map))
         .collect())
 }
