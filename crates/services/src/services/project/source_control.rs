@@ -1714,26 +1714,72 @@ async fn filter_committed_session_paths(
     } else {
         BTreeSet::new()
     };
+    let newer_other_session_paths = ChatSessionPathIndex::find_shared_sessions_for_paths(
+        pool,
+        context.project_id,
+        &context.workspace_path_string,
+        session_id,
+        &path_list,
+    )
+    .await?
+    .into_iter()
+    .fold(
+        HashMap::<String, DateTime<Utc>>::new(),
+        |mut latest, row| {
+            latest
+                .entry(row.path)
+                .and_modify(|observed_at| {
+                    if row.last_observed_at > *observed_at {
+                        *observed_at = row.last_observed_at;
+                    }
+                })
+                .or_insert(row.last_observed_at);
+            latest
+        },
+    );
     let mut retained_paths = BTreeMap::new();
     let mut pruned_paths = Vec::new();
     for (path, state) in paths {
-        let committed_after_observation = state
+        let delivery_commit_time = committed_paths.get(&path);
+        let head_commit_time = head_commit_times_by_path.get(&path);
+        let (delivery_committed_after_observation, head_committed_after_observation) = state
             .last_observed_at
             .as_ref()
             .map(|last_observed_at| {
-                let delivery_committed_after_observation = committed_paths
+                (
+                    delivery_commit_time
+                        .map(|committed_at| committed_at >= last_observed_at)
+                        .unwrap_or(false),
+                    head_commit_time
+                        .map(|committed_at| committed_at >= last_observed_at)
+                        .unwrap_or(false),
+                )
+            })
+            .unwrap_or((false, false));
+        let committed_after_observation =
+            delivery_committed_after_observation || head_committed_after_observation;
+        let session_commit_is_latest = delivery_committed_after_observation
+            && head_commit_time
+                .map(|head_committed_at| {
+                    delivery_commit_time.is_some_and(|delivery_committed_at| {
+                        delivery_committed_at >= head_committed_at
+                    })
+                })
+                .unwrap_or(true);
+        let superseded_by_other_session = state
+            .last_observed_at
+            .as_ref()
+            .and_then(|last_observed_at| {
+                newer_other_session_paths
                     .get(&path)
-                    .map(|committed_at| committed_at >= last_observed_at)
-                    .unwrap_or(false);
-                let head_committed_after_observation = head_commit_times_by_path
-                    .get(&path)
-                    .map(|committed_at| committed_at >= last_observed_at)
-                    .unwrap_or(false);
-                delivery_committed_after_observation || head_committed_after_observation
+                    .map(|other_observed_at| other_observed_at > last_observed_at)
             })
             .unwrap_or(false);
-        let keep = remaining_changed_paths.contains(&path)
-            || (!committed_after_observation
+        let keep = if remaining_changed_paths.contains(&path) {
+            !committed_after_observation
+                || (session_commit_is_latest && !superseded_by_other_session)
+        } else {
+            !committed_after_observation
                 && state
                     .last_observed_at
                     .as_ref()
@@ -1742,7 +1788,8 @@ async fn filter_committed_session_paths(
                             .get(&path)
                             .map(|committed_at| committed_at < last_observed_at)
                     })
-                    .unwrap_or(true));
+                    .unwrap_or(true)
+        };
         if keep {
             retained_paths.insert(path, state);
         } else {
