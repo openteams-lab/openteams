@@ -1,14 +1,14 @@
 <div align="center">
-  <img src="../frontend/public/logos/logo_blue.svg" alt="OpenTeams" width="100">
+  <img src="../frontend/public/logos/logo_blue.svg" alt="openteams" width="100">
 </div>
 
 <div align="center">
-  <img src="../frontend/public/openteams-brand-logo.png" alt="OpenTeams" width="200" style="margin-top: 10px; margin-bottom: 10px;">
+  <img src="../frontend/public/openteams-brand-logo.png" alt="openteams" width="200" style="margin-top: 10px; margin-bottom: 10px;">
 
   <h5>Planifier, construire et livrer — avec une équipe d'agents IA plutôt qu'un seul</h5>
 
   <p>
-    Plusieurs agents IA partagent le même contexte : collaborez librement par chat, ou orchestrez des tâches complexes avec des workflows visibles, relisibles et relançables.
+    openteams est une application de bureau IA open source et local-first qui aide les développeurs indépendants à planifier, construire et livrer plus vite avec une équipe IA qu'ils contrôlent.
   </p>
 
   <p>
@@ -46,7 +46,7 @@
 
 ## Qu'est-ce qu'openteams
 
-**openteams** est un workspace open source de collaboration multi-agent. Il rassemble plusieurs agents IA de code, comme Claude Code, Codex, Gemini CLI et d'autres, dans une session partagée où ils peuvent communiquer, partager le contexte et travailler ensemble comme une équipe. Vous pouvez collaborer avec les agents via un Free Chat léger, ou orchestrer des tâches complexes avec des Workflows structurés, des plans visibles, un contrôle étape par étape et une revue intégrée. Tout s'exécute localement dans votre propre workspace.
+**openteams** est un workspace open source de collaboration multi-agent. Il rassemble plusieurs agents IA de code, comme Claude Code, Codex, Gemini CLI et d'autres, dans une session partagée où ils peuvent communiquer, partager le contexte et travailler ensemble comme une équipe. Vous pouvez collaborer via un Free Chat léger ou orchestrer des tâches complexes avec des workflows structurés, des plans visibles, un contrôle étape par étape et des revues traçables. Des workspaces isolés optionnels donnent à chaque session son propre Git worktree afin que les agents exécutent des tâches indépendantes sans se gêner. Au-delà de l'exécution, openteams vous aide à gérer tout le parcours de l'idée à la livraison : les issues rendent la progression et les priorités visibles, synchronisent le travail depuis GitHub et relient chaque issue aux sessions où elle est réalisée. Une fois le travail terminé, les statistiques de build rapprochent les résultats livrés de la consommation de tokens et des coûts par session, modèle et tâche, pour rendre la production et l'efficacité clairement visibles. Tout s'exécute localement dans votre propre workspace.
 
 ## Pourquoi openteams
 
@@ -56,9 +56,21 @@ Les agents IA deviennent de plus en plus forts pour planifier, coder, relire et 
 
 **L'exécution des agents est invisible et difficile à contrôler.** Vous demandez à Claude Code de « construire la fonctionnalité ». Il tourne pendant 15 minutes. Vous ne savez pas quelles sous-tâches il a essayées, lesquelles ont réussi, ni lesquelles il a abandonnées en silence. La plupart des agents de code traitent aujourd'hui une tâche complexe comme une seule exécution monolithique : aucun plan visible avant l'exécution, aucun moyen d'approuver ou de rejeter une étape en cours de route, aucun moyen de relancer uniquement l'étape qui a échoué. Quand quelque chose casse, vous recommencez.
 
-**openteams** résout ces deux problèmes. Les agents **partagent le même contexte**, donc le travail ne se perd pas entre les relais. Les tâches complexes deviennent des **workflows visibles et contrôlables** : vous affinez le plan avant qu'il ne s'exécute, vous observez chaque étape, et vous pouvez intervenir sur n'importe quel noeud pour approuver, rejeter, relancer ou rediriger.
+**Les tâches indépendantes peuvent entrer en conflit dans un workspace partagé.** Quand plusieurs sessions modifient les mêmes fichiers en même temps, les changements inachevés se mélangent aux autres tâches, les agents se gênent et chaque résultat devient difficile à relire ou fusionner séparément.
 
-> Le vrai levier n'est pas d'avoir plus d'agents. C'est de les orchestrer avec un plan complexe que vous pouvez voir et des étapes que vous pouvez contrôler.
+**Le développement piloté par des agents peut vous faire perdre de vue le projet.** Une fois une fonctionnalité terminée, la prochaine étape n'existe parfois que dans votre tête ou dans des prompts dispersés. Si chaque tâche commence par un nouveau chat, il devient difficile de voir la feuille de route, de fixer les priorités et de savoir si le projet avance vers une livraison cohérente.
+
+**La consommation de tokens est facile à compter, mais difficile à relier à la valeur produite.** Les tokens sont dépensés entre agents, sessions et modèles, mais un total ne dit pas combien de bugs ont été corrigés ni combien de fonctionnalités ont été livrées. Sans rapprocher les coûts des résultats, vous ne pouvez pas savoir si le développement assisté par agents devient réellement plus efficace.
+
+**openteams** rend tout le processus de développement clair et contrôlable. Les agents d'une même session partagent le même contexte : plus besoin de jongler entre eux ou de vous répéter. Les tâches complexes deviennent des **workflows visibles et contrôlables** : vous affinez le plan avant l'exécution, observez chaque étape et pouvez approuver, rejeter, relancer ou rediriger n'importe quel noeud.
+
+Les workspaces isolés donnent à chaque session un Git worktree distinct, afin que les agents exécutent des tâches indépendantes sans partager leurs changements inachevés. Vous pouvez examiner chaque résultat séparément, puis le fusionner ou l'abandonner selon votre décision.
+
+La gestion des issues remet la feuille de route entre les mains du développeur. Enregistrez et priorisez le travail à accomplir, puis créez ou reliez directement une session d'exécution légère depuis chaque issue. Les issues restent sous le contrôle du développeur au lieu d'être modifiées de manière autonome par les agents : vous gardez ainsi une source de vérité maîtrisée pour la suite et l'avancement du projet.
+
+Les statistiques de build ferment la boucle entre les efforts et les résultats. Elles indiquent combien de bugs ont été corrigés, combien de fonctionnalités ont été livrées et combien de tokens ont été consommés dans la semaine, avec un détail par session et par modèle. Vous voyez non seulement ce que vous avez dépensé, mais aussi ce que cette dépense a produit.
+
+> Le vrai levier n'est pas d'avoir plus d'agents. C'est de garder le contrôle sur ce qu'ils font, leur manière de l'exécuter et la valeur obtenue pour le coût engagé.
 
 ## Cas d'usage courants
 
@@ -177,8 +189,8 @@ Vous avez une demande de fonctionnalité ou souhaitez contribuer à l'orientatio
 - Groupes communautaires :
 
 <p>
-  <a href="images/openteams-wechat-community.png"><img alt="QR code du groupe communautaire WeChat OpenTeams" src="images/openteams-wechat-community.png" width="260"></a>
-  <a href="images/openteams-feishu-community.png"><img alt="QR code du groupe communautaire Feishu/Lark OpenTeams" src="images/openteams-feishu-community.png" width="260"></a>
+  <a href="images/openteams-wechat-community.png"><img alt="QR code du groupe communautaire WeChat openteams" src="images/openteams-wechat-community.png" width="260"></a>
+  <a href="images/openteams-feishu-community.png"><img alt="QR code du groupe communautaire Feishu/Lark openteams" src="images/openteams-feishu-community.png" width="260"></a>
 </p>
 
 ## Fonctionnalités clés
@@ -192,6 +204,9 @@ Vous avez une demande de fonctionnalité ou souhaitez contribuer à l'orientatio
 | Mode Workflow | Convertissez les tâches complexes en étapes structurées, dépendances, revues, relances et acceptation. |
 | Exécution visible | Voyez ce que fait chaque agent et où le travail est bloqué. |
 | Revue et relance | Relisez une étape, relancez la bonne tâche et évitez de redémarrer tout le projet. |
+| Gestion des issues | Enregistrez et priorisez les éléments de travail contrôlés par le développeur, synchronisez les issues GitHub et créez ou reliez des sessions d'exécution. |
+| Workspaces isolés | Exécutez les tâches de chaque session dans un Git worktree distinct, puis relisez, fusionnez ou abandonnez chaque résultat sans affecter les autres travaux. |
+| Statistiques de build | Comparez les bugs corrigés et les fonctionnalités livrées avec la consommation de tokens et les coûts par session et par modèle. |
 | Artefacts et traces | Conservez les logs, diffs, transcriptions et artefacts générés attachés au travail. |
 | Exécution locale dans le workspace | Les agents travaillent sur votre workspace configuré, avec les enregistrements d'exécution conservés sous `.openteams/`. |
 
@@ -222,50 +237,18 @@ Ce n'est pas seulement un endroit pour rassembler plus d'agents. C'est une faço
 - **Node.js** >= 18
 - **pnpm** >= 8
 
-### Mac/Linux
+### macOS, Linux et Windows
 
 ```bash
 # Clone the repository
 git clone https://github.com/openteams-lab/openteams.git
 cd openteams
 pnpm i
-pnpm run dev
+npm run dev
 # build
 pnpm --filter frontend build
 pnpm desktop:build
 ```
-
-### Windows (PowerShell) : démarrer le backend et le frontend séparément
-
-`pnpm run dev` ne peut pas s'exécuter dans Windows PowerShell. Utilisez les commandes suivantes pour lancer séparément le backend et le frontend.
-
-```powershell
-git clone https://github.com/openteams-lab/openteams.git
-cd openteams
-pnpm i
-pnpm run generate-types
-pnpm run prepare-db
-```
-
-**Terminal A (backend)**
-
-```powershell
-$env:FRONTEND_PORT = node scripts/setup-dev-environment.js frontend
-$env:BACKEND_PORT = node scripts/setup-dev-environment.js backend
-$env:RUST_LOG = "debug"
-cargo run --bin server
-```
-
-**Terminal B (frontend)**
-
-```powershell
-$env:FRONTEND_PORT = <frontend port generated from terminal A>
-$env:BACKEND_PORT = <backend port generated from terminal A>
-cd frontend
-pnpm dev -- --port $env:FRONTEND_PORT --host
-```
-
-Ouvrez le frontend à `http://localhost:<FRONTEND_PORT>` (exemple : `http://localhost:3001`).
 
 ### Compiler `openteams-cli` localement
 
@@ -297,14 +280,19 @@ Consultez [CONTRIBUTING.md](../CONTRIBUTING.md) pour le guide complet.
 
 ## Licence
 
-Ce projet est sous Apache License 2.0. Consultez [LICENSE](../LICENSE) pour le
-texte complet, y compris les mentions de copyright et les règles de
-redistribution.
+openteams est publié sous Apache License 2.0. Concrètement, vous pouvez :
 
-Vous pouvez utiliser, modifier, publier et vendre ce projet, y
-compris dans des produits fermés. Gardez la mention de copyright, gardez le
-texte de la licence et dites ce que vous avez changé si vous le modifiez. Ne
-supprimez pas les mentions obligatoires, n'utilisez pas le nom ou les marques du
-propriétaire du projet comme caution, et ne comptez pas garder la licence de
-brevet si vous lancez une action en brevet contre ce projet. Le logiciel est
-fourni tel quel, sans garantie.
+- l'utiliser gratuitement pour des projets personnels, éducatifs, internes ou commerciaux ;
+- copier, modifier et réutiliser le code source comme base de votre travail ;
+- distribuer la version originale ou modifiée, sous forme de code source ou de logiciel compilé ;
+- l'intégrer à un produit propriétaire et vendre ce produit sans ouvrir le reste de votre code source.
+
+Si vous redistribuez openteams ou une version modifiée, joignez une copie de la licence, conservez les mentions de copyright et d'attribution pertinentes, et indiquez clairement les fichiers modifiés.
+
+Trois autres points sont à connaître :
+
+- **Marque :** Vous pouvez utiliser le code, mais vous ne pouvez pas vous présenter comme le projet officiel openteams ni utiliser son nom ou ses marques comme votre propre marque.
+- **Brevets :** Les contributeurs vous autorisent à utiliser les brevets nécessairement liés à leur code, afin qu'ils ne puissent pas s'en servir pour vous empêcher d'utiliser openteams. En échange, si vous engagez une action affirmant qu'openteams enfreint votre brevet, vous perdez cette protection. Seule l'autorisation liée aux brevets prend fin, pas votre droit ordinaire d'utiliser le code. Les utilisateurs qui n'engagent pas de procédure en matière de brevets ne sont normalement pas concernés.
+- **Risques :** Le logiciel est fourni gratuitement en l'état. Vous devez décider vous-même s'il répond à vos besoins et assumer les risques liés à son utilisation ; le projet ne fournit aucune garantie ni indemnisation.
+
+Consultez [LICENSE](../LICENSE) pour les conditions juridiques complètes.

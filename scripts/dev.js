@@ -83,6 +83,7 @@ async function main() {
     VK_ALLOWED_ORIGINS: process.env.VK_ALLOWED_ORIGINS || frontendOrigin,
   };
   const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+  const useShell = process.platform === "win32";
 
   console.log(`Starting backend at http://localhost:${ports.backend}`);
 
@@ -93,6 +94,7 @@ async function main() {
       cwd: repoRoot,
       env,
       stdio: "inherit",
+      shell: useShell,
     },
   );
   const backendExit = waitForExit(backend, "backend");
@@ -124,6 +126,7 @@ async function main() {
     cwd: repoRoot,
     env,
     stdio: "inherit",
+    shell: useShell,
   });
   const frontendExit = waitForExit(frontend, "frontend");
   children.push(frontend);

@@ -5,6 +5,7 @@ const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..");
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const useShell = process.platform === "win32";
 
 const child = spawn(
   pnpm,
@@ -12,6 +13,7 @@ const child = spawn(
   {
     cwd: repoRoot,
     stdio: "inherit",
+    shell: useShell,
   },
 );
 
