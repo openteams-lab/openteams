@@ -630,8 +630,6 @@ export const WorktreeMergeConflictsView: React.FC<
             <CodeMirrorConflictEditor
               key={selectedPath}
               path={selectedPath}
-              currentContent={detail.current ?? ''}
-              incomingContent={detail.session ?? ''}
               resultContent={
                 currentResolution?.kind === 'text'
                   ? currentResolution.content

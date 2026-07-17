@@ -17,8 +17,6 @@ import type {
 
 interface CodeMirrorConflictEditorProps {
   path: string;
-  currentContent: string;
-  incomingContent: string;
   resultContent: string;
   parsed: ParsedConflictText;
   currentBranch: string;
@@ -71,17 +69,17 @@ export const getConflictSpacerLineCounts = (
   };
 };
 
-const buildConflictRegions = (
+export const buildConflictPaneModel = (
   parsed: ParsedConflictText,
   side: 'current' | 'session',
   choices: Record<string, ConflictHunkChoice>,
   emptyLabel: string,
-): ConflictRegion[] => {
-  let line = 1;
+): ConflictPaneModel => {
+  let content = '';
   const regions: ConflictRegion[] = [];
   parsed.segments.forEach((segment) => {
     if (segment.kind === 'text') {
-      line += newlineCount(segment.content);
+      content += segment.content;
       return;
     }
     const text = segment.hunk[side];
@@ -92,23 +90,22 @@ const buildConflictRegions = (
     regions.push({
       id: segment.hunk.id,
       text,
-      lineHint: line,
+      from: content.length,
+      to: content.length + text.length,
       spacerLines:
         side === 'current' ? spacerLines.current : spacerLines.incoming,
       emptyLabel,
       choice: choices[segment.hunk.id],
     });
-    line += newlineCount(text);
+    content += text;
   });
-  return regions;
+  return { content, regions };
 };
 
 export const CodeMirrorConflictEditor: React.FC<
   CodeMirrorConflictEditorProps
 > = ({
   path,
-  currentContent,
-  incomingContent,
   resultContent,
   parsed,
   currentBranch,
@@ -120,6 +117,9 @@ export const CodeMirrorConflictEditor: React.FC<
   onChange,
 }) => {
   const rootRef = useRef<HTMLDivElement>(null);
+  const currentEditorRef = useRef<EditorView | null>(null);
+  const incomingEditorRef = useRef<EditorView | null>(null);
+  const [editorMountVersion, setEditorMountVersion] = useState(0);
   const [selectedHunkIndex, setSelectedHunkIndex] = useState(0);
   const [choices, setChoices] = useState<Record<string, ConflictHunkChoice>>(
     {},
@@ -128,9 +128,9 @@ export const CodeMirrorConflictEditor: React.FC<
   const unresolvedCount = parsed.hunks.filter(
     (hunk) => !choices[hunk.id],
   ).length;
-  const currentRegions = useMemo(
+  const currentPane = useMemo(
     () =>
-      buildConflictRegions(
+      buildConflictPaneModel(
         parsed,
         'current',
         choices,
@@ -138,9 +138,9 @@ export const CodeMirrorConflictEditor: React.FC<
       ),
     [choices, parsed, tr],
   );
-  const incomingRegions = useMemo(
+  const incomingPane = useMemo(
     () =>
-      buildConflictRegions(
+      buildConflictPaneModel(
         parsed,
         'session',
         choices,
@@ -148,13 +148,47 @@ export const CodeMirrorConflictEditor: React.FC<
       ),
     [choices, parsed, tr],
   );
-  const selectedCurrentRegion = currentRegions[selectedHunkIndex] ?? null;
-  const selectedIncomingRegion = incomingRegions[selectedHunkIndex] ?? null;
 
   useEffect(() => {
     setSelectedHunkIndex(0);
     setChoices({});
   }, [path]);
+
+  useEffect(() => {
+    if (!selectedHunk) return;
+    const currentRegion = currentPane.regions[selectedHunkIndex];
+    const incomingRegion = incomingPane.regions[selectedHunkIndex];
+    if (currentEditorRef.current && currentRegion) {
+      currentEditorRef.current.dispatch({
+        effects: EditorView.scrollIntoView(currentRegion.from, { y: 'center' }),
+      });
+    }
+    if (incomingEditorRef.current && incomingRegion) {
+      incomingEditorRef.current.dispatch({
+        effects: EditorView.scrollIntoView(incomingRegion.from, { y: 'center' }),
+      });
+    }
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        alignConflictBlocks(
+          currentEditorRef.current,
+          incomingEditorRef.current,
+          selectedHunk.id,
+        );
+      });
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  }, [
+    currentPane.regions,
+    editorMountVersion,
+    incomingPane.regions,
+    selectedHunk,
+    selectedHunkIndex,
+  ]);
 
   const chooseHunk = (choice: ConflictHunkChoice) => {
     if (!selectedHunk) return;
@@ -278,10 +312,8 @@ export const CodeMirrorConflictEditor: React.FC<
             )}
             branch={currentBranch}
             path={path}
-            content={currentContent}
-            focusText={selectedHunk?.current ?? null}
-            focusLine={selectedCurrentRegion?.lineHint ?? null}
-            conflicts={currentRegions}
+            content={currentPane.content}
+            conflicts={currentPane.regions}
             selectedConflictId={selectedHunk?.id ?? null}
             actionLabels={{
               current: tr('worktree.merge.acceptCurrent', 'Accept current'),
@@ -296,6 +328,10 @@ export const CodeMirrorConflictEditor: React.FC<
               const nextChoices = { ...choices, [hunkId]: choice };
               setChoices(nextChoices);
               onChange(buildResult(parsed, nextChoices));
+            }}
+            onEditorReady={(view) => {
+              currentEditorRef.current = view;
+              setEditorMountVersion((version) => version + 1);
             }}
             tone="current"
           />
@@ -307,10 +343,8 @@ export const CodeMirrorConflictEditor: React.FC<
             )}
             branch={incomingBranch}
             path={path}
-            content={incomingContent}
-            focusText={selectedHunk?.session ?? null}
-            focusLine={selectedIncomingRegion?.lineHint ?? null}
-            conflicts={incomingRegions}
+            content={incomingPane.content}
+            conflicts={incomingPane.regions}
             selectedConflictId={selectedHunk?.id ?? null}
             actionLabels={{
               current: tr('worktree.merge.acceptCurrent', 'Accept current'),
@@ -325,6 +359,10 @@ export const CodeMirrorConflictEditor: React.FC<
               const nextChoices = { ...choices, [hunkId]: choice };
               setChoices(nextChoices);
               onChange(buildResult(parsed, nextChoices));
+            }}
+            onEditorReady={(view) => {
+              incomingEditorRef.current = view;
+              setEditorMountVersion((version) => version + 1);
             }}
             tone="incoming"
           />
@@ -376,10 +414,16 @@ const CodeLensSeparator = () => (
 interface ConflictRegion {
   id: string;
   text: string;
-  lineHint: number;
+  from: number;
+  to: number;
   spacerLines: number;
   emptyLabel: string;
   choice?: ConflictHunkChoice;
+}
+
+interface ConflictPaneModel {
+  content: string;
+  regions: ConflictRegion[];
 }
 
 interface ConflictActionLabels {
@@ -412,6 +456,7 @@ class ConflictActionsWidget extends WidgetType {
   toDOM() {
     const container = document.createElement('div');
     container.className = `cm-conflict-codelens${this.selected ? ' is-selected' : ''}`;
+    container.dataset.conflictId = this.region.id;
 
     const actions: Array<{
       label: string;
@@ -611,11 +656,10 @@ const conflictDecorations = (
   onChoose: (hunkId: string, choice: ConflictHunkChoice) => void,
 ): Extension[] => {
   const ranges: Range<Decoration>[] = [];
-  let searchFrom = 0;
 
   conflicts.forEach((region) => {
     if (!region.text) {
-      const position = positionForLine(content, region.lineHint);
+      const position = Math.min(region.from, content.length);
       const selected = region.id === selectedConflictId;
       ranges.push(
         Decoration.widget({
@@ -636,19 +680,23 @@ const conflictDecorations = (
       );
       return;
     }
-    let start = content.indexOf(region.text, searchFrom);
-    if (start < 0) start = content.indexOf(region.text);
-    if (start < 0) return;
-    searchFrom = start + region.text.length;
+    const start = Math.min(region.from, content.length);
+    const end = Math.min(region.to, content.length);
 
     const selected = region.id === selectedConflictId;
-    const lastCharacter = Math.max(start, start + region.text.length - 1);
-    let lineStart = content.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+    const lastCharacter = Math.max(start, end - 1);
+    let lineStart = start;
     const lineStarts: number[] = [];
     while (lineStart <= lastCharacter) {
       lineStarts.push(lineStart);
-      const nextBreak = content.indexOf('\n', lineStart);
-      if (nextBreak < 0 || nextBreak >= lastCharacter) break;
+      let nextBreak = lineStart;
+      while (
+        nextBreak < lastCharacter &&
+        content.charCodeAt(nextBreak) !== 10
+      ) {
+        nextBreak += 1;
+      }
+      if (nextBreak >= lastCharacter) break;
       lineStart = nextBreak + 1;
     }
 
@@ -683,7 +731,7 @@ const conflictDecorations = (
           ),
           block: true,
           side: -4,
-        }).range(positionAfterText(content, start + region.text.length)),
+        }).range(region.to),
       );
     }
   });
@@ -693,54 +741,43 @@ const conflictDecorations = (
     : [];
 };
 
-const positionAfterText = (content: string, position: number): number => {
-  if (
-    position >= content.length ||
-    position === 0 ||
-    content[position - 1] === '\n'
-  ) {
-    return Math.min(position, content.length);
-  }
-  const nextBreak = content.indexOf('\n', position);
-  return nextBreak < 0 ? content.length : nextBreak + 1;
-};
+const conflictWidgetFor = (view: EditorView, conflictId: string) =>
+  [...view.dom.querySelectorAll<HTMLElement>('[data-conflict-id]')].find(
+    (element) => element.dataset.conflictId === conflictId,
+  ) ?? null;
 
-const positionForLine = (content: string, lineNumber: number): number => {
-  if (lineNumber <= 1) return 0;
-  let position = 0;
-  for (let line = 1; line < lineNumber; line += 1) {
-    const nextBreak = content.indexOf('\n', position);
-    if (nextBreak < 0) return content.length;
-    position = nextBreak + 1;
-  }
-  return position;
-};
-
-const scrollEditorToConflict = (
+const scrollBlockToOffset = (
   view: EditorView,
-  content: string,
-  focusText: string | null,
-  focusLine: number | null,
+  block: HTMLElement,
+  targetOffset: number,
 ) => {
-  const textPosition = focusText ? content.indexOf(focusText) : -1;
-  const position =
-    focusLine !== null
-      ? positionForLine(content, focusLine)
-      : textPosition;
-  if (position < 0) return;
-  requestAnimationFrame(() => {
-    view.dispatch({
-      effects: EditorView.scrollIntoView(position, { y: 'center' }),
-    });
-  });
+  const scrollerRect = view.scrollDOM.getBoundingClientRect();
+  const blockRect = block.getBoundingClientRect();
+  view.scrollDOM.scrollTop += blockRect.top - scrollerRect.top - targetOffset;
+};
+
+const alignConflictBlocks = (
+  currentView: EditorView | null,
+  incomingView: EditorView | null,
+  conflictId: string,
+) => {
+  if (!currentView || !incomingView) return;
+  const currentBlock = conflictWidgetFor(currentView, conflictId);
+  const incomingBlock = conflictWidgetFor(incomingView, conflictId);
+  if (!currentBlock || !incomingBlock) return;
+  const targetOffset =
+    Math.min(
+      currentView.scrollDOM.clientHeight,
+      incomingView.scrollDOM.clientHeight,
+    ) * 0.32;
+  scrollBlockToOffset(currentView, currentBlock, targetOffset);
+  scrollBlockToOffset(incomingView, incomingBlock, targetOffset);
 };
 
 const SyntaxCodeEditor: React.FC<{
   path: string;
   content: string;
   editable: boolean;
-  focusText?: string | null;
-  focusLine?: number | null;
   conflicts?: ConflictRegion[];
   selectedConflictId?: string | null;
   actionLabels?: ConflictActionLabels;
@@ -748,20 +785,19 @@ const SyntaxCodeEditor: React.FC<{
     hunkId: string,
     choice: ConflictHunkChoice,
   ) => void;
+  onEditorReady?: (view: EditorView) => void;
   onChange?: (content: string) => void;
 }> = ({
   path,
   content,
   editable,
-  focusText = null,
-  focusLine = null,
   conflicts = [],
   selectedConflictId = null,
   actionLabels,
   onChooseConflict,
+  onEditorReady,
   onChange,
 }) => {
-  const editorRef = useRef<EditorView | null>(null);
   const languageExtensions = useCodeLanguage(path);
   const focusExtensions = useMemo(
     () =>
@@ -783,12 +819,6 @@ const SyntaxCodeEditor: React.FC<{
     ],
   );
 
-  useEffect(() => {
-    if (editorRef.current) {
-      scrollEditorToConflict(editorRef.current, content, focusText, focusLine);
-    }
-  }, [content, focusLine, focusText]);
-
   return (
     <CodeMirror
       value={content}
@@ -804,8 +834,7 @@ const SyntaxCodeEditor: React.FC<{
         highlightActiveLineGutter: false,
       }}
       onCreateEditor={(view) => {
-        editorRef.current = view;
-        scrollEditorToConflict(view, content, focusText, focusLine);
+        onEditorReady?.(view);
       }}
       onChange={(value) => onChange?.(value)}
       className="h-full min-h-0 overflow-hidden [&_.cm-editor]:h-full"
@@ -819,8 +848,6 @@ const CodeEditorPane: React.FC<{
   branch: string;
   path: string;
   content: string;
-  focusText: string | null;
-  focusLine: number | null;
   conflicts: ConflictRegion[];
   selectedConflictId: string | null;
   actionLabels: ConflictActionLabels;
@@ -828,6 +855,7 @@ const CodeEditorPane: React.FC<{
     hunkId: string,
     choice: ConflictHunkChoice,
   ) => void;
+  onEditorReady: (view: EditorView) => void;
   tone: 'current' | 'incoming';
 }> = ({
   label,
@@ -835,12 +863,11 @@ const CodeEditorPane: React.FC<{
   branch,
   path,
   content,
-  focusText,
-  focusLine,
   conflicts,
   selectedConflictId,
   actionLabels,
   onChooseConflict,
+  onEditorReady,
   tone,
 }) => (
   <div className="flex min-h-0 min-w-0 flex-col">
@@ -863,12 +890,11 @@ const CodeEditorPane: React.FC<{
         path={path}
         content={content}
         editable={false}
-        focusText={focusText}
-        focusLine={focusLine}
         conflicts={conflicts}
         selectedConflictId={selectedConflictId}
         actionLabels={actionLabels}
         onChooseConflict={onChooseConflict}
+        onEditorReady={onEditorReady}
       />
     </div>
   </div>
