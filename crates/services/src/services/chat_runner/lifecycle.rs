@@ -1606,26 +1606,6 @@ impl ChatRunner {
             startup_timing::StartupMilestoneName::AgentStateRunningEmitted,
             None,
         );
-        self.emit(
-            session_id,
-            ChatStreamEvent::AgentRunStarted {
-                session_id,
-                session_agent_id,
-                agent_id,
-                agent_name: agent.name.clone(),
-                model: run_model.clone(),
-                run_id,
-                source_message_id: source_message.id,
-                client_message_id: client_message_id.clone(),
-                started_at: Some(session_agent.updated_at),
-            },
-        );
-        startup_timing.mark(
-            startup_timing::StartupMilestoneName::AgentRunStartedEmitted,
-            client_message_id
-                .as_ref()
-                .map(|id| format!("client_message_id={id}")),
-        );
 
         if track_source_message {
             // Emit MentionAcknowledged running event
