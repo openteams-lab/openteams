@@ -87,7 +87,12 @@ fn posthog_generic_event_names_and_event_group_mapping_are_correct() {
 
 #[test]
 fn sessions_route_uses_unified_workflow_analytics_events() {
-    let content = read_repo_file("crates/server/src/routes/chat/sessions.rs");
+    let content = [
+        read_repo_file("crates/server/src/routes/chat/sessions.rs"),
+        read_repo_file("crates/server/src/routes/chat/sessions/lifecycle.rs"),
+        read_repo_file("crates/server/src/routes/chat/sessions/agents.rs"),
+    ]
+    .join("\n");
 
     assert!(!content.contains("DomainEvent::SessionCreated"));
     assert!(!content.contains("DomainEvent::AgentAdded"));
