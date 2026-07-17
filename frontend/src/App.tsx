@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { WorkspaceProvider, useWorkspace } from "@/context/WorkspaceContext";
+import { RunActivityProvider } from "@/context/RunActivityContext";
 import { AppScaleContext } from "@/context/AppScaleContext";
 import { ShortcutProvider } from "@/shortcuts/ShortcutProvider";
 import { ShortcutOverlays } from "@/shortcuts/ShortcutOverlays";
@@ -159,7 +160,7 @@ type RenderedWorkspaceTab = {
 const extractAgentMentions = (text: string): string[] =>
   Array.from(
     new Set(
-      Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
+      Array.from(text.matchAll(/@([\p{L}\p{N}_-]+)/gu), (match) =>
         match[1],
       ),
     ),
@@ -2445,11 +2446,13 @@ export default function App() {
     <>
       <div className="macos-titlebar-drag-region" data-tauri-drag-region />
       <AppScaleFrame>
-        <WorkspaceProvider>
-          <ShortcutProviderBridge>
-            <WorkspaceLayout />
-          </ShortcutProviderBridge>
-        </WorkspaceProvider>
+        <RunActivityProvider>
+          <WorkspaceProvider>
+            <ShortcutProviderBridge>
+              <WorkspaceLayout />
+            </ShortcutProviderBridge>
+          </WorkspaceProvider>
+        </RunActivityProvider>
       </AppScaleFrame>
     </>
   );

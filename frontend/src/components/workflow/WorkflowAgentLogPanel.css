@@ -105,7 +105,9 @@ body[data-mode="light"] .workflow-window-root .wf-log-group + .wf-log-group {
   gap: 10px;
   padding: 1px 0;
   min-height: 20px;
-  font-size: 10px;
+  color: var(--ink-muted, #a1a5ad);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
 }
@@ -131,8 +133,8 @@ body[data-mode="light"] .workflow-window-root .wf-log-group + .wf-log-group {
 }
 
 .wf-log-task-chevron {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   color: var(--ink-tertiary, #62666d);
   transition: transform 120ms ease;
 }
@@ -158,7 +160,7 @@ body[data-mode="light"] .workflow-window-root .wf-log-group + .wf-log-group {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 12px;
+  width: 14px;
   flex-shrink: 0;
 }
 
@@ -207,12 +209,12 @@ body[data-mode="light"] .workflow-window-root .wf-log-group + .wf-log-group {
   opacity: 0.4;
 }
 
-/* Action keyword — subdued, almost hidden */
+/* Command status text shares the error-log typography. */
 .wf-log-task-label {
   flex-shrink: 0;
   white-space: nowrap;
-  color: rgba(255, 255, 255, 0.25);
-  font-size: 10px;
+  color: inherit;
+  font-size: inherit;
   font-weight: 400;
 }
 
@@ -221,12 +223,12 @@ body[data-mode="light"] .workflow-window-root .wf-log-group + .wf-log-group {
   font-size: 12px;
 }
 
-/* Target (file path, tool name) — tool calls use muted gray, content stays bright */
+/* Command target text shares the error-log typography. */
 .wf-log-task-target {
   flex: 1;
   min-width: 0;
-  color: rgba(255, 255, 255, 0.38);
-  font-size: 10px;
+  color: inherit;
+  font-size: inherit;
   font-weight: 400;
   white-space: nowrap;
   overflow: hidden;
@@ -235,14 +237,6 @@ body[data-mode="light"] .workflow-window-root .wf-log-group + .wf-log-group {
 
 body[data-mode="light"] :is(.workflow-window-root, .wf-log-panel-inline) .wf-log-task-tool-icon {
   color: var(--ink-subtle, #62666d);
-}
-
-body[data-mode="light"] :is(.workflow-window-root, .wf-log-panel-inline) .wf-log-task-label {
-  color: var(--ink-subtle, #62666d);
-}
-
-body[data-mode="light"] :is(.workflow-window-root, .wf-log-panel-inline) .wf-log-task-target {
-  color: var(--ink-muted, #2b2d34);
 }
 
 /* Content-type tasks (skill output, think) keep high-contrast text */
@@ -345,27 +339,27 @@ body[data-mode="light"] .workflow-window-root .wf-log-markdown pre {
   word-break: break-word;
 }
 
-/* Error entries render as a single collapsible code block. */
+/* Error entries render as neutral terminal-like text. */
 .wf-log-error-block {
   margin: 3px 0;
-  border: 1px solid var(--hairline, rgba(255, 255, 255, 0.12));
-  border-radius: 6px;
-  background: var(--surface-3, #18191a);
   color: var(--ink-muted, #a1a5ad);
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   line-height: 1.55;
-  overflow: hidden;
-}
-
-/* Match the content column used by regular activity rows in both variants. */
-:is(.wf-log-panel, .wf-log-panel-inline) .wf-log-error-block {
-  margin-left: 24px;
 }
 
 .wf-log-error-block--single {
-  padding: 7px 9px;
+  display: grid;
+  grid-template-columns: 14px 12px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: flex-start;
+}
+
+.wf-log-error-preview--single {
+  margin: 0;
+  overflow: visible;
   overflow-wrap: anywhere;
+  text-overflow: clip;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -380,11 +374,10 @@ body[data-mode="light"] .workflow-window-root .wf-log-markdown pre {
 }
 
 .wf-log-error-block-summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: 14px 12px minmax(0, 1fr);
+  column-gap: 10px;
   align-items: flex-start;
-  gap: 6px;
-  min-height: 30px;
-  padding: 7px 9px;
 }
 
 .wf-log-error-preview {
@@ -400,7 +393,7 @@ body[data-mode="light"] .workflow-window-root .wf-log-markdown pre {
 .wf-log-error-chevron {
   width: 12px;
   height: 12px;
-  flex: none;
+  justify-self: center;
   margin-top: 2px;
   color: var(--ink-tertiary, #62666d);
   transition: transform 120ms ease;
@@ -413,7 +406,7 @@ body[data-mode="light"] .workflow-window-root .wf-log-markdown pre {
 .wf-log-error-detail {
   max-height: 240px;
   margin: 0;
-  padding: 0 9px 8px 27px;
+  padding: 3px 0 0 58px;
   color: inherit;
   font: inherit;
   overflow: auto;

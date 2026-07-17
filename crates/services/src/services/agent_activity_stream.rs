@@ -20,8 +20,11 @@ pub struct AgentActivityEntryLine {
 pub struct AgentActivityStreamState {
     last_content_by_index: HashMap<usize, String>,
     assistant_buffer: String,
+    assistant_buffer_index: Option<usize>,
     thinking_buffer: String,
+    thinking_buffer_index: Option<usize>,
     error_buffer: String,
+    error_buffer_index: Option<usize>,
 }
 
 impl AgentActivityStreamState {
@@ -50,6 +53,8 @@ impl AgentActivityStreamState {
             return vec![line];
         }
 
+        self.mark_stream_entry_boundary(&line.stream_type, index);
+
         let chunk = if line.content.starts_with(&previous) {
             line.content[previous.len()..].to_string()
         } else {
@@ -57,6 +62,23 @@ impl AgentActivityStreamState {
         };
 
         self.drain_chunk_lines(line.stream_type, line.line_type, &chunk)
+    }
+
+    fn mark_stream_entry_boundary(&mut self, stream_type: &ChatStreamDeltaType, index: usize) {
+        let (buffer, buffer_index) = match stream_type {
+            ChatStreamDeltaType::Assistant => {
+                (&mut self.assistant_buffer, &mut self.assistant_buffer_index)
+            }
+            ChatStreamDeltaType::Thinking => {
+                (&mut self.thinking_buffer, &mut self.thinking_buffer_index)
+            }
+            ChatStreamDeltaType::Error => (&mut self.error_buffer, &mut self.error_buffer_index),
+        };
+
+        if buffer_index.is_some_and(|current| current != index) && !buffer.is_empty() {
+            buffer.push('\n');
+        }
+        *buffer_index = Some(index);
     }
 
     fn drain_chunk_lines(
@@ -125,6 +147,9 @@ impl AgentActivityStreamState {
             }
             buffer.clear();
         }
+        self.assistant_buffer_index = None;
+        self.thinking_buffer_index = None;
+        self.error_buffer_index = None;
 
         emitted
     }
@@ -394,6 +419,38 @@ mod tests {
         let flushed = state.flush_pending_lines();
         assert_eq!(flushed.len(), 1);
         assert_eq!(flushed[0].content, "second partial");
+    }
+
+    #[test]
+    fn chat_runner_line_buffer_separates_reasoning_summary_entries_without_newlines() {
+        let mut state = AgentActivityStreamState::default();
+        let first = ConversationPatch::add_normalized_entry(
+            0,
+            NormalizedEntry {
+                timestamp: None,
+                entry_type: NormalizedEntryType::Thinking,
+                content: "**Planning file inspection**".to_string(),
+                metadata: None,
+            },
+        );
+        assert!(state.drain_patch_lines(&first, true).is_empty());
+
+        let second = ConversationPatch::add_normalized_entry(
+            1,
+            NormalizedEntry {
+                timestamp: None,
+                entry_type: NormalizedEntryType::Thinking,
+                content: "**Reading existing package**".to_string(),
+                metadata: None,
+            },
+        );
+        let lines = state.drain_patch_lines(&second, true);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].content, "**Planning file inspection**");
+
+        let flushed = state.flush_pending_lines();
+        assert_eq!(flushed.len(), 1);
+        assert_eq!(flushed[0].content, "**Reading existing package**");
     }
 
     #[test]

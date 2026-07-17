@@ -147,8 +147,10 @@ pub enum ChatStreamEvent {
         client_message_id: Option<String>,
         started_at: Option<chrono::DateTime<Utc>>,
     },
-    AgentActivityLine {
-        line: ChatRunActivityLine,
+    AgentActivityUpdated {
+        session_id: Uuid,
+        run_id: Uuid,
+        latest_sequence: u64,
     },
     AgentState {
         session_agent_id: Uuid,

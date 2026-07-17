@@ -106,28 +106,24 @@ check(
     source.includes('chatSessionsApi.streamUrl') &&
     source.includes('parsed.type ===') &&
     source.includes('agent_run_started') &&
-    source.includes('agent_activity_line') &&
-    source.includes('agent_delta'),
+    source.includes('agent_activity_updated') &&
+    !source.includes('agent_activity_line'),
   source,
 );
 check(
-  'stream events create placeholders, append lines, and replace final messages',
+  'stream events create placeholders, notify the run store, and replace final messages',
   source.includes('insertRunningPlaceholder(parsed)') &&
-    source.includes('appendStreamActivityLine(parsed.line)') &&
-    source.includes('upsertStreamDeltaActivityLine(parsed)') &&
+    source.includes('runActivityStore.notifyUpdated(') &&
     source.includes('const incomingMessage = mapBackendChatMessage(parsed.message)') &&
     source.includes('upsertStreamedMessage(sid, incomingMessage)'),
   source,
 );
 check(
-  'agent_delta thinking is bridged into live activity lines',
-  source.includes("type: 'agent_delta'") &&
-    source.includes('LIVE_DELTA_ACTIVITY_LINE_PREFIX') &&
-    source.includes("event.stream_type !== 'thinking'") &&
-    source.includes('liveDeltaActivityLineId') &&
-    source.includes('event.delta && existingLine') &&
-    source.includes('activity_lines: activityLines') &&
-    source.includes('liveDeltaActivityLineId(line.run_id, line.stream_type)'),
+  'chat messages keep only run identity instead of copied activity lines',
+  source.includes("runId: run.status === 'starting' ? undefined : run.run_id") &&
+    !source.includes("type: 'agent_delta'") &&
+    !source.includes('LIVE_DELTA_ACTIVITY_LINE_PREFIX') &&
+    !source.includes('activity_lines: activityLines'),
   source,
 );
 check(
@@ -160,6 +156,7 @@ check(
     /shouldQueueForMember\s*\?\s*\[\]/.test(source) &&
     source.includes('fallbackMention?: string | null') &&
     source.includes('sendMessageToSession') &&
+    source.includes("/@([\\p{L}\\p{N}_-]+)/gu") &&
     source.includes('stagePendingAgentPlaceholder') &&
     source.includes('persistToBackend?: boolean') &&
     source.includes("placeholderMember?: Pick<Member, 'avatar' | 'name' | 'modelName'> | null") &&
@@ -466,12 +463,21 @@ check(
   source,
 );
 check(
-  'message refresh hydrates active run activity after page reload',
-    source.includes('hydrateRunningAgentPlaceholders') &&
-    source.includes('chatRunsApi.listSessionRetention') &&
-    source.includes('.getActivity(run.run_id') &&
-    source.includes('sessionAgentId: sessionAgent.id') &&
-    source.includes("activityLoadState: 'idle'"),
+  'runtime snapshots and websocket notifications sync file-backed activity',
+    source.includes("parsed.type === 'agent_activity_updated'") &&
+    source.includes('runActivityStore.notifyUpdated(') &&
+    source.includes('runActivityStore.syncRuns(') &&
+    source.includes(".filter((run) => run.status !== 'starting')") &&
+    source.includes('runActivityStore.requestCompletion(') &&
+    source.includes("document.addEventListener('visibilitychange'") &&
+    !source.includes('appendStreamActivityLine') &&
+    !source.includes('upsertStreamDeltaActivityLine') &&
+    !source.includes('activityLoadState'),
+  source,
+);
+check(
+  'starting runtime placeholders do not expose a queryable activity run id',
+  source.includes("runId: run.status === 'starting' ? undefined : run.run_id"),
   source,
 );
 check(
@@ -484,8 +490,7 @@ check(
 );
 check(
   'running placeholders carry session agent ids for stop controls',
-  source.includes('sessionAgentId: fallbackMember?.id') &&
-    source.includes('sessionAgentId: line.session_agent_id') &&
+    source.includes('sessionAgentId: fallbackMember?.id') &&
     source.includes('sessionAgentId: event.session_agent_id') &&
     source.includes('carriedSessionAgentId'),
   source,

@@ -20,10 +20,13 @@ export const extractAgentMarkdownParts = (
   const markdown = content
     .split(/\r?\n/)
     .map((line) => {
-      const match = line.match(/^(\s*@[a-zA-Z0-9_-]+\b\s*)+/);
+      const match = line.match(
+        /^(\s*@[\p{L}\p{N}_-]+(?=\s|$)\s*)+/u,
+      );
       if (!match) return line;
 
-      for (const mention of match[0].match(/@[a-zA-Z0-9_-]+\b/g) ?? []) {
+      for (const mention of
+        match[0].match(/@[\p{L}\p{N}_-]+(?=\s|$)/gu) ?? []) {
         const key = mention.toLowerCase();
         if (!seenMentions.has(key)) {
           seenMentions.add(key);

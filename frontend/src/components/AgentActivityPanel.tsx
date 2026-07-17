@@ -273,13 +273,26 @@ const ErrorLineItem: React.FC<{
   const detail = detailLines.join("\n").trim();
 
   if (!detail) {
-    return <pre className="wf-log-error-block wf-log-error-block--single">{preview}</pre>;
+    return (
+      <div className="wf-log-error-block wf-log-error-block--single">
+        <span className="wf-log-error-status" aria-hidden="true" />
+        <span className="wf-log-task-tool-icon wf-log-error-tool-icon">
+          <Terminal className="w-3 h-3" aria-hidden="true" />
+        </span>
+        <pre className="wf-log-error-preview wf-log-error-preview--single">
+          {preview}
+        </pre>
+      </div>
+    );
   }
 
   return (
     <details className="wf-log-error-block">
       <summary className="wf-log-error-block-summary">
         <ChevronRight className="wf-log-error-chevron" aria-hidden="true" />
+        <span className="wf-log-task-tool-icon wf-log-error-tool-icon">
+          <Terminal className="w-3 h-3" aria-hidden="true" />
+        </span>
         <code className="wf-log-error-preview" title={preview}>
           {preview}
         </code>

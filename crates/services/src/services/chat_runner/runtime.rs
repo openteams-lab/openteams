@@ -1207,7 +1207,7 @@ impl ChatRunner {
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn persist_and_emit_activity_line(
+    async fn persist_and_notify_activity_line(
         activity_path: &Path,
         sender: &broadcast::Sender<ChatStreamEvent>,
         session_id: Uuid,
@@ -1233,21 +1233,29 @@ impl ChatRunner {
         };
         *sequence = (*sequence).saturating_add(1);
 
-        if let Err(err) = Self::append_jsonl_line(activity_path, &line).await {
-            tracing::warn!(
-                session_id = %session_id,
-                run_id = %run_id,
-                activity_path = %activity_path.display(),
-                error = %err,
-                "failed to append chat run activity line"
-            );
+        match activity_log::append_activity_line(activity_path, &line).await {
+            Ok(()) => {
+                let _ = sender.send(ChatStreamEvent::AgentActivityUpdated {
+                    session_id,
+                    run_id,
+                    latest_sequence: line.sequence,
+                });
+            }
+            Err(err) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    run_id = %run_id,
+                    activity_path = %activity_path.display(),
+                    sequence = line.sequence,
+                    error = %err,
+                    "failed to append chat run activity line"
+                );
+            }
         }
-
-        let _ = sender.send(ChatStreamEvent::AgentActivityLine { line });
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn persist_and_emit_activity_lines(
+    async fn persist_and_notify_activity_lines(
         activity_path: &Path,
         sender: &broadcast::Sender<ChatStreamEvent>,
         session_id: Uuid,
@@ -1259,7 +1267,7 @@ impl ChatRunner {
         activity_lines: Vec<AgentActivityEntryLine>,
     ) {
         for activity_line in activity_lines {
-            Self::persist_and_emit_activity_line(
+            Self::persist_and_notify_activity_line(
                 activity_path,
                 sender,
                 session_id,
@@ -1415,7 +1423,7 @@ impl ChatRunner {
                             &mut error_type,
                             stream_filter,
                         );
-                        Self::persist_and_emit_activity_lines(
+                        Self::persist_and_notify_activity_lines(
                             &activity_path,
                             &sender,
                             session_id,
@@ -1555,7 +1563,7 @@ impl ChatRunner {
                                         &mut error_type,
                                         stream_filter,
                                     );
-                                    Self::persist_and_emit_activity_lines(
+                                    Self::persist_and_notify_activity_lines(
                                         &activity_path,
                                         &sender,
                                         session_id,
@@ -1601,7 +1609,7 @@ impl ChatRunner {
                             &mut stdout_line_buffer,
                             &mut last_token_usage,
                         );
-                        Self::persist_and_emit_activity_lines(
+                        Self::persist_and_notify_activity_lines(
                             &activity_path,
                             &sender,
                             session_id,
@@ -3465,7 +3473,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn thinking_delta_is_delivered_before_authoritative_activity_line() {
+    async fn thinking_delta_is_delivered_before_activity_update_notification() {
         let patch = ConversationPatch::add_normalized_entry(
             0,
             NormalizedEntry {
@@ -3508,7 +3516,7 @@ mod tests {
         );
         let temp = tempdir().expect("tempdir");
         let mut sequence = 0;
-        ChatRunner::persist_and_emit_activity_lines(
+        ChatRunner::persist_and_notify_activity_lines(
             &temp.path().join(RUN_ACTIVITY_FILE_NAME),
             &sender,
             session_id,
@@ -3529,12 +3537,54 @@ mod tests {
                 ..
             }
         ));
-        let second = receiver.recv().await.expect("activity line");
+        let second = receiver.recv().await.expect("activity update");
         assert!(matches!(
             second,
-            ChatStreamEvent::AgentActivityLine { line }
-                if matches!(line.line_type, ChatRunActivityLineType::Thinking)
-                    && line.content == "**Final thinking line**"
+            ChatStreamEvent::AgentActivityUpdated {
+                session_id: event_session_id,
+                run_id: event_run_id,
+                latest_sequence: 0,
+            } if event_session_id == session_id && event_run_id == run_id
+        ));
+    }
+
+    #[tokio::test]
+    async fn activity_update_is_not_sent_when_file_append_fails() {
+        let patch = ConversationPatch::add_normalized_entry(
+            0,
+            NormalizedEntry {
+                timestamp: None,
+                entry_type: NormalizedEntryType::Thinking,
+                content: "thinking".to_string(),
+                metadata: None,
+            },
+        );
+        let mut activity_state = AgentActivityStreamState::default();
+        let activity_lines = activity_state.drain_patch_lines(&patch, true);
+        let temp = tempdir().expect("tempdir");
+        let blocker = temp.path().join("blocker");
+        tokio::fs::write(&blocker, b"file")
+            .await
+            .expect("write blocker");
+        let (sender, mut receiver) = broadcast::channel(4);
+        let mut sequence = 0;
+
+        ChatRunner::persist_and_notify_activity_lines(
+            &blocker.join(RUN_ACTIVITY_FILE_NAME),
+            &sender,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "codex",
+            Uuid::new_v4(),
+            &mut sequence,
+            activity_lines,
+        )
+        .await;
+
+        assert!(matches!(
+            receiver.try_recv(),
+            Err(broadcast::error::TryRecvError::Empty)
         ));
     }
 

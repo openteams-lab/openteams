@@ -57,6 +57,26 @@ const chatInputPrefillSource = readFileSync(
 );
 const activityPanelIndex = messageContentSource.indexOf("<AgentActivityPanel");
 const markdownIndex = messageContentSource.indexOf("<AgentMarkdown");
+const errorBlockCss =
+  activityPanelCssSource.match(/\.wf-log-error-block \{([\s\S]*?)\}/)?.[1] ?? "";
+const errorSingleCss =
+  activityPanelCssSource.match(/\.wf-log-error-block--single \{([\s\S]*?)\}/)?.[1] ?? "";
+const errorSummaryCss =
+  activityPanelCssSource.match(/\.wf-log-error-block-summary \{([\s\S]*?)\}/)?.[1] ?? "";
+const errorDetailCss =
+  activityPanelCssSource.match(/\.wf-log-error-detail \{([\s\S]*?)\}/)?.[1] ?? "";
+const taskStatusCss =
+  activityPanelCssSource.match(/\.wf-log-task-status \{([\s\S]*?)\}/)?.[1] ?? "";
+const taskRowCss =
+  activityPanelCssSource.match(/\.wf-log-task-row \{([\s\S]*?)\}/)?.[1] ?? "";
+const taskLabelCss =
+  activityPanelCssSource.match(/\.wf-log-task-label \{([\s\S]*?)\}/)?.[1] ?? "";
+const taskTargetCss =
+  activityPanelCssSource.match(/\.wf-log-task-target \{([\s\S]*?)\}/)?.[1] ?? "";
+const toolChevronCss =
+  activityPanelCssSource.match(/\.wf-log-task-chevron \{([\s\S]*?)\}/)?.[1] ?? "";
+const errorChevronCss =
+  activityPanelCssSource.match(/\.wf-log-error-chevron \{([\s\S]*?)\}/)?.[1] ?? "";
 const composerQuoteIndex = source.indexOf("{quotedMessage && (");
 const composerAttachmentIndex = source.indexOf(
   'className="mb-2 flex flex-wrap gap-2"',
@@ -199,6 +219,7 @@ check(
     source.includes("const displayedMessages = selectedSidebarMember") &&
     source.includes("message.sender === selectedSidebarMember.name") &&
     source.includes("const extractMentionHandles = (text: string): string[]") &&
+    source.includes("/@[\\p{L}\\p{N}_-]+/gu") &&
     source.includes("const memberMentionHandles = new Set(") &&
     source.includes("const matchedMemberMentions = extractMentionHandles(") &&
     source.includes("memberMentionHandles.has(mention)") &&
@@ -228,8 +249,7 @@ check(
 check(
   "delegates agent message rendering to an isolated component",
   source.includes("AgentMessageContent") &&
-    messageContentSource.includes("chatRunsApi") &&
-    messageContentSource.includes(".getActivity") &&
+    messageContentSource.includes("useRunActivity") &&
     messageContentSource.includes("AgentRunStatusPill") &&
     messageContentSource.includes("AgentActivityPanel") &&
     messageContentSource.includes("AgentMarkdown") &&
@@ -286,22 +306,65 @@ check(
   { source, markdownSource, activityPanelCssSource },
 );
 check(
-  "reloads historical activity when live stream lines are only partial",
-  messageContentSource.includes('loadState === "loaded"') &&
-    messageContentSource.includes("activityRequestIdRef") &&
-    messageContentSource.includes("mountedRef") &&
-    messageContentSource.includes("mountedRef.current = true") &&
-    messageContentSource.includes("ACTIVITY_LOAD_TIMEOUT_MS") &&
-    messageContentSource.includes(
-      "Promise.race([activityRequest, timeoutRequest])",
-    ) &&
-    messageContentSource.includes("[expanded, isRunning, message.runId]") &&
-    !messageContentSource.includes("if (activityLines ||"),
+  "loads activity through the run-scoped store",
+  messageContentSource.includes("useRunActivity(message.runId") &&
+    messageContentSource.includes("isRunning || expanded") &&
+    messageContentSource.includes("activity.lines") &&
+    !messageContentSource.includes("activityRequestIdRef") &&
+    !messageContentSource.includes("ACTIVITY_LOAD_TIMEOUT_MS") &&
+    !messageContentSource.includes("chatRunsApi.getActivity"),
   messageContentSource,
+);
+check(
+  "keeps activity loading silent for live and historical agent messages",
+  /activity\.status === "loading"\s*\?\s*"idle"/.test(messageContentSource),
+  messageContentSource,
+);
+check(
+  "renders agent errors as neutral terminal text with conditional disclosure",
+  activityPanelSource.includes("if (!detail)") &&
+    activityPanelSource.includes("wf-log-error-block--single") &&
+    activityPanelSource.includes('<details className="wf-log-error-block">') &&
+    activityPanelSource.includes('className="wf-log-error-status"') &&
+    (activityPanelSource.match(/className="wf-log-task-tool-icon wf-log-error-tool-icon"/g)?.length ?? 0) === 2 &&
+    (activityPanelSource.match(/<Terminal className="w-3 h-3" aria-hidden="true" \/>/g)?.length ?? 0) === 2 &&
+    !activityPanelSource.includes("wf-log-error-icon") &&
+    !/(?:^|\s)(?:background|border|border-radius)\s*:/.test(errorBlockCss) &&
+    errorSingleCss.includes("grid-template-columns: 14px 12px minmax(0, 1fr)") &&
+    errorSingleCss.includes("column-gap: 10px") &&
+    errorSummaryCss.includes("grid-template-columns: 14px 12px minmax(0, 1fr)") &&
+    errorSummaryCss.includes("column-gap: 10px") &&
+    errorDetailCss.includes("padding: 3px 0 0 58px") &&
+    taskStatusCss.includes("width: 14px") &&
+    taskRowCss.includes("font-family: 'JetBrains Mono', monospace") &&
+    taskRowCss.includes("font-size: 11px") &&
+    taskRowCss.includes("color: var(--ink-muted") &&
+    taskLabelCss.includes("font-size: inherit") &&
+    taskLabelCss.includes("color: inherit") &&
+    taskTargetCss.includes("font-size: inherit") &&
+    taskTargetCss.includes("color: inherit") &&
+    toolChevronCss.includes("width: 12px") &&
+    toolChevronCss.includes("height: 12px") &&
+    errorChevronCss.includes("width: 12px") &&
+    errorChevronCss.includes("height: 12px"),
+  {
+    activityPanelSource,
+    errorBlockCss,
+    errorSingleCss,
+    errorSummaryCss,
+    errorDetailCss,
+    taskStatusCss,
+    taskRowCss,
+    taskLabelCss,
+    taskTargetCss,
+    toolChevronCss,
+    errorChevronCss,
+  },
 );
 check(
   "agent markdown renders leading mentions outside markdown content",
   markdownSource.includes("extractAgentMarkdownParts") &&
+    markdownSource.includes("@[\\p{L}\\p{N}_-]+(?=\\s|$)") &&
     markdownSource.includes("ReactMarkdown") &&
     markdownSource.includes("remarkGfm") &&
     markdownSource.includes("remarkPlugins={[remarkGfm]}") &&
@@ -520,7 +583,7 @@ check(
     source.includes(
       "Highlight @mentions while keeping user-entered markdown characters literal",
     ) &&
-    source.includes("text.split(/(@[a-zA-Z0-9_-]+)/g)") &&
+    source.includes("text.split(/(@[\\p{L}\\p{N}_-]+)/gu)") &&
     !source.includes("el.substring(1, el.length - 1)"),
   source,
 );
@@ -549,6 +612,7 @@ check(
 check(
   "attachment send routes unmentioned free-mode uploads to the main agent",
   source.includes("const routeMentionsForText = (text: string): string[]") &&
+    source.includes("/@([\\p{L}\\p{N}_-]+)/gu") &&
     source.includes("const explicitAttachmentMentions = routeMentionsForText(messageText)") &&
     source.includes("const mainAgentRouteMention = mainAgentName") &&
     source.includes('mainAgentName.trim().replace(/^@/, "")') &&

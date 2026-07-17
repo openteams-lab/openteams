@@ -344,14 +344,14 @@ const getVisibleSidebarMemberCount = (
 };
 
 const extractMentionHandles = (text: string): string[] =>
-  (text.match(/@[a-zA-Z0-9_-]+/g) ?? []).map((mention) =>
+  (text.match(/@[\p{L}\p{N}_-]+/gu) ?? []).map((mention) =>
     mention.toLowerCase(),
   );
 
 const routeMentionsForText = (text: string): string[] =>
   Array.from(
     new Set(
-      Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
+      Array.from(text.matchAll(/@([\p{L}\p{N}_-]+)/gu), (match) =>
         match[1],
       ),
     ),
@@ -2059,7 +2059,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
     const cursorStart = input?.selectionStart ?? currentValue.length;
     const cursorEnd = input?.selectionEnd ?? cursorStart;
     const beforeCursor = currentValue.slice(0, cursorStart);
-    const tokenMatch = beforeCursor.match(/@[a-zA-Z0-9_-]*$/);
+    const tokenMatch = beforeCursor.match(/@[\p{L}\p{N}_-]*$/u);
     const replaceStart = tokenMatch
       ? cursorStart - tokenMatch[0].length
       : cursorStart;
@@ -2324,7 +2324,7 @@ export const FreeChatWorkspace: React.FC<FreeChatWorkspaceProps> = ({
   // Highlight @mentions while keeping user-entered markdown characters literal.
   const formatMsgText = (text: string) => {
     if (!text) return "";
-    const elements = text.split(/(@[a-zA-Z0-9_-]+)/g);
+    const elements = text.split(/(@[\p{L}\p{N}_-]+)/gu);
 
     return elements.map((el, idx) => {
       if (el.startsWith("@")) {

@@ -18,7 +18,6 @@ import {
   BackendChatSession,
   BackendChatSessionAgent,
   ChatActiveRun,
-  ChatRunActivityLine,
   ChatSessionRuntimeSnapshot,
   QuotedMessageReference,
   Provider,
@@ -89,14 +88,13 @@ import {
   resolveWorkflowSidebarState,
 } from '@/lib/workflowSidebarState';
 import { createConfigPatchQueue } from './configPatchQueue';
+import { useRunActivityStore } from './RunActivityContext';
 
 type ListUpdater<T> = T[] | ((prev: T[]) => T[]);
 
 type ChatInputMode = 'free' | 'workflow';
 const DEFAULT_CHAT_INPUT_MODE: ChatInputMode = 'free';
-type RuntimeActiveRun = Omit<ChatActiveRun, 'activity_lines'> & {
-  activity_lines: ChatRunActivityLine[];
-};
+type RuntimeActiveRun = ChatActiveRun;
 
 const resolveChatInputMode = (
   value: string | null | undefined,
@@ -168,19 +166,10 @@ type ChatStreamEvent =
       started_at: string | null;
     }
   | {
-      type: 'agent_activity_line';
-      line: ChatRunActivityLine;
-    }
-  | {
-      type: 'agent_delta';
+      type: 'agent_activity_updated';
       session_id: string;
-      session_agent_id: string;
-      agent_id: string;
       run_id: string;
-      stream_type: 'assistant' | 'thinking' | 'error';
-      content: string;
-      delta: boolean;
-      is_final: boolean;
+      latest_sequence: number;
     }
   | {
       type: 'message_new' | 'message_updated';
@@ -261,7 +250,6 @@ const ACKED_WORKFLOW_INPUT_IDS_STORAGE_KEY =
   'openteams-acked-workflow-input-ids';
 const ACKED_WORKFLOW_ERROR_SESSION_IDS_STORAGE_KEY =
   'openteams-acked-workflow-error-session-ids';
-const LIVE_DELTA_ACTIVITY_LINE_PREFIX = 'live-delta-';
 // WebSocket auto-reconnect backoff bounds (ms).
 const CHAT_STREAM_RECONNECT_BASE_DELAY_MS = 1000;
 const CHAT_STREAM_RECONNECT_MAX_DELAY_MS = 30000;
@@ -977,11 +965,8 @@ const mergeCarriedRunPlaceholder = (
 ): Message => {
   if (!existing) return incoming;
 
-  const existingLineCount = existing.activityLines?.length ?? 0;
-  const incomingLineCount = incoming.activityLines?.length ?? 0;
-  const primary =
-    incomingLineCount > existingLineCount ? incoming : existing;
-  const secondary = primary === incoming ? existing : incoming;
+  const primary = incoming;
+  const secondary = existing;
   const sourceMessageId =
     primary.sourceMessageId ?? secondary.sourceMessageId;
   const clientMessageId =
@@ -998,9 +983,6 @@ const mergeCarriedRunPlaceholder = (
       secondaryHasAnchor && (sourceMessageId || clientMessageId)
         ? (secondary.createdAt ?? primary.createdAt)
         : (primary.createdAt ?? secondary.createdAt),
-    activityLines: primary.activityLines ?? secondary.activityLines,
-    activityLoadState:
-      primary.activityLoadState ?? secondary.activityLoadState,
   };
 };
 
@@ -1085,12 +1067,6 @@ const correlateRunningPlaceholdersWithPending = (
         sourceMessageId: pending.sourceMessageId,
         clientMessageId: pending.clientMessageId,
         createdAt: pending.createdAt ?? placeholder.createdAt,
-        activityLines:
-          placeholder.activityLines && placeholder.activityLines.length > 0
-            ? placeholder.activityLines
-            : pending.activityLines,
-        activityLoadState:
-          placeholder.activityLoadState ?? pending.activityLoadState,
       };
     },
   );
@@ -1190,7 +1166,7 @@ const tokenUsageNotificationSignature = (
 };
 
 const extractAgentMentions = (text: string): string[] =>
-  Array.from(text.matchAll(/@([a-zA-Z0-9_-]+)/g), (match) =>
+  Array.from(text.matchAll(/@([\p{L}\p{N}_-]+)/gu), (match) =>
     match[1],
   );
 
@@ -1357,29 +1333,7 @@ const mergePersistedWithRunningPlaceholders = (
   return orderMessagesForConversation(merged);
 };
 
-const sortActivityLines = (
-  lines: ChatRunActivityLine[],
-): ChatRunActivityLine[] =>
-  [...lines].sort((a, b) => {
-    if (a.sequence !== b.sequence) return a.sequence - b.sequence;
-    return a.line_id.localeCompare(b.line_id);
-  });
-
-const normalizeActivityLine = (
-  line: ChatActiveRun['activity_lines'][number] | ChatRunActivityLine,
-): ChatRunActivityLine => ({
-  ...line,
-  sequence: Number(line.sequence),
-});
-
-const normalizeActivityLines = (
-  lines: ReadonlyArray<ChatActiveRun['activity_lines'][number] | ChatRunActivityLine>,
-): ChatRunActivityLine[] => sortActivityLines(lines.map(normalizeActivityLine));
-
-const normalizeActiveRun = (run: ChatActiveRun): RuntimeActiveRun => ({
-  ...run,
-  activity_lines: normalizeActivityLines(run.activity_lines ?? []),
-});
+const normalizeActiveRun = (run: ChatActiveRun): RuntimeActiveRun => run;
 
 const activeRunToMessage = (run: RuntimeActiveRun): Message => {
   const displayName = run.display_name?.trim() || run.agent_name || 'agent';
@@ -1396,12 +1350,10 @@ const activeRunToMessage = (run: RuntimeActiveRun): Message => {
     isAgent: true,
     isThinking: true,
     isAgentRunning: true,
-    runId: run.run_id,
+    runId: run.status === 'starting' ? undefined : run.run_id,
     sessionAgentId: run.session_agent_id,
     sourceMessageId: run.source_message_id ?? undefined,
     clientMessageId: run.client_message_id ?? undefined,
-    activityLines: sortActivityLines(run.activity_lines ?? []),
-    activityLoadState: 'idle',
   };
 };
 
@@ -1412,11 +1364,6 @@ const activeRunMessagesForSession = (
   Object.values(activeRunsByRunId)
     .filter((run) => run.session_id === sessionId)
     .map(activeRunToMessage);
-
-const liveDeltaActivityLineId = (
-  runId: string,
-  streamType: ChatRunActivityLine['stream_type'],
-) => `${LIVE_DELTA_ACTIVITY_LINE_PREFIX}${runId}-${streamType}`;
 
 export interface WorkspaceContextProps {
   theme: Theme;
@@ -1560,6 +1507,7 @@ export const WorkspaceContext = createContext<WorkspaceContextProps | undefined>
 export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const runActivityStore = useRunActivityStore();
   const [themePreference, setThemePreferenceState] =
     useState<ThemePreference>('system');
   const [systemTheme, setSystemTheme] = useState<Theme>(resolveSystemTheme);
@@ -2158,6 +2106,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         return next;
       });
+      runActivityStore.syncRuns(
+        snapshot.active_runs
+          .filter((run) => run.status !== 'starting')
+          .map((run) => run.run_id),
+      );
       setSessionRunningIndicator(sid, snapshot.active_runs.length > 0);
       if (snapshot.messages) {
         const mapped = mapMessages(snapshot.messages as unknown as BackendChatMessage[], {
@@ -2170,7 +2123,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         }));
       }
     },
-    [setSessionRunningIndicator],
+    [runActivityStore, setSessionRunningIndicator],
   );
   const setSessionWorkflowRunningIndicator = useCallback(
     (sessionId: string, hasRunningWorkflow: boolean) => {
@@ -3566,8 +3519,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     (sid: string, incoming: Message) => {
       setAllMessages((prev) => {
         const current = filterMessagesForSession(sid, prev[sid] ?? []);
-        let carriedLines: ChatRunActivityLine[] | undefined;
-        let carriedState = incoming.activityLoadState;
         let carriedSessionAgentId = incoming.sessionAgentId;
         let carriedSourceMessageId = incoming.sourceMessageId;
         let carriedClientMessageId = incoming.clientMessageId;
@@ -3646,8 +3597,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
               replacementIndex === null
                 ? index
                 : Math.min(replacementIndex, index);
-            carriedLines = message.activityLines;
-            carriedState = message.activityLoadState ?? 'loaded';
             carriedSessionAgentId =
               carriedSessionAgentId ?? message.sessionAgentId;
             carriedSourceMessageId =
@@ -3660,8 +3609,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         });
         const nextMessage: Message = {
           ...incoming,
-          activityLines: carriedLines ?? incoming.activityLines,
-          activityLoadState: carriedState,
           sessionAgentId: carriedSessionAgentId,
           sourceMessageId: carriedSourceMessageId,
           clientMessageId: carriedClientMessageId,
@@ -3718,149 +3665,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     [],
   );
 
-  const appendStreamActivityLine = useCallback((line: ChatRunActivityLine) => {
-    setActiveRunsByRunId((prev) => {
-      if (
-        !prev[line.run_id] &&
-        optimisticallyStoppedSessionAgentIdsRef.current.has(
-          line.session_agent_id,
-        )
-      ) {
-        return prev;
-      }
-
-      const existing = prev[line.run_id];
-      const mergeLines = (lines: ChatRunActivityLine[]) => {
-        const liveLineId =
-          line.line_type === 'thinking'
-            ? liveDeltaActivityLineId(line.run_id, line.stream_type)
-            : null;
-        const normalized = liveLineId
-          ? lines.filter((item) => item.line_id !== liveLineId)
-          : lines;
-        if (normalized.some((item) => item.line_id === line.line_id)) {
-          return normalized;
-        }
-        return sortActivityLines([...normalized, line]);
-      };
-      const activityLines = mergeLines(existing?.activity_lines ?? []);
-      if (
-        existing &&
-        activityLines.length === existing.activity_lines.length &&
-        activityLines.every(
-          (activityLine, index) =>
-            activityLine.line_id === existing.activity_lines[index]?.line_id,
-        )
-      ) {
-        return prev;
-      }
-
-      const displayName = line.agent_name.startsWith('@')
-        ? line.agent_name
-        : `@${line.agent_name}`;
-      const fallbackRun: RuntimeActiveRun = {
-        run_id: line.run_id,
-        session_id: line.session_id,
-        session_agent_id: line.session_agent_id,
-        agent_id: line.agent_id,
-        agent_name: line.agent_name,
-        display_name: displayName,
-        avatar: monogramFromName(line.agent_name),
-        model: agentModelsByIdRef.current[line.agent_id] ?? null,
-        status: 'running',
-        source_message_id: null,
-        client_message_id: null,
-        activity_lines: [],
-        created_at: line.created_at,
-      };
-      const nextRun = {
-        ...(existing ?? fallbackRun),
-        activity_lines: activityLines,
-      };
-      const next = { ...prev };
-      for (const [runId, run] of Object.entries(next)) {
-        if (
-          run.session_agent_id === line.session_agent_id &&
-          runId !== line.run_id
-        ) {
-          delete next[runId];
-        }
-      }
-      next[line.run_id] = nextRun;
-      return next;
-    });
-  }, []);
-
-  const upsertStreamDeltaActivityLine = useCallback(
-    (event: Extract<ChatStreamEvent, { type: 'agent_delta' }>) => {
-      if (event.stream_type !== 'thinking' || !event.content) {
-        return;
-      }
-
-      setActiveRunsByRunId((prev) => {
-        const existing = prev[event.run_id];
-        const displayName =
-          agentNamesByIdRef.current[event.agent_id] ?? event.agent_id;
-        const lines = existing?.activity_lines ?? [];
-        const lineId = liveDeltaActivityLineId(
-          event.run_id,
-          event.stream_type,
-        );
-        const existingLine = lines.find((line) => line.line_id === lineId);
-        const content =
-          event.delta && existingLine
-            ? `${existingLine.content}${event.content}`
-            : event.content;
-        const maxSequence = lines.reduce(
-          (max, line) => Math.max(max, line.sequence),
-          -1,
-        );
-        const liveLine: ChatRunActivityLine = {
-          line_id: lineId,
-          run_id: event.run_id,
-          session_id: event.session_id,
-          session_agent_id: event.session_agent_id,
-          agent_id: event.agent_id,
-          agent_name: displayName.replace(/^@/, ''),
-          sequence: existingLine?.sequence ?? maxSequence + 1,
-          line_type: 'thinking',
-          stream_type: event.stream_type,
-          content,
-          created_at: existingLine?.created_at ?? new Date().toISOString(),
-        };
-        const activityLines = sortActivityLines([
-          ...lines.filter((line) => line.line_id !== lineId),
-          liveLine,
-        ]);
-        const fallbackRun: RuntimeActiveRun = {
-          run_id: event.run_id,
-          session_id: event.session_id,
-          session_agent_id: event.session_agent_id,
-          agent_id: event.agent_id,
-          agent_name: displayName.replace(/^@/, ''),
-          display_name: displayName.startsWith('@')
-            ? displayName
-            : `@${displayName}`,
-          avatar: monogramFromName(displayName),
-          model: agentModelsByIdRef.current[event.agent_id] ?? null,
-          status: 'running',
-          source_message_id: null,
-          client_message_id: null,
-          activity_lines: [],
-          created_at: liveLine.created_at,
-        };
-        return {
-          ...prev,
-          [event.run_id]: {
-            ...(existing ?? fallbackRun),
-            activity_lines: activityLines,
-          },
-        };
-      });
-    },
-    [],
-  );
-
   const insertRunningPlaceholder = useCallback(
     (event: Extract<ChatStreamEvent, { type: 'agent_run_started' }>) => {
       // A new run for this agent supersedes any optimistic-stop suppression.
@@ -3873,7 +3677,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
         const displayName = event.agent_name.startsWith('@')
           ? event.agent_name
           : `@${event.agent_name}`;
-        const existing = prev[event.run_id];
         const nextRun: RuntimeActiveRun = {
           run_id: event.run_id,
           session_id: event.session_id,
@@ -3886,7 +3689,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           status: 'running',
           source_message_id: event.source_message_id,
           client_message_id: event.client_message_id ?? null,
-          activity_lines: existing?.activity_lines ?? [],
           created_at: event.started_at ?? new Date().toISOString(),
         };
         const next = { ...prev };
@@ -3969,15 +3771,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       if (
-        parsed.type === 'agent_activity_line' &&
-        parsed.line.session_id === sid
+        parsed.type === 'agent_activity_updated' &&
+        parsed.session_id === sid
       ) {
-        appendStreamActivityLine(parsed.line);
-        return;
-      }
-
-      if (parsed.type === 'agent_delta' && parsed.session_id === sid) {
-        upsertStreamDeltaActivityLine(parsed);
+        runActivityStore.notifyUpdated(
+          parsed.run_id,
+          parsed.latest_sequence,
+        );
         return;
       }
 
@@ -4056,6 +3856,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       if (parsed.type === 'agent_state') {
+        if (
+          parsed.run_id &&
+          !isRunningSessionAgentState(parsed.state)
+        ) {
+          runActivityStore.requestCompletion(parsed.run_id);
+        }
         if (isRunningSessionAgentState(parsed.state)) {
           setSessionRunningIndicator(sid, true);
         } else {
@@ -4158,7 +3964,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [
     activeSessionId,
-    appendStreamActivityLine,
     handleWorkflowRuntimeLine,
     insertRunningPlaceholder,
     mapBackendChatMessage,
@@ -4169,13 +3974,28 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     refreshSessionWorkflowStatus,
     refreshWorkspaceChanges,
     refreshMembers,
+    runActivityStore,
     scheduleInboxRefresh,
     setSessionRunningIndicator,
     setSessionWorkflowRunningIndicator,
     sessionsAsync.source,
-    upsertStreamDeltaActivityLine,
     upsertStreamedMessage,
   ]);
+
+  useEffect(() => {
+    const syncVisibleRuns = () => {
+      if (document.visibilityState !== 'visible' || !activeSessionId) return;
+      runActivityStore.syncRuns(
+        Object.values(activeRunsByRunId)
+          .filter((run) => run.session_id === activeSessionId)
+          .map((run) => run.run_id),
+      );
+    };
+    document.addEventListener('visibilitychange', syncVisibleRuns);
+    return () => {
+      document.removeEventListener('visibilitychange', syncVisibleRuns);
+    };
+  }, [activeRunsByRunId, activeSessionId, runActivityStore]);
 
   useEffect(() => {
     if (!initialRefreshCompletedRef.current) return;

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 use axum::{
     Extension,
@@ -18,19 +18,14 @@ use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use services::services::{
     chat::should_include_message_in_history,
-    chat_runner::ChatRunActivityLine,
     member_execution::resolve_effective_member_execution_config,
     queued_message::{MemberQueueSnapshot, QueuedMessageService},
 };
-use tokio::fs;
 use ts_rs::TS;
 use utils::response::ApiResponse;
 use uuid::Uuid;
 
 use crate::{DeploymentImpl, error::ApiError};
-
-const RUN_ACTIVITY_FILE_NAME: &str = "activity.jsonl";
-const DEFAULT_ACTIVE_RUN_ACTIVITY_LIMIT: usize = 1_000;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -56,7 +51,6 @@ pub struct ChatActiveRun {
     pub status: ChatActiveRunStatus,
     pub source_message_id: Option<Uuid>,
     pub client_message_id: Option<String>,
-    pub activity_lines: Vec<ChatRunActivityLine>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -151,17 +145,11 @@ pub async fn build_session_runtime_snapshot(
             .map(|agent| agent.name.clone())
             .unwrap_or_else(|| display_name.trim_start_matches('@').to_string());
         let latest_run = ChatRun::find_latest_for_session_agent(pool, session_agent.id).await?;
-        let (run_id, activity_lines, created_at, status) =
+        let (run_id, created_at, status) =
             match latest_run.filter(|run| run.session_id == session.id) {
-                Some(run) => (
-                    run.id,
-                    read_activity_lines(&run, DEFAULT_ACTIVE_RUN_ACTIVITY_LIMIT).await,
-                    run.created_at,
-                    status,
-                ),
+                Some(run) => (run.id, run.created_at, status),
                 None => (
                     session_agent.id,
-                    Vec::new(),
                     session_agent.updated_at,
                     ChatActiveRunStatus::Starting,
                 ),
@@ -181,7 +169,6 @@ pub async fn build_session_runtime_snapshot(
             status,
             source_message_id,
             client_message_id,
-            activity_lines,
             created_at,
         });
     }
@@ -299,26 +286,4 @@ fn source_message_identity(
         .and_then(|value| value.as_str())
         .map(ToString::to_string);
     (Some(message.id), client_message_id)
-}
-
-async fn read_activity_lines(run: &ChatRun, limit: usize) -> Vec<ChatRunActivityLine> {
-    let activity_path = PathBuf::from(&run.run_dir).join(RUN_ACTIVITY_FILE_NAME);
-    let Ok(contents) = fs::read_to_string(activity_path).await else {
-        return Vec::new();
-    };
-
-    let mut lines: Vec<ChatRunActivityLine> = contents
-        .lines()
-        .filter_map(|line| serde_json::from_str::<ChatRunActivityLine>(line).ok())
-        .collect();
-    lines.sort_by(|a, b| {
-        a.sequence
-            .cmp(&b.sequence)
-            .then_with(|| a.line_id.cmp(&b.line_id))
-    });
-    if lines.len() > limit {
-        lines.split_off(lines.len() - limit)
-    } else {
-        lines
-    }
 }

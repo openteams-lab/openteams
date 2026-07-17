@@ -1,3 +1,4 @@
+mod activity_log;
 mod prompting;
 mod protocol;
 mod runtime;
