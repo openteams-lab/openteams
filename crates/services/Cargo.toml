@@ -64,4 +64,4 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Securit
 junction = "1.0"
 
 [target.'cfg(not(windows))'.dependencies]
-keyring = { version = "3.6.3", default-features = false, features = ["apple-native", "linux-native-sync-persistent"] }
+keyring = { version = "3.6.3", default-features = false, features = ["apple-native", "linux-native-sync-persistent", "vendored"] }
