@@ -142,6 +142,21 @@ check(
 );
 
 check(
+  "offers to open the conflict resolver when a merge reports conflicts",
+    source.includes("const result = await mergeWorktree();") &&
+    source.includes("result.has_conflicts") &&
+    source.includes("result.conflict_files.length") &&
+    source.includes('"worktree.confirm.conflictTitle"') &&
+    source.includes('"worktree.confirm.conflictDescription"') &&
+    source.includes('"worktree.confirm.conflictDescriptionUnknown"') &&
+    source.includes('"worktree.confirm.conflictResolve"') &&
+    source.includes('"worktree.confirm.conflictLater"') &&
+    source.includes("if (openResolver && isCurrentScope(actionScopeKey))") &&
+    source.includes("onOpenConflictResolver(projectId, sessionId)"),
+  source,
+);
+
+check(
   "displays worktree action errors alongside source-control errors",
   source.includes("worktreeActionError") &&
     source.includes("viewModel.blockedReason || actionError || worktreeActionError") &&
