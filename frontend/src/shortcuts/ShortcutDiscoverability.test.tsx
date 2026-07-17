@@ -48,6 +48,11 @@ assert.ok(
 assert.ok(tooltip.includes('onPointerEnter'));
 assert.ok(tooltip.includes('onFocusCapture'));
 assert.equal(tooltip.includes('title={presentation.tooltip}'), false);
+assert.ok(tooltip.includes('{presentation.title}'));
+assert.ok(tooltip.includes('{presentation.label}'));
+assert.ok(tooltip.includes('presentation.sequence.length > 0'));
+assert.ok(tooltip.includes('ml-3 font-mono text-[10px]'));
+assert.ok(tooltip.includes('text-[var(--ink-tertiary)]'));
 assert.ok(tooltip.includes('className="app-tooltip command-tooltip'));
 assert.equal(tooltip.includes('bg-zinc-900'), false);
 assert.ok(palette.includes('data-command-palette'));

@@ -141,7 +141,5 @@ export type CommandPresentation = {
   sequence: ShortcutSequence;
   label: string;
   ariaKeyShortcuts: string;
-  tooltipShortcut: string;
-  tooltip: string;
   disabledReason?: string;
 };

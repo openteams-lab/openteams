@@ -32,11 +32,7 @@ await act(async () =>
   root.render(
     <ShortcutProvider
       runtime={{ platform: 'macos', isDesktopShell: false, source: 'fallback' }}
-      translate={(key, replacements) =>
-        key === 'shortcuts.tooltip.shortcut'
-          ? `Shortcut: ${replacements?.shortcut}`
-          : key
-      }
+      translate={(key) => key}
       config={null}
       saveConfigPatch={async () => {
         throw new Error('not used');
@@ -69,13 +65,18 @@ await act(async () => {
 });
 
 const tooltip = document.querySelector<HTMLElement>('[role="tooltip"]');
-assert.equal(tooltip?.textContent, 'Search (Shortcut: ⌘K)');
+assert.equal(tooltip?.textContent, 'Search ⌘K');
 assert.ok(tooltip?.classList.contains('app-tooltip'));
 assert.ok(tooltip?.classList.contains('border-[var(--hairline-strong)]'));
 assert.ok(tooltip?.classList.contains('bg-[var(--surface-1)]'));
 assert.ok(tooltip?.classList.contains('text-[11px]'));
 assert.ok(tooltip?.classList.contains('text-[var(--ink)]'));
 assert.ok(tooltip?.classList.contains('whitespace-nowrap'));
+const shortcut = tooltip?.querySelector<HTMLElement>('span.font-mono');
+assert.equal(shortcut?.textContent, '⌘K');
+assert.ok(shortcut?.classList.contains('ml-3'));
+assert.ok(shortcut?.classList.contains('text-[10px]'));
+assert.ok(shortcut?.classList.contains('text-[var(--ink-tertiary)]'));
 assert.ok(trigger.getAttribute('aria-describedby')?.includes(tooltip?.id ?? ''));
 
 await act(async () => {

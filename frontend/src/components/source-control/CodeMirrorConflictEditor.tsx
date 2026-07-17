@@ -491,7 +491,7 @@ const CodeLensAction: React.FC<{
         ? 'text-[var(--ink)] underline decoration-[var(--ink-tertiary)] underline-offset-4'
         : 'text-[var(--ink-tertiary)] hover:text-[var(--ink)] focus:text-[var(--ink)]'
     }`}
-    title={shortcut ? `${label} (${shortcut})` : label}
+    title={label}
   >
     {label}
     {shortcut && (
