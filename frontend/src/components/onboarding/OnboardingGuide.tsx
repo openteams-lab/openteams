@@ -217,12 +217,12 @@ const scenarioDefinitions: ScenarioDefinition[] = [
   {
     key: OnboardingScenario.design,
     titleKey: 'onboarding.scenario.design.title',
-    titleFallback: 'Design implementation',
+    titleFallback: 'Prototype design',
     descKey: 'onboarding.scenario.design.desc',
     descFallback:
-      'Translate product screens, interaction states, and visual details into implementation tasks while keeping fidelity and quality aligned.',
+      'Turn product ideas, user flows, interaction states, and visual details into testable prototypes before implementation.',
     teamKey: 'onboarding.scenario.design.team',
-    teamFallback: 'Design implementation team',
+    teamFallback: 'Prototype design team',
     Icon: Sparkles,
     members: [
       { member: 'UX Lead', runner_type: 'claude_code', model_name: 'claude-sonnet' },

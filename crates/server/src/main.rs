@@ -387,12 +387,12 @@ mod tests {
         let rows = ChatTeamTemplateCatalog::list_stable_sorted(&pool)
             .await
             .expect("list catalog");
-        assert_eq!(rows.len(), 10);
+        assert_eq!(rows.len(), 11);
         assert_eq!(
             rows.iter()
                 .filter(|row| row.source == TeamTemplateCatalogSource::Builtin)
                 .count(),
-            10
+            11
         );
     }
 }

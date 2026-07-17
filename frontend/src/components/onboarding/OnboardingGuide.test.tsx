@@ -208,6 +208,16 @@ check(
 );
 
 check(
+  'recommended teams reuse locale-aware team template data',
+  appSource.includes('teamPresetsApi') &&
+    appSource.includes('.list(locale)') &&
+    appSource.includes('localizedTeamPresetSummaries') &&
+    appSource.includes('name: localized.name') &&
+    guideSource.includes('recommendOnboardingTeamTemplate(selectedScenario, teamPresets)'),
+  { appSource, guideSource },
+);
+
+check(
   'executor and model configuration reuses DropdownSelect',
   guideSource.includes('import { DropdownSelect') &&
     guideSource.includes('runnerOptions') &&
@@ -706,6 +716,25 @@ const localizedWelcomePageKeys = [
   'onboarding.welcome.pointWorkflow',
   'onboarding.welcome.title',
 ] as const;
+const localizedScenarioPageKeys = [
+  'onboarding.scenario.desc',
+  'onboarding.scenario.design.desc',
+  'onboarding.scenario.design.team',
+  'onboarding.scenario.design.title',
+  'onboarding.scenario.memberDetailsHint',
+  'onboarding.scenario.other.desc',
+  'onboarding.scenario.other.team',
+  'onboarding.scenario.other.title',
+  'onboarding.scenario.recommendedTeam',
+  'onboarding.scenario.recommendedTemplate',
+  'onboarding.scenario.research.desc',
+  'onboarding.scenario.research.team',
+  'onboarding.scenario.research.title',
+  'onboarding.scenario.software.desc',
+  'onboarding.scenario.software.team',
+  'onboarding.scenario.software.title',
+  'onboarding.scenario.title',
+] as const;
 
 for (const locale of ['ja', 'ko', 'fr', 'es'] as const) {
   const englishValues = localizedAppearancePageKeys.filter(
@@ -729,7 +758,32 @@ for (const locale of ['ja', 'ko', 'fr', 'es'] as const) {
     englishWelcomeValues.length === 0,
     englishWelcomeValues,
   );
+
+  const englishScenarioValues = localizedScenarioPageKeys.filter(
+    (key) =>
+      onboardingLocaleDictionaries[locale][key] ===
+      onboardingLocaleDictionaries.en[key],
+  );
+  check(
+    `locale ${locale} localizes the scenario onboarding page`,
+    englishScenarioValues.length === 0,
+    englishScenarioValues,
+  );
 }
+
+check(
+  'prototype design replaces design implementation in English and Chinese',
+  onboardingLocaleDictionaries.en['onboarding.scenario.design.title'] ===
+    'Prototype design' &&
+    onboardingLocaleDictionaries.zh['onboarding.scenario.design.title'] ===
+      '原型设计' &&
+    guideSource.includes("titleFallback: 'Prototype design'") &&
+    !guideSource.includes("titleFallback: 'Design implementation'"),
+  {
+    en: onboardingLocaleDictionaries.en['onboarding.scenario.design.title'],
+    zh: onboardingLocaleDictionaries.zh['onboarding.scenario.design.title'],
+  },
+);
 
 for (const locale of localeNames) {
   const localeKeys = onboardingLocaleKeys(onboardingLocaleDictionaries[locale]);

@@ -490,17 +490,17 @@ mod tests {
         let first = service.sync().await.expect("first sync");
         let second = service.sync().await.expect("second sync");
 
-        assert_eq!(first.builtin_upserted, 10);
-        assert_eq!(second.builtin_upserted, 10);
+        assert_eq!(first.builtin_upserted, 11);
+        assert_eq!(second.builtin_upserted, 11);
         let rows = ChatTeamTemplateCatalog::list_stable_sorted(&pool)
             .await
             .expect("list catalog");
-        assert_eq!(rows.len(), 10);
+        assert_eq!(rows.len(), 11);
         assert_eq!(
             rows.iter()
                 .filter(|row| row.source == TeamTemplateCatalogSource::Builtin)
                 .count(),
-            10
+            11
         );
         assert!(rows.iter().all(|row| !row.content_checksum.is_empty()));
     }
@@ -596,11 +596,11 @@ Use the English protocol.
         assert_eq!(localized.members, english.members);
         assert_eq!(custom_detail.name, custom.name);
         assert_eq!(custom_detail.team_protocol, custom.team_protocol);
-        assert_eq!(listed.len(), 11);
+        assert_eq!(listed.len(), 12);
         assert_eq!(listed[0].tier, ChatTeamTemplateTier::Standard);
-        assert_eq!(listed[7].tier, ChatTeamTemplateTier::Standard);
         assert_eq!(listed[8].tier, ChatTeamTemplateTier::Standard);
-        assert_eq!(listed[9].tier, ChatTeamTemplateTier::Advanced);
+        assert_eq!(listed[9].tier, ChatTeamTemplateTier::Standard);
+        assert_eq!(listed[10].tier, ChatTeamTemplateTier::Advanced);
         assert!(
             listed
                 .iter()

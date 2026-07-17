@@ -1340,7 +1340,7 @@ mod tests {
                 .expect("localized template exists");
             let response = list_team_presets_from_templates(&templates);
 
-            assert_eq!(response.teams.len(), 10, "{locale}");
+            assert_eq!(response.teams.len(), 11, "{locale}");
             assert!(response.teams.iter().any(|team| {
                 team.id == "advanced-growth-ops" && team.tier == ChatTeamTemplateTier::Advanced
             }));
@@ -1365,7 +1365,7 @@ mod tests {
 
         assert_ne!(localized["name"], english["name"]);
         assert_ne!(localized["team_protocol"], english["team_protocol"]);
-        assert_eq!(list["teams"].as_array().expect("teams array").len(), 10);
+        assert_eq!(list["teams"].as_array().expect("teams array").len(), 11);
         assert!(
             list["teams"]
                 .as_array()

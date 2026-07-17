@@ -60,6 +60,7 @@ import {
   onboardingApi,
   projectApi,
   projectWorkItemsApi,
+  teamPresetsApi,
   type VersionCheckResponse,
 } from "@/lib/api";
 import { useVersionUpdate } from "@/hooks/useVersionUpdate";
@@ -106,6 +107,7 @@ import {
   ProjectMemberType,
   type CreateProjectRequest,
   type ProjectMemberWithRuntime,
+  type TeamPresetSummary,
   type UpdateProject,
 } from "../../shared/types";
 import rootPackage from "../../package.json";
@@ -512,6 +514,8 @@ function WorkspaceLayout() {
     useState<OnboardingState | null>(null);
   const [onboardingAppTransitionActive, setOnboardingAppTransitionActive] =
     useState(false);
+  const [localizedTeamPresetSummaries, setLocalizedTeamPresetSummaries] =
+    useState<TeamPresetSummary[]>([]);
   const [openTabs, setOpenTabs] = useState<WorkspaceTab[]>(() =>
     activeSessionId ? [createSessionTab(activeSessionId)] : [],
   );
@@ -1880,12 +1884,55 @@ function WorkspaceLayout() {
     closeMobileSidebar();
   };
 
-  const chatPresets =
-    (config as { chat_presets?: ChatPresetConfigView } | null)
-      ?.chat_presets ?? {};
-  const teamPresets = (chatPresets.teams ?? []).filter(
-    (preset) => preset.enabled !== false,
+  const chatPresets = useMemo(
+    () =>
+      (config as { chat_presets?: ChatPresetConfigView } | null)
+        ?.chat_presets ?? {},
+    [config],
   );
+  const configuredTeamPresets = useMemo(
+    () =>
+      (chatPresets.teams ?? []).filter((preset) => preset.enabled !== false),
+    [chatPresets.teams],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void teamPresetsApi
+      .list(locale)
+      .then((response) => {
+        if (!cancelled) setLocalizedTeamPresetSummaries(response.teams);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setLocalizedTeamPresetSummaries([]);
+          console.error('Failed to load localized team templates', error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
+
+  const teamPresets = useMemo(() => {
+    const localizedById = new Map(
+      localizedTeamPresetSummaries.map((preset) => [preset.id, preset]),
+    );
+    return configuredTeamPresets.map((preset) => {
+      const localized = localizedById.get(preset.id);
+      return localized
+        ? {
+            ...preset,
+            name: localized.name,
+            description: localized.description,
+            team_protocol: localized.team_protocol,
+            enabled: localized.enabled,
+            tier: localized.tier,
+          }
+        : preset;
+    });
+  }, [configuredTeamPresets, localizedTeamPresetSummaries]);
 
   const handleCreateProject = async (
     data: CreateProjectRequest,
