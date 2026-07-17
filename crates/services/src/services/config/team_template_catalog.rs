@@ -730,7 +730,7 @@ Use the English protocol.
     }
 
     #[tokio::test]
-    async fn save_custom_template_reports_config_failure_without_catalog_write() {
+    async fn save_custom_template_reports_config_path_failure_without_catalog_write() {
         let pool = setup_pool().await;
         let temp = TempDir::new().expect("temp dir");
         let blocked_parent = temp.path().join("blocked-parent");
@@ -745,7 +745,7 @@ Use the English protocol.
 
         assert!(
             err.to_string()
-                .contains("failed to save custom team template config")
+                .contains("failed to read team template config")
         );
         assert!(
             ChatTeamTemplateCatalog::find_by_id(&pool, "custom_config_failure")

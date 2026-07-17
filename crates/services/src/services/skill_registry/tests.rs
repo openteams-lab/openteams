@@ -165,6 +165,15 @@ Open the page and inspect it carefully.
         .execute(&pool)
         .await
         .expect("create chat_session_agents table");
+        for statement in [
+            "CREATE TABLE project_members (id TEXT PRIMARY KEY, member_name TEXT)",
+            "CREATE TABLE chat_agents (id TEXT PRIMARY KEY, name TEXT)",
+        ] {
+            sqlx::query(statement)
+                .execute(&pool)
+                .await
+                .expect("create session agent lookup table");
+        }
 
         let installed_skill = ChatSkill::create(
             &pool,

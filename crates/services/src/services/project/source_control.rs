@@ -1732,9 +1732,9 @@ async fn filter_committed_session_paths(
                 delivery_committed_after_observation || head_committed_after_observation
             })
             .unwrap_or(false);
-        let keep = !committed_after_observation
-            && (remaining_changed_paths.contains(&path)
-                || state
+        let keep = remaining_changed_paths.contains(&path)
+            || (!committed_after_observation
+                && state
                     .last_observed_at
                     .as_ref()
                     .and_then(|last_observed_at| {

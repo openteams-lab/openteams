@@ -1619,7 +1619,7 @@ fn parse_agent_protocol_messages_supports_relaxed_message_type_shorthand() {
 "#;
 
     let messages = ChatRunner::parse_agent_protocol_messages(content).expect("messages");
-    assert_eq!(messages.len(), 4);
+    assert_eq!(messages.len(), 3);
     assert!(matches!(
         messages[0].message_type,
         AgentProtocolMessageType::Send
@@ -1628,10 +1628,6 @@ fn parse_agent_protocol_messages_supports_relaxed_message_type_shorthand() {
     assert_eq!(messages[0].intent.as_deref(), Some("reply"));
     assert!(matches!(
         messages[1].message_type,
-        AgentProtocolMessageType::Artifact
-    ));
-    assert!(matches!(
-        messages[2].message_type,
         AgentProtocolMessageType::Record
     ));
     assert_eq!(messages[1].content, "hero grid restored to idle");

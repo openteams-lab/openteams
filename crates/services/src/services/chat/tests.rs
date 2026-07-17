@@ -10,7 +10,7 @@ mod tests {
         project::CreateProject,
         project_member::{ProjectMember, ProjectMemberType},
     };
-    use sqlx::SqlitePool;
+    use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
     use uuid::Uuid;
 
     use super::{
@@ -155,7 +155,9 @@ mod tests {
     }
 
     async fn setup_chat_message_pool() -> SqlitePool {
-        let pool = SqlitePool::connect("sqlite::memory:")
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
             .await
             .expect("create sqlite memory pool");
 
@@ -205,6 +207,25 @@ mod tests {
                 system_prompt TEXT NOT NULL DEFAULT '',
                 tools_enabled TEXT NOT NULL DEFAULT '{}',
                 model_name TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+            r#"
+            CREATE TABLE chat_session_agents (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                agent_id BLOB NOT NULL,
+                state TEXT NOT NULL DEFAULT 'idle'
+                    CHECK (state IN ('idle','running','stopping','waitingapproval','dead')),
+                workspace_path TEXT,
+                pty_session_key TEXT,
+                agent_session_id TEXT,
+                agent_message_id TEXT,
+                project_member_id BLOB,
+                member_name TEXT NOT NULL DEFAULT '',
+                execution_config TEXT NOT NULL DEFAULT '{}',
+                allowed_skill_ids TEXT NOT NULL DEFAULT '[]',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
             )
@@ -267,7 +288,9 @@ mod tests {
     }
 
     async fn setup_project_session_pool() -> SqlitePool {
-        let pool = SqlitePool::connect("sqlite::memory:")
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
             .await
             .expect("create sqlite memory pool");
 
@@ -459,7 +482,16 @@ mod tests {
     #[tokio::test]
     async fn create_project_session_snapshots_agents_initialized_from_global_agents() {
         let pool = setup_project_session_pool().await;
+        sqlx::query("ALTER TABLE chat_agents ADD COLUMN is_default BOOLEAN DEFAULT 0")
+            .execute(&pool)
+            .await
+            .expect("add global default marker");
         let agent = create_agent_member(&pool, "coder").await;
+        sqlx::query("UPDATE chat_agents SET is_default = 1 WHERE id = ?1")
+            .bind(agent.id)
+            .execute(&pool)
+            .await
+            .expect("mark global agent as default");
 
         let project = ProjectService::new()
             .create_project(
