@@ -42,7 +42,7 @@ async function createMainPackageTarball(targetPath, version = '0.4.8') {
   await fs.rm(workspaceDir, { recursive: true, force: true });
 }
 
-function createFixtureSigner() {
+function createFixtureSigner({ prehashed = false } = {}) {
   const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
   const publicDer = publicKey.export({ format: 'der', type: 'spki' });
   const keyId = crypto.randomBytes(8);
@@ -50,10 +50,14 @@ function createFixtureSigner() {
   return {
     publicKey: Buffer.from(publicText).toString('base64'),
     sign(data) {
-      const signature = crypto.sign(null, data, privateKey);
+      const signatureAlgorithm = prehashed ? 'ED' : 'Ed';
+      const signedData = prehashed
+        ? crypto.createHash('blake2b512').update(data).digest()
+        : data;
+      const signature = crypto.sign(null, signedData, privateKey);
       const trusted = 'trusted comment: timestamp:1700000000\tfile:test';
       const global = crypto.sign(null, Buffer.concat([signature, Buffer.from(trusted.slice(17))]), privateKey);
-      const text = `untrusted comment: signature from minisign secret key\n${Buffer.concat([Buffer.from('Ed'), keyId, signature]).toString('base64')}\n${trusted}\n${global.toString('base64')}\n`;
+      const text = `untrusted comment: signature from minisign secret key\n${Buffer.concat([Buffer.from(signatureAlgorithm), keyId, signature]).toString('base64')}\n${trusted}\n${global.toString('base64')}\n`;
       return Buffer.from(text).toString('base64');
     },
   };
@@ -100,14 +104,14 @@ async function createDeb(targetPath, version = '0.4.8') {
   await fs.rm(workspaceDir, { recursive: true, force: true });
 }
 
-async function createValidReleaseDir({ linuxAppImageUpdater = false, includeDmg = false } = {}) {
+async function createValidReleaseDir({ linuxAppImageUpdater = false, includeDmg = false, prehashedSignatures = false } = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'openteams-release-assets-'));
   const tag = 'v0.4.8';
   const macArchive = 'openteams-0.4.8-x86_64.app.tar.gz';
   const linuxArchive = 'openteams-0.4.8-x86_64.AppImage.tar.gz';
   const debName = 'openteams_0.4.8_amd64-linux.deb';
   const webTarball = 'openteams-0.4.8.tgz';
-  const signer = createFixtureSigner();
+  const signer = createFixtureSigner({ prehashed: prehashedSignatures });
 
   await createMacArchive(path.join(dir, macArchive));
   await writeFile(path.join(dir, `${macArchive}.sig`), `${signer.sign(await fs.readFile(path.join(dir, macArchive)))}\n`);
@@ -174,6 +178,16 @@ test('production and development updater configs share endpoint and public key',
 
 test('validator accepts a valid release directory without dmg', async () => {
   const dir = await createValidReleaseDir();
+  try {
+    const result = runValidator(dir);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('validator accepts Tauri prehashed Minisign signatures', async () => {
+  const dir = await createValidReleaseDir({ prehashedSignatures: true });
   try {
     const result = runValidator(dir);
     assert.equal(result.status, 0, result.stderr || result.stdout);

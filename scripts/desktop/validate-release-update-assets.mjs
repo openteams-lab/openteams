@@ -74,15 +74,19 @@ function verifyMinisignSignature(data, signature, publicKey, basename) {
   const text = decodeMinisignText(signature, `signature for ${basename}`);
   const lines = text.split(/\r?\n/).filter(Boolean);
   const rawSignature = Buffer.from(lines[1] || '', 'base64');
-  if (rawSignature.length !== 74 || rawSignature.subarray(0, 2).toString() !== 'Ed') {
+  const signatureAlgorithm = rawSignature.subarray(0, 2).toString();
+  if (rawSignature.length !== 74 || !['Ed', 'ED'].includes(signatureAlgorithm)) {
     throw new Error(`Updater signature is not a valid Minisign signature for ${basename}.`);
   }
   if (!rawSignature.subarray(2, 10).equals(publicKey.keyId)) {
     throw new Error(`Updater signature key id does not match configured public key for ${basename}.`);
   }
+  const signedData = signatureAlgorithm === 'ED'
+    ? crypto.createHash('blake2b512').update(data).digest()
+    : data;
   const verified = crypto.verify(
     null,
-    data,
+    signedData,
     publicKey.key,
     rawSignature.subarray(10),
   );
