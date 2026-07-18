@@ -60,17 +60,22 @@ check(
 );
 
 check(
-  "add member menu includes only available runtimes and omits removed agents",
+  "add member menu includes available runtimes and unassigned legacy agents",
   source.includes("const addableRuntimeOptions = useMemo(") &&
     source.includes(
       ".filter((runner) => getRuntimeDisplayState(runner) === \"available\")",
     ) &&
+    source.includes("const addableLegacyAgents = useMemo(") &&
+    source.includes("agent.owner_project_id === null") &&
+    source.includes("!memberAgentIds.has(agent.id)") &&
+    source.includes("const addLegacyMember = async (agentId: string)") &&
+    source.includes("await addProjectMemberForAgent(agent);") &&
+    sidebarSource.includes("filteredLegacyAgents.map((agent) => (") &&
     sidebarSource.includes("filteredRuntimeOptions.map((option) => (") &&
-    sidebarSource.includes("const hasAddOptions = filteredRuntimeOptions.length > 0") &&
+    sidebarSource.includes("filteredLegacyAgents.length > 0 || filteredRuntimeOptions.length > 0") &&
     sidebarSource.includes("runtimeOptions = []") &&
-    !sidebarSource.includes("availableAgents") &&
-    !sidebarSource.includes("filteredAgents") &&
-    !sidebarSource.includes("onAddMember"),
+    sidebarSource.includes("legacyAgents = []") &&
+    sidebarSource.includes("onAddLegacyMember(agent.id)"),
   { source, sidebarSource },
 );
 
@@ -80,7 +85,7 @@ check(
     appSource.includes('openPageTab("team", getPageTabLabel("team"))') &&
     source.includes("readTeamMemberInviteTarget()") &&
     source.includes("clearTeamMemberInviteTarget()") &&
-    source.includes("setAddMemberMenuRequestId((current) => current + 1)") &&
+    source.includes("setAddMemberMenuRequestId((value) => value + 1)") &&
     source.includes("openRequestKey={addMemberMenuRequestId}") &&
     sidebarSource.includes("openRequestKey?: number") &&
     sidebarSource.includes("setShowAddMenu(true)") &&

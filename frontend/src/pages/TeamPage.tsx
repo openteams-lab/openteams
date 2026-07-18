@@ -467,6 +467,17 @@ export function TeamPage() {
         })),
     [runners],
   );
+  const addableLegacyAgents = useMemo(() => {
+    const memberAgentIds = new Set(
+      currentProjectMembers
+        .map((member) => member.agent_id)
+        .filter((agentId): agentId is string => Boolean(agentId)),
+    );
+    return agents.filter(
+      (agent) =>
+        agent.owner_project_id === null && !memberAgentIds.has(agent.id),
+    );
+  }, [agents, currentProjectMembers]);
   const selectedRuntime = useMemo(
     () => runners.find((runner) => runner.runner_type === runnerType),
     [runnerType, runners],
@@ -1259,6 +1270,23 @@ export function TeamPage() {
     }
   };
 
+  const addLegacyMember = async (agentId: string) => {
+    const agent = addableLegacyAgents.find((item) => item.id === agentId);
+    if (!selectedProjectId || !agent) return;
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await addProjectMemberForAgent(agent);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : t("teamPage.error.addMember"),
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const requestRemoveMember = (member: ProjectMemberWithExecution) => {
     setMemberPendingRemoval(member);
     setError(null);
@@ -1345,9 +1373,11 @@ export function TeamPage() {
         actions={
           teamDataReady ? (
             <TeamAddMemberButton
+              legacyAgents={addableLegacyAgents}
               openRequestKey={addMemberMenuRequestId}
               runtimeOptions={addableRuntimeOptions}
               saving={saving}
+              onAddLegacyMember={addLegacyMember}
               onCreateMember={createMemberFromRuntime}
               t={t}
             />
