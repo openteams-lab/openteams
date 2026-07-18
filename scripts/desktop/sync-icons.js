@@ -2,6 +2,7 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { PNG } = require('pngjs');
 
 const root = path.join(__dirname, '..', '..');
 const sourceSvg = path.join(
@@ -252,6 +253,17 @@ function validateSourcePng(outputPng) {
   validateWindowsRoundedCorners(outputPng);
 }
 
+function normalizeLinuxPngToRgba(outputPng) {
+  // librsvg may encode fully opaque images as RGB, while Tauri requires RGBA.
+  const decoded = PNG.sync.read(fs.readFileSync(outputPng));
+  const rgba = PNG.sync.write(decoded, {
+    colorType: 6,
+    inputColorType: 6,
+    inputHasAlpha: true,
+  });
+  fs.writeFileSync(outputPng, rgba);
+}
+
 function readSvgNumberAttribute(markup, name) {
   const match = markup.match(new RegExp(`\\s${name}="([^"]+)"`));
   if (!match) {
@@ -335,6 +347,9 @@ function syncIcons() {
     createDesktopSourceSvg(desktopSvg);
     renderSourcePng(desktopSvg, sourcePng);
     validateSourcePng(sourcePng);
+    if (process.platform === 'linux') {
+      normalizeLinuxPngToRgba(sourcePng);
+    }
     run(process.execPath, [tauriCli, 'icon', sourcePng, '-o', generatedDir], {
       stdio: 'inherit',
     });
@@ -344,7 +359,9 @@ function syncIcons() {
         path.join(iconsDir, fileName)
       );
     }
-    fs.copyFileSync(sourcePng, iconSquarePng);
+    if (process.platform === 'linux' || process.platform === 'win32') {
+      fs.copyFileSync(sourcePng, iconSquarePng);
+    }
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -354,9 +371,13 @@ function syncIcons() {
   );
 }
 
-try {
-  syncIcons();
-} catch (error) {
-  console.error(error.message);
-  process.exit(1);
+if (require.main === module) {
+  try {
+    syncIcons();
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
 }
+
+module.exports = { normalizeLinuxPngToRgba };

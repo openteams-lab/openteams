@@ -50,6 +50,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^1.5.0",
     "concurrently": "^8.2.2",
+    "pngjs": "^7.0.0",
     "vite": "^6.3.5"
   },
   "engines": {
