@@ -1094,11 +1094,9 @@ mod tests {
             fullstack_member_ids,
             vec![
                 "coordinator_pmo".to_string(),
-                "ux_ui_designer".to_string(),
                 "backend_engineer".to_string(),
                 "frontend_engineer".to_string(),
                 "qa_tester".to_string(),
-                "code_reviewer".to_string(),
             ]
         );
         assert!(!fullstack.team_protocol.trim().is_empty());
@@ -1113,11 +1111,7 @@ mod tests {
             advanced,
             vec!["advanced-growth-ops", "advanced-release-command"]
         );
-        assert!(
-            fullstack
-                .team_protocol
-                .contains("Only the Planner (Coordinator / PMO) and the UI Designer (UX/UI Designer) may directly `@` the user.")
-        );
+        assert!(!fullstack.team_protocol.contains("`@`"));
     }
 
     #[test]

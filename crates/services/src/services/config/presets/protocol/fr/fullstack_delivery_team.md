@@ -19,7 +19,6 @@ workflow_steps:
 Objectif : définir les règles de collaboration de l'équipe, unifier les protocoles de communication entre membres et conserver des raccourcis efficaces pour accélérer le travail.
 
 ## Règles d'équipe obligatoires
-- Seuls le responsable de planification (coordination / gestion de projet) et le concepteur d'interface (expérience utilisateur / interface) peuvent `@` directement l'utilisateur.
 - Le fichier de plan se trouve dans `.openteams/plan.md`. Tous les membres peuvent le lire, mais seul le responsable de planification peut le modifier.
 - Lors de l'affectation des tâches, le responsable de planification doit attribuer chaque tâche à un membre précis. Après achèvement, le membre informe le responsable de planification, qui met ensuite à jour l'état de la tâche.
 - Tous les résultats doivent être enregistrés comme fichiers dans l'espace de travail de chaque membre. Ne pas envoyer de longs textes ou du code dans la discussion de groupe.
