@@ -58,7 +58,7 @@ openteams is what is missing around those agents: **one shared room where they c
 | a developer-owned issue list linked to agent sessions | a full project-management suite or a roadmap that agents rewrite themselves |
 | a workflow you can inspect, review, interrupt, and retry step by step | one large prompt that disappears into a black box until it finishes |
 | isolated worktrees you can review, merge, or discard separately | multiple agents changing the same workspace and interfering with each other |
-| build statistics that show what agents delivered, used, and cost | a token counter with no record of what was built |
+| build statistics that show what agents delivered, the resources they used, and what it cost | a token counter with no record of what was built |
 
 **Concretely, installing it gives you:** chat sessions for lightweight collaboration and planned execution, ready-to-use team workflow templates, developer-controlled Issues that link work to sessions, independent workspaces for isolating parallel tasks, and complete build statistics.
 
@@ -99,7 +99,7 @@ npx openteams-web
 
 ### Configure Providers
 
-**openteams** includes a built-in openteams CLI agent. Configure your model providers in the app under `setting->provider config->add provider`.
+**openteams** includes a built-in openteams CLI agent. Configure your model providers in the app under `Settings → Provider Config → Add Provider`.
 
 ⚙️ [Provider config](https://doc.openteams-lab.com/advanced-usage/custom-provider)
 
@@ -135,7 +135,7 @@ openteams is under active development. Here is where we are heading:
 
 - [ ] **Expert AI workers** — Launch more AI workers with deep domain knowledge that can solve specialized problems.
 - [ ] **High-output AI teams** — Compose efficient expert AI workers into teams that can customize production workflows for specific business needs and turn requirements into deliverables end to end.
-- [ ] **Integrate more agents** — Add support for more commonly used agents, such as Kilo code, hermes-agent, openclaw, and others.
+- [ ] **Integrate more agents** — Add support for more commonly used agents, such as Kilo Code, hermes-agent, openclaw, and others.
 
 ***Vision: Transform token consumption into real productivity.***
 
@@ -257,5 +257,7 @@ Three other points are worth knowing:
 - **Brand:** You may use the code, but you may not present yourself as the official openteams project or use its name and trademarks as your own brand.
 - **Patents:** Contributors give you permission to use the patents necessarily covered by their code, so they cannot use those patents to stop you from using openteams. In return, if you file a lawsuit claiming that openteams infringes your patent, you lose this patent protection. Only the patent permission ends—not your ordinary copyright permission to use the code. Most users who are not involved in patent litigation are unaffected.
 - **Risk:** The software is provided for free as it is. You decide whether it fits your needs and accept the risks of using it; the project does not provide a warranty or compensation for problems.
+
+This section is a plain-language summary. The [LICENSE](LICENSE) file contains the authoritative legal terms.
 
 See [LICENSE](LICENSE) for the complete legal terms.

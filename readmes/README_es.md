@@ -8,7 +8,7 @@
   <h5>Planifica, construye y entrega — con un equipo de agentes de IA en lugar de uno solo</h5>
 
   <p>
-    openteams es una aplicación de escritorio de IA open source y local-first que ayuda a desarrolladores independientes a planificar, construir y entregar software más rápido con un equipo de IA que controlan.
+    openteams es una aplicación de escritorio de IA, de código abierto y local-first, que ayuda a desarrolladores independientes a planificar, construir y entregar software más rápido con un equipo de IA bajo su control.
   </p>
 
   <p>
@@ -52,14 +52,14 @@ openteams aporta lo que falta alrededor de esos agentes: **una sala compartida d
 
 | openteams **es** | openteams **no es** |
 | --- | --- |
-| un workspace local-first que conecta los agentes de código que ya utilizas | otro modelo o un sustituto de Claude Code, Codex o Gemini CLI |
+| un espacio de trabajo local-first que conecta los agentes de código que ya utilizas | otro modelo o un sustituto de Claude Code, Codex o Gemini CLI |
 | una sesión compartida donde los agentes pueden hablar, pasarse trabajo y mantener el mismo contexto | una colección de chats separados que todavía tienes que coordinar a mano |
 | una lista de issues controlada por el desarrollador y vinculada a las sesiones de los agentes | una suite completa de gestión de proyectos o una hoja de ruta que los agentes reescriben |
-| un workflow que puedes revisar, interrumpir y reintentar paso a paso | un gran prompt que permanece como una caja negra hasta que termina |
-| worktrees aislados que puedes revisar, fusionar o descartar por separado | varios agentes modificando el mismo workspace e interfiriendo entre sí |
-| estadísticas de build que muestran qué entregaron los agentes, cuánto usaron y cuánto costó | un contador de tokens sin registro de lo construido |
+| un flujo de trabajo que puedes revisar, interrumpir y reintentar paso a paso | un gran prompt que permanece como una caja negra hasta que termina |
+| worktrees aislados que puedes revisar, fusionar o descartar por separado | varios agentes modificando el mismo espacio de trabajo e interfiriendo entre sí |
+| estadísticas de compilación que muestran qué entregaron los agentes, qué recursos usaron y cuánto costó | un contador de tokens sin registro de lo construido |
 
-**En concreto, al instalarlo obtienes:** sesiones de chat para colaboración ligera y ejecución planificada, plantillas de workflow de equipo listas para usar, issues controlados por el desarrollador que vinculan el trabajo con las sesiones, workspaces independientes para aislar tareas paralelas y estadísticas de build completas.
+**En concreto, al instalarlo obtienes:** sesiones de chat para colaboración ligera y ejecución planificada, plantillas de flujo de trabajo en equipo listas para usar, issues controlados por el desarrollador que vinculan el trabajo con las sesiones, espacios de trabajo independientes para aislar tareas paralelas y estadísticas de compilación detalladas.
 
 ```text
 sin openteams                       con openteams
@@ -77,7 +77,7 @@ Hacer que los agentes escriban código ya no es la parte difícil. Lo complicado
 
 openteams reúne a los agentes y sus conversaciones en una misma sesión. Para tareas grandes, el modo Workflow muestra los pasos y sus dependencias, de modo que puedes revisar o reintentar solo la parte necesaria. Si varias sesiones trabajan a la vez, cada una puede usar su propio Git worktree; los cambios permanecen separados hasta que decidas fusionarlos o descartarlos.
 
-La dirección del proyecto sigue en manos del desarrollador. Los issues guardan el trabajo que has elegido y enlazan con las sesiones donde los agentes lo realizan. Los agentes hacen el trabajo, pero no cambian el plan por ti. Cuando terminan, las estadísticas de build muestran los resultados junto con los tokens utilizados y el coste.
+La dirección del proyecto sigue en manos del desarrollador. Los issues guardan el trabajo que has elegido y enlazan con las sesiones donde los agentes lo realizan. Los agentes hacen el trabajo, pero no cambian el plan por ti. Cuando terminan, las estadísticas de compilación muestran los resultados junto con los tokens utilizados y el coste.
 
 openteams no intenta darte más agentes. Su objetivo es que siempre sepas qué se está construyendo, dónde están los cambios, qué viene después y cuánto costó el resultado.
 
@@ -98,7 +98,7 @@ npx openteams-web
 
 ### Configurar proveedores
 
-**openteams** incluye un agente openteams CLI integrado. Configura tus proveedores de modelos en la app desde `setting->provider config->add provider`.
+**openteams** incluye un agente openteams CLI integrado. Configura tus proveedores de modelos en la app desde `Settings → Provider Config → Add Provider`.
 
 ⚙️ [Configuración de proveedores](https://doc.openteams-lab.com/advanced-usage/custom-provider)
 
@@ -120,7 +120,7 @@ También puedes conectar agentes de código compatibles como:
 - **2026.05.07 (v0.3.22)**
   - Permite guardar con un clic los miembros de una sesión de chat grupal como equipo predefinido
 - **2026.04.14 (v0.3.15)**
-  - Visor de cambios de archivos del workspace
+  - Visor de cambios de archivos del espacio de trabajo
 - **2026.04.06 (v0.3.12)**
   - Activación del modo de UI oscura
   - Corrección de problemas de concurrencia en openteams-cli
@@ -133,8 +133,8 @@ También puedes conectar agentes de código compatibles como:
 openteams está en desarrollo activo. Hacia allí vamos:
 
 - [ ] **Trabajadores IA expertos** — Lanzar más trabajadores de IA con conocimiento profundo de dominios específicos, capaces de resolver problemas especializados.
-- [ ] **Equipos IA de alta producción** — Formar equipos con trabajadores de IA expertos y eficientes, capaces de personalizar workflows de producción para necesidades de negocio específicas y convertir requisitos en resultados de extremo a extremo.
-- [ ] **Integrar más agentes** — Integrar más agentes de uso común, como Kilo code, hermes-agent, openclaw, entre otros.
+- [ ] **Equipos de IA de alto rendimiento** — Formar equipos con trabajadores de IA expertos y eficientes, capaces de personalizar workflows de producción para necesidades de negocio específicas y convertir requisitos en entregables de principio a fin.
+- [ ] **Integrar más agentes** — Integrar más agentes de uso común, como Kilo Code, hermes-agent y openclaw, entre otros.
 
 ***Visión: transformar el consumo de tokens en productividad real.***
 
@@ -145,7 +145,7 @@ openteams está en desarrollo activo. Hacia allí vamos:
 - [GitHub Issues](https://github.com/openteams-lab/openteams/issues): reportes de bugs y solicitudes de funcionalidades
 - [GitHub Discussions](https://github.com/openteams-lab/openteams/discussions): ideas de producto y preguntas
 - [Discord](https://discord.gg/openteams): chat de la comunidad
-- [Linux.do](https://linux.do): enlace amigo; gracias por apoyar el intercambio de la comunidad
+- [Linux.do](https://linux.do): sitio asociado; gracias por apoyar el intercambio de la comunidad
 - Grupos de la comunidad:
 
 <p>
@@ -166,9 +166,9 @@ openteams está en desarrollo activo. Hacia allí vamos:
 | Revisión y reintento | Revisa un paso, reintenta la tarea correcta y evita reiniciar todo el proyecto. |
 | Gestión de issues | Registra y prioriza elementos de trabajo controlados por el desarrollador, sincroniza issues desde GitHub y crea o enlaza sesiones de ejecución. |
 | Workspaces aislados | Ejecuta tareas de sesiones independientes en Git worktrees separados y revisa, fusiona o descarta cada resultado sin afectar al resto del trabajo. |
-| Estadísticas de build | Compara bugs corregidos y funcionalidades entregadas con el consumo de tokens y los costes por sesión y modelo. |
+| Estadísticas de compilación | Compara bugs corregidos y funcionalidades entregadas con el consumo de tokens y los costes por sesión y modelo. |
 | Artefactos y trazas | Mantén logs, diffs, transcripciones y artefactos generados unidos al trabajo. |
-| Ejecución local del workspace | Los agentes trabajan sobre el workspace configurado, con registros de ejecución guardados bajo `.openteams/`. |
+| Ejecución local | Los agentes trabajan sobre el espacio de trabajo configurado, con registros de ejecución guardados bajo `.openteams/`. |
 
 ## Para quién es
 
@@ -225,7 +225,7 @@ bun run ./scripts/build-openteams-cli.ts
 Las contribuciones son bienvenidas, incluidos los workflows de equipos de IA reutilizables que otros puedan estudiar y adaptar. Así puedes empezar:
 
 1. **Encuentra un issue** — Revisa [Good First Issues](https://github.com/openteams-lab/openteams/labels/good%20first%20issue) para tareas aptas para principiantes, o explora los issues abiertos.
-2. **Habla antes de construir** — Antes de abrir una pull request grande, abre un issue o una discusión para alinear la dirección.
+2. **Habla antes de construir** — Antes de abrir una pull request grande, abre un issue o una discusión para acordar el enfoque.
 3. **Sigue el estilo de código** — Ejecuta lo siguiente antes de enviar:
 
 ```bash
@@ -254,5 +254,7 @@ También conviene conocer otros tres puntos:
 - **Marca:** Puedes usar el código, pero no presentarte como el proyecto oficial openteams ni usar su nombre o sus marcas como tu propia marca.
 - **Patentes:** Los contribuidores te permiten usar las patentes necesariamente relacionadas con su código, por lo que no pueden utilizarlas para impedir que uses openteams. A cambio, si presentas una demanda afirmando que openteams infringe tu patente, pierdes esa protección. Solo termina el permiso de patentes, no tu permiso normal para usar el código. Los usuarios que no participan en litigios de patentes normalmente no se ven afectados.
 - **Riesgo:** El software se ofrece gratis tal como está. Tú decides si sirve para tus necesidades y asumes los riesgos de usarlo; el proyecto no ofrece garantía ni compensación.
+
+Esta sección es un resumen en lenguaje sencillo. El archivo [LICENSE](../LICENSE) contiene los términos legales vinculantes.
 
 Consulta [LICENSE](../LICENSE) para ver los términos legales completos.
