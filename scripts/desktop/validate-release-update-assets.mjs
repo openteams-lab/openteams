@@ -319,7 +319,12 @@ function validateDebAsset(debPath, name, releaseVersion) {
   const controlName = members.find((member) => /^control\.tar\.(gz|xz)$/.test(member));
   if (!members.includes('debian-binary') || !controlName) return false;
   const controlArchive = execFileSync('ar', ['p', debPath, controlName]);
-  const control = execFileSync('tar', ['-xOf', '-', './control'], { input: controlArchive, encoding: 'utf8' });
+  const compressionOption = controlName.endsWith('.gz') ? '-z' : '-J';
+  const control = execFileSync(
+    'tar',
+    ['-x', compressionOption, '-O', '-f', '-', './control'],
+    { input: controlArchive, encoding: 'utf8' },
+  );
   const architecture = control.match(/^Architecture:\s*(\S+)/m)?.[1];
   const version = control.match(/^Version:\s*(\S+)/m)?.[1];
   return canonicalArchitecture(match[1]) === canonicalArchitecture(architecture || '') && normalizeVersion(version || '') === normalizeVersion(releaseVersion);
