@@ -63,13 +63,15 @@ function createFixtureSigner({ prehashed = false } = {}) {
   };
 }
 
-async function createMacArchive(targetPath) {
+async function createMacArchive(targetPath, executableSize = 8) {
   const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'openteams-mac-fixture-'));
   const executableDir = path.join(workspaceDir, 'openteams.app', 'Contents', 'MacOS');
   await fs.mkdir(executableDir, { recursive: true });
-  await fs.writeFile(path.join(executableDir, 'openteams'), Buffer.from([
+  const executable = Buffer.alloc(executableSize);
+  executable.set([
     0xcf, 0xfa, 0xed, 0xfe, 0x07, 0x00, 0x00, 0x01,
-  ]));
+  ]);
+  await fs.writeFile(path.join(executableDir, 'openteams'), executable);
   execFileSync('tar', ['-czf', targetPath, '-C', workspaceDir, 'openteams.app']);
   await fs.rm(workspaceDir, { recursive: true, force: true });
 }
@@ -104,7 +106,7 @@ async function createDeb(targetPath, version = '0.4.8') {
   await fs.rm(workspaceDir, { recursive: true, force: true });
 }
 
-async function createValidReleaseDir({ linuxAppImageUpdater = false, includeDmg = false, prehashedSignatures = false } = {}) {
+async function createValidReleaseDir({ linuxAppImageUpdater = false, includeDmg = false, prehashedSignatures = false, macExecutableSize = 8 } = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'openteams-release-assets-'));
   const tag = 'v0.4.8';
   const macArchive = 'openteams-0.4.8-x86_64.app.tar.gz';
@@ -113,7 +115,7 @@ async function createValidReleaseDir({ linuxAppImageUpdater = false, includeDmg 
   const webTarball = 'openteams-0.4.8.tgz';
   const signer = createFixtureSigner({ prehashed: prehashedSignatures });
 
-  await createMacArchive(path.join(dir, macArchive));
+  await createMacArchive(path.join(dir, macArchive), macExecutableSize);
   await writeFile(path.join(dir, `${macArchive}.sig`), `${signer.sign(await fs.readFile(path.join(dir, macArchive)))}\n`);
   await createDeb(path.join(dir, debName));
   await createMainPackageTarball(path.join(dir, webTarball));
@@ -188,6 +190,16 @@ test('validator accepts a valid release directory without dmg', async () => {
 
 test('validator accepts Tauri prehashed Minisign signatures', async () => {
   const dir = await createValidReleaseDir({ prehashedSignatures: true });
+  try {
+    const result = runValidator(dir);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('validator inspects macOS executables larger than the child process buffer', async () => {
+  const dir = await createValidReleaseDir({ macExecutableSize: 2 * 1024 * 1024 });
   try {
     const result = runValidator(dir);
     assert.equal(result.status, 0, result.stderr || result.stdout);

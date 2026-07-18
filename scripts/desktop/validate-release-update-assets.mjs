@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 
 function parseArgs(argv) {
@@ -223,8 +224,22 @@ function readTarEntries(archivePath) {
     .filter(Boolean);
 }
 
-function readTarEntry(archivePath, entry) {
-  return execFileSync('tar', ['-xOf', archivePath, entry]);
+async function readTarEntryHeader(archivePath, entry) {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'openteams-release-validator-'));
+  try {
+    execFileSync('tar', ['-xzf', archivePath, '-C', tempDir, entry]);
+    const extractedPath = path.join(tempDir, ...entry.split('/'));
+    const handle = await fs.open(extractedPath, 'r');
+    try {
+      const header = Buffer.alloc(4096);
+      const { bytesRead } = await handle.read(header, 0, header.length, 0);
+      return header.subarray(0, bytesRead);
+    } finally {
+      await handle.close();
+    }
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
 }
 
 function expectedArchitecture(platformKey) {
@@ -271,13 +286,14 @@ function canonicalArchitecture(value) {
   }[value] || value;
 }
 
-function validateUpdaterArchive(assets, platformKey, basename) {
+async function validateUpdaterArchive(assets, platformKey, basename) {
   const architecture = expectedArchitecture(platformKey);
   if (platformKey.startsWith('darwin-')) {
     const entries = readTarEntries(requireAsset(assets, basename));
     const executable = entries.find((entry) => /\.app\/Contents\/MacOS\/openteams$/.test(entry));
     if (!executable) throw new Error(`Darwin updater archive has no app executable: ${basename}`);
-    const actual = machoArchitectures(readTarEntry(requireAsset(assets, basename), executable));
+    const header = await readTarEntryHeader(requireAsset(assets, basename), executable);
+    const actual = machoArchitectures(header);
     if (!actual.includes(architecture)) throw new Error(`Darwin updater architecture mismatch for ${basename}`);
     return;
   }
@@ -368,7 +384,7 @@ async function main() {
       publicKeyObject,
       basename,
     );
-    validateUpdaterArchive(assets, platformKey, basename);
+    await validateUpdaterArchive(assets, platformKey, basename);
   }
 
   if (!platformKinds.has('darwin')) {
