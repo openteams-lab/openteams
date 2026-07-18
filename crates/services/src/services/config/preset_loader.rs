@@ -1277,17 +1277,12 @@ mod tests {
             team_member_ids,
             vec![
                 "coordinator_pmo".to_string(),
-                "ux_ui_designer".to_string(),
                 "backend_engineer".to_string(),
                 "frontend_engineer".to_string(),
                 "qa_tester".to_string(),
-                "code_reviewer".to_string(),
             ]
         );
-        assert!(
-            team.team_protocol
-                .contains("Only the Planner (Coordinator / PMO) and the UI Designer (UX/UI Designer) may directly `@` the user.")
-        );
+        assert!(!team.team_protocol.contains("`@`"));
 
         let blank_team = presets
             .teams
@@ -1521,6 +1516,7 @@ Follow the team protocol.
             assert_eq!(member_ids, english_member_ids, "{locale}");
             assert_eq!(fullstack.lead_member_id, english_fullstack.lead_member_id);
             assert_eq!(fullstack.tier, english_fullstack.tier);
+            assert!(!fullstack.team_protocol.contains("`@`"), "{locale}");
 
             let blank_team = localized
                 .teams

@@ -45,9 +45,9 @@
   </video>
 </div>
 
-## Wait, what is openteams?
+## What is openteams?
 
-You already run Claude Code, Codex, Gemini CLI, or another coding agent. Each one works well on its own. Then you open a second terminal, and a third. You repeat the same context, carry results from one window to another, and keep track of who is changing what. A few days later, the code is scattered across sessions, the backlog lives somewhere else, and there is no simple answer to what the agents built for the tokens you spent.
+You already run Claude Code, Codex, Gemini CLI, or another coding agent. Each one works well on its own. Then you open a second terminal, and a third. You repeat the same context, carry results from one window to another, and keep track of who is changing what. Before long, you are managing the agents instead of the work: changes are scattered across sessions, project priorities live elsewhere, and token usage is disconnected from what actually shipped.
 
 openteams is what is missing around those agents: **one shared room where they can talk and hand off work, a plan you can see and control, and a lightweight local record that connects project work to agent output without giving agents control of the roadmap.**
 
@@ -88,8 +88,17 @@ openteams is not trying to give you more agents. It is trying to make sure you a
 
 Download the latest release for your platform from GitHub Releases.
 
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/openteams-lab/openteams/releases/latest)
-[![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/openteams-lab/openteams/releases/latest/download/openteams-windows-x64.msi)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/openteams-lab/openteams/releases/latest/download/openteams-macos.dmg)
+[![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest/download/openteams-linux-amd64.deb)
+
+**macOS:** The current macOS release is not signed or notarized by Apple. Browsers add a quarantine attribute to apps downloaded from the internet, so Gatekeeper may report that openteams is “damaged” even when the download is intact. After dragging `openteams.app` to `/Applications`, and only if you trust that it came from the official openteams GitHub Release, run:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/openteams.app
+```
+
+This removes the quarantine attribute only from openteams; it does not disable Gatekeeper globally.
 
 #### npx
 

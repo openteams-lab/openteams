@@ -1016,6 +1016,10 @@ function AgentConfigSidebar({
   >("idle");
   const autoSaveTimerRef = useRef<number | null>(null);
   const savedStatusTimerRef = useRef<number | null>(null);
+  const draftRevisionRef = useRef(0);
+  const saveInFlightRef = useRef(false);
+  const savePendingRef = useRef(false);
+  const runAutoSaveRef = useRef<() => Promise<void>>(async () => {});
   const latestRunnerRef = useRef(runner);
   latestRunnerRef.current = runner;
   const schema = agentConfigSchemas[runner.runner_type];
@@ -1049,6 +1053,16 @@ function AgentConfigSidebar({
     () => envSummaryToText(envSummary),
     [envSummary],
   );
+  const envParseResult = useMemo(() => parseEnvText(envText), [envText]);
+  const envValidationError =
+    envDirty && !envParseResult.ok
+      ? t(
+          envParseResult.error.code === "missing_equals"
+            ? "agents.env.error.missingEquals"
+            : "agents.env.error.invalidKey",
+          { line: envParseResult.error.line },
+        )
+      : null;
   const latestDraftRef = useRef({
     formData,
     envText,
@@ -1076,25 +1090,51 @@ function AgentConfigSidebar({
       window.clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
     }
+    const parsedEnv = draft.envDirty ? parseEnvText(draft.envText) : null;
+    if (parsedEnv && !parsedEnv.ok) {
+      setAutoSaveStatus("idle");
+      return;
+    }
+    if (saveInFlightRef.current) {
+      savePendingRef.current = true;
+      return;
+    }
+
+    const savedRevision = draftRevisionRef.current;
+    saveInFlightRef.current = true;
+    savePendingRef.current = false;
     clearSavedStatusTimer();
     setAutoSaveStatus("saving");
     try {
       await onSave(
         runner.runner_type,
         draft.formData,
-        draft.envDirty ? parseEnvText(draft.envText) : null,
+        parsedEnv?.value ?? null,
       );
-      setInitialFormData(draft.formData);
-      setEnvDirty(false);
-      setAutoSaveStatus("saved");
-      savedStatusTimerRef.current = window.setTimeout(() => {
-        setAutoSaveStatus("idle");
-        savedStatusTimerRef.current = null;
-      }, 1500);
+      if (savedRevision === draftRevisionRef.current) {
+        setInitialFormData(draft.formData);
+        if (draft.envDirty) setEnvDirty(false);
+        setAutoSaveStatus("saved");
+        savedStatusTimerRef.current = window.setTimeout(() => {
+          setAutoSaveStatus("idle");
+          savedStatusTimerRef.current = null;
+        }, 1500);
+      } else {
+        savePendingRef.current = true;
+      }
     } catch {
       setAutoSaveStatus("idle");
+    } finally {
+      saveInFlightRef.current = false;
+      if (savePendingRef.current) {
+        savePendingRef.current = false;
+        window.setTimeout(() => {
+          void runAutoSaveRef.current();
+        }, 0);
+      }
     }
   }, [clearSavedStatusTimer, onSave, runner.runner_type]);
+  runAutoSaveRef.current = runAutoSave;
 
   useEffect(() => {
     if (autoSaveTimerRef.current !== null) {
@@ -1102,12 +1142,17 @@ function AgentConfigSidebar({
       autoSaveTimerRef.current = null;
     }
     clearSavedStatusTimer();
+    draftRevisionRef.current += 1;
+    savePendingRef.current = false;
     setAutoSaveStatus("idle");
     const nextFormData = getRuntimeExecutorOptions(runner);
     setFormData(nextFormData);
     setInitialFormData(nextFormData);
     setEnvText(envSummaryToText(runner.env_summary));
     setEnvDirty(false);
+  }, [clearSavedStatusTimer, runner.runner_type]);
+
+  useEffect(() => {
     setDiagnostics((current) =>
       current?.runner_type === runner.runner_type
         ? {
@@ -1126,7 +1171,7 @@ function AgentConfigSidebar({
           }
         : current,
     );
-  }, [clearSavedStatusTimer, runner]);
+  }, [runner]);
 
   useEffect(() => {
     return () => {
@@ -1197,6 +1242,7 @@ function AgentConfigSidebar({
     key: string,
     value: JsonValue | undefined,
   ) => {
+    draftRevisionRef.current += 1;
     setFormData((current) => {
       const next = { ...current };
       if (value === undefined || value === null) {
@@ -1210,16 +1256,18 @@ function AgentConfigSidebar({
 
   const handleModelSaved = async (model: string) => {
     const nextFormData = { ...formData, model };
+    const parsedEnv = envDirty ? parseEnvText(envText) : null;
+    draftRevisionRef.current += 1;
     setFormData(nextFormData);
     clearSavedStatusTimer();
     setAutoSaveStatus("saving");
     await onSave(
       runner.runner_type,
       nextFormData,
-      envDirty ? parseEnvText(envText) : null,
+      parsedEnv?.ok ? parsedEnv.value : null,
     );
     setInitialFormData(nextFormData);
-    setEnvDirty(false);
+    if (parsedEnv?.ok) setEnvDirty(false);
     setAutoSaveStatus("saved");
     savedStatusTimerRef.current = window.setTimeout(() => {
       setAutoSaveStatus("idle");
@@ -1309,6 +1357,7 @@ function AgentConfigSidebar({
             <textarea
               value={envText}
               onChange={(event) => {
+                draftRevisionRef.current += 1;
                 setEnvText(event.target.value);
                 setEnvDirty(true);
               }}
@@ -1317,9 +1366,27 @@ function AgentConfigSidebar({
               }}
               rows={Math.max(4, Math.min(10, envText.split(/\r?\n/u).length))}
               spellCheck={false}
+              aria-invalid={envValidationError ? true : undefined}
+              aria-describedby={
+                envValidationError ? "agent-runtime-env-error" : undefined
+              }
               placeholder={t("agents.env.placeholder")}
-              className="block w-full resize-y rounded-[6px] border border-transparent bg-transparent px-2.5 py-2 font-mono text-[12px] leading-[1.55] text-[var(--ink)] outline-none transition-all placeholder:text-[var(--ink-tertiary)] hover:border-white/10 hover:bg-white/[0.025] focus:border-white/20 focus:bg-transparent focus:ring-1 focus:ring-white/10"
+              className={cx(
+                "block w-full resize-y rounded-[6px] border bg-transparent px-2.5 py-2 font-mono text-[12px] leading-[1.55] text-[var(--ink)] outline-none transition-all placeholder:text-[var(--ink-tertiary)] hover:bg-white/[0.025] focus:bg-transparent focus:ring-1",
+                envValidationError
+                  ? "border-red-400/50 focus:border-red-400/70 focus:ring-red-400/20"
+                  : "border-transparent hover:border-white/10 focus:border-white/20 focus:ring-white/10",
+              )}
             />
+            {envValidationError && (
+              <p
+                id="agent-runtime-env-error"
+                role="alert"
+                className="mt-2 px-2.5 text-[12px] leading-relaxed text-red-400"
+              >
+                {envValidationError}
+              </p>
+            )}
           </div>
         </section>
 
@@ -1627,7 +1694,9 @@ export function AgentsPage() {
         executor_options: formData as JsonValue,
       });
       replaceRuntimeRunner(updated);
-      setSelectedRunner(updated);
+      setSelectedRunner((current) =>
+        current?.runner_type === updated.runner_type ? updated : current,
+      );
     } catch (error) {
       setSaveError(
         error instanceof Error ? error.message : t("agents.save.failed"),

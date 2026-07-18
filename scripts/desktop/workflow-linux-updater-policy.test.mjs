@@ -76,14 +76,24 @@ test('pre-release falls back to a documented unsigned macOS DMG', async () => {
 test('pre-release workflow validates release assets before creating the GitHub release', async () => {
   const source = await readWorkflow('pre-release.yml');
   const validateIndex = source.indexOf('name: Validate release update assets before GitHub release');
+  const aliasIndex = source.indexOf('name: Stage stable desktop download aliases');
   const createIndex = source.indexOf('name: Create GitHub Release');
 
   assert.notEqual(validateIndex, -1, 'pre-release.yml must validate release assets before publishing');
+  assert.notEqual(aliasIndex, -1, 'pre-release.yml must stage stable desktop download aliases');
   assert.notEqual(createIndex, -1, 'pre-release.yml must still create the GitHub release');
-  assert.ok(validateIndex < createIndex, 'asset validation must run before Create GitHub Release');
+  assert.ok(validateIndex < aliasIndex, 'versionless aliases must be staged after versioned asset validation');
+  assert.ok(aliasIndex < createIndex, 'desktop aliases must be staged before Create GitHub Release');
   assert.match(
     source,
     /node scripts\/desktop\/validate-release-update-assets\.mjs[\s\S]*--assets-dir release-assets[\s\S]*--release-tag "\$\{\{ needs\.bump-version\.outputs\.new_tag \}\}"/,
     'pre-release.yml must run the full release validator against release-assets before publishing'
   );
+  for (const alias of [
+    'openteams-windows-x64.msi',
+    'openteams-linux-amd64.deb',
+    'openteams-macos.dmg',
+  ]) {
+    assert.match(source, new RegExp(alias.replace('.', '\\.')));
+  }
 });

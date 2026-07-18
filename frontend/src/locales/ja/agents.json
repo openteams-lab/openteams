@@ -104,6 +104,8 @@
   "agents.empty.desc": "検索条件または状態フィルターを調整してください。",
   "agents.empty.title": "一致するエージェントがありません",
   "agents.env.empty": "環境変数は設定されていません。",
+  "agents.env.error.invalidKey": "{line} 行目の変数名が無効です。英字、数字、アンダースコアのみを使用してください。",
+  "agents.env.error.missingEquals": "{line} 行目が不完全です。KEY=VALUE 形式で入力してください。",
   "agents.env.placeholder": "ANTHROPIC_API_KEY=...\nDEBUG=true",
   "agents.env.title": "環境変数の上書き",
   "agents.filter.all": "すべて",

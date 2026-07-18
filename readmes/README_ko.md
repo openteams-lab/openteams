@@ -44,9 +44,9 @@
   </video>
 </div>
 
-## 잠깐, openteams가 뭔가요?
+## openteams가 뭔가요?
 
-이미 Claude Code, Codex, Gemini CLI 같은 코딩 Agent를 사용하고 있을 것입니다. 각각 따로 쓸 때는 잘 작동합니다. 그러다 두 번째 터미널을 열고, 세 번째 터미널도 엽니다. 같은 컨텍스트를 반복해서 설명하고, 결과를 다른 창으로 옮기고, 누가 무엇을 바꾸는지 직접 기억합니다. 며칠 뒤에는 코드가 여러 세션에 흩어지고 할 일 목록은 다른 곳에 남아, 사용한 Token으로 무엇을 만들었는지 간단히 설명하기 어려워집니다.
+이미 Claude Code, Codex, Gemini CLI 같은 코딩 Agent를 사용하고 있을 것입니다. 각각 따로 쓸 때는 잘 작동합니다. 그러다 두 번째 터미널을 열고, 세 번째 터미널도 엽니다. 같은 컨텍스트를 반복해서 설명하고, 결과를 다른 창으로 옮기고, 누가 무엇을 바꾸는지 직접 기억합니다. 얼마 지나지 않아, 일을 관리하는 대신 Agent를 관리하게 됩니다. 변경 사항은 여러 세션에 흩어져 있고, 프로젝트 우선순위는 다른 곳에 있으며, Token 사용량은 실제로 제공된 결과물과 연결되어 있지 않습니다.
 
 openteams는 기존 에이전트 도구만으로 부족했던 부분을 채웁니다. **에이전트가 대화하고 작업을 넘길 수 있는 하나의 공유 공간, 개발자가 직접 보고 통제하는 계획, 그리고 로드맵을 에이전트에게 넘기지 않으면서 프로젝트 작업과 에이전트 결과물을 연결하는 가벼운 로컬 기록입니다.**
 
@@ -87,8 +87,17 @@ openteams의 목표는 Agent를 더 많이 붙이는 것이 아닙니다. 지금
 
 GitHub Releases에서 사용 중인 플랫폼에 맞는 최신 릴리스를 다운로드하세요.
 
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/openteams-lab/openteams/releases/latest)
-[![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows)](https://github.com/openteams-lab/openteams/releases/latest/download/openteams-windows-x64.msi)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/openteams-lab/openteams/releases/latest/download/openteams-macos.dmg)
+[![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest/download/openteams-linux-amd64.deb)
+
+**macOS:** 현재 macOS 릴리스는 Apple Developer ID로 서명되거나 공증되지 않았습니다. 브라우저는 인터넷에서 다운로드한 앱에 격리 속성을 추가하므로 다운로드 파일이 손상되지 않았더라도 Gatekeeper가 openteams를 “손상됨”으로 표시할 수 있습니다. `openteams.app`을 `/Applications`로 옮긴 후, openteams 공식 GitHub Release에서 받은 앱이라고 신뢰할 수 있을 때만 다음 명령을 실행하세요.
+
+```bash
+xattr -dr com.apple.quarantine /Applications/openteams.app
+```
+
+이 명령은 openteams의 격리 속성만 제거하며 Gatekeeper를 시스템 전체에서 비활성화하지 않습니다.
 
 #### npx
 

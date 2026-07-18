@@ -24,6 +24,15 @@ export interface MachineSummary {
   workloadLabel: string;
 }
 
+export type EnvTextParseResult =
+  | { ok: true; value: Record<string, string> }
+  | {
+      ok: false;
+      error: { line: number; code: "missing_equals" | "invalid_key" };
+    };
+
+const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/u;
+
 export function getRunnerLabel(runner: BaseCodingAgent | string): string {
   return runner
     .toString()
@@ -117,20 +126,32 @@ export function envSummaryToText(envSummary: AgentRuntimeEnvSummary[]): string {
   return envSummary.map((entry) => `${entry.key}=${entry.value}`).join("\n");
 }
 
-export function parseEnvText(text: string): Record<string, string> {
-  return text
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .reduce<Record<string, string>>((acc, line) => {
-      const equalsIndex = line.indexOf("=");
-      if (equalsIndex <= 0) {
-        acc[line] = "";
-        return acc;
-      }
+export function parseEnvText(text: string): EnvTextParseResult {
+  const value: Record<string, string> = {};
+  const lines = text.split(/\r?\n/u);
 
-      const key = line.slice(0, equalsIndex).trim();
-      if (key) acc[key] = line.slice(equalsIndex + 1);
-      return acc;
-    }, {});
+  for (const [index, rawLine] of lines.entries()) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const equalsIndex = line.indexOf("=");
+    if (equalsIndex === -1) {
+      return {
+        ok: false,
+        error: { line: index + 1, code: "missing_equals" },
+      };
+    }
+
+    const key = line.slice(0, equalsIndex).trim();
+    if (!ENV_KEY_PATTERN.test(key)) {
+      return {
+        ok: false,
+        error: { line: index + 1, code: "invalid_key" },
+      };
+    }
+
+    value[key] = line.slice(equalsIndex + 1);
+  }
+
+  return { ok: true, value };
 }

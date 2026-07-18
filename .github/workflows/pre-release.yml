@@ -2121,6 +2121,38 @@ jobs:
               .addCodeBlock(body, 'markdown')
               .write();
 
+      - name: Stage stable desktop download aliases
+        shell: bash
+        run: |
+          set -euo pipefail
+          desktop_dir='release-assets/desktop'
+
+          copy_single_asset() {
+            local pattern="$1"
+            local destination="$2"
+            mapfile -t matches < <(find "$desktop_dir" -type f -name "$pattern")
+            if [ "${#matches[@]}" -ne 1 ]; then
+              echo "::error::Expected exactly one desktop asset matching $pattern, found ${#matches[@]}"
+              exit 1
+            fi
+            cp "${matches[0]}" "$desktop_dir/$destination"
+          }
+
+          copy_single_asset '*-windows.msi' 'openteams-windows-x64.msi'
+          copy_single_asset '*_amd64-linux.deb' 'openteams-linux-amd64.deb'
+
+          if [ -f "$desktop_dir/openteams-signed.dmg" ]; then
+            macos_dmg="$desktop_dir/openteams-signed.dmg"
+          else
+            mapfile -t macos_dmgs < <(find "$desktop_dir" -type f -name '*-unsigned.dmg')
+            if [ "${#macos_dmgs[@]}" -ne 1 ]; then
+              echo "::error::Expected exactly one signed or unsigned macOS DMG, found ${#macos_dmgs[@]}"
+              exit 1
+            fi
+            macos_dmg="${macos_dmgs[0]}"
+          fi
+          cp "$macos_dmg" "$desktop_dir/openteams-macos.dmg"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
