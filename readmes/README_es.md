@@ -91,6 +91,14 @@ Descarga la última versión para tu plataforma desde GitHub Releases.
 [![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple)](https://github.com/openteams-lab/openteams/releases/latest/download/openteams-macos.dmg)
 [![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/openteams-lab/openteams/releases/latest/download/openteams-linux-amd64.deb)
 
+**macOS:** La versión actual para macOS no está firmada con Apple Developer ID ni notarizada por Apple. Los navegadores añaden un atributo de cuarentena a las aplicaciones descargadas de Internet, por lo que Gatekeeper puede indicar que openteams está «dañada» aunque la descarga esté intacta. Después de mover `openteams.app` a `/Applications`, y solo si confías en que procede de la GitHub Release oficial de openteams, ejecuta:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/openteams.app
+```
+
+Este comando solo elimina el atributo de cuarentena de openteams; no desactiva Gatekeeper globalmente.
+
 #### npx
 
 ```bash
