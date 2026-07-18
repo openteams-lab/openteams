@@ -181,13 +181,19 @@ async function createValidReleaseDir({
   return dir;
 }
 
-function runValidator(assetsDir, configPath = path.join(assetsDir, 'tauri.conf.json'), releaseTag = 'v0.4.8') {
+function runValidator(
+  assetsDir,
+  configPath = path.join(assetsDir, 'tauri.conf.json'),
+  releaseTag = 'v0.4.8',
+  env = process.env,
+) {
   return spawnSync(
     process.execPath,
     [scriptPath, '--assets-dir', assetsDir, '--release-tag', releaseTag, '--config', configPath],
     {
       cwd: root,
       encoding: 'utf8',
+      env,
     }
   );
 }
@@ -204,6 +210,41 @@ test('validator accepts a valid release directory without dmg', async () => {
   const dir = await createValidReleaseDir();
   try {
     const result = runValidator(dir);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('validator extracts a deb control entry without a leading dot', async () => {
+  const dir = await createValidReleaseDir();
+  try {
+    const binDir = path.join(dir, 'bin');
+    const fakeTar = path.join(binDir, 'tar');
+    await writeFile(
+      fakeTar,
+      `#!/bin/sh
+for argument in "$@"; do
+  if [ "$argument" = "./control" ]; then
+    echo "strict tar fixture rejects ./control" >&2
+    exit 2
+  fi
+done
+exec "$REAL_TAR" "$@"
+`,
+    );
+    await fs.chmod(fakeTar, 0o755);
+    const realTar = execFileSync('sh', ['-c', 'command -v tar'], { encoding: 'utf8' }).trim();
+    const result = runValidator(
+      dir,
+      path.join(dir, 'tauri.conf.json'),
+      'v0.4.8',
+      {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH || ''}`,
+        REAL_TAR: realTar,
+      },
+    );
     assert.equal(result.status, 0, result.stderr || result.stdout);
   } finally {
     await fs.rm(dir, { recursive: true, force: true });

@@ -320,9 +320,17 @@ function validateDebAsset(debPath, name, releaseVersion) {
   if (!members.includes('debian-binary') || !controlName) return false;
   const controlArchive = execFileSync('ar', ['p', debPath, controlName]);
   const compressionOption = controlName.endsWith('.gz') ? '-z' : '-J';
+  const controlEntry = execFileSync(
+    'tar',
+    ['-t', compressionOption, '-f', '-'],
+    { input: controlArchive, encoding: 'utf8' },
+  )
+    .split(/\r?\n/)
+    .find((entry) => entry.replace(/^\.\//, '') === 'control');
+  if (!controlEntry) return false;
   const control = execFileSync(
     'tar',
-    ['-x', compressionOption, '-O', '-f', '-', './control'],
+    ['-x', compressionOption, '-O', '-f', '-', controlEntry],
     { input: controlArchive, encoding: 'utf8' },
   );
   const architecture = control.match(/^Architecture:\s*(\S+)/m)?.[1];
