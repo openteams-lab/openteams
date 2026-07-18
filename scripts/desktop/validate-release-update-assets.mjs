@@ -116,6 +116,10 @@ function normalizeVersion(raw) {
   return String(raw).trim().replace(/^v/i, '');
 }
 
+function packageVersionFromReleaseTag(releaseTag) {
+  return normalizeVersion(releaseTag).replace(/[-.]\d{14}$/, '');
+}
+
 async function walk(dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const files = [];
@@ -183,25 +187,26 @@ function architecturePattern(architecture) {
   }[architecture];
 }
 
-function ensureManifestEntryShape(platformKey, basename, releaseVersion) {
-  const version = escapeRegExp(normalizeVersion(releaseVersion));
+function ensureManifestEntryShape(platformKey, basename, releaseVersion, desktopVersion) {
+  const releaseArtifactVersion = escapeRegExp(normalizeVersion(releaseVersion));
+  const desktopArtifactVersion = escapeRegExp(normalizeVersion(desktopVersion));
   if (/^darwin-(aarch64|x86_64)$/.test(platformKey)) {
     const architecture = architecturePattern(platformKey.slice('darwin-'.length));
-    if (!new RegExp(`^openteams[_-]v?${version}[_-]${architecture}\\.app\\.tar\\.gz$`).test(basename)) {
+    if (!new RegExp(`^openteams[_-]v?${releaseArtifactVersion}[_-]${architecture}\\.app\\.tar\\.gz$`).test(basename)) {
       throw new Error(`Darwin updater must be a .app.tar.gz archive: ${basename}`);
     }
     return 'darwin';
   }
   if (/^linux-(aarch64|x86_64|i686)$/.test(platformKey)) {
     const architecture = architecturePattern(platformKey.slice('linux-'.length));
-    if (!new RegExp(`^openteams[_-]v?${version}[_-]${architecture}\\.AppImage\\.tar\\.gz$`).test(basename)) {
+    if (!new RegExp(`^openteams[_-]v?${desktopArtifactVersion}[_-]${architecture}\\.AppImage\\.tar\\.gz$`).test(basename)) {
       throw new Error(`Linux updater must be a .AppImage.tar.gz archive: ${basename}`);
     }
     return 'linux';
   }
   if (/^windows-(aarch64|x86_64|i686)$/.test(platformKey)) {
     const architecture = architecturePattern(platformKey.slice('windows-'.length));
-    if (!new RegExp(`^openteams[_-]v?${version}[_-]${architecture}(?:[_-][A-Za-z0-9-]+)?\\.msi\\.zip$`).test(basename)) {
+    if (!new RegExp(`^openteams[_-]v?${desktopArtifactVersion}[_-]${architecture}(?:[_-][A-Za-z0-9-]+)?\\.msi\\.zip$`).test(basename)) {
       throw new Error(`Windows updater must be a .msi.zip archive: ${basename}`);
     }
     return 'windows';
@@ -328,6 +333,10 @@ async function main() {
   const manifestPath = requireAsset(assets, 'latest.json');
   const policyPath = requireAsset(assets, 'update-policy.json');
   const config = JSON.parse(await fs.readFile(path.resolve(args.config), 'utf8'));
+  const desktopVersion = normalizeVersion(config?.package?.version || '');
+  if (!desktopVersion) {
+    throw new Error(`Missing desktop package version in ${args.config}`);
+  }
   const publicKey = config?.tauri?.updater?.pubkey;
   if (typeof publicKey !== 'string' || !publicKey.trim()) {
     throw new Error(`Missing updater public key in ${args.config}`);
@@ -338,6 +347,13 @@ async function main() {
   const policy = JSON.parse(await fs.readFile(policyPath, 'utf8'));
 
   const normalizedReleaseVersion = normalizeVersion(args.releaseTag);
+  const expectedPackageVersion = packageVersionFromReleaseTag(args.releaseTag);
+  const expectedDesktopVersion = expectedPackageVersion.split('-')[0];
+  if (desktopVersion !== expectedDesktopVersion) {
+    throw new Error(
+      `Desktop package version ${desktopVersion} does not match release package version ${expectedPackageVersion}`
+    );
+  }
   if (normalizeVersion(manifest.version) !== normalizedReleaseVersion) {
     throw new Error(
       `Manifest version ${manifest.version} does not match release ${normalizedReleaseVersion}`
@@ -361,7 +377,12 @@ async function main() {
       throw new Error(`Manifest entry is invalid for ${platformKey}`);
     }
     const basename = parseAllowedManifestUrl(entry.url, args.releaseTag);
-    const kind = ensureManifestEntryShape(platformKey, basename, normalizedReleaseVersion);
+    const kind = ensureManifestEntryShape(
+      platformKey,
+      basename,
+      normalizedReleaseVersion,
+      desktopVersion,
+    );
     platformKinds.add(kind);
     requireAsset(assets, basename);
     if (kind === 'linux') {
@@ -392,9 +413,9 @@ async function main() {
   }
 
   const debPattern = new RegExp(
-    `^openteams[_-]v?${escapeRegExp(normalizedReleaseVersion)}[_-](?:amd64|x86_64|x64|arm64|aarch64|i386|i686|x86)(?:[_-]linux)?\\.deb$`,
+    `^openteams[_-]v?${escapeRegExp(desktopVersion)}[_-](?:amd64|x86_64|x64|arm64|aarch64|i386|i686|x86)(?:[_-]linux)?\\.deb$`,
   );
-  if (![...assets.entries()].some(([name, file]) => debPattern.test(name) && validateDebAsset(file, name, normalizedReleaseVersion))) {
+  if (![...assets.entries()].some(([name, file]) => debPattern.test(name) && validateDebAsset(file, name, desktopVersion))) {
     throw new Error('At least one Linux .deb asset is required.');
   }
 
@@ -409,15 +430,15 @@ async function main() {
   }
 
   const packages = [...assets.keys()].filter((name) =>
-    new RegExp(`^openteams-v?${escapeRegExp(normalizedReleaseVersion)}\\.tgz$`).test(name)
+    new RegExp(`^openteams-v?${escapeRegExp(expectedPackageVersion)}\\.tgz$`).test(name)
   );
   if (packages.length !== 1) {
     throw new Error('Expected exactly one validated main Web package.');
   }
   const packageVersion = readPackageVersion(requireAsset(assets, packages[0]));
-  if (packageVersion !== normalizedReleaseVersion) {
+  if (packageVersion !== expectedPackageVersion) {
     throw new Error(
-      `Main Web package version ${packageVersion} does not match manifest version ${normalizedReleaseVersion}`
+      `Main Web package version ${packageVersion} does not match release package version ${expectedPackageVersion}`
     );
   }
 }

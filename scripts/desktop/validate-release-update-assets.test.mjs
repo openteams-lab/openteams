@@ -106,50 +106,72 @@ async function createDeb(targetPath, version = '0.4.8') {
   await fs.rm(workspaceDir, { recursive: true, force: true });
 }
 
-async function createValidReleaseDir({ linuxAppImageUpdater = false, includeDmg = false, prehashedSignatures = false, macExecutableSize = 8 } = {}) {
+async function createValidReleaseDir({
+  linuxAppImageUpdater = false,
+  includeDmg = false,
+  prehashedSignatures = false,
+  macExecutableSize = 8,
+  includeWindowsUpdater = false,
+  releaseTag = 'v0.4.8',
+  packageVersion = '0.4.8',
+  desktopVersion = '0.4.8',
+} = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'openteams-release-assets-'));
-  const tag = 'v0.4.8';
-  const macArchive = 'openteams-0.4.8-x86_64.app.tar.gz';
-  const linuxArchive = 'openteams-0.4.8-x86_64.AppImage.tar.gz';
-  const debName = 'openteams_0.4.8_amd64-linux.deb';
-  const webTarball = 'openteams-0.4.8.tgz';
+  const macArtifactVersion = releaseTag === `v${packageVersion}` ? packageVersion : releaseTag;
+  const macArchive = `openteams-${macArtifactVersion}-x86_64.app.tar.gz`;
+  const linuxArchive = `openteams-${desktopVersion}-x86_64.AppImage.tar.gz`;
+  const debName = `openteams_${desktopVersion}_amd64-linux.deb`;
+  const webTarball = `openteams-${packageVersion}.tgz`;
   const signer = createFixtureSigner({ prehashed: prehashedSignatures });
 
   await createMacArchive(path.join(dir, macArchive), macExecutableSize);
   await writeFile(path.join(dir, `${macArchive}.sig`), `${signer.sign(await fs.readFile(path.join(dir, macArchive)))}\n`);
-  await createDeb(path.join(dir, debName));
-  await createMainPackageTarball(path.join(dir, webTarball));
+  await createDeb(path.join(dir, debName), desktopVersion);
+  await createMainPackageTarball(path.join(dir, webTarball), packageVersion);
   const macSignature = (await fs.readFile(path.join(dir, `${macArchive}.sig`), 'utf8')).trim();
 
   const manifest = {
-    version: tag,
+    version: releaseTag,
     platforms: {
       'darwin-x86_64': {
         signature: macSignature,
-        url: `https://github.com/openteams-lab/openteams/releases/download/${tag}/${macArchive}`,
+        url: `https://github.com/openteams-lab/openteams/releases/download/${releaseTag}/${macArchive}`,
       },
     },
   };
 
+  if (includeWindowsUpdater) {
+    const windowsArchive = `openteams_${desktopVersion}_x64_en-US-windows.msi.zip`;
+    await writeFile(path.join(dir, windowsArchive), 'windows updater');
+    await writeFile(
+      path.join(dir, `${windowsArchive}.sig`),
+      `${signer.sign(await fs.readFile(path.join(dir, windowsArchive)))}\n`,
+    );
+    manifest.platforms['windows-x86_64'] = {
+      signature: (await fs.readFile(path.join(dir, `${windowsArchive}.sig`), 'utf8')).trim(),
+      url: `https://github.com/openteams-lab/openteams/releases/download/${releaseTag}/${windowsArchive}`,
+    };
+  }
+
   if (linuxAppImageUpdater) {
-    const rawPath = path.join(dir, 'openteams-0.4.8-x86_64.AppImage');
+    const rawPath = path.join(dir, `openteams-${desktopVersion}-x86_64.AppImage`);
     await createLinuxAppImage(path.join(dir, linuxArchive), rawPath);
     await writeFile(path.join(dir, `${linuxArchive}.sig`), `${signer.sign(await fs.readFile(path.join(dir, linuxArchive)))}\n`);
     const linuxSignature = (await fs.readFile(path.join(dir, `${linuxArchive}.sig`), 'utf8')).trim();
     manifest.platforms['linux-x86_64'] = {
       signature: linuxSignature,
-      url: `https://github.com/openteams-lab/openteams/releases/download/${tag}/${linuxArchive}`,
+      url: `https://github.com/openteams-lab/openteams/releases/download/${releaseTag}/${linuxArchive}`,
     };
   }
 
   if (includeDmg) {
-    await writeFile(path.join(dir, 'openteams-0.4.8-x86_64.dmg'), 'dmg installer');
+    await writeFile(path.join(dir, `openteams-${desktopVersion}-x86_64.dmg`), 'dmg installer');
   }
 
   await writeFile(path.join(dir, 'latest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   await writeFile(
     path.join(dir, 'tauri.conf.json'),
-    `${JSON.stringify({ tauri: { updater: { pubkey: signer.publicKey } } }, null, 2)}\n`,
+    `${JSON.stringify({ package: { version: desktopVersion }, tauri: { updater: { pubkey: signer.publicKey } } }, null, 2)}\n`,
   );
   await writeFile(
     path.join(dir, 'update-policy.json'),
@@ -159,10 +181,10 @@ async function createValidReleaseDir({ linuxAppImageUpdater = false, includeDmg 
   return dir;
 }
 
-function runValidator(assetsDir, configPath = path.join(assetsDir, 'tauri.conf.json')) {
+function runValidator(assetsDir, configPath = path.join(assetsDir, 'tauri.conf.json'), releaseTag = 'v0.4.8') {
   return spawnSync(
     process.execPath,
-    [scriptPath, '--assets-dir', assetsDir, '--release-tag', 'v0.4.8', '--config', configPath],
+    [scriptPath, '--assets-dir', assetsDir, '--release-tag', releaseTag, '--config', configPath],
     {
       cwd: root,
       encoding: 'utf8',
@@ -182,6 +204,32 @@ test('validator accepts a valid release directory without dmg', async () => {
   const dir = await createValidReleaseDir();
   try {
     const result = runValidator(dir);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('validator distinguishes timestamped release tags from package and desktop versions', async () => {
+  const releaseTag = 'v0.4.8-20260718072609';
+  const dir = await createValidReleaseDir({ releaseTag, includeWindowsUpdater: true });
+  try {
+    const result = runValidator(dir, path.join(dir, 'tauri.conf.json'), releaseTag);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('validator distinguishes prerelease package versions from stable desktop versions', async () => {
+  const releaseTag = 'v0.4.8-123.20260718072609';
+  const dir = await createValidReleaseDir({
+    releaseTag,
+    packageVersion: '0.4.8-123',
+    includeWindowsUpdater: true,
+  });
+  try {
+    const result = runValidator(dir, path.join(dir, 'tauri.conf.json'), releaseTag);
     assert.equal(result.status, 0, result.stderr || result.stdout);
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
@@ -288,7 +336,7 @@ test('validator rejects a validly shaped signature made by a different public ke
     const differentPublicKey = Buffer.from(publicKeyText.join('\n'), 'utf8').toString('base64');
     await writeFile(
       path.join(dir, 'tauri.conf.json'),
-      `${JSON.stringify({ tauri: { updater: { pubkey: differentPublicKey } } }, null, 2)}\n`,
+      `${JSON.stringify({ package: fixtureConfig.package, tauri: { updater: { pubkey: differentPublicKey } } }, null, 2)}\n`,
     );
     const result = runValidator(dir);
     assert.notEqual(result.status, 0);
