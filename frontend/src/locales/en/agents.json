@@ -104,6 +104,8 @@
   "agents.empty.desc": "Adjust search or status filters.",
   "agents.empty.title": "No matching agents",
   "agents.env.empty": "No environment variables configured.",
+  "agents.env.error.invalidKey": "Line {line} has an invalid variable name. Use letters, numbers, and underscores only.",
+  "agents.env.error.missingEquals": "Line {line} is incomplete. Use KEY=VALUE.",
   "agents.env.placeholder": "ANTHROPIC_API_KEY=...\nDEBUG=true",
   "agents.env.title": "Environment overrides",
   "agents.filter.all": "All",

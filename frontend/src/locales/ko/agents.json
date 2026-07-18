@@ -104,6 +104,8 @@
   "agents.empty.desc": "검색어 또는 상태 필터를 조정하세요.",
   "agents.empty.title": "일치하는 에이전트가 없습니다",
   "agents.env.empty": "환경 변수가 설정되지 않았습니다.",
+  "agents.env.error.invalidKey": "{line}번째 줄의 변수 이름이 잘못되었습니다. 문자, 숫자, 밑줄만 사용하세요.",
+  "agents.env.error.missingEquals": "{line}번째 줄이 완전하지 않습니다. KEY=VALUE 형식을 사용하세요.",
   "agents.env.placeholder": "ANTHROPIC_API_KEY=...\nDEBUG=true",
   "agents.env.title": "환경 변수 재정의",
   "agents.filter.all": "전체",

@@ -104,6 +104,8 @@
   "agents.empty.desc": "Ajusta la búsqueda o los filtros de estado.",
   "agents.empty.title": "No hay agentes coincidentes",
   "agents.env.empty": "No hay variables de entorno configuradas.",
+  "agents.env.error.invalidKey": "La línea {line} tiene un nombre de variable no válido. Usa solo letras, números y guiones bajos.",
+  "agents.env.error.missingEquals": "La línea {line} está incompleta. Usa KEY=VALUE.",
   "agents.env.placeholder": "ANTHROPIC_API_KEY=...\nDEBUG=true",
   "agents.env.title": "Variables de entorno",
   "agents.filter.all": "Todos",

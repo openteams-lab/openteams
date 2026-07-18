@@ -119,11 +119,35 @@ check(
   ]) === "OPENAI_API_KEY=sk-live-test\nDEBUG=true",
 );
 check(
-  "parses env text",
-  same(parseEnvText("OPENAI_API_KEY=secret\nEMPTY_VALUE\nMODEL=gpt-5"), {
-    OPENAI_API_KEY: "secret",
-    EMPTY_VALUE: "",
-    MODEL: "gpt-5",
+  "parses complete env text",
+  same(parseEnvText("OPENAI_API_KEY=secret\nEMPTY_VALUE=\nURL=a=b"), {
+    ok: true,
+    value: {
+      OPENAI_API_KEY: "secret",
+      EMPTY_VALUE: "",
+      URL: "a=b",
+    },
+  }),
+);
+check(
+  "rejects incomplete env lines",
+  same(parseEnvText("OPENAI_API_KEY=secret\nHTTP_PROXY"), {
+    ok: false,
+    error: { line: 2, code: "missing_equals" },
+  }),
+);
+check(
+  "rejects invalid env keys",
+  same(parseEnvText("export HTTP_PROXY=http://localhost:7890"), {
+    ok: false,
+    error: { line: 1, code: "invalid_key" },
+  }),
+);
+check(
+  "rejects empty env keys",
+  same(parseEnvText("=http://localhost:7890"), {
+    ok: false,
+    error: { line: 1, code: "invalid_key" },
   }),
 );
 check(
