@@ -214,13 +214,17 @@ function ensureManifestEntryShape(platformKey, basename, releaseVersion, desktop
   throw new Error(`Unsupported manifest platform key: ${platformKey}`);
 }
 
-function readPackageVersion(packagePath) {
+function readPackageMetadata(packagePath) {
   const packageJson = execFileSync(
     'tar',
     ['-xOf', packagePath, 'package/package.json'],
     { encoding: 'utf8' }
   );
-  return normalizeVersion(JSON.parse(packageJson).version);
+  const metadata = JSON.parse(packageJson);
+  return {
+    name: metadata.name,
+    version: normalizeVersion(metadata.version),
+  };
 }
 
 function readTarEntries(archivePath) {
@@ -443,15 +447,18 @@ async function main() {
   }
 
   const packages = [...assets.keys()].filter((name) =>
-    new RegExp(`^openteams-v?${escapeRegExp(expectedPackageVersion)}\\.tgz$`).test(name)
+    new RegExp(`^openteams-lab-openteams-web-v?${escapeRegExp(expectedPackageVersion)}\\.tgz$`).test(name)
   );
   if (packages.length !== 1) {
     throw new Error('Expected exactly one validated main Web package.');
   }
-  const packageVersion = readPackageVersion(requireAsset(assets, packages[0]));
-  if (packageVersion !== expectedPackageVersion) {
+  const packageMetadata = readPackageMetadata(requireAsset(assets, packages[0]));
+  if (packageMetadata.name !== '@openteams-lab/openteams-web') {
+    throw new Error(`Unexpected main Web package name: ${packageMetadata.name}`);
+  }
+  if (packageMetadata.version !== expectedPackageVersion) {
     throw new Error(
-      `Main Web package version ${packageVersion} does not match release package version ${expectedPackageVersion}`
+      `Main Web package version ${packageMetadata.version} does not match release package version ${expectedPackageVersion}`
     );
   }
 }

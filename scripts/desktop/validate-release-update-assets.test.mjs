@@ -121,7 +121,7 @@ async function createValidReleaseDir({
   const macArchive = `openteams-${macArtifactVersion}-x86_64.app.tar.gz`;
   const linuxArchive = `openteams-${desktopVersion}-x86_64.AppImage.tar.gz`;
   const debName = `openteams_${desktopVersion}_amd64-linux.deb`;
-  const webTarball = `openteams-${packageVersion}.tgz`;
+  const webTarball = `openteams-lab-openteams-web-${packageVersion}.tgz`;
   const signer = createFixtureSigner({ prehashed: prehashedSignatures });
 
   await createMacArchive(path.join(dir, macArchive), macExecutableSize);
@@ -338,7 +338,7 @@ test('validator rejects linux manifest entries when policy is disabled', async (
 });
 
 test('validator rejects missing required release assets', async () => {
-  const cases = ['latest.json', 'update-policy.json', 'openteams-0.4.8-x86_64.app.tar.gz', 'openteams_0.4.8_amd64-linux.deb', 'openteams-0.4.8.tgz'];
+  const cases = ['latest.json', 'update-policy.json', 'openteams-0.4.8-x86_64.app.tar.gz', 'openteams_0.4.8_amd64-linux.deb', 'openteams-lab-openteams-web-0.4.8.tgz'];
 
   for (const missing of cases) {
     const dir = await createValidReleaseDir();
@@ -456,8 +456,8 @@ test('validator rejects a main tgz whose filename version does not match the rel
   const dir = await createValidReleaseDir();
   try {
     await fs.rename(
-      path.join(dir, 'openteams-0.4.8.tgz'),
-      path.join(dir, 'openteams-0.4.7.tgz'),
+      path.join(dir, 'openteams-lab-openteams-web-0.4.8.tgz'),
+      path.join(dir, 'openteams-lab-openteams-web-0.4.7.tgz'),
     );
     const result = runValidator(dir);
     assert.notEqual(result.status, 0);
