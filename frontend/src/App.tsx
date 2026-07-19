@@ -92,6 +92,7 @@ import { notifyInboxWorkflowFocus } from "@/lib/inboxNavigation";
 import { mapSession } from "@/lib/mappers";
 import { mockFrontendApi } from "@/lib/mockFrontendApi";
 import { projectDisplayName } from "@/lib/projectDisplay";
+import { formatVersionForDisplay } from "@/lib/versionDisplay";
 import {
   buildTemplateMemberSpecs,
 } from "@/lib/teamTemplateRuntime";
@@ -2183,11 +2184,17 @@ function WorkspaceLayout() {
       {versionUpdate.reminder && (
         <NotificationToast
           title={t('onboarding.upgrade.toastTitle', {
-            version: versionUpdate.reminder.latest_version,
+            version: formatVersionForDisplay(
+              versionUpdate.reminder.latest_version,
+            ),
           })}
           message={t('onboarding.upgrade.toastMessage', {
-            current: versionUpdate.reminder.current_version,
-            latest: versionUpdate.reminder.latest_version,
+            current: formatVersionForDisplay(
+              versionUpdate.reminder.current_version,
+            ),
+            latest: formatVersionForDisplay(
+              versionUpdate.reminder.latest_version,
+            ),
           })}
           tone="info"
           actionLabel={t('onboarding.upgrade.toastAction')}

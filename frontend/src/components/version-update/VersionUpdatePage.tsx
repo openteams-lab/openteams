@@ -19,6 +19,7 @@ import ReactMarkdown from 'react-markdown';
 import type { VersionCheckResponse } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { getUpdatePageViewModel } from '@/lib/updatePresentation';
+import { formatVersionForDisplay } from '@/lib/versionDisplay';
 import type { VersionUpdateCheckStatus } from '@/hooks/useVersionUpdate';
 import type { Theme } from '@/types';
 import type {
@@ -159,8 +160,12 @@ export function VersionUpdatePage({
 }: VersionUpdatePageProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const currentDisplay = versionUpdateInfo?.current_version ?? currentVersion;
-  const latestDisplay = versionUpdateInfo?.latest_version ?? currentVersion;
+  const currentDisplay = formatVersionForDisplay(
+    versionUpdateInfo?.current_version ?? currentVersion,
+  );
+  const latestDisplay = formatVersionForDisplay(
+    versionUpdateInfo?.latest_version ?? currentVersion,
+  );
   const releaseNotes = versionUpdateInfo?.release_notes?.trim();
   const hasUpdate = Boolean(versionUpdateInfo?.has_update);
   const updateView = getUpdatePageViewModel({
