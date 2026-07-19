@@ -1,14 +1,20 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { groupCommandsByCategory } from './commandRegistry';
 import { useShortcuts } from './ShortcutProvider';
 
 export function ShortcutHelpDialog() {
   const {
+    categoryTitleFor,
     definitions,
     helpOpen,
     presentationFor,
     setHelpOpen,
   } = useShortcuts();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const commandGroups = useMemo(
+    () => groupCommandsByCategory(definitions),
+    [definitions],
+  );
 
   useEffect(() => {
     if (!helpOpen) return;
@@ -55,21 +61,38 @@ export function ShortcutHelpDialog() {
           </button>
         </div>
         <div className="grid min-h-0 gap-0.5 overflow-y-auto p-2 ot-scroll-area-styled">
-          {definitions.map((command) => {
-            const presentation = presentationFor(command.id);
+          {commandGroups.map((group) => {
+            const headingId = `shortcut-help-${group.categoryKey}`;
             return (
-              <div
-                key={command.id}
-                data-command-id={command.id}
-                className="flex min-h-10 items-center justify-between gap-4 rounded-[8px] px-3 py-2 text-[13px] transition-colors hover:bg-[var(--surface-2)]"
+              <section
+                key={group.categoryKey}
+                data-command-category={group.categoryKey}
+                aria-labelledby={headingId}
               >
-                <span className="min-w-0 flex-1 truncate font-medium text-[var(--ink-muted)]">
-                  {presentation.title}
-                </span>
-                <span className="shrink-0 rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-2)] px-2 py-1 font-mono text-[10px] leading-none text-[var(--ink-subtle)]">
-                  {presentation.label}
-                </span>
-              </div>
+                <h3
+                  id={headingId}
+                  className="px-3 pb-1 pt-3 text-[11px] font-semibold text-[var(--ink-tertiary)]"
+                >
+                  {categoryTitleFor(group.categoryKey)}
+                </h3>
+                {group.commands.map((command) => {
+                  const presentation = presentationFor(command.id);
+                  return (
+                    <div
+                      key={command.id}
+                      data-command-id={command.id}
+                      className="flex min-h-10 items-center justify-between gap-4 rounded-[8px] px-3 py-2 text-[13px] transition-colors hover:bg-[var(--surface-2)]"
+                    >
+                      <span className="min-w-0 flex-1 truncate font-medium text-[var(--ink-muted)]">
+                        {presentation.title}
+                      </span>
+                      <span className="shrink-0 rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-2)] px-2 py-1 font-mono text-[10px] leading-none text-[var(--ink-subtle)]">
+                        {presentation.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </section>
             );
           })}
         </div>

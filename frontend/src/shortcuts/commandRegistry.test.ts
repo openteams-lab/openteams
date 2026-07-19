@@ -1,11 +1,71 @@
 import assert from 'node:assert/strict';
-import { commandRegistry } from './commandRegistry';
+import {
+  commandRegistry,
+  groupCommandsByCategory,
+  shortcutCategoryOrder,
+} from './commandRegistry';
 import { expectedCommandRegistry } from './commandRegistry.test-fixture';
 
 assert.equal(expectedCommandRegistry.length, 57);
 assert.equal(new Set(expectedCommandRegistry.map((item) => item.id)).size, 57);
 assert.deepEqual(commandRegistry, expectedCommandRegistry);
 assert.equal(new Set(commandRegistry.map((item) => item.id)).size, 57);
+assert.deepEqual(shortcutCategoryOrder, [
+  'shortcuts.category.generalSearch',
+  'shortcuts.category.workspaceNavigation',
+  'shortcuts.category.agentsTeam',
+  'shortcuts.category.issues',
+  'shortcuts.category.sourceControl',
+  'shortcuts.category.worktreeConflicts',
+  'shortcuts.category.workflowPlanning',
+  'shortcuts.category.settings',
+]);
+const categoryGroups = groupCommandsByCategory(commandRegistry);
+assert.deepEqual(
+  categoryGroups.map((group) => group.categoryKey),
+  shortcutCategoryOrder,
+);
+assert.deepEqual(
+  categoryGroups.map((group) => group.commands.length),
+  [3, 8, 2, 11, 8, 7, 16, 2],
+);
+assert.equal(
+  commandRegistry.some(
+    (definition) => definition.categoryKey === 'shortcuts.category.create',
+  ),
+  false,
+);
+for (const commandId of ['project.create', 'session.create']) {
+  assert.equal(
+    commandRegistry.find((definition) => definition.id === commandId)
+      ?.categoryKey,
+    'shortcuts.category.workspaceNavigation',
+  );
+}
+assert.deepEqual(
+  groupCommandsByCategory(
+    commandRegistry.filter((definition) =>
+      ['search.open', 'workflow.open', 'settings.open'].includes(definition.id),
+    ),
+  ).map((group) => ({
+    categoryKey: group.categoryKey,
+    commandIds: group.commands.map((definition) => definition.id),
+  })),
+  [
+    {
+      categoryKey: 'shortcuts.category.generalSearch',
+      commandIds: ['search.open'],
+    },
+    {
+      categoryKey: 'shortcuts.category.workflowPlanning',
+      commandIds: ['workflow.open'],
+    },
+    {
+      categoryKey: 'shortcuts.category.settings',
+      commandIds: ['settings.open'],
+    },
+  ],
+);
 assert.deepEqual(
   [
     ...new Set(

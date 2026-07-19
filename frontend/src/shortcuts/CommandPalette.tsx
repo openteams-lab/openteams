@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { groupCommandsByCategory } from './commandRegistry';
 import { useShortcuts } from './ShortcutProvider';
 
 export function CommandPalette() {
   const {
+    categoryTitleFor,
     definitions,
     executeCommand,
     paletteOpen,
@@ -26,6 +28,10 @@ export function CommandPalette() {
         .includes(normalized);
     });
   }, [definitions, presentationFor, query]);
+  const commandGroups = useMemo(
+    () => groupCommandsByCategory(commands),
+    [commands],
+  );
   if (!paletteOpen) return null;
   return (
     <div className="fixed inset-0 z-[70] flex justify-center bg-black/55 px-4 pt-[12vh] backdrop-blur-[2px]">
@@ -47,27 +53,44 @@ export function CommandPalette() {
           className="h-12 w-full shrink-0 border-b border-[var(--hairline)] bg-[var(--surface-1)] px-4 text-[14px] text-[var(--ink)] caret-[var(--primary)] outline-none placeholder:text-[var(--ink-tertiary)] focus:bg-[var(--surface-2)]"
         />
         <div className="max-h-[min(55vh,480px)] overflow-y-auto p-1.5 ot-scroll-area-styled">
-          {commands.map((command) => {
-            const presentation = presentationFor(command.id);
+          {commandGroups.map((group) => {
+            const headingId = `command-palette-${group.categoryKey}`;
             return (
-              <button
-                key={command.id}
-                data-command-id={command.id}
-                disabled={Boolean(presentation.disabledReason)}
-                onClick={() => {
-                  void executeCommand(command.id).then((executed) => {
-                    if (executed) setPaletteOpen(false);
-                  });
-                }}
-                className="flex min-h-9 w-full items-center justify-between gap-4 rounded-[8px] px-3 py-2 text-left text-[13px] text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:text-[var(--ink-tertiary)] disabled:opacity-55"
+              <section
+                key={group.categoryKey}
+                data-command-category={group.categoryKey}
+                aria-labelledby={headingId}
               >
-                <span className="min-w-0 flex-1 truncate font-medium">
-                  {presentation.title}
-                </span>
-                <span className="shrink-0 rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-2)] px-2 py-1 font-mono text-[10px] leading-none text-[var(--ink-subtle)]">
-                  {presentation.label}
-                </span>
-              </button>
+                <h3
+                  id={headingId}
+                  className="px-3 pb-1 pt-3 text-[11px] font-semibold text-[var(--ink-tertiary)]"
+                >
+                  {categoryTitleFor(group.categoryKey)}
+                </h3>
+                {group.commands.map((command) => {
+                  const presentation = presentationFor(command.id);
+                  return (
+                    <button
+                      key={command.id}
+                      data-command-id={command.id}
+                      disabled={Boolean(presentation.disabledReason)}
+                      onClick={() => {
+                        void executeCommand(command.id).then((executed) => {
+                          if (executed) setPaletteOpen(false);
+                        });
+                      }}
+                      className="flex min-h-9 w-full items-center justify-between gap-4 rounded-[8px] px-3 py-2 text-left text-[13px] text-[var(--ink-muted)] transition-colors hover:bg-[var(--surface-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:text-[var(--ink-tertiary)] disabled:opacity-55"
+                    >
+                      <span className="min-w-0 flex-1 truncate font-medium">
+                        {presentation.title}
+                      </span>
+                      <span className="shrink-0 rounded-[6px] border border-[var(--hairline)] bg-[var(--surface-2)] px-2 py-1 font-mono text-[10px] leading-none text-[var(--ink-subtle)]">
+                        {presentation.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </section>
             );
           })}
         </div>
