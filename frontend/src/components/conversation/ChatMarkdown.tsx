@@ -3,6 +3,7 @@ import { Check, Clipboard } from 'lucide-react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
+import { openExternalUrlInDesktop } from '@/lib/openExternalUrl';
 import { cn } from '@/lib/utils';
 import {
   fileHrefToPath,
@@ -222,6 +223,11 @@ export function ChatMarkdown({
         const external = isExternalHref(resolvedHref);
 
         const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+          if (external && openExternalUrlInDesktop(resolvedHref)) {
+            event.preventDefault();
+            return;
+          }
+
           if (!onFilePath || !resolvedHref) return;
 
           const originalHref = decodeURI(resolvedHref);

@@ -392,6 +392,14 @@ check(
   markdownSource,
 );
 check(
+  "opens agent message web links in the system browser on desktop",
+  markdownSource.includes("openExternalUrlInDesktop") &&
+    markdownSource.includes("event.preventDefault()") &&
+    markdownSource.includes("onClick={handleClick}") &&
+    markdownSource.includes('target={external ? "_blank" : undefined}'),
+  markdownSource,
+);
+check(
   "uses the configured chat message font size for user and agent bodies",
   source.includes("chatMessageFontSize") &&
     source.includes("style={{ fontSize: `${chatMessageFontSize}px` }}") &&
