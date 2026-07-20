@@ -27,6 +27,7 @@ import { GlobalSearchDialog } from "@/components/GlobalSearchDialog";
 import {
   OnboardingGuide,
 } from "@/components/onboarding/OnboardingGuide";
+import { CommandPaletteHintCard } from "@/components/onboarding/CommandPaletteHintCard";
 import { VersionUpdatePage } from "@/components/version-update/VersionUpdatePage";
 import { GitHubRepositoryPage } from "@/pages/GitHubRepositoryPage";
 import { IssuePage } from "@/pages/IssuePage";
@@ -516,6 +517,7 @@ function WorkspaceLayout() {
     useState<OnboardingState | null>(null);
   const [onboardingAppTransitionActive, setOnboardingAppTransitionActive] =
     useState(false);
+  const [showCommandPaletteHint, setShowCommandPaletteHint] = useState(false);
   const [localizedTeamPresetSummaries, setLocalizedTeamPresetSummaries] =
     useState<TeamPresetSummary[]>([]);
   const [openTabs, setOpenTabs] = useState<WorkspaceTab[]>(() =>
@@ -2080,6 +2082,7 @@ function WorkspaceLayout() {
       startOnboardingAppTransition();
     }
     setOnboardingOverlay(null);
+    setShowCommandPaletteHint(true);
   };
 
   const handleCreateOnboardingProject = async ({
@@ -2263,6 +2266,12 @@ function WorkspaceLayout() {
           onCheckUpdate={versionUpdate.checkNow}
           onOpenManualFallback={versionUpdate.openManualFallback}
           manualFallbackAvailable={versionUpdate.manualFallbackAvailable}
+        />
+      )}
+      {showCommandPaletteHint && onboardingOverlay === null && (
+        <CommandPaletteHintCard
+          t={t}
+          onDismiss={() => setShowCommandPaletteHint(false)}
         />
       )}
 

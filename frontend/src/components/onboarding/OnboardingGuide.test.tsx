@@ -22,12 +22,14 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 console.log('OnboardingGuide wiring');
 
 const guideSource = read('./OnboardingGuide.tsx');
+const commandPaletteHintSource = read('./CommandPaletteHintCard.tsx');
 const updatePageSource = read('../version-update/VersionUpdatePage.tsx');
 const newSessionModalSource = read('../CreateAgentSessionModal.tsx');
 const appSource = read('../../App.tsx');
 const updateHookSource = read('../../hooks/useVersionUpdate.ts');
 const updatePresentationSource = read('../../lib/updatePresentation.ts');
 const settingsSource = read('../SettingsWorkspace.tsx');
+const indexCssSource = read('../../index.css');
 
 const requiredLocaleKeys = [
   'onboarding.welcome.title',
@@ -42,6 +44,12 @@ const requiredLocaleKeys = [
   'onboarding.step.projectPath.title',
   'onboarding.step.appearance.title',
   'onboarding.action.startNow',
+  'onboarding.commandPaletteHint.description',
+  'onboarding.commandPaletteHint.dismiss',
+  'onboarding.commandPaletteHint.eyebrow',
+  'onboarding.commandPaletteHint.later',
+  'onboarding.commandPaletteHint.open',
+  'onboarding.commandPaletteHint.title',
   'onboarding.project.createTitle',
   'onboarding.project.createDesc',
   'onboarding.project.createFailed',
@@ -91,6 +99,37 @@ check(
     appSource.includes('onboardingOverlay?.mode === "onboarding"') &&
     appSource.includes('onboardingOverlay?.mode === "upgrade"'),
   { appSource, guideSource, updatePageSource },
+);
+
+check(
+  'onboarding completion opens a secondary command palette hint',
+  appSource.includes('setShowCommandPaletteHint(true)') &&
+    appSource.includes('showCommandPaletteHint && onboardingOverlay === null') &&
+    appSource.includes('<CommandPaletteHintCard') &&
+    commandPaletteHintSource.includes("presentationFor('commandPalette.open')") &&
+    commandPaletteHintSource.includes("presentationFor('shortcuts.help.open')") &&
+    commandPaletteHintSource.includes('helpShortcut: helpPresentation.label') &&
+    commandPaletteHintSource.includes("scope: 'modal-menu'") &&
+    commandPaletteHintSource.includes('if (paletteOpen) onDismiss()') &&
+    commandPaletteHintSource.includes('setPaletteOpen(true)'),
+);
+
+check(
+  'command palette hint uses theme tokens, a two-action Linear card, and reduced-motion-safe SVG animation',
+  commandPaletteHintSource.includes('role="alertdialog"') &&
+    commandPaletteHintSource.includes('bg-[var(--surface-1)]') &&
+    commandPaletteHintSource.includes('border-[var(--hairline-strong)]') &&
+    commandPaletteHintSource.includes("onboarding.commandPaletteHint.later") &&
+    commandPaletteHintSource.includes("onboarding.commandPaletteHint.open") &&
+    commandPaletteHintSource.includes('<svg') &&
+    commandPaletteHintSource.includes('command-palette-hint-key') &&
+    commandPaletteHintSource.includes('command-palette-hint-trace') &&
+    commandPaletteHintSource.includes('command-palette-hint-packet') &&
+    commandPaletteHintSource.includes('command-palette-hint-scan') &&
+    commandPaletteHintSource.includes('command-palette-hint-result') &&
+    indexCssSource.includes('@keyframes commandPaletteHintKeyPress') &&
+    indexCssSource.includes('@media (prefers-reduced-motion: reduce)') &&
+    indexCssSource.includes('.command-palette-hint-packet,'),
 );
 
 check(

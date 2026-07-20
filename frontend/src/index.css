@@ -351,6 +351,126 @@ html[data-tauri-platform="macos"] .macos-titlebar-drag-region {
   }
 }
 
+@keyframes commandPaletteHintKeyPress {
+  0%,
+  14%,
+  100% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 0 0 color-mix(in srgb, var(--primary) 0%, transparent));
+  }
+  20% {
+    transform: translateY(3px) scale(0.975);
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--primary) 38%, transparent));
+  }
+  27%,
+  72% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--primary) 16%, transparent));
+  }
+}
+
+@keyframes commandPaletteHintTrace {
+  0%,
+  24% {
+    stroke-dashoffset: 62;
+    opacity: 0;
+  }
+  32%,
+  62% {
+    opacity: 0.9;
+  }
+  70%,
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes commandPaletteHintPacket {
+  0%,
+  26% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  32%,
+  58% {
+    opacity: 1;
+  }
+  68%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes commandPaletteHintScan {
+  0%,
+  42% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  48% {
+    opacity: 0.42;
+  }
+  78% {
+    transform: translateY(118px);
+    opacity: 0.12;
+  }
+  79%,
+  100% {
+    transform: translateY(118px);
+    opacity: 0;
+  }
+}
+
+@keyframes commandPaletteHintResult {
+  0%,
+  38% {
+    opacity: 0;
+    transform: translateX(-7px);
+  }
+  52%,
+  86% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0.72;
+    transform: translateX(0);
+  }
+}
+
+@keyframes commandPaletteHintCaret {
+  0%,
+  44% {
+    opacity: 0;
+  }
+  45%,
+  68% {
+    opacity: 1;
+  }
+  69%,
+  78% {
+    opacity: 0.2;
+  }
+  79%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes commandPaletteHintStatus {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.82);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
 @keyframes planModePulse {
   0%,
   100% {
@@ -441,6 +561,44 @@ body[data-mode="light"] .animate-shimmer::after {
   animation: onboardingAppEnter 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+.command-palette-hint-key {
+  animation: commandPaletteHintKeyPress 2.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.command-palette-hint-trace {
+  animation: commandPaletteHintTrace 2.8s ease-out infinite;
+  stroke-dasharray: 62;
+}
+
+.command-palette-hint-packet {
+  animation: commandPaletteHintPacket 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--primary) 72%, transparent));
+  offset-path: path("M189 104 H199 C208 104 207 85 215 85 H227");
+}
+
+.command-palette-hint-scan {
+  animation: commandPaletteHintScan 2.8s linear infinite;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--primary) 55%, transparent));
+}
+
+.command-palette-hint-result {
+  animation: commandPaletteHintResult 2.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.command-palette-hint-caret {
+  animation: commandPaletteHintCaret 2.8s steps(1, end) infinite;
+}
+
+.command-palette-hint-status {
+  animation: commandPaletteHintStatus 1.4s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 .animate-spin-slow {
   animation: spin 3s linear infinite;
 }
@@ -480,6 +638,13 @@ body[data-mode="light"] .animate-shimmer::after {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-onboarding-app-enter,
+  .command-palette-hint-key,
+  .command-palette-hint-trace,
+  .command-palette-hint-packet,
+  .command-palette-hint-scan,
+  .command-palette-hint-result,
+  .command-palette-hint-caret,
+  .command-palette-hint-status,
   .plan-mode-toggle-active,
   .plan-mode-toggle-active::after,
   .plan-mode-input-active {
