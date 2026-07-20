@@ -3,6 +3,8 @@
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
+  useState,
 } from 'react';
 import {
   BackendChatSession,
@@ -266,6 +268,15 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
     setSessionChatInputMode,
     setChatInputMode,
   } = workspaceState;
+  const [runtimeHydratedSessionId, setRuntimeHydratedSessionId] =
+    useState<string>('');
+
+  // A cached active run can become stale while its session is not selected.
+  // Invalidate it before the newly selected session is painted; the runtime
+  // snapshot will opt the session back in once its authoritative state arrives.
+  useLayoutEffect(() => {
+    setRuntimeHydratedSessionId('');
+  }, [activeSessionId]);
 
   const applyMockBootstrap = useCallback(
     (bootstrap: WorkspaceBootstrapMock) => {
@@ -821,6 +832,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
           })),
         ]);
       applyChatRuntimeSnapshot(runtimeSnapshot);
+      if (shouldUpdateActiveMessages()) {
+        setRuntimeHydratedSessionId(sid);
+      }
       const projectMemberNameByAgentId = new Map(
         projectMembers
           .filter((member) => member.agent_id && member.member_name?.trim())
@@ -1426,7 +1440,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({
       )
     : [];
   const activeRunMessages = activeSessionId
-    ? activeRunMessagesForSession(activeRunsByRunId, activeSessionId)
+    ? runtimeHydratedSessionId === activeSessionId
+      ? activeRunMessagesForSession(activeRunsByRunId, activeSessionId)
+      : []
     : [];
   const activeSessionMessageSnapshot = activeSessionId
     ? mergeSessionMessagesWithActiveRuns(

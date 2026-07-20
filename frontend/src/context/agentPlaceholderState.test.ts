@@ -47,6 +47,18 @@ assert.notEqual(pending[0].id, pending[1].id, 'uses one stable identity per targ
 assert.equal(pending[0].runId, undefined, 'starting placeholders never expose a run id');
 assert.equal(pending[0].sessionAgentId, 'session-agent-alpha');
 
+const missingMemberPending = makePendingAgentPlaceholders(
+  ['does-not-exist'],
+  'msg-user-missing-member',
+  members,
+  'session-1',
+);
+assert.deepEqual(
+  missingMemberPending,
+  [],
+  'does not stage a permanent starting placeholder for an unknown member',
+);
+
 const runningAlpha: Message = {
   ...pending[0],
   id: 'run-real-alpha',

@@ -1185,6 +1185,12 @@ export const makePendingAgentPlaceholder = (
     normalizedAgentHandle(placeholderMember.name) === normalizedMention
       ? placeholderMember
       : null;
+  // An arbitrary @handle is not evidence that an agent will run. The backend
+  // may reject it before a run exists, and a new session can miss that stream
+  // event while its socket is connecting. Only stage an optimistic placeholder
+  // when the target is known locally (including the explicit new-session
+  // member supplied by the caller).
+  if (!fallbackMember && !matchingPlaceholderMember) return null;
   const displayMember = fallbackMember ?? matchingPlaceholderMember ?? null;
   const sender = asAgentHandle(displayMember?.name ?? targetMention);
 

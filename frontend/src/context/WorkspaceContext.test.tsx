@@ -540,6 +540,14 @@ check(
   source,
 );
 check(
+  'session switches suppress cached run placeholders until runtime hydration',
+  source.includes("const [runtimeHydratedSessionId, setRuntimeHydratedSessionId]") &&
+    source.includes("setRuntimeHydratedSessionId('')") &&
+    source.includes('setRuntimeHydratedSessionId(sid)') &&
+    source.includes('runtimeHydratedSessionId === activeSessionId'),
+  source,
+);
+check(
   'message refresh keeps a running placeholder even before a run row exists',
   source.includes('const run = latestRunBySessionAgentId.get(sessionAgent.id)') &&
     /id:\s*run\s*\?/.test(source) &&
