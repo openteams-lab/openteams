@@ -4,6 +4,7 @@
   "agentActivity.error": "사고 과정을 불러오지 못했습니다.",
   "agentActivity.loading": "사고 과정을 불러오는 중...",
   "agentActivity.running": "에이전트가 작업을 수행 중입니다",
+  "agentActivity.starting": "에이전트를 시작하는 중입니다",
   "agentActivity.toggle": "사고 과정",
   "agentActivity.tool.activity.completed": "?? ??",
   "agentActivity.tool.activity.denied": "?? ???",

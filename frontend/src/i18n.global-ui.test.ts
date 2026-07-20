@@ -36,6 +36,7 @@ const requiredKeys = [
   "globalSearch.worktreeStatus.merged",
   "globalSearch.worktreeStatus.merging",
   "globalSearch.worktreeStatus.needs_conflict_resolution",
+  "message.memberNotFound",
   "sidebar.aria.openNotifications",
   "sidebar.buildStats.open",
   "sidebar.archiveSession",
@@ -76,6 +77,7 @@ const requiredKeys = [
   "settings.providers.custom.modality.image",
   "settings.providers.custom.modality.text",
   "toast.dismissNotification",
+  "toast.memberNotFound",
 ] as const;
 
 type Locale = (typeof locales)[number];

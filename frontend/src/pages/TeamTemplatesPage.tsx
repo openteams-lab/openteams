@@ -27,6 +27,7 @@ import {
   type ReactNode,
 } from "react";
 import { AgentMarkdown } from "@/components/AgentMarkdown";
+import { useConfirmationDialogKeyboard } from "@/components/useConfirmationDialogKeyboard";
 import {
   DropdownSelect,
   type DropdownSelectOption,
@@ -2423,6 +2424,12 @@ function UnsavedEditorExitDialog({
   onSave: () => void;
   t: TranslateFn;
 }) {
+  useConfirmationDialogKeyboard({
+    confirming: saving,
+    onCancel,
+    onConfirm: onSave,
+  });
+
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm"
@@ -2504,6 +2511,12 @@ function UseTeamTemplateDialog({
   onConfirm: () => void;
   t: TranslateFn;
 }) {
+  useConfirmationDialogKeyboard({
+    confirming: applying,
+    onCancel,
+    onConfirm,
+  });
+
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm"

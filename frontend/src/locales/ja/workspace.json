@@ -4,6 +4,7 @@
   "agentActivity.error": "思考プロセスを読み込めませんでした。",
   "agentActivity.loading": "思考プロセスを読み込み中...",
   "agentActivity.running": "エージェントがタスクを実行中です",
+  "agentActivity.starting": "エージェントを起動中です",
   "agentActivity.toggle": "思考プロセス",
   "agentActivity.tool.activity.completed": "?????????",
   "agentActivity.tool.activity.denied": "?????????",

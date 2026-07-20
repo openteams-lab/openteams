@@ -546,7 +546,9 @@ impl ChatRunner {
         )
         .await;
 
+        let mut client_message_id = None;
         if let Ok(Some(msg)) = ChatMessage::find_by_id(&self.db.pool, message_id).await {
+            client_message_id = Self::extract_client_message_id(&msg.meta);
             let mut meta = msg.meta.0.clone();
             if let Some(meta_obj) = meta.as_object_mut() {
                 let mention_errors = meta_obj
@@ -585,6 +587,7 @@ impl ChatRunner {
             ChatStreamEvent::MentionError {
                 session_id,
                 message_id,
+                client_message_id,
                 session_agent_id: session_agent.map(|member| member.id),
                 project_member_id: session_agent.and_then(|member| member.project_member_id),
                 agent_name: agent_name.to_string(),
@@ -724,6 +727,69 @@ impl ChatRunner {
                 .run_agent_for_mention(session_id, &mention, ordinal as i64, message)
                 .await
             {
+                Ok(DispatchOutcome::Rejected { reason }) if reason == "member_not_found" => {
+                    self.update_mention_status(
+                        message.id,
+                        &mention,
+                        Self::mention_status_as_str(&MentionStatus::Failed),
+                        None,
+                    )
+                    .await;
+                    self.emit(
+                        session_id,
+                        ChatStreamEvent::MentionError {
+                            session_id,
+                            message_id: message.id,
+                            client_message_id: Self::extract_client_message_id(&message.meta),
+                            session_agent_id: None,
+                            project_member_id: None,
+                            agent_name: mention.clone(),
+                            agent_id: None,
+                            reason: "member_not_found".to_string(),
+                        },
+                    );
+                    let member_handle = if mention.starts_with('@') {
+                        mention.clone()
+                    } else {
+                        format!("@{mention}")
+                    };
+                    let system_meta = serde_json::json!({
+                        "mention_failure": {
+                            "source_message_id": message.id,
+                            "mentioned_agent": mention,
+                            "reason": "member_not_found",
+                        },
+                        "i18n": {
+                            "key": "message.memberNotFound",
+                            "params": {
+                                "member": member_handle,
+                            },
+                        },
+                    });
+                    match chat::create_message(
+                        &self.db.pool,
+                        session_id,
+                        ChatSenderType::System,
+                        None,
+                        format!("Member {member_handle} does not exist."),
+                        Some(system_meta),
+                    )
+                    .await
+                    {
+                        Ok(system_message) => self.emit_message_new(session_id, system_message),
+                        Err(err) => tracing::warn!(
+                            error = %err,
+                            mention = mention,
+                            session_id = %session_id,
+                            "failed to persist missing-member system message"
+                        ),
+                    }
+                    tracing::warn!(
+                        mention = mention,
+                        session_id = %session_id,
+                        "mentioned chat member does not exist"
+                    );
+                }
                 Ok(DispatchOutcome::Rejected { reason }) => tracing::debug!(
                     mention = mention,
                     session_id = %session_id,
@@ -1293,7 +1359,9 @@ impl ChatRunner {
             .resolve_session_agent_for_mention(session_id, mention)
             .await?
         else {
-            return Err(ChatRunnerError::AgentNotFound(mention.to_string()));
+            return Ok(DispatchOutcome::Rejected {
+                reason: "member_not_found".to_string(),
+            });
         };
         let route_kind = if source_message.sender_type == ChatSenderType::Agent {
             db::models::chat_message_target::ChatMessageTargetRouteKind::AgentProtocol

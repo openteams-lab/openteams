@@ -4,6 +4,7 @@
   "agentActivity.error": "Thinking details could not be loaded.",
   "agentActivity.loading": "Loading thinking details...",
   "agentActivity.running": "Agent is working on the task",
+  "agentActivity.starting": "Agent is starting",
   "agentActivity.toggle": "Thinking details",
   "agentArtifacts.more": "+{count} more",
   "agentArtifacts.title": "Files",

@@ -79,6 +79,7 @@ export type ShortcutsContextValue = {
   savePlatformOverrides: (
     overrides: Record<string, KeyboardShortcutOverride>,
   ) => Promise<Config>;
+  categoryTitleFor: (categoryKey: string) => string;
   presentationFor: (commandId: string) => CommandPresentation;
 };
 
@@ -362,6 +363,11 @@ export function ShortcutProvider({
     [handlerRegistryVersion, mergedBindings, runtime.platform, translate],
   );
 
+  const categoryTitleFor = useCallback(
+    (categoryKey: string) => translate(categoryKey),
+    [translate],
+  );
+
   const savePlatformOverrides = useCallback(
     async (overrides: Record<string, KeyboardShortcutOverride>) => {
       if (!config) throw new Error('Config is not loaded');
@@ -521,10 +527,12 @@ export function ShortcutProvider({
       setHelpOpen,
       executeCommand,
       savePlatformOverrides,
+      categoryTitleFor,
       presentationFor,
     }),
     [
       chord,
+      categoryTitleFor,
       executeCommand,
       helpOpen,
       mergedBindings,

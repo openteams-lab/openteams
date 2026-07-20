@@ -1,6 +1,7 @@
 import React, { useMemo, type CSSProperties } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { openExternalUrlInDesktop } from "@/lib/openExternalUrl";
 
 interface AgentMarkdownProps {
   content: string;
@@ -50,12 +51,19 @@ const markdownComponents: Components = {
     const resolvedHref = typeof href === "string" ? href : "";
     const external = isExternalHref(resolvedHref);
 
+    const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (external && openExternalUrlInDesktop(resolvedHref)) {
+        event.preventDefault();
+      }
+    };
+
     return (
       <a
         href={resolvedHref}
         target={external ? "_blank" : undefined}
         rel={external ? "noreferrer" : undefined}
         className="font-medium text-[var(--primary)] underline decoration-[var(--primary)]/40 underline-offset-2 transition hover:text-[var(--primary-hover)]"
+        onClick={handleClick}
       >
         {children}
       </a>

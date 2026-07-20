@@ -4,6 +4,7 @@
   "agentActivity.error": "No se pudo cargar el proceso de pensamiento.",
   "agentActivity.loading": "Cargando proceso de pensamiento...",
   "agentActivity.running": "El agente está trabajando en la tarea",
+  "agentActivity.starting": "El agente se está iniciando",
   "agentActivity.toggle": "Proceso de pensamiento",
   "agentActivity.tool.activity.completed": "Actividad completada",
   "agentActivity.tool.activity.denied": "Actividad denegada",

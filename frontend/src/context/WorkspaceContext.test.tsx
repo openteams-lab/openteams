@@ -20,10 +20,42 @@ const check = (label: string, cond: boolean, detail?: unknown) => {
 
 console.log('WorkspaceContext project session isolation');
 
-const source = readFileSync(
+const workspaceContextSource = readFileSync(
   new URL('./WorkspaceContext.tsx', import.meta.url),
   'utf8',
 );
+const runtimeSource = readFileSync(
+  new URL('./workspace/useWorkspaceChatRuntime.ts', import.meta.url),
+  'utf8',
+);
+const runtimeHookStart = workspaceContextSource.indexOf(
+  '  const { mapBackendChatMessage, upsertStreamedMessage } =',
+);
+const runtimeHookEnd = workspaceContextSource.indexOf(
+  '  // ---------------------------------------------------------------------------\n  // i18n',
+  runtimeHookStart,
+);
+const source = [
+  readFileSync(
+    new URL('./workspace/workspaceContextTypes.ts', import.meta.url),
+    'utf8',
+  ),
+  readFileSync(
+    new URL('./workspace/workspaceContextContract.ts', import.meta.url),
+    'utf8',
+  ),
+  readFileSync(
+    new URL('./workspace/workspaceContextUtils.ts', import.meta.url),
+    'utf8',
+  ),
+  readFileSync(
+    new URL('./workspace/useWorkspaceState.ts', import.meta.url),
+    'utf8',
+  ),
+  workspaceContextSource.slice(0, runtimeHookStart),
+  runtimeSource,
+  workspaceContextSource.slice(runtimeHookEnd),
+].join('\n');
 const workflowCardSource = readFileSync(
   new URL('../components/workflow/WorkflowCard.tsx', import.meta.url),
   'utf8',
@@ -145,23 +177,22 @@ check(
   source,
 );
 check(
-  'real sends skip immediate pending placeholders for queued messages',
+  'real sends stage immediate starting placeholders only for non-queued targets',
   pendingPlaceholderIndex >= 0 &&
     source.includes('PENDING_AGENT_MESSAGE_PREFIX') &&
     source.includes('OPTIMISTIC_USER_MESSAGE_PREFIX') &&
     source.includes('clientMessageId: userMsgId') &&
-    source.includes('const shouldQueueForMember = Boolean(') &&
-    source.includes('!shouldQueueForMember && pendingAgentMsg') &&
+    source.includes('const pendingAgentMessages = shouldPersistToBackend') &&
+    source.includes('const queuedSessionAgentIds = new Set(') &&
+    source.includes('const immediatePendingAgentMessages =') &&
     source.includes('const messagesToAppend =') &&
-    /shouldQueueForMember\s*\?\s*\[\]/.test(source) &&
     source.includes('fallbackMention?: string | null') &&
     source.includes('sendMessageToSession') &&
     source.includes("/@([\\p{L}\\p{N}_-]+)/gu") &&
-    source.includes('stagePendingAgentPlaceholder') &&
+    source.includes('stageOptimisticQueuedMessage') &&
     source.includes('persistToBackend?: boolean') &&
     source.includes("placeholderMember?: Pick<Member, 'avatar' | 'name' | 'modelName'> | null") &&
     source.includes('const shouldPersistToBackend =') &&
-    source.includes('const effectiveMentions =') &&
     source.includes('const visibleMentions =') &&
     source.includes('mentions: visibleMentions') &&
     source.includes('options.routeMentions') &&
@@ -175,7 +206,7 @@ check(
 );
 check(
   'pending placeholders can carry display member model without stale session agent id',
-  source.includes('const displayMember = fallbackMember ?? placeholderMember ?? null') &&
+    source.includes('const displayMember = fallbackMember ?? matchingPlaceholderMember ?? null') &&
     source.includes('avatar: displayMember?.avatar ?? monogramFromName(sender)') &&
     source.includes('model: displayMember?.modelName') &&
     source.includes('sessionAgentId: fallbackMember?.id') &&
@@ -188,19 +219,19 @@ check(
     source.includes('pendingPlaceholderMatches') &&
     source.includes('message.clientMessageId === match.clientMessageId') &&
     source.includes('message.sourceMessageId === match.sourceMessageId') &&
-    source.includes('const hasCorrelationId = Boolean(') &&
-    /!hasCorrelationId\s*&&\s*match\.sessionAgentId/.test(source) &&
     source.includes('message.sessionAgentId === match.sessionAgentId') &&
+    source.includes('normalizedAgentHandle(message.sender) ===') &&
+    source.includes('const hasCorrelationId = Boolean(') &&
     source.includes('clientMessageId: incoming.clientMessageId') &&
-    source.includes('clientMessageId: event.client_message_id') &&
+    source.includes('client_message_id: event.client_message_id') &&
     !source.includes('current.findIndex(isPendingAgentPlaceholder)'),
   source,
 );
 check(
-  'new sends prune stale pending placeholders only for immediate execution',
+  'new sends prune stale pending placeholders only for immediate targets',
   source.includes('withoutStalePending') &&
-    source.includes('!shouldQueueForMember && pendingAgentMsg?.sessionAgentId') &&
-    source.includes('message.sessionAgentId === pendingAgentMsg.sessionAgentId') &&
+    source.includes('immediatePendingSessionAgentIds') &&
+    source.includes('immediatePendingAgentMessages') &&
     source.includes('[...withoutStalePending, ...messagesToAppend]'),
   source,
 );
@@ -209,9 +240,29 @@ check(
   !source.includes('const isWorkflowPlanCardMessage =') &&
     !source.includes('const hasWorkflowPlanCard =') &&
     !source.includes('shouldCreatePendingAgentPlaceholder') &&
-    /const pendingAgentMsg = shouldPersistToBackend\s*\?\s*makePendingAgentPlaceholder/.test(
+    /const pendingAgentMessages = shouldPersistToBackend\s*\?\s*makePendingAgentPlaceholders/.test(
       source,
     ),
+  source,
+);
+check(
+  'starting placeholders upgrade in place and never downgrade a real run',
+  source.includes('correlateRunningPlaceholdersWithPending') &&
+    source.includes('const upgraded: Message = {') &&
+    source.includes('id: pending.id') &&
+    source.includes('nextCurrent[pendingIndex] = upgraded') &&
+    source.includes('if (existing.runId) return existing') &&
+    source.includes('createdAt: pending.createdAt ?? running.createdAt'),
+  source,
+);
+check(
+  'starting placeholders use unique client ids and reconcile without forced failure',
+  source.includes('globalThis.crypto?.randomUUID?.()') &&
+    source.includes('STARTING_AGENT_RECONCILE_DELAY_MS = 30000') &&
+    source.includes('reconcileStartingPlaceholders') &&
+    source.includes('const keep = hasActiveRun || isQueued') &&
+    source.includes('applyChatRuntimeSnapshot(snapshot)') &&
+    !source.includes('window.location.reload'),
   source,
 );
 check(
@@ -463,6 +514,14 @@ check(
   source,
 );
 check(
+  'missing member mentions show a localized error naming the requested member',
+  source.includes("parsed.reason === 'member_not_found'") &&
+    source.includes('memberNotFoundToastMessage(locale, parsed.agent_name)') &&
+    source.includes("const key = 'toast.memberNotFound'") &&
+    source.includes('clientMessageId: parsed.client_message_id'),
+  source,
+);
+check(
   'runtime snapshots and websocket notifications sync file-backed activity',
     source.includes("parsed.type === 'agent_activity_updated'") &&
     source.includes('runActivityStore.notifyUpdated(') &&
@@ -489,7 +548,7 @@ check(
   source,
 );
 check(
-  'running placeholders carry session agent ids for stop controls',
+  'running placeholders carry session agent ids for correlation',
     source.includes('sessionAgentId: fallbackMember?.id') &&
     source.includes('sessionAgentId: event.session_agent_id') &&
     source.includes('carriedSessionAgentId'),
@@ -537,6 +596,18 @@ check(
     source.includes('void refreshMemberQueues()') &&
     source.includes('chatQueuesApi.deleteQueued(sessionId, queueId)') &&
     source.includes('chatQueuesApi.continueMember('),
+  source,
+);
+
+check(
+  'claimed queue messages create stable starting placeholders before run creation',
+  source.includes('reconcileProcessingQueuePlaceholders') &&
+    source.includes("String(item.message.status) !== 'processing'") &&
+    source.includes('QUEUE_PROCESSING_AGENT_MESSAGE_PREFIX') &&
+    source.includes('sourceMessageId = item.message.chat_message_id') &&
+    source.includes('syncProcessingQueuePlaceholders(queue.session_id, [queue])') &&
+    source.includes('clientMessageId,') &&
+    source.includes('sessionAgentId: queue.session_agent_id'),
   source,
 );
 

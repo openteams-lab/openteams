@@ -9,6 +9,7 @@ import {
 import { ChevronRight, ShieldCheck, Trash2, X } from "lucide-react";
 import type { DropdownSelectOption } from "@/components/DropdownSelect";
 import { ProjectBreadcrumbAvatar } from "@/components/ProjectBreadcrumbAvatar";
+import { useConfirmationDialogKeyboard } from "@/components/useConfirmationDialogKeyboard";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import {
   agentRuntimeApi,
@@ -157,6 +158,12 @@ function TeamRemoveMemberDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  useConfirmationDialogKeyboard({
+    confirming: removing,
+    onCancel,
+    onConfirm,
+  });
+
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm"

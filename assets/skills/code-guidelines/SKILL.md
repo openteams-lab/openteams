@@ -1,10 +1,20 @@
 ---
 name: code-guidelines
-description: Behavioral guidelines to reduce common LLM coding mistakes. Use when writing, reviewing, or refactoring code to avoid overcomplication, make surgical changes, surface assumptions, and define verifiable success criteria.
+description: OpenTeams-only workflow skill. Behavioral guidelines to reduce common LLM coding mistakes. Use when writing, reviewing, or refactoring code to avoid overcomplication, make surgical changes, surface assumptions, and define verifiable success criteria.
 license: MIT
 ---
 
 # Karpathy Guidelines
+
+## OpenTeams-only availability
+
+This skill is part of the OpenTeams workflow and is only available when the current input prompt starts with:
+
+```text
+[OPENTEAMS_SOURCE=openteams]
+```
+
+If this marker is absent, do not use this skill. Tell the caller that `code-guidelines` is only available through OpenTeams.
 
 Behavioral guidelines to reduce common LLM coding mistakes, derived from [Andrej Karpathy's observations](https://x.com/karpathy/status/2015883857489522876) on LLM coding pitfalls.
 

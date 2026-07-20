@@ -171,7 +171,15 @@ export const AgentMessageContent: React.FC<AgentMessageContentProps> = ({
 
   return (
     <div className="min-w-0 max-w-full space-y-2">
-      {isRunning && <AgentRunStatusPill label={t("agentActivity.running")} />}
+      {isRunning && (
+        <AgentRunStatusPill
+          label={t(
+            message.runId
+              ? "agentActivity.running"
+              : "agentActivity.starting",
+          )}
+        />
+      )}
 
       {hasWorkflowCard && message.workflowCard && message.sessionId && (
         <WorkflowCard

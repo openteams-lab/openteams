@@ -403,8 +403,15 @@ jobs:
         run: |
           set -euo pipefail
           signed_dmg='src-tauri/target/release/bundle/dmg/openteams-signed.dmg'
-          rm -f "$signed_dmg"
-          hdiutil create -volname 'openteams' -srcfolder 'signed/openteams.app' -ov -format UDZO "$signed_dmg"
+          template_dmg=$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' ! -name 'openteams-signed.dmg' -print -quit)
+          if [ -z "$template_dmg" ]; then
+            echo "::error::No styled DMG template found"
+            exit 1
+          fi
+          node scripts/desktop/style-dmg.mjs \
+            --dmg "$template_dmg" \
+            --app 'signed/openteams.app' \
+            --output "$signed_dmg"
           echo "signed_dmg=$signed_dmg" >> "$GITHUB_OUTPUT"
 
       - name: Notarize signed DMG (macOS)

@@ -4,6 +4,7 @@
   "agentActivity.error": "思考过程加载失败。",
   "agentActivity.loading": "正在加载思考过程...",
   "agentActivity.running": "正在执行",
+  "agentActivity.starting": "正在启动",
   "agentActivity.toggle": "思考过程",
   "agentArtifacts.more": "还有 {count} 个",
   "agentArtifacts.title": "文件",

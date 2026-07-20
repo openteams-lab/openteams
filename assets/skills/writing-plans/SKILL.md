@@ -1,9 +1,19 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code
+description: OpenTeams-only workflow skill. Use when you have a spec or requirements for a multi-step task, before touching code
 ---
 
 # Writing Plans
+
+## OpenTeams-only availability
+
+This skill is part of the OpenTeams workflow and is only available when the current input prompt starts with:
+
+```text
+[OPENTEAMS_SOURCE=openteams]
+```
+
+If this marker is absent, do not use this skill. Tell the caller that `writing-plans` is only available through OpenTeams.
 
 ## Overview
 

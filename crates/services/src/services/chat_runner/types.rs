@@ -195,6 +195,10 @@ pub enum ChatStreamEvent {
     MentionError {
         session_id: Uuid,
         message_id: Uuid,
+        /// Frontend-supplied id from the source message meta (`client_message_id`).
+        /// Lets the frontend remove the matching optimistic placeholder even
+        /// when the stream event arrives before the create-message response.
+        client_message_id: Option<String>,
         session_agent_id: Option<Uuid>,
         project_member_id: Option<Uuid>,
         agent_name: String,

@@ -4,6 +4,7 @@ import {
   githubOAuthPollDelay,
   issueDisplayIdFontSizePx,
   issueSourceProviderId,
+  markIssueIntegrationsAuthorized,
   projectIssueIdPrefix,
   projectWorkItemDisplayId,
   projectWorkItemIssueStatus,
@@ -54,6 +55,38 @@ check(
       retry_after_ms: null,
       fallback_to_device: false,
     }),
+);
+
+const authorizedAccount = {
+  login: 'octocat',
+  id: 1,
+  avatar_url: null,
+  html_url: null,
+  scopes: ['repo'],
+  connected_at: '2026-07-19T00:00:00Z',
+};
+const authorizedIntegrationState = markIssueIntegrationsAuthorized(
+  {
+    providers: [
+      {
+        id: 'github',
+        name: 'GitHub',
+        supported: true,
+        status: 'auth_required',
+      },
+    ],
+    github_account: null,
+    github_repositories: [],
+    linked_repositories: [],
+    primary_repository: null,
+  },
+  authorizedAccount,
+);
+check(
+  'successful GitHub authorization immediately switches integration UI state',
+  authorizedIntegrationState?.github_account?.login === 'octocat' &&
+    authorizedIntegrationState.providers[0]?.status === 'authorized',
+  authorizedIntegrationState,
 );
 
 const item = (

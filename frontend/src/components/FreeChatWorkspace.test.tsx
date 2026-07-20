@@ -19,10 +19,12 @@ const check = (label: string, cond: boolean, detail?: unknown) => {
 
 console.log("FreeChatWorkspace");
 
-const source = readFileSync(
-  new URL("./FreeChatWorkspace.tsx", import.meta.url),
-  "utf8",
-);
+const source = [
+  "./free-chat/FreeChatWorkspaceParts.tsx",
+  "./FreeChatWorkspace.tsx",
+]
+  .map((path) => readFileSync(new URL(path, import.meta.url), "utf8"))
+  .join("\n");
 const composerSource = readFileSync(
   new URL("./chat/ChatComposer.tsx", import.meta.url),
   "utf8",
@@ -392,6 +394,14 @@ check(
   markdownSource,
 );
 check(
+  "opens agent message web links in the system browser on desktop",
+  markdownSource.includes("openExternalUrlInDesktop") &&
+    markdownSource.includes("event.preventDefault()") &&
+    markdownSource.includes("onClick={handleClick}") &&
+    markdownSource.includes('target={external ? "_blank" : undefined}'),
+  markdownSource,
+);
+check(
   "uses the configured chat message font size for user and agent bodies",
   source.includes("chatMessageFontSize") &&
     source.includes("style={{ fontSize: `${chatMessageFontSize}px` }}") &&
@@ -414,9 +424,29 @@ check(
   "running pill uses the required copy and reused visual tokens",
   runStatusSource.includes("正在执行") &&
     runStatusSource.includes("Loader2") &&
+    runStatusSource.includes("min-h-6") &&
+    runStatusSource.includes("whitespace-nowrap") &&
     runStatusSource.includes("bg-[var(--primary-tint)]") &&
     runStatusSource.includes("text-[var(--primary)]"),
   runStatusSource,
+);
+check(
+  "agent startup uses distinct copy until a real run id is available",
+  messageContentSource.includes('message.runId') &&
+    messageContentSource.includes('"agentActivity.starting"') &&
+    messageContentSource.includes('"agentActivity.running"'),
+  messageContentSource,
+);
+check(
+  "startup keeps the same status component and hides run-only controls",
+  messageContentSource.includes("<AgentRunStatusPill") &&
+    /message\.runId\s*\?\s*"agentActivity\.running"/.test(
+      messageContentSource,
+    ) &&
+    /msg\.isAgentRunning\s*&&\s*msg\.runId\s*&&\s*msg\.sessionAgentId/.test(
+      source,
+    ),
+  { source, messageContentSource },
 );
 check(
   "agent messages expose hover copy and quote actions",
@@ -504,7 +534,7 @@ check(
     source.includes("messagesById.get(item.message.chat_message_id)") &&
     source.includes("queueGroupsBySessionAgentId") &&
     source.includes("queueAnchorMessageIds") &&
-    source.includes("renderInlineQueueGroup") &&
+    source.includes("InlineQueueGroup") &&
     source.includes("queueAnchorMessageIds.get(msg.sessionAgentId) === msg.id") &&
     source.includes("queueGroupsBySessionAgentId.get(msg.sessionAgentId)") &&
     source.includes("<Trash2") &&
@@ -519,7 +549,7 @@ check(
     source.includes("max-h-24") &&
     source.includes("handleDeleteQueuedMessage") &&
     source.includes("handleContinueMemberQueue") &&
-    source.indexOf("renderInlineQueueGroup(") <
+    source.indexOf("<InlineQueueGroup") <
       source.indexOf("\n          <ChatComposer") &&
     !source.includes("{visibleQueueGroups.length > 0") &&
     !source.includes("false && visibleQueueGroups.length > 0"),
@@ -661,6 +691,18 @@ check(
 check(
   "linked work item status trigger does not show a redundant tooltip",
   !source.includes('"linkedWorkItems.changeStatusTitle"'),
+  source,
+);
+check(
+  "linked work item status menu toggles and resets across sessions",
+  source.includes("linkedWorkItemStatusMenuTarget") &&
+    source.includes("setLinkedWorkItemStatusMenuTarget((current) =>") &&
+    source.includes("toggleLinkedWorkItemStatusMenuTarget(") &&
+    source.includes("isLinkedWorkItemStatusMenuTarget(") &&
+    source.includes("setLinkedWorkItemStatusMenuTarget(null)") &&
+    source.includes("handleLinkedWorkItemStatusMenuOpenChange") &&
+    source.includes("!linkedWorkItemsLoading") &&
+    !source.includes("linkedWorkItemStatusMenuRequestKey"),
   source,
 );
 check(

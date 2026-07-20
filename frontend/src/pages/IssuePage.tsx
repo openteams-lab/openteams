@@ -756,6 +756,7 @@ export function IssuePage() {
     useState<GitHubDeviceFlowStartResponse | null>(null);
   const [authStatus, setAuthStatus] = useState<string | null>(null);
   const oauthFallbackStartedRef = useRef(false);
+  const integrationsRequestIdRef = useRef(0);
   const workItemsRequestIdRef = useRef(0);
   const issueListRef = useRef<HTMLDivElement>(null);
   const issueDetailRef = useRef<HTMLDivElement>(null);
@@ -945,9 +946,11 @@ export function IssuePage() {
   }, [repoNotice]);
 
   const loadIssueIntegrations = useCallback(async () => {
+    const requestId = ++integrationsRequestIdRef.current;
     if (!selectedProjectId) {
       setIntegrationState(null);
       setIntegrationError('');
+      setIntegrationLoading(false);
       return;
     }
     setIntegrationLoading(true);
@@ -955,11 +958,15 @@ export function IssuePage() {
     try {
       const result =
         await projectGithubApi.getIssueIntegrations(selectedProjectId);
+      if (integrationsRequestIdRef.current !== requestId) return;
       setIntegrationState(result);
     } catch (error) {
+      if (integrationsRequestIdRef.current !== requestId) return;
       setIntegrationError(errorMessage(error));
     } finally {
-      setIntegrationLoading(false);
+      if (integrationsRequestIdRef.current === requestId) {
+        setIntegrationLoading(false);
+      }
     }
   }, [selectedProjectId]);
 
@@ -1054,7 +1061,11 @@ export function IssuePage() {
         const result = await githubAuthApi.getOAuthStatus(oauthFlow.flow_id);
         if (cancelled) return;
         setAuthStatus(result.status);
-        if (result.account) {
+        const account = result.account;
+        if (account) {
+          setIntegrationState((current) =>
+            markIssueIntegrationsAuthorized(current, account),
+          );
           setOauthFlow(null);
           setAuthFlow(null);
           setIntegrationError('');
@@ -1062,7 +1073,7 @@ export function IssuePage() {
             tr(
               'issue.linkDialog.notice.authorizedAs',
               'GitHub authorized as {login}',
-              { login: result.account.login },
+              { login: account.login },
             ),
           );
           await loadIssueIntegrations();
@@ -1121,14 +1132,18 @@ export function IssuePage() {
         const result = await githubAuthApi.pollDeviceFlow(authFlow.device_code);
         if (cancelled) return;
         setAuthStatus(result.status);
-        if (result.account) {
+        const account = result.account;
+        if (account) {
+          setIntegrationState((current) =>
+            markIssueIntegrationsAuthorized(current, account),
+          );
           setAuthFlow(null);
           setIntegrationError('');
           setInteractionMessage(
             tr(
               'issue.linkDialog.notice.authorizedAs',
               'GitHub authorized as {login}',
-              { login: result.account.login },
+              { login: account.login },
             ),
           );
           await loadIssueIntegrations();
@@ -2565,7 +2580,7 @@ function RemoteRepositoryDialog({
                             href={oauthFlow.authorization_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="mt-3 inline-flex h-[34px] items-center rounded-[7px] border border-[#34363c] px-3 text-[15px] text-[#d4d5da] transition hover:bg-white/[0.04] hover:text-white"
+                            className="mt-3 inline-flex h-[34px] items-center rounded-[7px] border border-[color-mix(in_srgb,var(--primary-hover)_42%,transparent)] bg-[var(--primary-tint)] px-3 text-[15px] font-semibold text-[var(--primary-hover)] transition hover:border-[var(--primary-hover)] hover:bg-[color-mix(in_srgb,var(--primary)_18%,transparent)]"
                           >
                             {tr(
                               'issue.linkDialog.auth.reopen',
@@ -2596,7 +2611,7 @@ function RemoteRepositoryDialog({
                             }
                             target="_blank"
                             rel="noreferrer"
-                            className="mt-3 inline-flex h-[34px] items-center rounded-[7px] border border-[#34363c] px-3 text-[15px] text-[#d4d5da] transition hover:bg-white/[0.04] hover:text-white"
+                            className="mt-3 inline-flex h-[34px] items-center rounded-[7px] border border-[color-mix(in_srgb,var(--primary-hover)_42%,transparent)] bg-[var(--primary-tint)] px-3 text-[15px] font-semibold text-[var(--primary-hover)] transition hover:border-[var(--primary-hover)] hover:bg-[color-mix(in_srgb,var(--primary)_18%,transparent)]"
                           >
                             {tr(
                               'issue.linkDialog.auth.open',
@@ -2915,6 +2930,26 @@ export function shouldAutoFallbackToDevice(
   result: GitHubOAuthStatusResponse,
 ): boolean {
   return result.status === 'error' && result.fallback_to_device;
+}
+
+export function markIssueIntegrationsAuthorized(
+  state: ProjectIssueIntegrationsResponse | null,
+  account: GitHubAccount,
+): ProjectIssueIntegrationsResponse | null {
+  if (!state) return null;
+
+  return {
+    ...state,
+    github_account: account,
+    providers: state.providers.map((provider) =>
+      provider.id === 'github'
+        ? {
+            ...provider,
+            status: state.primary_repository ? 'linked' : 'authorized',
+          }
+        : provider,
+    ),
+  };
 }
 
 function formatSimpleDate(value: string | Date) {

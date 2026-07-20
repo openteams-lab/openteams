@@ -1,9 +1,19 @@
 ---
 name: brainstorming
-description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+description: "OpenTeams-only workflow skill. You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
 ---
 
 # Brainstorming Ideas Into Designs
+
+## OpenTeams-only availability
+
+This skill is part of the OpenTeams workflow and is only available when the current input prompt starts with:
+
+```text
+[OPENTEAMS_SOURCE=openteams]
+```
+
+If this marker is absent, do not use this skill. Tell the caller that `brainstorming` is only available through OpenTeams.
 
 Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
 

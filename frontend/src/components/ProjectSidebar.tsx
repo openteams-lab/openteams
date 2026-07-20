@@ -53,6 +53,7 @@ import type {
 } from "@/types";
 import { DropdownSelect, type DropdownSelectOption } from "./DropdownSelect";
 import { InboxNotificationsPopover } from "./InboxNotificationsPopover";
+import { useConfirmationDialogKeyboard } from "./useConfirmationDialogKeyboard";
 import { useAppScale } from "@/context/AppScaleContext";
 import { chatSessionsApi, filesystemApi } from "@/lib/api";
 import { buildStatsApi } from "@/lib/buildStatsApi";
@@ -1266,6 +1267,13 @@ export function ProjectSidebar({
     }
   };
 
+  useConfirmationDialogKeyboard({
+    enabled: Boolean(deletingSession),
+    confirming: deleteSessionInFlight,
+    onCancel: closeDeleteSessionDialog,
+    onConfirm: () => void confirmDeleteSession(),
+  });
+
   const startEditProject = (project: SidebarProjectDisplay) => {
     const draft = draftFromProject(project);
     setEditingProject(draft);
@@ -1314,6 +1322,13 @@ export function ProjectSidebar({
       setDeleteInFlight(false);
     }
   };
+
+  useConfirmationDialogKeyboard({
+    enabled: Boolean(deletingProjectDraft),
+    confirming: deleteInFlight,
+    onCancel: closeDeleteDialog,
+    onConfirm: () => void confirmDeleteProject(),
+  });
 
   const resetProjectForm = () => {
     setProjectName("");

@@ -4,6 +4,7 @@
   "agentActivity.error": "Impossible de charger le processus de réflexion.",
   "agentActivity.loading": "Chargement du processus de réflexion...",
   "agentActivity.running": "L’agent travaille sur la tâche",
+  "agentActivity.starting": "L’agent démarre",
   "agentActivity.toggle": "Processus de réflexion",
   "agentActivity.tool.activity.completed": "Activit? termin?e",
   "agentActivity.tool.activity.denied": "Activit? refus?e",

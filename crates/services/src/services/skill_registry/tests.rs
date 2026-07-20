@@ -13,11 +13,28 @@ mod tests {
 
     use super::{
         check_link_conflict, create_skill_link, discover_global_skills, global_skill_roots,
-        install_skill_files_from_embedded_at_paths, is_openteams_managed_link, LinkConflict,
-        RemoteSkillPackage, uninstall_skill_files_from_global_directory_at_paths,
-        openteams_skill_data_dir, parse_discovered_skill_markdown,
+        find_builtin_skill_by_name, install_skill_files_from_embedded_at_paths,
+        is_openteams_managed_link, LinkConflict, RemoteSkillPackage,
+        uninstall_skill_files_from_global_directory_at_paths, openteams_skill_data_dir,
+        parse_discovered_skill_markdown,
         sync_discovered_global_skills_at_home_dir,
     };
+
+    #[test]
+    fn workflow_builtin_skills_are_marked_openteams_only() {
+        for skill_name in ["brainstorming", "writing-plans", "code-guidelines"] {
+            let skill = find_builtin_skill_by_name(skill_name).expect("built-in workflow skill");
+
+            assert!(skill.description.starts_with("OpenTeams-only workflow skill."));
+            assert!(skill.content.contains("## OpenTeams-only availability"));
+            assert!(
+                skill
+                    .content
+                    .contains("[OPENTEAMS_SOURCE=openteams]")
+            );
+            assert!(skill.content.contains("If this marker is absent, do not use this skill."));
+        }
+    }
 
     #[test]
     fn global_skill_roots_use_slugified_skill_name() {

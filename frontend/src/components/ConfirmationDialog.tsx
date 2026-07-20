@@ -1,5 +1,6 @@
 import { AlertTriangle, X } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { useConfirmationDialogKeyboard } from './useConfirmationDialogKeyboard';
 
 export type ConfirmationDialogTone = 'warning' | 'danger';
 
@@ -36,28 +37,7 @@ export function ConfirmationDialog({
   const escKey = escLabel.startsWith('Esc') ? 'Esc' : escLabel;
   const escHelp = escLabel.startsWith('Esc') ? escLabel.slice(3).trim() : '';
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !confirming) {
-        event.preventDefault();
-        event.stopPropagation();
-        onCancel();
-        return;
-      }
-      if (
-        event.key === 'Enter' &&
-        !event.repeat &&
-        !event.isComposing &&
-        !confirming
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-        onConfirm();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [confirming, onCancel, onConfirm]);
+  useConfirmationDialogKeyboard({ confirming, onCancel, onConfirm });
 
   return (
     <div

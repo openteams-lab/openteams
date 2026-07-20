@@ -35,6 +35,7 @@ use super::{
     TokenUsageInfo, runtime::RunLogForwarders,
 };
 use crate::services::{
+    chat,
     config::UiLanguage,
     queued_message::{CreateQueuedMessage, QueuedMessageService},
     session_worktree::SessionWorktreeService,
@@ -694,6 +695,103 @@ async fn default_route_ignores_unmentioned_free_mode_user_messages() {
         .expect("resolve default mention");
 
     assert_eq!(default_mention, None);
+}
+
+#[tokio::test]
+async fn missing_mentioned_member_emits_correlated_error_and_marks_mention_failed() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    let session = insert_test_chat_session(&db, session_id).await;
+    let mut events = runner.subscribe(session_id);
+
+    let message = chat::create_message(
+        &db.pool,
+        session_id,
+        ChatSenderType::User,
+        None,
+        "@MissingMember please respond".to_string(),
+        Some(json!({ "client_message_id": "client-message-missing-member" })),
+    )
+    .await
+    .expect("create message with missing mention");
+
+    runner.handle_message(&session, &message).await;
+
+    let mention_error = std::iter::from_fn(|| events.try_recv().ok()).find_map(|event| {
+        if let ChatStreamEvent::MentionError {
+            message_id,
+            client_message_id,
+            session_agent_id,
+            project_member_id,
+            agent_name,
+            agent_id,
+            reason,
+            ..
+        } = event
+        {
+            Some((
+                message_id,
+                client_message_id,
+                session_agent_id,
+                project_member_id,
+                agent_name,
+                agent_id,
+                reason,
+            ))
+        } else {
+            None
+        }
+    });
+    assert_eq!(
+        mention_error,
+        Some((
+            message.id,
+            Some("client-message-missing-member".to_string()),
+            None,
+            None,
+            "MissingMember".to_string(),
+            None,
+            "member_not_found".to_string(),
+        ))
+    );
+
+    let persisted = ChatMessage::find_by_id(&db.pool, message.id)
+        .await
+        .expect("load missing-mention message")
+        .expect("missing-mention message exists");
+    assert_eq!(persisted.meta["mention_statuses"]["MissingMember"], "failed");
+
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("load session messages");
+    let system_message = messages
+        .iter()
+        .find(|candidate| candidate.sender_type == ChatSenderType::System)
+        .expect("missing-member system message exists");
+    assert_eq!(
+        system_message.content,
+        "Member @MissingMember does not exist."
+    );
+    assert_eq!(
+        system_message.meta["mention_failure"]["source_message_id"],
+        json!(message.id)
+    );
+    assert_eq!(
+        system_message.meta["mention_failure"]["mentioned_agent"],
+        "MissingMember"
+    );
+    assert_eq!(
+        system_message.meta["mention_failure"]["reason"],
+        "member_not_found"
+    );
+    assert_eq!(
+        system_message.meta["i18n"],
+        json!({
+            "key": "message.memberNotFound",
+            "params": { "member": "@MissingMember" },
+        })
+    );
 }
 
 #[tokio::test]

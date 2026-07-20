@@ -685,6 +685,17 @@ impl WorktreeManager {
 
     /// Get the default base directory (ignoring any override)
     pub fn get_default_worktree_base_dir() -> std::path::PathBuf {
+        // macOS may purge `std::env::temp_dir()` (`/var/folders/.../T`) during
+        // reboot. Session worktrees can contain uncommitted user changes, so
+        // production builds must keep them in persistent application data.
+        // Unit tests retain the temporary root to avoid writing test fixtures
+        // into the user's Application Support directory.
+        #[cfg(all(target_os = "macos", not(test)))]
+        {
+            return utils::path::get_openteams_data_dir().join("worktrees");
+        }
+
+        #[cfg(any(not(target_os = "macos"), test))]
         utils::path::get_agent_chatgroup_temp_dir().join("worktrees")
     }
 

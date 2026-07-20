@@ -233,6 +233,13 @@ check(
   settingsSource,
 );
 
+check(
+  'uses persistent Application Support storage for default macOS worktrees',
+  settingsSource.includes("['Library', 'Application Support', appIdentifier]") &&
+    settingsSource.includes("['worktrees', 'sessions']"),
+  settingsSource,
+);
+
 for (const locale of ['en', 'zh', 'ja', 'ko', 'fr', 'es']) {
   const localeSource = readFileSync(
     new URL(`../locales/${locale}/settings.json`, import.meta.url),

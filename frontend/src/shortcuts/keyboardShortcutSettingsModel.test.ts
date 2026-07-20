@@ -16,8 +16,8 @@ const rows = buildShortcutSettingsRows({
   unboundCommandIds: new Set(['worktree.merge']),
 });
 
-assert.equal(rows.length, 49);
-assert.equal(new Set(rows.map((row) => row.categoryKey)).size, 9);
+assert.equal(rows.length, 57);
+assert.equal(new Set(rows.map((row) => row.categoryKey)).size, 8);
 assert.deepEqual(
   filterShortcutSettingsRows(rows, {
     query: 'title:search.open',
