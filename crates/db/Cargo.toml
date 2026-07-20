@@ -1,6 +1,6 @@
 [package]
 name = "db"
-version = "0.5.3"
+version = "1.0.0"
 edition = "2024"
 
 [dependencies]
