@@ -40,6 +40,16 @@ check(
   source,
 );
 
+check(
+  'supports Enter confirmation through the shared dialog keyboard handler',
+  source.includes("import { useConfirmationDialogKeyboard }") &&
+    source.includes('useConfirmationDialogKeyboard({') &&
+    source.includes('enabled: open') &&
+    source.includes('confirming: submitting') &&
+    source.includes('onConfirm: handleSubmit'),
+  source,
+);
+
 if (failures > 0) {
   // eslint-disable-next-line no-console
   console.error(`\n${failures} IssueWorktreeSessionDialog assertion(s) failed.`);

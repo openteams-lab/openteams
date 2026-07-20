@@ -1451,7 +1451,9 @@ function WorkspaceLayout() {
   const handleCreateDefaultSession = async (options?: {
     projectId?: string | null;
     workspacePath?: string | null;
+    focusComposer?: boolean;
   }) => {
+    const focusComposer = options?.focusComposer ?? true;
     const projectId = options?.projectId?.trim() || selectedProjectId;
     if (!projectId) {
       showToast(
@@ -1488,11 +1490,13 @@ function WorkspaceLayout() {
       setSessionChatInputMode(backendSession.id, 'free');
       setIsCreateSessionModalOpen(false);
       closeMobileSidebar();
-      notifyChatInputPrefill({
-        sessionId: backendSession.id,
-        text: '',
-        mode: 'free',
-      });
+      if (focusComposer) {
+        notifyChatInputPrefill({
+          sessionId: backendSession.id,
+          text: '',
+          mode: 'free',
+        });
+      }
       void refreshSessions();
     } catch (err) {
       showToast(
@@ -1815,6 +1819,11 @@ function WorkspaceLayout() {
       replaceActiveTab(createSessionTab(backendSession.id));
       setActiveSessionId(backendSession.id);
       closeMobileSidebar();
+      notifyChatInputPrefill({
+        sessionId: backendSession.id,
+        text: '',
+        mode: nextChatInputMode,
+      });
 
       if (options.workItemId) {
         await projectWorkItemsApi.linkExecution(
@@ -2078,6 +2087,7 @@ function WorkspaceLayout() {
           options.workspacePath ??
           nextState.project_path ??
           activeProjectWorkspacePath,
+        focusComposer: false,
       });
       startOnboardingAppTransition();
     }

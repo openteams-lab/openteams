@@ -174,7 +174,10 @@ check(
     source.includes("if (options?.createDefaultSession)") &&
     source.includes("projectId: project.id") &&
     source.includes("workspacePath: data.default_workspace_path") &&
-    source.includes("await handleCreateDefaultSession({"),
+    source.includes("await handleCreateDefaultSession({") &&
+    source.includes("const focusComposer = options?.focusComposer ?? true") &&
+    source.includes("if (focusComposer)") &&
+    source.includes("notifyChatInputPrefill({"),
   source,
 );
 check(
@@ -199,7 +202,7 @@ check(
   source,
 );
 check(
-  "onboarding creates a real project before opening a default focused session",
+  "onboarding creates a real project before opening a default session",
   source.includes("handleCreateOnboardingProject") &&
     source.includes("onCreateProjectFromOnboarding={handleCreateOnboardingProject}") &&
     source.includes("default_workspace_path: path") &&
@@ -209,6 +212,13 @@ check(
     source.includes("onComplete={handleOnboardingCompleted}") &&
     source.includes("setIsCreateSessionModalOpen(false)") &&
     source.includes("await handleCreateDefaultSession({"),
+  source,
+);
+check(
+  "onboarding leaves focus outside the chat composer for command shortcuts",
+  source.includes("focusComposer?: boolean") &&
+    source.includes("const focusComposer = options?.focusComposer ?? true") &&
+    source.includes("focusComposer: false"),
   source,
 );
 check(
@@ -428,6 +438,14 @@ check(
     createAgentSessionSource.indexOf("setActiveSessionId(backendSession.id)") &&
     createAgentSessionSource.indexOf("setSessionChatInputMode(backendSession.id, nextChatInputMode)") <
       createAgentSessionSource.indexOf("sendMessageToSession(backendSession.id, content"),
+  createAgentSessionSource,
+);
+check(
+  "new session focuses its composer after activation",
+  createAgentSessionSource.indexOf("setActiveSessionId(backendSession.id)") <
+    createAgentSessionSource.indexOf("notifyChatInputPrefill({") &&
+    createAgentSessionSource.includes("sessionId: backendSession.id") &&
+    createAgentSessionSource.includes("mode: nextChatInputMode"),
   createAgentSessionSource,
 );
 check(

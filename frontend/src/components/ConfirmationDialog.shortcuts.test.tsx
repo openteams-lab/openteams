@@ -20,6 +20,13 @@ const customDialogSources: Array<[string, number]> = [
   ],
   [readFileSync(new URL('./ProjectSidebar.tsx', import.meta.url), 'utf8'), 2],
   [readFileSync(new URL('./SettingsWorkspace.tsx', import.meta.url), 'utf8'), 1],
+  [
+    readFileSync(
+      new URL('./IssueWorktreeSessionDialog.tsx', import.meta.url),
+      'utf8',
+    ),
+    1,
+  ],
 ];
 
 assert.ok(source.includes('useConfirmationDialogKeyboard'));

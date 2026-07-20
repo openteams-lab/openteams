@@ -1,6 +1,7 @@
 import { Check, FolderGit2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
+import { useConfirmationDialogKeyboard } from '@/components/useConfirmationDialogKeyboard';
 import {
   canUseIsolatedWorktree,
   isolatedWorktreeModeOrNull,
@@ -33,6 +34,23 @@ export function IssueWorktreeSessionDialog({
   const [isolate, setIsolate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const handleSubmit = useCallback(async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onCreate(isolatedWorktreeModeOrNull(isolate, gitAvailable));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [gitAvailable, isolate, onCreate, submitting]);
+
+  useConfirmationDialogKeyboard({
+    enabled: open,
+    confirming: submitting,
+    onCancel: onClose,
+    onConfirm: handleSubmit,
+  });
+
   useEffect(() => {
     if (!open) {
       setIsolate(false);
@@ -45,15 +63,6 @@ export function IssueWorktreeSessionDialog({
     setIsolate(false);
   }, [gitAvailable]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !submitting) onClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, open, submitting]);
-
   if (!open) return null;
 
   const gitUnavailable = gitAvailable === false;
@@ -61,16 +70,6 @@ export function IssueWorktreeSessionDialog({
   const projectLabel =
     projectName.trim() || tr('issue.createDialog.projectFallback', 'Project');
   const toggleDisabled = !canUseIsolatedWorktree(gitAvailable);
-
-  const handleSubmit = async () => {
-    if (submitting) return;
-    setSubmitting(true);
-    try {
-      await onCreate(isolatedWorktreeModeOrNull(isolate, gitAvailable));
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   return (
     <div
@@ -199,4 +198,3 @@ export function IssueWorktreeSessionDialog({
     </div>
   );
 }
-
