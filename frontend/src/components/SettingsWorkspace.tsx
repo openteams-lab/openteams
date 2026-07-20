@@ -109,6 +109,16 @@ const defaultWorktreeTempRoot = (
   return '/var/tmp';
 };
 
+const defaultMacWorktreeRoot = (
+  homeDirectory: string,
+  appIdentifier: string,
+): string =>
+  joinPath(
+    homeDirectory,
+    ['Library', 'Application Support', appIdentifier],
+    'macos',
+  );
+
 const getDefaultWorktreeSessionsDir = (
   config: UserSystemInfo['config'] | null,
   systemInfo: Pick<UserSystemInfo, 'home_directory' | 'environment'> | null,
@@ -132,6 +142,16 @@ const getDefaultWorktreeSessionsDir = (
   }
 
   const appTempName = import.meta.env.DEV ? 'openteams-dev' : 'openteams';
+  if (osType?.toLowerCase().includes('mac') && systemInfo.home_directory) {
+    const appIdentifier = import.meta.env.DEV
+      ? 'ai.openteams-lab-dev.openteams'
+      : 'ai.openteams-lab.openteams';
+    return joinPath(
+      defaultMacWorktreeRoot(systemInfo.home_directory, appIdentifier),
+      ['worktrees', 'sessions'],
+      osType,
+    );
+  }
   return joinPath(
     defaultWorktreeTempRoot(osType, systemInfo?.home_directory),
     [appTempName, 'worktrees', 'sessions'],

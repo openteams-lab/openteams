@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use directories::ProjectDirs;
+
 /// Directory name for storing images in worktrees
 pub const VIBE_IMAGES_DIR: &str = ".vibe-images";
 
@@ -114,7 +116,9 @@ pub fn get_agent_chatgroup_temp_dir() -> std::path::PathBuf {
     };
 
     if cfg!(target_os = "macos") {
-        // macOS already uses /var/folders/... which is persistent storage
+        // macOS uses /var/folders/.../T. This remains appropriate for logs and
+        // disposable caches, but the OS may purge it during reboot; durable
+        // worktrees must use `get_openteams_data_dir` instead.
         std::env::temp_dir().join(dir_name)
     } else if cfg!(target_os = "linux") {
         // Linux: use /var/tmp instead of /tmp to avoid RAM usage
@@ -123,6 +127,23 @@ pub fn get_agent_chatgroup_temp_dir() -> std::path::PathBuf {
         // Windows and other platforms: use temp dir with openteams subdirectory
         std::env::temp_dir().join(dir_name)
     }
+}
+
+/// Persistent per-user application data directory.
+///
+/// Unlike `get_agent_chatgroup_temp_dir`, this location is not managed by the
+/// operating system's temporary-file janitor and is therefore suitable for
+/// session worktrees that may contain uncommitted user changes.
+pub fn get_openteams_data_dir() -> PathBuf {
+    let organization = if cfg!(debug_assertions) {
+        "openteams-lab-dev"
+    } else {
+        "openteams-lab"
+    };
+
+    ProjectDirs::from("ai", organization, "openteams")
+        .map(|dirs| dirs.data_dir().to_path_buf())
+        .unwrap_or_else(|| home_directory().join(".openteams"))
 }
 
 /// Resolve the current user's home directory with platform-specific fallbacks.
@@ -171,6 +192,19 @@ mod tests {
         assert_eq!(
             make_path_relative("/other/path/file.js", "/tmp/test-worktree"),
             "/other/path/file.js"
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn persistent_app_data_dir_is_not_under_system_temp() {
+        let data_dir = get_openteams_data_dir();
+        let temp_dir = std::env::temp_dir();
+        assert!(!data_dir.starts_with(temp_dir));
+        assert!(
+            data_dir
+                .to_string_lossy()
+                .contains("Library/Application Support")
         );
     }
 
