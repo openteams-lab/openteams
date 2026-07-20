@@ -69,7 +69,12 @@ test('pre-release workflow gates Linux AppImage updater bundles behind policy', 
 test('pre-release falls back to a documented unsigned macOS DMG', async () => {
   const source = await readWorkflow('pre-release.yml');
   assert.match(source, /artifact_name=desktop-installer-macos-unsigned/);
-  assert.match(source, /## macOS unsigned build/);
+  assert.doesNotMatch(source, /## macOS unsigned build/);
+  assert.match(
+    source,
+    /If macOS blocks the app and reports that it is damaged, run:[\s\S]*xattr -dr com\.apple\.quarantine \/Applications\/openteams\.app/,
+    'pre-release.yml must tell users how to clear quarantine when macOS reports the app as damaged'
+  );
   assertUnsignedMacDistribution(source, 'pre-release.yml');
 });
 

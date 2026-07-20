@@ -2114,10 +2114,10 @@ jobs:
             if (macosUnsigned) {
               lines.push(
                 '',
-                '## macOS unsigned build',
-                'This macOS build is not signed or notarized by Apple.',
-                'After installation, Control-click the app and choose **Open**. If macOS still blocks it, use **System Settings → Privacy & Security → Open Anyway**.',
-                'Do not disable Gatekeeper globally. Verify the download with `SHA256SUMS-macos.txt`.'
+                'If macOS blocks the app and reports that it is damaged, run:',
+                '```bash',
+                'xattr -dr com.apple.quarantine /Applications/openteams.app',
+                '```'
               );
             }
 
