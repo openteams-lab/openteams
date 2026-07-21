@@ -269,6 +269,12 @@ export const useWorkspaceState = () => {
   const [membersAsync, setMembersAsync] = useState<
     AsyncResourceState<Member[]>
   >(() => initialAsync([]));
+  // Queue reconciliation needs the latest member labels, but the callback is
+  // also part of the chat stream dependency chain. Reading through a ref keeps
+  // member refreshes from tearing down the WebSocket while preserving fresh
+  // member data for newly claimed queue items.
+  const membersAsyncDataRef = useRef<Member[]>(membersAsync.data);
+  membersAsyncDataRef.current = membersAsync.data;
   const [mainAgentName, setMainAgentName] = useState<string | null>(null);
   const [providersAsync, setProvidersAsync] = useState<
     AsyncResourceState<Provider[]>
@@ -800,7 +806,7 @@ export const useWorkspaceState = () => {
           next = reconcileProcessingQueuePlaceholders(
             next,
             queue,
-            membersAsync.data,
+            membersAsyncDataRef.current,
           );
         }
         const unchanged =
@@ -809,7 +815,7 @@ export const useWorkspaceState = () => {
         return unchanged ? prev : { ...prev, [sessionId]: next };
       });
     },
-    [membersAsync.data],
+    [],
   );
   const applyChatRuntimeSnapshot = useCallback(
     (snapshot: ChatSessionRuntimeSnapshot) => {

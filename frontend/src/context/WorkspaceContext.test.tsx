@@ -143,6 +143,17 @@ check(
   source,
 );
 check(
+  'member refreshes do not rebuild the chat websocket dependency chain',
+  source.includes(
+    'const membersAsyncDataRef = useRef<Member[]>(membersAsync.data)',
+  ) &&
+    source.includes('membersAsyncDataRef.current = membersAsync.data') &&
+    /const syncProcessingQueuePlaceholders = useCallback\([\s\S]*?membersAsyncDataRef\.current[\s\S]*?\n\s*\[\],\n\s*\);\n\s*const applyChatRuntimeSnapshot/.test(
+      source,
+    ),
+  source,
+);
+check(
   'stream events create placeholders, notify the run store, and replace final messages',
   source.includes('insertRunningPlaceholder(parsed)') &&
     source.includes('runActivityStore.notifyUpdated(') &&
