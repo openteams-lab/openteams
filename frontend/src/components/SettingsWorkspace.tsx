@@ -1314,9 +1314,6 @@ export const SettingsWorkspace: React.FC = () => {
                 <p className="settings-row-description mt-2 leading-relaxed">
                   {t('settings.privacy.excludedData')}
                 </p>
-                <p className="settings-row-description mt-2 leading-relaxed">
-                  {t('settings.privacy.backendOnly')}
-                </p>
               </div>
             </section>
           </div>

@@ -1424,6 +1424,30 @@ export const mergePersistedWithRunningPlaceholders = (
   const carriedMessagesByKey = new Map<string, Message>();
   let hasRunIdPlaceholder = false;
   for (const message of combinedCurrent) {
+    // Inactive sessions miss streamed final replies. REST hydration must apply
+    // the same correlation-based replacement instead of carrying the cached
+    // optimistic "starting" row alongside its persisted reply.
+    const hasPersistedReplacement =
+      isPendingAgentPlaceholder(message) &&
+      persisted.some((candidate) => {
+        if (candidate.isUser || candidate.isAgentRunning) return false;
+        const correlationMatches = Boolean(
+          (message.clientMessageId &&
+            candidate.clientMessageId === message.clientMessageId) ||
+            (message.sourceMessageId &&
+              candidate.sourceMessageId === message.sourceMessageId),
+        );
+        if (!correlationMatches) return false;
+        if (message.sessionAgentId && candidate.sessionAgentId) {
+          return message.sessionAgentId === candidate.sessionAgentId;
+        }
+        return (
+          normalizedAgentHandle(message.sender) ===
+          normalizedAgentHandle(candidate.sender)
+        );
+      });
+    if (hasPersistedReplacement) continue;
+
     if (
       message.isAgentRunning &&
       message.sessionAgentId &&

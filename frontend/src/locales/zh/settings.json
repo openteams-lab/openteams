@@ -66,7 +66,6 @@
   "settings.privacy.errorReporting.restartNotice": "请重启 OpenTeams，使错误报告设置生效。",
   "settings.privacy.collectedData": "产品分析包括事件类型；根据本地设备和用户信息生成的稳定伪匿名安装 ID；会话、运行、工作流执行、计划、步骤、Agent 和 Skill ID；运行及工作流状态和稳定错误码；分桶后的数量和耗时；以及应用版本。",
   "settings.privacy.excludedData": "产品分析绝不包含消息或文件内容、提示词、文件路径、原始输出、堆栈信息或密钥值。错误报告与产品分析相互独立，可能包含堆栈信息和技术诊断数据。",
-  "settings.privacy.backendOnly": "分析数据仅由 OpenTeams 后端发送；浏览器不会加载 PostHog SDK。",
   "settings.privacy.saveFailed": "隐私设置保存失败。",
   "settings.notifications.agentActivity.desc": "智能体完成任务或遇到失败时",
   "settings.notifications.agentActivity.title": "智能体活动",

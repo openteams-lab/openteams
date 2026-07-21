@@ -85,7 +85,6 @@ const requiredPrivacyLocaleKeys = [
   'settings.privacy.errorReporting.restartNotice',
   'settings.privacy.collectedData',
   'settings.privacy.excludedData',
-  'settings.privacy.backendOnly',
   'settings.privacy.saveFailed',
 ];
 

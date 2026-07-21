@@ -66,7 +66,6 @@
   "settings.privacy.errorReporting.restartNotice": "エラー報告の変更を反映するには OpenTeams を再起動してください。",
   "settings.privacy.collectedData": "製品分析には、イベント種別、ローカルのデバイス情報とユーザー情報から生成される安定した仮名インストール ID、セッション・実行・ワークフロー実行・プラン・ステップ・Agent・Skill の各 ID、実行状態とワークフロー状態、安定したエラーコード、区分化された件数と所要時間、アプリのバージョンが含まれます。",
   "settings.privacy.excludedData": "製品分析には、メッセージやファイルの内容、プロンプト、ファイルパス、生の出力、スタックトレース、秘密値は含まれません。エラー報告は別機能であり、スタックトレースや技術診断が含まれる場合があります。",
-  "settings.privacy.backendOnly": "分析は OpenTeams バックエンドからのみ送信され、ブラウザは PostHog SDK を読み込みません。",
   "settings.privacy.saveFailed": "プライバシー設定を保存できませんでした。",
   "settings.notifications.agentActivity.desc": "エージェントがタスクを完了したとき、または失敗したとき",
   "settings.notifications.agentActivity.title": "エージェントの活動",

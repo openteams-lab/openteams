@@ -166,7 +166,39 @@ const refreshed = mergePersistedWithRunningPlaceholders(
 assert.deepEqual(
   refreshed.filter((message) => message.isAgentRunning).map((message) => message.id),
   pending.map((message) => message.id),
-  'message refresh carries every optimistic starting placeholder',
+  'message refresh carries optimistic placeholders until a run or reply exists',
+);
+
+const pendingWithoutSessionAgentId: Message = {
+  ...pending[0],
+  id: 'pending-agent-new-session-without-member-id',
+  sessionAgentId: undefined,
+};
+const refreshedWithPersistedReply = mergePersistedWithRunningPlaceholders(
+  [persistedUser, finalAlpha],
+  [pendingWithoutSessionAgentId],
+  new Set<string>(),
+  [],
+);
+assert.deepEqual(
+  refreshedWithPersistedReply.filter((message) => message.isAgentRunning),
+  [],
+  'a persisted final reply removes a correlated placeholder without a session agent id',
+);
+
+const refreshedKnownMemberWithPersistedReply =
+  mergePersistedWithRunningPlaceholders(
+    [persistedUser, finalAlpha],
+    pending,
+    new Set<string>(),
+    [],
+  );
+assert.deepEqual(
+  refreshedKnownMemberWithPersistedReply.filter(
+    (message) => message.isAgentRunning,
+  ).map((message) => message.id),
+  [pending[1].id],
+  'a persisted final reply removes only its optimistic placeholder after a session switch',
 );
 
 const alphaQueue: MemberQueueSnapshot[] = [

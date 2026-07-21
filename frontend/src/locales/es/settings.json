@@ -66,7 +66,6 @@
   "settings.privacy.errorReporting.restartNotice": "Reinicia OpenTeams para aplicar el cambio de informes de errores.",
   "settings.privacy.collectedData": "El análisis del producto incluye tipos de evento; un ID de instalación seudónimo y estable derivado de información local del dispositivo y del usuario; IDs de sesión, ejecución, flujo de trabajo, plan, paso, agente y skill; estados de ejecución y flujo y códigos de error estables; recuentos y duraciones agrupados; y versión de la aplicación.",
   "settings.privacy.excludedData": "El análisis del producto nunca incluye contenido de mensajes o archivos, prompts, rutas de archivos, salida sin procesar, trazas de pila ni valores secretos. Los informes de errores son independientes y pueden incluir trazas y diagnósticos técnicos.",
-  "settings.privacy.backendOnly": "Solo el backend de OpenTeams envía el análisis; el navegador no carga el SDK de PostHog.",
   "settings.privacy.saveFailed": "No se pudo guardar la configuración de privacidad.",
   "settings.notifications.agentActivity.desc": "Cuando un agente completa una tarea o encuentra un fallo",
   "settings.notifications.agentActivity.title": "Actividad del agente",

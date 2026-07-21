@@ -66,7 +66,6 @@
   "settings.privacy.errorReporting.restartNotice": "오류 보고 변경 사항을 적용하려면 OpenTeams를 다시 시작하세요.",
   "settings.privacy.collectedData": "제품 분석에는 이벤트 유형, 로컬 기기 및 사용자 정보에서 생성되는 안정적인 가명 설치 ID, 세션·실행·워크플로 실행·계획·단계·Agent·Skill ID, 실행 및 워크플로 상태와 안정적인 오류 코드, 구간화된 횟수와 소요 시간, 앱 버전이 포함됩니다.",
   "settings.privacy.excludedData": "제품 분석에는 메시지나 파일 내용, 프롬프트, 파일 경로, 원시 출력, 스택 추적 또는 비밀 값이 포함되지 않습니다. 오류 보고는 별도 기능이며 스택 추적과 기술 진단이 포함될 수 있습니다.",
-  "settings.privacy.backendOnly": "분석은 OpenTeams 백엔드에서만 전송되며 브라우저는 PostHog SDK를 로드하지 않습니다.",
   "settings.privacy.saveFailed": "개인정보 설정을 저장하지 못했습니다.",
   "settings.notifications.agentActivity.desc": "에이전트가 작업을 완료했거나 실패했을 때",
   "settings.notifications.agentActivity.title": "에이전트 활동",

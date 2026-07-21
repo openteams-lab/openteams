@@ -66,7 +66,6 @@
   "settings.privacy.errorReporting.restartNotice": "Restart OpenTeams for the error reporting change to take effect.",
   "settings.privacy.collectedData": "Product analytics includes event types; a stable pseudonymous installation ID derived from local device and user information; session, run, workflow execution, plan, step, agent, and skill IDs; run and workflow states and stable error codes; bucketed counts and durations; and app version.",
   "settings.privacy.excludedData": "Product analytics never includes message or file contents, prompts, file paths, raw output, stack traces, or secret values. Error reports are separate and can include stack traces and technical diagnostics.",
-  "settings.privacy.backendOnly": "Analytics is sent only by the OpenTeams backend; the browser does not load the PostHog SDK.",
   "settings.privacy.saveFailed": "Failed to save privacy settings.",
   "settings.notifications.agentActivity.desc": "When an agent completes a task or encounters a failure",
   "settings.notifications.agentActivity.title": "Agent activity",
