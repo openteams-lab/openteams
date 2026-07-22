@@ -3,6 +3,7 @@ pub(crate) enum LoopOutcome {
     Progressed,
     Completed,
     Parked,
+    Failed(String),
 }
 
 pub(crate) struct LoopExecutor<'a> {
@@ -22,5 +23,9 @@ enum LoopReviewDecision {
     Rejected {
         feedback: String,
         step_feedbacks: HashMap<String, String>,
+    },
+    LimitReached {
+        feedback: String,
+        review_attempt: i32,
     },
 }

@@ -830,6 +830,7 @@ mod tests {
                 "Must pass tests".to_string(),
                 "Must preserve API contract".to_string(),
             ],
+            2,
         );
 
         assert!(prompt.contains("You are reviewing a worker's step task output."));
@@ -846,6 +847,15 @@ mod tests {
         assert!(prompt.contains(&step.step_key));
         assert!(prompt.contains(&step.execution_id.to_string()));
         assert!(prompt.contains("Language Requirement"));
+        assert!(prompt.contains("Review attempt: 2 of at most 5"));
+        assert!(prompt.contains("report every issue you can identify in this single response"));
+    }
+
+    #[test]
+    fn workflow_review_attempt_limit_is_five() {
+        assert!(!workflow_review_attempt_limit_reached(4));
+        assert!(workflow_review_attempt_limit_reached(5));
+        assert!(workflow_review_attempt_limit_reached(6));
     }
 
     #[test]
@@ -872,6 +882,8 @@ mod tests {
 
         assert!(!prompt.contains("Coding Task Skill Requirement"));
         assert!(!prompt.contains("`code-guidelines` skill"));
+        assert!(prompt.contains("Workflow review is capped at five attempts"));
+        assert!(prompt.contains("cite every issue you can identify in this single response"));
     }
 
     #[test]

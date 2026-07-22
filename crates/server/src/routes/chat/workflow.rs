@@ -23,6 +23,7 @@ use db::models::{
     workflow_types::{
         ReviewVerdict, ReviewerType, WorkflowExecutionStatus, WorkflowPlanJson, WorkflowPlanStatus,
         WorkflowRevisionEditor, WorkflowStepStatus, WorkflowValidationStatus,
+        to_workflow_wire_value,
     },
 };
 use deployment::Deployment;
@@ -915,6 +916,39 @@ pub async fn stop_execution(
         .into_response())
 }
 
+pub async fn mark_execution_completed(
+    Extension(session): Extension<ChatSession>,
+    State(deployment): State<DeploymentImpl>,
+    axum::extract::Path((_session_id, execution_id)): axum::extract::Path<(Uuid, Uuid)>,
+) -> Result<Response, ApiError> {
+    let execution = WorkflowExecution::find_by_id(&deployment.db().pool, execution_id)
+        .await?
+        .ok_or_else(|| ApiError::BadRequest("Execution not found.".to_string()))?;
+    if execution.session_id != session.id {
+        return Err(ApiError::BadRequest(
+            "Execution not found in this session.".to_string(),
+        ));
+    }
+
+    let completed = WorkflowOrchestrator::mark_execution_completed(
+        deployment.chat_runner(),
+        &deployment.db().pool,
+        execution_id,
+    )
+    .await
+    .map_err(|error| ApiError::BadRequest(error.to_string()))?;
+
+    Ok((
+        StatusCode::OK,
+        ResponseJson(ApiResponse::<serde_json::Value>::success(
+            serde_json::json!({
+                "status": db::models::workflow_types::to_workflow_wire_value(&completed.status)
+            }),
+        )),
+    )
+        .into_response())
+}
+
 // -----------------------------------------------------------------------
 // Pause All
 // -----------------------------------------------------------------------
@@ -1204,6 +1238,43 @@ pub async fn retry_step(
                 } else {
                     format!("{:?}", step.status).to_lowercase()
                 },
+            },
+        )),
+    )
+        .into_response())
+}
+
+pub async fn skip_step(
+    Extension(session): Extension<ChatSession>,
+    State(deployment): State<DeploymentImpl>,
+    axum::extract::Path((_session_id, step_id)): axum::extract::Path<(Uuid, Uuid)>,
+) -> Result<Response, ApiError> {
+    let pool = &deployment.db().pool;
+    let (_step, _execution) = load_step_for_session(pool, &session, step_id).await?;
+
+    let (execution, step) =
+        WorkflowOrchestrator::skip_step(pool, deployment.chat_runner(), step_id)
+            .await
+            .map_err(|err| ApiError::BadRequest(err.to_string()))?;
+
+    let deployment_clone = deployment.clone();
+    tokio::spawn(async move {
+        if let Err(err) = WorkflowOrchestrator::wake_scheduler(
+            deployment_clone.db(),
+            deployment_clone.chat_runner(),
+            execution.id,
+        )
+        .await
+        {
+            tracing::error!(execution_id = %execution.id, step_id = %step_id, error = %err, "workflow scheduler failed after skipping step");
+        }
+    });
+
+    Ok((
+        StatusCode::OK,
+        ResponseJson(ApiResponse::<StepActionResponse>::success(
+            StepActionResponse {
+                status: to_workflow_wire_value(&step.status),
             },
         )),
     )
@@ -1825,6 +1896,9 @@ mod tests {
             chat_message::{ChatSenderType, CreateChatMessage},
             chat_session::CreateChatSession,
             workflow_execution::CreateWorkflowExecution,
+            workflow_round::{CreateWorkflowRound, WorkflowRound},
+            workflow_step::{CreateWorkflowStep, WorkflowStep},
+            workflow_types::WorkflowStepType,
         },
     };
     use serde_json::{Value, json};
@@ -1977,6 +2051,57 @@ mod tests {
         (status, body)
     }
 
+    async fn seed_step_with_status(
+        pool: &SqlitePool,
+        execution: &WorkflowExecution,
+        status: WorkflowStepStatus,
+    ) -> WorkflowStep {
+        let round = WorkflowRound::create(
+            pool,
+            &CreateWorkflowRound {
+                execution_id: execution.id,
+                round_index: 1,
+                source_revision_id: execution.active_revision_id,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create workflow round");
+        WorkflowExecution::update_active_round(pool, execution.id, round.id, 1)
+            .await
+            .expect("attach active round");
+        let step = WorkflowStep::create(
+            pool,
+            &CreateWorkflowStep {
+                execution_id: execution.id,
+                round_id: round.id,
+                compiled_revision_id: execution.active_revision_id,
+                step_key: format!("{}-step", to_workflow_wire_value(&status)),
+                step_type: WorkflowStepType::Task,
+                title: format!("{status:?} step"),
+                instructions: "Exercise skip route status validation".to_string(),
+                assigned_workflow_agent_session_id: None,
+                max_retry: 1,
+                round_index: 1,
+                display_order: 0,
+                loop_id: None,
+                lead_review_required: Some(false),
+                user_review_required: Some(false),
+                revision_context: None,
+            },
+            Uuid::new_v4(),
+        )
+        .await
+        .expect("create workflow step");
+        let step = WorkflowStep::update_status(pool, step.id, status)
+            .await
+            .expect("set workflow step status");
+        WorkflowExecution::update_status(pool, execution.id, WorkflowExecutionStatus::Paused)
+            .await
+            .expect("pause failed execution");
+        step
+    }
+
     #[tokio::test]
     async fn workflow_stop_execution_route_enforces_owner_terminal_state_and_resume_guard() {
         let (app, pool) = setup_workflow_route_app().await;
@@ -2041,6 +2166,160 @@ mod tests {
             resume_body
                 .to_string()
                 .contains("workflow stopped by user cannot be resumed")
+        );
+    }
+
+    #[tokio::test]
+    async fn workflow_mark_completed_route_enforces_owner_and_is_idempotent() {
+        let (app, pool) = setup_workflow_route_app().await;
+        let owner = create_test_session(&pool, "owner").await;
+        let other = create_test_session(&pool, "other").await;
+        let execution = seed_running_execution(&pool, &owner).await;
+
+        let (running_status, running_body) = post_without_body(
+            &app,
+            format!(
+                "/api/chat/sessions/{}/workflow/executions/{}/complete",
+                owner.id, execution.id
+            ),
+        )
+        .await;
+        assert_eq!(running_status, StatusCode::BAD_REQUEST);
+        assert!(
+            running_body
+                .to_string()
+                .contains("expected failed or paused")
+        );
+
+        let (cross_status, _) = post_without_body(
+            &app,
+            format!(
+                "/api/chat/sessions/{}/workflow/executions/{}/complete",
+                other.id, execution.id
+            ),
+        )
+        .await;
+        assert_eq!(cross_status, StatusCode::BAD_REQUEST);
+
+        WorkflowExecution::update_status(&pool, execution.id, WorkflowExecutionStatus::Failed)
+            .await
+            .expect("fail execution before manual completion");
+
+        for _ in 0..2 {
+            let (complete_status, complete_body) = post_without_body(
+                &app,
+                format!(
+                    "/api/chat/sessions/{}/workflow/executions/{}/complete",
+                    owner.id, execution.id
+                ),
+            )
+            .await;
+            assert_eq!(complete_status, StatusCode::OK, "{complete_body}");
+            assert_eq!(complete_body["success"], true);
+            assert_eq!(complete_body["data"]["status"], "completed");
+        }
+
+        let completed = WorkflowExecution::find_by_id(&pool, execution.id)
+            .await
+            .expect("load execution")
+            .expect("execution exists");
+        assert_eq!(completed.status, WorkflowExecutionStatus::Completed);
+        assert!(completed.completed_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn workflow_skip_step_route_accepts_supported_states_owned_by_session() {
+        let (app, pool) = setup_workflow_route_app().await;
+        let owner = create_test_session(&pool, "owner").await;
+        let other = create_test_session(&pool, "other").await;
+        let execution = seed_running_execution(&pool, &owner).await;
+        let step = seed_step_with_status(&pool, &execution, WorkflowStepStatus::Failed).await;
+
+        let (cross_status, _) = post_without_body(
+            &app,
+            format!(
+                "/api/chat/sessions/{}/workflow-steps/{}/skip",
+                other.id, step.id
+            ),
+        )
+        .await;
+        assert_eq!(cross_status, StatusCode::BAD_REQUEST);
+
+        let (skip_status, skip_body) = post_without_body(
+            &app,
+            format!(
+                "/api/chat/sessions/{}/workflow-steps/{}/skip",
+                owner.id, step.id
+            ),
+        )
+        .await;
+        assert_eq!(skip_status, StatusCode::OK, "{skip_body}");
+        assert_eq!(skip_body["success"], true);
+        assert_eq!(skip_body["data"]["status"], "skipped");
+
+        let skipped = WorkflowStep::find_by_id(&pool, step.id)
+            .await
+            .expect("load skipped step")
+            .expect("skipped step exists");
+        assert_eq!(skipped.status, WorkflowStepStatus::Skipped);
+
+        for supported_status in [WorkflowStepStatus::Interrupted, WorkflowStepStatus::Blocked] {
+            let execution = seed_running_execution(&pool, &owner).await;
+            let step = seed_step_with_status(&pool, &execution, supported_status.clone()).await;
+            let (skip_status, skip_body) = post_without_body(
+                &app,
+                format!(
+                    "/api/chat/sessions/{}/workflow-steps/{}/skip",
+                    owner.id, step.id
+                ),
+            )
+            .await;
+            assert_eq!(
+                skip_status,
+                StatusCode::OK,
+                "{supported_status:?}: {skip_body}"
+            );
+            assert_eq!(skip_body["success"], true);
+            assert_eq!(skip_body["data"]["status"], "skipped");
+
+            let skipped = WorkflowStep::find_by_id(&pool, step.id)
+                .await
+                .expect("load skipped step")
+                .expect("skipped step exists");
+            assert_eq!(skipped.status, WorkflowStepStatus::Skipped);
+        }
+
+        let (repeat_status, repeat_body) = post_without_body(
+            &app,
+            format!(
+                "/api/chat/sessions/{}/workflow-steps/{}/skip",
+                owner.id, step.id
+            ),
+        )
+        .await;
+        assert_eq!(repeat_status, StatusCode::BAD_REQUEST);
+        assert!(
+            repeat_body
+                .to_string()
+                .contains("only interrupted, blocked, or failed steps can be skipped")
+        );
+
+        let execution = seed_running_execution(&pool, &owner).await;
+        let running_step =
+            seed_step_with_status(&pool, &execution, WorkflowStepStatus::Running).await;
+        let (running_status, running_body) = post_without_body(
+            &app,
+            format!(
+                "/api/chat/sessions/{}/workflow-steps/{}/skip",
+                owner.id, running_step.id
+            ),
+        )
+        .await;
+        assert_eq!(running_status, StatusCode::BAD_REQUEST);
+        assert!(
+            running_body
+                .to_string()
+                .contains("only interrupted, blocked, or failed steps can be skipped")
         );
     }
 

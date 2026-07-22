@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SkipForward } from 'lucide-react';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { useQuery } from '@/lib/queryCompat';
 import { chatMessagesApi, workflowApi } from '@/lib/api';
@@ -15,6 +16,7 @@ import type {
   WorkflowTranscriptEntry,
 } from '@/types';
 import { useWorkspace } from '@/context/WorkspaceContext';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import {
   clearInboxWorkflowFocus,
   getPendingInboxWorkflowFocus,
@@ -91,6 +93,12 @@ export function WorkflowCard({
   const [windowOpen, setWindowOpen] = useState(false);
   const workflowCardRef = useRef<HTMLDivElement>(null);
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
+  const [pendingActionType, setPendingActionType] = useState<string | null>(
+    null,
+  );
+  const [skipConfirmationStepId, setSkipConfirmationStepId] = useState<
+    string | null
+  >(null);
   const [retryPlanGenerationError, setRetryPlanGenerationError] = useState<
     string | null
   >(null);
@@ -145,13 +153,19 @@ export function WorkflowCard({
     await loadProjection();
   };
 
-  const withPending = async (id: string, action: () => Promise<unknown>) => {
+  const withPending = async (
+    id: string,
+    actionType: string,
+    action: () => Promise<unknown>,
+  ) => {
     setPendingActionId(id);
+    setPendingActionType(actionType);
     try {
       await action();
       await refreshAll();
     } finally {
       setPendingActionId(null);
+      setPendingActionType(null);
     }
   };
 
@@ -302,7 +316,7 @@ export function WorkflowCard({
     if (!executeReviewProjection) return;
     setExecuteReviewError(null);
     try {
-      await withPending('execute-plan', () =>
+      await withPending('execute-plan', 'execute-plan', () =>
         workflowApi.executePlan(sessionId, executeReviewProjection.plan_id, {
           plan: null,
           stepReviewOverrides: overrides,
@@ -321,27 +335,50 @@ export function WorkflowCard({
   };
 
   const handlePauseAll = (executionId: string) =>
-    void withPending(executionId, () => workflowApi.pauseAll(sessionId, executionId));
+    void withPending(executionId, 'pause-execution', () =>
+      workflowApi.pauseAll(sessionId, executionId),
+    );
 
   const handleResume = (executionId: string) =>
-    void withPending(executionId, () =>
+    void withPending(executionId, 'resume-execution', () =>
       workflowApi.resumeExecution(sessionId, executionId),
     );
 
   const handleRetryStep = (stepId: string, retryTarget?: 'task' | 'review') =>
-    void withPending(stepId, () =>
+    void withPending(stepId, `retry-${retryTarget ?? 'task'}`, () =>
       workflowApi.retryStep(sessionId, stepId, retryTarget),
     );
 
+  const handleRequestSkipStep = (stepId: string) =>
+    setSkipConfirmationStepId(stepId);
+
+  const confirmSkipStep = () => {
+    const stepId = skipConfirmationStepId;
+    if (!stepId) return;
+    setSkipConfirmationStepId(null);
+    void withPending(stepId, 'skip-step', () =>
+      workflowApi.skipStep(sessionId, stepId),
+    );
+  };
+
   const handleInterruptStep = (stepId: string) =>
-    void withPending(stepId, () => workflowApi.interruptStepById(sessionId, stepId));
+    void withPending(stepId, 'terminate-step', () =>
+      workflowApi.interruptStepById(sessionId, stepId),
+    );
 
   const handleStopStep = (stepId: string) =>
-    void withPending(stepId, () => workflowApi.stopStep(sessionId, stepId));
+    void withPending(stepId, 'terminate-step', () =>
+      workflowApi.stopStep(sessionId, stepId),
+    );
 
   const handleStopExecution = (executionId: string) =>
-    void withPending(executionId, () =>
+    void withPending(executionId, 'stop-execution', () =>
       workflowApi.stopExecution(sessionId, executionId),
+    );
+
+  const handleMarkExecutionCompleted = (executionId: string) =>
+    void withPending(executionId, 'complete-execution', () =>
+      workflowApi.markExecutionCompleted(sessionId, executionId),
     );
 
   const handleApproval = (
@@ -350,7 +387,7 @@ export function WorkflowCard({
     transcriptId: string,
     inputText?: string,
   ) =>
-    void withPending(transcriptId, () =>
+    void withPending(transcriptId, 'resolve-transcript', () =>
       workflowApi.approveStep(sessionId, stepId, {
         transcriptId,
         action,
@@ -364,7 +401,7 @@ export function WorkflowCard({
     feedback?: string,
     expectedStepId?: string,
   ) =>
-    void withPending(reviewId, () =>
+    void withPending(reviewId, 'respond-review', () =>
       workflowApi.respondToReview({
         review_id: reviewId,
         action,
@@ -374,7 +411,7 @@ export function WorkflowCard({
     );
 
   const handleStepInput = (stepId: string, inputText: string) =>
-    void withPending(stepId, () =>
+    void withPending(stepId, 'submit-input', () =>
       workflowApi.submitStepInput(sessionId, stepId, inputText),
     );
 
@@ -388,7 +425,7 @@ export function WorkflowCard({
       additional_notes?: string | null;
     };
   }) =>
-    void withPending(payload.executionId, async () => {
+    void withPending(payload.executionId, 'iteration-feedback', async () => {
       await workflowApi.submitIterationFeedback({
         execution_id: payload.executionId,
         action: payload.action,
@@ -412,7 +449,7 @@ export function WorkflowCard({
       userReview: boolean | null;
     }>,
   ) =>
-    withPending('review-settings', () =>
+    withPending('review-settings', 'review-settings', () =>
       workflowApi.updateReviewSettings(sessionId, executionId, {
         stepReviewOverrides: overrides,
       }),
@@ -420,7 +457,7 @@ export function WorkflowCard({
 
   const handleRetryPlanGeneration = (retryMessageId: string) => {
     setRetryPlanGenerationError(null);
-    void withPending(retryMessageId, () =>
+    void withPending(retryMessageId, 'retry-plan-generation', () =>
       workflowApi.retryPlanGeneration(sessionId, retryMessageId).catch((error) => {
         setRetryPlanGenerationError(
           error instanceof Error ? error.message : 'Retry request failed',
@@ -439,7 +476,9 @@ export function WorkflowCard({
         onExecute={handleExecute}
         onPauseAll={handlePauseAll}
         onResume={handleResume}
+        onMarkExecutionCompleted={handleMarkExecutionCompleted}
         onRetryStep={handleRetryStep}
+        onSkipStep={handleRequestSkipStep}
         onOpenWindow={() => setWindowOpen(true)}
         onRetryPlanGeneration={handleRetryPlanGeneration}
         retryPlanGenerationPending={pendingActionId === messageId}
@@ -449,6 +488,7 @@ export function WorkflowCard({
         onSubmitStepInput={handleStepInput}
         onSubmitIterationFeedback={handleIterationFeedback}
         pendingActionId={pendingActionId}
+        pendingActionType={pendingActionType}
       />
       </div>
 
@@ -467,13 +507,16 @@ export function WorkflowCard({
           onInterruptStep={handleInterruptStep}
           onStopStep={handleStopStep}
           onStopExecution={handleStopExecution}
+          onMarkExecutionCompleted={handleMarkExecutionCompleted}
           onRetryStep={handleRetryStep}
+          onSkipStep={handleRequestSkipStep}
           onUpdateReviewSettings={handleUpdateReviewSettings}
           onSubmitStepInput={handleStepInput}
           onApproval={handleApproval}
           onRespondPendingReview={handlePendingReview}
           onSubmitIterationFeedback={handleIterationFeedback}
           pendingActionId={pendingActionId}
+          pendingActionType={pendingActionType}
         />
       )}
 
@@ -493,6 +536,27 @@ export function WorkflowCard({
           disabled={pendingActionId === 'execute-plan'}
           error={executeReviewError}
           variant="modal"
+        />
+      )}
+
+      {skipConfirmationStepId && (
+        <ConfirmationDialog
+          title={t('workflow.confirm.skipStepTitle', {
+            defaultValue: 'Skip this node?',
+          })}
+          description={t('workflow.confirm.skipStepDescription', {
+            defaultValue:
+              'The node will be treated as completed, and dependent downstream nodes may continue. This action cannot be undone.',
+          })}
+          confirmLabel={t('workflow.controls.skipStep', {
+            defaultValue: 'Skip',
+          })}
+          cancelLabel={t('cancel', { defaultValue: 'Cancel' })}
+          escLabel={t('escToCancel', { defaultValue: 'Esc to cancel' })}
+          confirmIcon={<SkipForward />}
+          idPrefix="workflow-skip-step-confirm"
+          onCancel={() => setSkipConfirmationStepId(null)}
+          onConfirm={confirmSkipStep}
         />
       )}
     </>

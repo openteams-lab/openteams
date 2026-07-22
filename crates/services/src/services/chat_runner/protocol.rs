@@ -969,8 +969,11 @@ impl ChatRunner {
         use super::super::workflow_orchestrator::WorkflowOrchestrator;
 
         if let Some(message_id) =
-            WorkflowOrchestrator::find_session_workflow_card_message_id(&self.db.pool, session_id)
-                .await
+            WorkflowOrchestrator::find_reusable_plan_generation_card_message_id(
+                &self.db.pool,
+                session_id,
+            )
+            .await
         {
             return Ok(Some(message_id));
         }
@@ -1214,6 +1217,28 @@ impl ChatRunner {
         Ok(message)
     }
 
+    async fn persist_active_workflow_plan_generation_notice(
+        &self,
+        session_id: Uuid,
+    ) -> Result<(), ChatRunnerError> {
+        use db::models::chat_message::ChatSenderType;
+
+        let message = chat::create_message(
+            &self.db.pool,
+            session_id,
+            ChatSenderType::System,
+            None,
+            "A workflow execution is already active in this session.".to_string(),
+            Some(serde_json::json!({
+                "type": "workflow_plan_generation_blocked",
+                "reason": "active_execution"
+            })),
+        )
+        .await?;
+        self.emit_message_new(session_id, message);
+        Ok(())
+    }
+
     async fn mark_plan_generation_failed(
         &self,
         session_id: Uuid,
@@ -1279,6 +1304,25 @@ impl ChatRunner {
         let session = ChatSession::find_by_id(pool, session_id)
             .await?
             .ok_or_else(|| ChatRunnerError::SessionNotFound(session_id))?;
+
+        if !WorkflowExecution::find_generation_blocking_by_session(pool, session_id)
+            .await?
+            .is_empty()
+        {
+            tracing::warn!(
+                session_id = %session_id,
+                "[plan_generation] skipped before card mutation: active execution already exists"
+            );
+            workflow_analytics::track_plan_generated(
+                self.analytics_service(),
+                session_id,
+                None,
+                false,
+            );
+            self.persist_active_workflow_plan_generation_notice(session_id)
+                .await?;
+            return Ok(());
+        }
 
         let session_agents = ChatSessionAgent::find_all_for_session(pool, session_id).await?;
         if session_agents.is_empty() {
@@ -1357,26 +1401,38 @@ impl ChatRunner {
             )
             .await?;
 
-        if !WorkflowExecution::find_generation_blocking_by_session(pool, session_id)
-            .await
-            .unwrap_or_default()
-            .is_empty()
-        {
+        let blocking_executions =
+            WorkflowExecution::find_generation_blocking_by_session(pool, session_id).await?;
+        if !blocking_executions.is_empty() {
             tracing::warn!(
                 session_id = %session_id,
                 "[plan_generation] skipping: active execution already exists"
             );
 
-            self.mark_plan_generation_failed(
-                session_id,
-                placeholder.id,
-                plan_goal,
-                &lead_agent_id,
-                &available_agents,
-                "A workflow execution is already active in this session.",
-                previous_plan_context.as_ref(),
-            )
-            .await?;
+            if blocking_executions
+                .iter()
+                .any(|execution| execution.workflow_card_message_id == Some(placeholder.id))
+            {
+                workflow_analytics::track_plan_generated(
+                    self.analytics_service(),
+                    session_id,
+                    None,
+                    false,
+                );
+                self.persist_active_workflow_plan_generation_notice(session_id)
+                    .await?;
+            } else {
+                self.mark_plan_generation_failed(
+                    session_id,
+                    placeholder.id,
+                    plan_goal,
+                    &lead_agent_id,
+                    &available_agents,
+                    "A workflow execution is already active in this session.",
+                    previous_plan_context.as_ref(),
+                )
+                .await?;
+            }
             return Ok(());
         }
 

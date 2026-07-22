@@ -3,12 +3,18 @@ import {
   PlayIcon,
   PauseIcon,
 } from '@phosphor-icons/react';
-import { BookOpen } from 'lucide-react';
+import {
+  BadgeCheck,
+  BookOpen,
+  CheckCircle2,
+  LoaderCircle,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { motion } from 'framer-motion';
 import type { WorkflowCardData } from '@/lib/api';
 import { AgentMarkdown } from '@/components/AgentMarkdown';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import { ChatMarkdown } from '@/components/conversation/ChatMarkdown';
 import { WorkflowIterationFeedbackCard } from './WorkflowIterationFeedbackCard';
 import { WorkflowPendingInputCard } from './WorkflowPendingInputCard';
@@ -16,6 +22,7 @@ import { WorkflowPendingReviewCard } from './WorkflowPendingReviewCard';
 import { WorkflowGraphBoard } from './WorkflowGraphBoard';
 import { type WorkflowFinalReviewActionData } from './WorkflowFinalReviewCard';
 import {
+  canMarkWorkflowExecutionCompleted,
   canPauseWorkflowExecution,
   canResumeWorkflowExecution,
   isWorkflowExecutionRecompiling,
@@ -297,7 +304,9 @@ type ChatWorkflowCardProps = {
   onExecute?: (projection: WorkflowCardProjection) => void;
   onPauseAll?: (executionId: string) => void;
   onResume?: (executionId: string, projection: WorkflowCardProjection) => void;
+  onMarkExecutionCompleted?: (executionId: string) => void;
   onRetryStep?: (stepId: string, retryTarget?: 'task' | 'review') => void;
+  onSkipStep?: (stepId: string) => void;
   onOpenWindow?: () => void;
   onRetryPlanGeneration?: (messageId: string) => void;
   retryPlanGenerationPending?: boolean;
@@ -320,6 +329,7 @@ type ChatWorkflowCardProps = {
     };
   }) => void;
   pendingActionId?: string | null;
+  pendingActionType?: string | null;
 };
 
 export function ChatWorkflowCard({
@@ -328,7 +338,9 @@ export function ChatWorkflowCard({
   onExecute,
   onPauseAll,
   onResume,
+  onMarkExecutionCompleted,
   onRetryStep,
+  onSkipStep,
   onOpenWindow,
   onRetryPlanGeneration,
   retryPlanGenerationPending = false,
@@ -338,6 +350,7 @@ export function ChatWorkflowCard({
   onSubmitStepInput,
   onSubmitIterationFeedback,
   pendingActionId,
+  pendingActionType,
 }: ChatWorkflowCardProps) {
   const { t } = useAppTranslation();
   const projection =
@@ -362,6 +375,8 @@ export function ChatWorkflowCard({
   const [selectedRoundIndex, setSelectedRoundIndex] = useState<number | null>(
     null
   );
+  const [markCompletedConfirmationOpen, setMarkCompletedConfirmationOpen] =
+    useState(false);
 
   useEffect(() => {
     setSelectedRoundIndex(defaultRoundIndex);
@@ -492,6 +507,19 @@ export function ChatWorkflowCard({
   const isCompletedState =
     !isPreview &&
     (executionStatus === 'completed' || projection.state === 'completed');
+  const canMarkExecutionCompleted = Boolean(
+    projection.execution_id &&
+      canMarkWorkflowExecutionCompleted(projection) &&
+      onMarkExecutionCompleted
+  );
+  const executionActionPending =
+    !!projection.execution_id && pendingActionId === projection.execution_id;
+  const pauseActionPending =
+    executionActionPending && pendingActionType === 'pause-execution';
+  const resumeActionPending =
+    executionActionPending && pendingActionType === 'resume-execution';
+  const completeActionPending =
+    executionActionPending && pendingActionType === 'complete-execution';
   const isPausedState = !isPreview && executionStatus === 'paused';
   const shouldHideExecutionStatusLabel = stateLabel
     .trim()
@@ -598,7 +626,9 @@ export function ChatWorkflowCard({
             planLoops={graphPlan.loops}
             agents={projection.agents}
             onRetryStep={isViewingCurrentRound ? onRetryStep : undefined}
+            onSkipStep={isViewingCurrentRound ? onSkipStep : undefined}
             pendingActionId={pendingActionId}
+            pendingActionType={pendingActionType}
             className="workflow-card-graph-board"
             compact
           />
@@ -697,21 +727,51 @@ export function ChatWorkflowCard({
                 <button
                   type="button"
                   onClick={() => onPauseAll(projection.execution_id!)}
-                  className={quietButtonClassName}
+                  disabled={executionActionPending}
+                  aria-busy={pauseActionPending}
+                  className={`${quietButtonClassName} disabled:cursor-not-allowed disabled:opacity-50`}
                 >
-                  <PauseIcon className="size-3.5" weight="bold" />
+                  {pauseActionPending ? (
+                    <LoaderCircle className="size-3.5 animate-spin" />
+                  ) : (
+                    <PauseIcon className="size-3.5" weight="bold" />
+                  )}
                   {t('workflow.card.buttons.pauseAll', {
                     defaultValue: 'Pause All',
                   })}
                 </button>
               )}
+            {canMarkExecutionCompleted && (
+              <button
+                type="button"
+                onClick={() => setMarkCompletedConfirmationOpen(true)}
+                disabled={executionActionPending}
+                aria-busy={completeActionPending}
+                className={`${quietButtonClassName} text-amber-500 hover:text-amber-600 hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-40`}
+              >
+                {completeActionPending ? (
+                  <LoaderCircle className="size-3.5 animate-spin" />
+                ) : (
+                  <BadgeCheck className="size-3.5" />
+                )}
+                {t('workflow.controls.markCompleted', {
+                  defaultValue: 'Complete',
+                })}
+              </button>
+            )}
             {canResumeExecution && projection.execution_id && onResume && (
               <button
                 type="button"
                 onClick={() => onResume(projection.execution_id!, projection)}
-                className={primaryButtonClassName}
+                disabled={executionActionPending}
+                aria-busy={resumeActionPending}
+                className={`${primaryButtonClassName} disabled:cursor-not-allowed disabled:opacity-50`}
               >
-                <PlayIcon className="size-3.5" weight="bold" />
+                {resumeActionPending ? (
+                  <LoaderCircle className="size-3.5 animate-spin" />
+                ) : (
+                  <PlayIcon className="size-3.5" weight="bold" />
+                )}
                 {t('workflow.card.buttons.resume', { defaultValue: 'Resume' })}
               </button>
             )}
@@ -764,19 +824,49 @@ export function ChatWorkflowCard({
           <button
             type="button"
             onClick={() => onPauseAll(projection.execution_id!)}
-            className={quietButtonClassName}
+            disabled={executionActionPending}
+            aria-busy={pauseActionPending}
+            className={`${quietButtonClassName} disabled:cursor-not-allowed disabled:opacity-50`}
           >
-            <PauseIcon className="size-3.5" weight="bold" />
+            {pauseActionPending ? (
+              <LoaderCircle className="size-3.5 animate-spin" />
+            ) : (
+              <PauseIcon className="size-3.5" weight="bold" />
+            )}
             {t('workflow.card.buttons.pauseAll', { defaultValue: 'Pause All' })}
           </button>
           )}
+        {canMarkExecutionCompleted && (
+          <button
+            type="button"
+            onClick={() => setMarkCompletedConfirmationOpen(true)}
+            disabled={executionActionPending}
+            aria-busy={completeActionPending}
+            className={`${quietButtonClassName} text-amber-500 hover:text-amber-600 hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-40`}
+          >
+            {completeActionPending ? (
+              <LoaderCircle className="size-3.5 animate-spin" />
+            ) : (
+              <BadgeCheck className="size-3.5" />
+            )}
+            {t('workflow.controls.markCompleted', {
+              defaultValue: 'Complete',
+            })}
+          </button>
+        )}
         {canResumeExecution && projection.execution_id && onResume && (
           <button
             type="button"
             onClick={() => onResume(projection.execution_id!, projection)}
-            className={primaryButtonClassName}
+            disabled={executionActionPending}
+            aria-busy={resumeActionPending}
+            className={`${primaryButtonClassName} disabled:cursor-not-allowed disabled:opacity-50`}
           >
-            <PlayIcon className="size-3.5" weight="bold" />
+            {resumeActionPending ? (
+              <LoaderCircle className="size-3.5 animate-spin" />
+            ) : (
+              <PlayIcon className="size-3.5" weight="bold" />
+            )}
             {t('workflow.card.buttons.resume', { defaultValue: 'Resume' })}
           </button>
         )}
@@ -787,14 +877,11 @@ export function ChatWorkflowCard({
             disabled={retryPlanGenerationPending}
             className={`${primaryButtonClassName} disabled:cursor-not-allowed disabled:opacity-50`}
           >
-            <ArrowClockwiseIcon
-              className={
-                retryPlanGenerationPending
-                  ? 'size-3.5 animate-spin'
-                  : 'size-3.5'
-              }
-              weight="bold"
-            />
+            {retryPlanGenerationPending ? (
+              <LoaderCircle className="size-3.5 animate-spin" />
+            ) : (
+              <ArrowClockwiseIcon className="size-3.5" weight="bold" />
+            )}
             {retryPlanGenerationPending
               ? t('workflow.card.buttons.retrying', {
                   defaultValue: 'Retrying...',
@@ -884,6 +971,29 @@ export function ChatWorkflowCard({
             {projection.error_message}
           </div>
         )}
+      {markCompletedConfirmationOpen && projection.execution_id && (
+        <ConfirmationDialog
+          title={t('workflow.confirm.markCompletedTitle', {
+            defaultValue: 'Mark workflow as completed?',
+          })}
+          description={t('workflow.confirm.markCompletedDescription', {
+            defaultValue:
+              'All unfinished steps and loops will be marked completed, and running agents will be stopped. This action cannot be undone.',
+          })}
+          confirmLabel={t('workflow.controls.markCompleted', {
+            defaultValue: 'Complete',
+          })}
+          cancelLabel={t('cancel', { defaultValue: 'Cancel' })}
+          escLabel={t('escToCancel', { defaultValue: 'Esc to cancel' })}
+          confirmIcon={<CheckCircle2 />}
+          idPrefix="workflow-card-complete-confirm"
+          onCancel={() => setMarkCompletedConfirmationOpen(false)}
+          onConfirm={() => {
+            onMarkExecutionCompleted?.(projection.execution_id!);
+            setMarkCompletedConfirmationOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

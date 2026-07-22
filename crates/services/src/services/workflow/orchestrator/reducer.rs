@@ -240,10 +240,10 @@ pub fn validate_step_transition(
             Ready | Revising | Completed | Failed | WaitingInput | InterruptRequested
         ),
         InterruptRequested => matches!(to, Interrupted | Failed),
-        Interrupted => matches!(to, Ready | Failed),
-        Blocked => matches!(to, Ready),
+        Interrupted => matches!(to, Ready | Failed | Skipped),
+        Blocked => matches!(to, Ready | Skipped),
         Revising => matches!(to, Ready | Running | Failed),
-        Failed => matches!(to, Ready),
+        Failed => matches!(to, Ready | Skipped),
         Completed => matches!(to, Ready),
         Skipped => false,
     };
@@ -295,7 +295,7 @@ pub fn validate_step_in_execution(
     use WorkflowStepStatus as S;
 
     match execution_status {
-        E::Pending => matches!(step_status, S::Pending | S::Ready | S::Blocked),
+        E::Pending => matches!(step_status, S::Pending | S::Ready | S::Blocked | S::Skipped),
         E::Running => true,
         E::Failed => !matches!(step_status, S::Running),
         E::Paused => matches!(
@@ -305,6 +305,7 @@ pub fn validate_step_in_execution(
                 | S::Blocked
                 | S::Completed
                 | S::Failed
+                | S::Skipped
                 | S::InterruptRequested
                 | S::Interrupted
         ),
@@ -599,6 +600,65 @@ pub async fn guarded_transition_step(
         entity: updated,
         event,
     })
+}
+
+/// Complete a step as an explicit user override, regardless of its current
+/// non-completed runtime state. This path is reserved for the workflow-level
+/// "mark completed" command and still uses CAS plus the normal audit stream.
+pub async fn force_complete_step(
+    pool: &SqlitePool,
+    execution: &WorkflowExecution,
+    step: &WorkflowStep,
+    reason: &str,
+) -> Result<Option<TransitionResult<WorkflowStep>>, TransitionError> {
+    if step.status == WorkflowStepStatus::Completed {
+        return Ok(None);
+    }
+
+    let from_str = to_workflow_wire_value(&step.status);
+    let to_str = to_workflow_wire_value(&WorkflowStepStatus::Completed);
+    let updated = WorkflowStep::mark_completed_if_current(pool, step.id, step.status.clone())
+        .await?
+        .ok_or_else(|| TransitionError::StaleTransition {
+            entity_id: step.id.to_string(),
+        })?;
+    let event = WorkflowEvent::create(
+        pool,
+        &CreateWorkflowEvent {
+            execution_id: execution.id,
+            round_id: Some(step.round_id),
+            step_id: Some(step.id),
+            agent_session_id: step.assigned_workflow_agent_session_id,
+            event_type: WorkflowEventType::StepStatusChanged,
+            status_before: Some(from_str.clone()),
+            status_after: Some(to_str.clone()),
+            detail_json: Some(
+                serde_json::json!({
+                    "step_key": step.step_key,
+                    "step_title": step.title,
+                    "forced": true,
+                    "reason": reason,
+                })
+                .to_string(),
+            ),
+        },
+        Uuid::new_v4(),
+    )
+    .await?;
+
+    tracing::info!(
+        execution_id = %execution.id,
+        step_id = %step.id,
+        from = %from_str,
+        to = %to_str,
+        reason,
+        "step manually marked completed"
+    );
+
+    Ok(Some(TransitionResult {
+        entity: updated,
+        event,
+    }))
 }
 
 pub async fn recover_orphaned_running_step(

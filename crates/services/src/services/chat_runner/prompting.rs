@@ -867,6 +867,7 @@ impl ChatRunner {
         skills: &[ChatSkill],
         prompt_language: ResolvedPromptLanguage,
         team_protocol: Option<&str>,
+        workflow_generation_blocked: bool,
     ) -> String {
         let mut markdown = String::new();
         let sender = Self::resolve_message_sender_identity(message);
@@ -889,6 +890,7 @@ impl ChatRunner {
             .unwrap_or_else(|| work_records_path.clone());
 
         let is_workflow_mode = chat::is_workflow_chat_input_mode(&message.meta.0);
+        let workflow_generation_available = is_workflow_mode && !workflow_generation_blocked;
 
         markdown.push_str("# Chat Message\n\n");
         markdown.push_str("## Workspace\n");
@@ -921,7 +923,7 @@ impl ChatRunner {
         markdown.push_str(
             "7. `conclusion`: current-turn summary only (completed work, blockers, next steps). Max 3 sentences.\n",
         );
-        if is_workflow_mode {
+        if workflow_generation_available {
             markdown.push_str("8. `workflow_generate`: \n");
             markdown.push_str(
                 "- Emit `workflow_generate` only when the user explicitly asks to start generating an execution plan.\n",
@@ -941,9 +943,20 @@ impl ChatRunner {
             markdown.push_str(
                 "- `design_doc_path` (optional, array of strings): file paths to design documents that were discussed and confirmed. If the chat history references design document files, include their paths here so the plan generator can read them for context. Leave empty or omit if no design documents are available.\n\n",
             );
+        } else if is_workflow_mode {
+            markdown.push_str("8. Active workflow guard:\n");
+            markdown.push_str(
+                "- A workflow execution is already active in this session, so `workflow_generate` is unavailable. Do not emit it in this response.\n",
+            );
+            markdown.push_str(
+                "- If the user asks to generate or start another workflow, return only a `send` item addressed to `\"you\"` explaining that another workflow cannot be generated until the active workflow is completed or stopped.\n",
+            );
+            markdown.push_str(
+                "- For requests that do not ask to trigger another workflow, continue the workflow-mode discussion normally without emitting `workflow_generate`.\n\n",
+            );
         }
 
-        if is_workflow_mode {
+        if workflow_generation_available {
             markdown.push_str("### Schema\n");
             markdown.push_str("```json\n");
             markdown.push_str(PROTOCOL_OUTPUT_SCHEMA_JSON_WORKFLOW_PLAN);
@@ -955,7 +968,7 @@ impl ChatRunner {
             markdown.push_str("\n```\n\n");
         }
 
-        if is_workflow_mode {
+        if workflow_generation_available {
             markdown.push_str("### Example\n");
             markdown.push_str("```json\n");
             markdown.push_str(MARKDOWN_PROTOCOL_OUTPUT_EXAMPLE_JSON_WORKFLOW_PLAN);
@@ -2251,6 +2264,7 @@ impl ChatRunner {
         skills: &[ChatSkill],
         prompt_language: ResolvedPromptLanguage,
         team_protocol: Option<&str>,
+        workflow_generation_blocked: bool,
     ) -> String {
         let context_dir = context_path.parent().unwrap_or(context_path);
 
@@ -2265,6 +2279,7 @@ impl ChatRunner {
             skills,
             prompt_language,
             team_protocol,
+            workflow_generation_blocked,
         )
     }
 }

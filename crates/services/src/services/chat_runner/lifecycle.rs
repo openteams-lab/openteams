@@ -1867,6 +1867,19 @@ impl ChatRunner {
             } else {
                 crate::services::agent_skill_policy::AgentPromptContext::FreeChat
             };
+            let workflow_generation_blocked = if matches!(
+                prompt_context,
+                crate::services::agent_skill_policy::AgentPromptContext::WorkflowChat
+            ) {
+                !db::models::workflow_execution::WorkflowExecution::find_generation_blocking_by_session(
+                    &self.db.pool,
+                    session_id,
+                )
+                .await?
+                .is_empty()
+            } else {
+                false
+            };
             let agent_skills = self
                 .prepare_and_resolve_agent_skills(&mut session_agent, &agent, prompt_context)
                 .await?;
@@ -1891,6 +1904,7 @@ impl ChatRunner {
                 &agent_skills,
                 prompt_language,
                 team_protocol.as_deref(),
+                workflow_generation_blocked,
             );
             startup_timing.mark(
                 startup_timing::StartupMilestoneName::PromptBuilt,

@@ -17,6 +17,12 @@ export function isRetryableWorkflowStepStatus(status?: string | null) {
   return status === 'failed' || status === 'interrupted';
 }
 
+export function canSkipWorkflowStep(status?: string | null) {
+  return (
+    status === 'interrupted' || status === 'blocked' || status === 'failed'
+  );
+}
+
 export function canRetryWorkflowStepReview(step?: WorkflowStepLike | null) {
   if (
     !step?.lead_review_required ||
@@ -45,5 +51,14 @@ export function canResumeWorkflowExecution(projection: WorkflowProjectionLike) {
   return (
     projection.execution_status === 'failed' &&
     !projection.stopped_by_user
+  );
+}
+
+export function canMarkWorkflowExecutionCompleted(
+  projection: Pick<WorkflowProjectionLike, 'execution_status'>
+) {
+  return (
+    projection.execution_status === 'failed' ||
+    projection.execution_status === 'paused'
   );
 }

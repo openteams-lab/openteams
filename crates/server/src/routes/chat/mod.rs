@@ -90,6 +90,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             axum::routing::post(workflow::stop_execution),
         )
         .route(
+            "/workflow/executions/{execution_id}/complete",
+            axum::routing::post(workflow::mark_execution_completed),
+        )
+        .route(
             "/workflow/executions/{execution_id}/review-settings",
             axum::routing::post(workflow::update_review_settings),
         )
@@ -128,6 +132,10 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route(
             "/workflow-steps/{step_id}/retry",
             axum::routing::post(workflow::retry_step),
+        )
+        .route(
+            "/workflow-steps/{step_id}/skip",
+            axum::routing::post(workflow::skip_step),
         )
         .route(
             "/workflow/interrupt-step",

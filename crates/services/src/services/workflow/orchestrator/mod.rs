@@ -1116,6 +1116,11 @@ impl WorkflowOrchestrator {
                     | SchedulerWorkOutcome::Loop(LoopOutcome::Parked) => {
                         any_parked = true;
                     }
+                    SchedulerWorkOutcome::Loop(LoopOutcome::Failed(reason)) => {
+                        if first_failure.is_none() {
+                            first_failure = Some(reason);
+                        }
+                    }
                     SchedulerWorkOutcome::Step {
                         step,
                         outcome: StepOutcome::Failed(reason),
@@ -1597,7 +1602,12 @@ impl WorkflowOrchestrator {
             .all(|edge| {
                 step_by_id
                     .get(&edge.from_step_id)
-                    .map(|step| step.status == WorkflowStepStatus::Completed)
+                    .map(|step| {
+                        matches!(
+                            step.status,
+                            WorkflowStepStatus::Completed | WorkflowStepStatus::Skipped
+                        )
+                    })
                     .unwrap_or(false)
             })
     }
@@ -1617,11 +1627,13 @@ impl WorkflowOrchestrator {
                     .find(|candidate| candidate.id == edge.from_step_id)
                     .map(|candidate| {
                         let same_loop = step.loop_id.is_some() && candidate.loop_id == step.loop_id;
-                        candidate.status == WorkflowStepStatus::Completed
-                            && (same_loop
-                                || candidate
-                                    .loop_id
-                                    .is_none_or(|loop_id| completed_loop_ids.contains(&loop_id)))
+                        matches!(
+                            candidate.status,
+                            WorkflowStepStatus::Completed | WorkflowStepStatus::Skipped
+                        ) && (same_loop
+                            || candidate
+                                .loop_id
+                                .is_none_or(|loop_id| completed_loop_ids.contains(&loop_id)))
                     })
                     .unwrap_or(false)
             })
@@ -1770,7 +1782,12 @@ impl WorkflowOrchestrator {
         Ok(member_ids.iter().all(|step_id| {
             step_by_id
                 .get(step_id)
-                .map(|step| step.status == WorkflowStepStatus::Completed)
+                .map(|step| {
+                    matches!(
+                        step.status,
+                        WorkflowStepStatus::Completed | WorkflowStepStatus::Skipped
+                    )
+                })
                 .unwrap_or(false)
         }))
     }

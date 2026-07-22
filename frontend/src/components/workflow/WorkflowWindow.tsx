@@ -13,6 +13,7 @@ import {
   Send,
   AlertCircle,
   Loader2,
+  LoaderCircle,
   MessageSquare,
   FileText,
   ScrollText,
@@ -20,6 +21,9 @@ import {
   RotateCcw,
   Ban,
   Settings,
+  BadgeCheck,
+  CheckCircle2,
+  SkipForward,
   type LucideIcon,
 } from 'lucide-react';
 import type { WorkflowCardData } from '@/lib/api';
@@ -63,6 +67,8 @@ import {
   type WorkflowFinalReviewActionData,
 } from './WorkflowFinalReviewCard';
 import {
+  canMarkWorkflowExecutionCompleted,
+  canSkipWorkflowStep,
   canRetryWorkflowStepReview,
   canPauseWorkflowExecution,
   canResumeWorkflowExecution,
@@ -728,7 +734,9 @@ export type WorkflowWindowProps = {
   onInterruptStep?: (stepId: string) => void;
   onStopStep?: (stepId: string) => void;
   onStopExecution?: (executionId: string) => void;
+  onMarkExecutionCompleted?: (executionId: string) => void;
   onRetryStep?: (stepId: string, retryTarget?: 'task' | 'review') => void;
+  onSkipStep?: (stepId: string) => void;
   onUpdateReviewSettings?: (
     executionId: string,
     overrides: WorkflowReviewSettingOverride[]
@@ -757,6 +765,7 @@ export type WorkflowWindowProps = {
     };
   }) => void;
   pendingActionId?: string | null;
+  pendingActionType?: string | null;
 };
 
 type StopConfirmation =
@@ -935,7 +944,9 @@ function InspectorCard({
   onInterruptStep,
   onStopStep,
   onRetryStep,
+  onSkipStep,
   pendingActionId,
+  pendingActionType,
   transcriptEntries,
   isLoadingTranscript,
   tokenUsage,
@@ -956,7 +967,9 @@ function InspectorCard({
   onInterruptStep?: (stepId: string) => void;
   onStopStep?: (stepId: string) => void;
   onRetryStep?: (stepId: string, retryTarget?: 'task' | 'review') => void;
+  onSkipStep?: (stepId: string) => void;
   pendingActionId?: string | null;
+  pendingActionType?: string | null;
   transcriptEntries: WorkflowTranscriptEntry[];
   isLoadingTranscript: boolean;
   tokenUsage: WorkflowStepTokenEntry | null;
@@ -985,6 +998,15 @@ function InspectorCard({
   const isFailed = WORKFLOW_FAILURE_STEP_STATUSES.has(step.status);
   const isCompleted = step.status === 'completed';
   const hasError = isFailed;
+  const stepActionPending = pendingActionId === step.id;
+  const terminateActionPending =
+    stepActionPending && pendingActionType === 'terminate-step';
+  const retryTaskActionPending =
+    stepActionPending && pendingActionType === 'retry-task';
+  const retryReviewActionPending =
+    stepActionPending && pendingActionType === 'retry-review';
+  const skipActionPending =
+    stepActionPending && pendingActionType === 'skip-step';
   const leadReviewRequired = step.lead_review_required;
   const canRetryReviewStep = canRetryWorkflowStepReview(step);
   const retryPresentation = useCommandPresentation('workflow.node.retry');
@@ -1385,9 +1407,15 @@ function InspectorCard({
                     }
                     onStopStep?.(step.id);
                   }}
-                  className="flex items-center gap-1.5 text-[12px] font-medium text-[#E5484D] hover:text-[#F2555A] transition-colors"
+                  disabled={stepActionPending}
+                  aria-busy={terminateActionPending}
+                  className="flex items-center gap-1.5 text-[12px] font-medium text-[#E5484D] hover:text-[#F2555A] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Ban className="w-3.5 h-3.5" />
+                  {terminateActionPending ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Ban className="w-3.5 h-3.5" />
+                  )}
                   {t('workflow.inspector.terminate', {
                     defaultValue: 'Terminate',
                   })}
@@ -1409,12 +1437,11 @@ function InspectorCard({
                     disabled={pendingActionId === step.id}
                     className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--ink-subtle)] hover:text-[var(--ink)] transition-colors disabled:opacity-50"
                   >
-                    <RotateCcw
-                      className={cn(
-                        'w-3.5 h-3.5',
-                        pendingActionId === step.id && 'animate-spin'
-                      )}
-                    />
+                    {retryTaskActionPending ? (
+                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    )}
                     {t('workflow.inspector.retryTask', {
                       defaultValue: 'Retry task',
                     })}
@@ -1441,12 +1468,11 @@ function InspectorCard({
                         : 'text-[var(--ink-tertiary)]'
                     )}
                   >
-                    <RotateCcw
-                      className={cn(
-                        'w-3.5 h-3.5',
-                        pendingActionId === step.id && 'animate-spin'
-                      )}
-                    />
+                    {retryReviewActionPending ? (
+                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    )}
                     {t('workflow.inspector.retryReview', {
                       defaultValue: 'Retry review',
                     })}
@@ -1465,18 +1491,33 @@ function InspectorCard({
                   disabled={pendingActionId === step.id}
                   className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--ink-subtle)] hover:text-[var(--ink)] transition-colors disabled:opacity-50"
                 >
-                  <RotateCcw
-                    className={cn(
-                      'w-3.5 h-3.5',
-                      pendingActionId === step.id && 'animate-spin'
-                    )}
-                  />
+                  {retryTaskActionPending ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  )}
                   {t('workflow.inspector.retry', { defaultValue: 'Retry' })}
                   <kbd className="ml-0.5 text-[10px] text-[var(--ink-tertiary)] font-mono">
                     {retryPresentation.label}
                   </kbd>
                 </button>
               ))}
+            {canSkipWorkflowStep(step.status) && onSkipStep && (
+              <button
+                type="button"
+                onClick={() => onSkipStep(step.id)}
+                disabled={stepActionPending}
+                aria-busy={skipActionPending}
+                className="flex items-center gap-1.5 bg-transparent text-[12px] font-medium text-[var(--ink-tertiary)] transition-colors hover:text-[var(--ink-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {skipActionPending ? (
+                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <SkipForward className="h-3.5 w-3.5" />
+                )}
+                {t('workflow.controls.skipStep', { defaultValue: 'Skip' })}
+              </button>
+            )}
           </div>
         </footer>
       )}
@@ -1809,13 +1850,16 @@ export function WorkflowWindow({
   onInterruptStep,
   onStopStep,
   onStopExecution,
+  onMarkExecutionCompleted,
   onRetryStep,
+  onSkipStep,
   onUpdateReviewSettings,
   onSubmitStepInput,
   onApproval,
   onRespondPendingReview,
   onSubmitIterationFeedback,
   pendingActionId,
+  pendingActionType,
 }: WorkflowWindowProps) {
   const { t } = useAppTranslation();
   const { showToast } = useWorkspace();
@@ -1836,6 +1880,8 @@ export function WorkflowWindow({
   const [isSavingReviewSettings, setIsSavingReviewSettings] = useState(false);
   const [stopConfirmation, setStopConfirmation] =
     useState<StopConfirmation | null>(null);
+  const [completionConfirmationExecutionId, setCompletionConfirmationExecutionId] =
+    useState<string | null>(null);
   const [reviewSelection, setReviewSelection] =
     useState<ReviewSelection | null>(null);
   const [selectedRoundIndex, setSelectedRoundIndex] = useState<number | null>(
@@ -1931,6 +1977,23 @@ export function WorkflowWindow({
     projection.execution_status === 'completed';
   const hasWorkflowFailed =
     projection.state === 'failed' || projection.execution_status === 'failed';
+  const canMarkExecutionCompleted = Boolean(
+    projection.execution_id &&
+      canMarkWorkflowExecutionCompleted(projection) &&
+      onMarkExecutionCompleted
+  );
+  const executeActionPending =
+    pendingActionId === 'execute-plan' && pendingActionType === 'execute-plan';
+  const executionActionPending =
+    !!projection.execution_id && pendingActionId === projection.execution_id;
+  const pauseActionPending =
+    executionActionPending && pendingActionType === 'pause-execution';
+  const resumeActionPending =
+    executionActionPending && pendingActionType === 'resume-execution';
+  const completeActionPending =
+    executionActionPending && pendingActionType === 'complete-execution';
+  const stopActionPending =
+    executionActionPending && pendingActionType === 'stop-execution';
   const pendingReviews = useMemo(
     () => getPendingReviews(projection),
     [projection]
@@ -2567,6 +2630,13 @@ export function WorkflowWindow({
     setStopConfirmation(null);
   };
 
+  const confirmMarkCompleted = () => {
+    if (completionConfirmationExecutionId) {
+      onMarkExecutionCompleted?.(completionConfirmationExecutionId);
+    }
+    setCompletionConfirmationExecutionId(null);
+  };
+
   const currentPendingReview = activeStepPendingReview ?? pendingReviews[0] ?? null;
   const currentPendingReviewStep = currentPendingReview
     ? getPendingReviewStep(currentPendingReview)
@@ -2789,12 +2859,18 @@ export function WorkflowWindow({
               <button
                 type="button"
                 onClick={() => onExecute(projection)}
-                className="p-1.5 rounded-md transition-all text-[#5E6AD2] hover:text-[#4850B8] hover:bg-[rgba(94,106,210,0.1)]"
+                disabled={executeActionPending}
+                aria-busy={executeActionPending}
+                className="p-1.5 rounded-md transition-all text-[#5E6AD2] hover:text-[#4850B8] hover:bg-[rgba(94,106,210,0.1)] disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={t('workflow.controls.executePlan', {
                   defaultValue: 'Execute Plan',
                 })}
               >
-                <Play className="w-4 h-4 fill-current" />
+                {executeActionPending ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="w-4 h-4 fill-current" />
+                )}
               </button>
               </CommandTooltip>
             )}
@@ -2802,24 +2878,59 @@ export function WorkflowWindow({
               <button
                 type="button"
                 onClick={() => onResume(projection.execution_id!, projection)}
-                className="p-1.5 rounded-md transition-all text-[#5E6AD2] hover:text-[#4850B8] hover:bg-[rgba(94,106,210,0.1)]"
+                disabled={executionActionPending}
+                aria-busy={resumeActionPending}
+                className="p-1.5 rounded-md transition-all text-[#5E6AD2] hover:text-[#4850B8] hover:bg-[rgba(94,106,210,0.1)] disabled:cursor-not-allowed disabled:opacity-50"
                 title={t('workflow.controls.resume', {
                   defaultValue: 'Resume',
                 })}
               >
-                <Play className="w-4 h-4 fill-current" />
+                {resumeActionPending ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="w-4 h-4 fill-current" />
+                )}
               </button>
             )}
             {canPauseExecution && projection.execution_id && onPauseAll && (
               <button
                 type="button"
                 onClick={() => onPauseAll(projection.execution_id!)}
-                className="p-1.5 rounded-md transition-all text-[var(--ink-subtle)] hover:text-[var(--ink)] hover:bg-[var(--surface-3)]"
+                disabled={executionActionPending}
+                aria-busy={pauseActionPending}
+                className="p-1.5 rounded-md transition-all text-[var(--ink-subtle)] hover:text-[var(--ink)] hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
                 title={t('workflow.controls.pauseAll', {
                   defaultValue: 'Pause All',
                 })}
               >
-                <Pause className="w-4 h-4" />
+                {pauseActionPending ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Pause className="w-4 h-4" />
+                )}
+              </button>
+            )}
+            {canMarkExecutionCompleted && projection.execution_id && (
+              <button
+                type="button"
+                onClick={() =>
+                  setCompletionConfirmationExecutionId(projection.execution_id!)
+                }
+                disabled={executionActionPending}
+                aria-busy={completeActionPending}
+                className="p-1.5 rounded-md transition-all text-amber-500 hover:text-amber-600 hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-40"
+                title={t('workflow.controls.markCompleted', {
+                  defaultValue: 'Complete',
+                })}
+                aria-label={t('workflow.controls.markCompleted', {
+                  defaultValue: 'Complete',
+                })}
+              >
+                {completeActionPending ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <BadgeCheck className="h-4 w-4" />
+                )}
               </button>
             )}
             {projection.execution_id && onStopExecution && isRunning && (
@@ -2832,10 +2943,16 @@ export function WorkflowWindow({
                     executionId: projection.execution_id!,
                   })
                 }
-                className="p-1.5 rounded-md transition-all text-[var(--ink-subtle)] hover:text-[var(--ink)] hover:bg-[var(--surface-3)]"
+                disabled={executionActionPending}
+                aria-busy={stopActionPending}
+                className="p-1.5 rounded-md transition-all text-[var(--ink-subtle)] hover:text-[var(--ink)] hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={t('workflow.controls.stop', { defaultValue: 'Stop' })}
               >
-                <Square className="w-4 h-4" />
+                {stopActionPending ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Square className="w-4 h-4" />
+                )}
               </button>
               </CommandTooltip>
             )}
@@ -2892,7 +3009,9 @@ export function WorkflowWindow({
           selectedStepId={isViewingCurrentRound ? activeNodeId : undefined}
           onSelectStep={isViewingCurrentRound ? handleNodeClick : undefined}
           onRetryStep={isViewingCurrentRound ? onRetryStep : undefined}
+          onSkipStep={isViewingCurrentRound ? onSkipStep : undefined}
           pendingActionId={pendingActionId}
+          pendingActionType={pendingActionType}
           isOpen={isOpen}
           historicalRound={!isViewingCurrentRound}
           className="flex-1 min-w-0 h-full"
@@ -3151,7 +3270,9 @@ export function WorkflowWindow({
                   setStopConfirmation({ kind: 'step', stepId })
                 }
                 onRetryStep={onRetryStep}
+                onSkipStep={onSkipStep}
                 pendingActionId={pendingActionId}
+                pendingActionType={pendingActionType}
                 transcriptEntries={visibleActiveTranscript}
                 isLoadingTranscript={
                   isLoadingActiveStepTranscript &&
@@ -3187,6 +3308,26 @@ export function WorkflowWindow({
           idPrefix="workflow-stop-confirm"
           onCancel={() => setStopConfirmation(null)}
           onConfirm={confirmStop}
+        />
+      )}
+      {completionConfirmationExecutionId && (
+        <ConfirmationDialog
+          title={t('workflow.confirm.markCompletedTitle', {
+            defaultValue: 'Mark workflow as completed?',
+          })}
+          description={t('workflow.confirm.markCompletedDescription', {
+            defaultValue:
+              'All unfinished steps and loops will be marked completed, and running agents will be stopped. This action cannot be undone.',
+          })}
+          confirmLabel={t('workflow.controls.markCompleted', {
+            defaultValue: 'Complete',
+          })}
+          cancelLabel={t('cancel', { defaultValue: 'Cancel' })}
+          escLabel={t('escToCancel', { defaultValue: 'Esc to cancel' })}
+          confirmIcon={<CheckCircle2 />}
+          idPrefix="workflow-complete-confirm"
+          onCancel={() => setCompletionConfirmationExecutionId(null)}
+          onConfirm={confirmMarkCompleted}
         />
       )}
     </div>

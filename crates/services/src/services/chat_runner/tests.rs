@@ -236,6 +236,27 @@ async fn setup_chat_runner_db() -> DBService {
             )
             "#,
         r#"
+            CREATE TABLE chat_workflow_executions (
+                id BLOB PRIMARY KEY,
+                session_id BLOB NOT NULL,
+                plan_id BLOB NOT NULL,
+                active_revision_id BLOB,
+                active_round_id BLOB,
+                workflow_card_message_id BLOB,
+                lead_session_agent_id BLOB,
+                status TEXT NOT NULL DEFAULT 'pending',
+                current_round INTEGER NOT NULL DEFAULT 0,
+                title TEXT NOT NULL,
+                compiled_graph_hash TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                cleaned_at TEXT,
+                cleaned_reason TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'subsec'))
+            )
+            "#,
+        r#"
             CREATE TABLE chat_messages (
                 id BLOB PRIMARY KEY,
                 session_id BLOB NOT NULL,
@@ -417,6 +438,86 @@ async fn insert_test_project(pool: &SqlitePool, project_id: Uuid) {
     .execute(pool)
     .await
     .expect("insert project");
+}
+
+#[tokio::test]
+async fn active_workflow_blocks_plan_generation_without_overwriting_its_card() {
+    let db = setup_chat_runner_db().await;
+    let runner = ChatRunner::new(db.clone());
+    let session_id = Uuid::new_v4();
+    insert_test_chat_session(&db, session_id).await;
+
+    let execution_id = Uuid::new_v4();
+    let card = chat::create_message(
+        &db.pool,
+        session_id,
+        ChatSenderType::System,
+        None,
+        "Active Workflow".to_string(),
+        Some(json!({
+            "card_type": "workflow_execution",
+            "workflow_card": {
+                "execution_id": execution_id,
+                "state": "running",
+                "is_terminal": false
+            }
+        })),
+    )
+    .await
+    .expect("create active workflow card");
+    let original_meta = card.meta.clone();
+
+    sqlx::query(
+        r#"
+        INSERT INTO chat_workflow_executions (
+            id, session_id, plan_id, workflow_card_message_id, status, title
+        )
+        VALUES (?1, ?2, ?3, ?4, 'running', 'Active Workflow')
+        "#,
+    )
+    .bind(execution_id)
+    .bind(session_id)
+    .bind(Uuid::new_v4())
+    .bind(card.id)
+    .execute(&db.pool)
+    .await
+    .expect("create active workflow execution");
+
+    runner
+        .trigger_plan_generation(
+            session_id,
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "lead",
+            Uuid::new_v4(),
+            "Generate another workflow",
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("block plan generation");
+
+    let unchanged_card = ChatMessage::find_by_id(&db.pool, card.id)
+        .await
+        .expect("load active workflow card")
+        .expect("active workflow card still exists");
+    assert_eq!(unchanged_card.content, "Active Workflow");
+    assert_eq!(unchanged_card.meta, original_meta);
+
+    let messages = ChatMessage::find_by_session_id(&db.pool, session_id, None)
+        .await
+        .expect("list session messages");
+    assert_eq!(messages.len(), 2);
+    let notice = messages.last().expect("active workflow notice exists");
+    assert_eq!(
+        notice.content,
+        "A workflow execution is already active in this session."
+    );
+    assert_eq!(
+        notice.meta.0.get("type").and_then(serde_json::Value::as_str),
+        Some("workflow_plan_generation_blocked")
+    );
 }
 
 #[tokio::test]
@@ -2888,6 +2989,7 @@ fn build_exact_markdown_prompt_includes_routed_message_intent_meaning() {
             instruction: "You MUST respond in English.",
         },
         Some("Follow the team protocol."),
+        false,
     );
 
     assert!(prompt.contains("- intent: confirm"));
@@ -2921,6 +3023,7 @@ fn build_exact_markdown_prompt_declares_active_workspace_as_project_repo() {
             instruction: "You MUST respond in English.",
         },
         None,
+        false,
     );
 
     assert!(prompt.contains("## Workspace"));
@@ -3031,6 +3134,7 @@ async fn prompt_after_worktree_discard_declares_base_workspace() {
             instruction: "You MUST respond in English.",
         },
         None,
+        false,
     );
 
     assert!(prompt.contains("Active workspace path: `E:/workspace/base`"));
@@ -3072,6 +3176,7 @@ fn build_exact_markdown_prompt_tells_notify_receiver_not_to_reply() {
             instruction: "You MUST respond in English.",
         },
         Some("Follow the team protocol."),
+        false,
     );
 
     assert!(prompt.contains("- intent: notify"));
@@ -3101,6 +3206,7 @@ fn build_exact_markdown_prompt_includes_team_protocol_section_when_empty() {
             instruction: "You MUST respond in English.",
         },
         Some(" "),
+        false,
     );
 
     assert!(prompt.contains("## Team Protocol"));
@@ -3204,6 +3310,7 @@ fn build_exact_markdown_prompt_matches_expected_input_template() {
             instruction: "You MUST respond in Simplified Chinese.",
         },
         Some("Follow the team protocol."),
+        false,
     );
 
     // Verify key sections exist instead of exact string match
@@ -3296,6 +3403,7 @@ fn build_exact_markdown_prompt_restricts_send_targets_in_workflow_mode() {
             instruction: "You MUST respond in Simplified Chinese.",
         },
         None,
+        false,
     );
 
     assert!(prompt.contains("Workflow mode: `send.to` may only be `\"you\"`"));
@@ -3313,6 +3421,42 @@ fn build_exact_markdown_prompt_restricts_send_targets_in_workflow_mode() {
         "Emit `workflow_generate` only when the user explicitly asks to start generating an execution plan."
     ));
     assert!(prompt.contains("`生成计划`, `开始执行`, `开始落实`, `进入执行`"));
+}
+
+#[test]
+fn build_exact_markdown_prompt_blocks_workflow_generation_when_execution_is_active() {
+    let agent = test_agent("planner", "Workflow lead");
+    let message = test_message(
+        "Generate another workflow plan",
+        json!({ "chat_input_mode": "workflow" }),
+    );
+
+    let prompt = ChatRunner::build_exact_markdown_prompt(
+        &agent,
+        &message,
+        Path::new(r"E:\workspace\projectSS\MainPage2\.openteams\context\demo"),
+        Path::new(r"E:\workspace\projectSS\MainPage2"),
+        &[],
+        None,
+        None,
+        &[],
+        ResolvedPromptLanguage {
+            setting: "english",
+            code: "en",
+            instruction: "You MUST respond in English.",
+        },
+        None,
+        true,
+    );
+
+    assert!(prompt.contains("A workflow execution is already active in this session"));
+    assert!(prompt.contains("`workflow_generate` is unavailable"));
+    assert!(prompt.contains(
+        "return only a `send` item addressed to `\"you\"` explaining that another workflow cannot be generated"
+    ));
+    assert!(prompt.contains(PROTOCOL_OUTPUT_SCHEMA_JSON));
+    assert!(!prompt.contains(r#""type": { "const": "workflow_generate" }"#));
+    assert!(!prompt.contains("Generate a workflow plan to implement the following task"));
 }
 
 #[test]
@@ -3342,6 +3486,7 @@ fn build_exact_markdown_prompt_keeps_current_turn_after_stable_prefix() {
             instruction: "You MUST respond in Simplified Chinese.",
         },
         None,
+        false,
     );
     let second_prompt = ChatRunner::build_exact_markdown_prompt(
         &agent,
@@ -3358,6 +3503,7 @@ fn build_exact_markdown_prompt_keeps_current_turn_after_stable_prefix() {
             instruction: "You MUST respond in Simplified Chinese.",
         },
         None,
+        false,
     );
 
     let first_prefix = first_prompt
@@ -3398,6 +3544,7 @@ fn build_exact_markdown_prompt_for_protocol_retry_omits_agent_and_team_protocol_
             instruction: "You MUST respond in Simplified Chinese.",
         },
         Some("Follow the team protocol."),
+        false,
     );
 
     assert!(prompt.contains("## Input Message"));

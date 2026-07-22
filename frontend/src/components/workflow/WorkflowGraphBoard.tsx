@@ -7,12 +7,14 @@ import {
   MinusIcon,
   PlusIcon,
 } from '@phosphor-icons/react';
+import { LoaderCircle, SkipForward } from 'lucide-react';
 import { useAppTranslation } from '@/hooks/useAppTranslation';
 import { motion } from 'framer-motion';
 import type { WorkflowCardData, WorkflowCardLoopData } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useShortcutScope } from '@/shortcuts/ShortcutProvider';
 import {
+  canSkipWorkflowStep,
   canRetryWorkflowStepReview,
   isRetryableWorkflowStepStatus,
 } from './workflowControlContract';
@@ -49,7 +51,9 @@ type WorkflowGraphBoardProps = {
   selectedStepId?: string | null;
   onSelectStep?: (id: string) => void;
   onRetryStep?: (stepId: string, retryTarget?: 'task' | 'review') => void;
+  onSkipStep?: (stepId: string) => void;
   pendingActionId?: string | null;
+  pendingActionType?: string | null;
   compact?: boolean;
   className?: string;
   isOpen?: boolean;
@@ -432,7 +436,9 @@ export function WorkflowGraphBoard({
   selectedStepId = null,
   onSelectStep,
   onRetryStep,
+  onSkipStep,
   pendingActionId = null,
+  pendingActionType = null,
   compact = false,
   className,
   isOpen = false,
@@ -799,7 +805,13 @@ export function WorkflowGraphBoard({
           !!onRetryStep &&
           !!retryStepId &&
           isRetryableWorkflowStepStatus(step?.status);
+        const canSkipStep =
+          !!onSkipStep && !!retryStepId && canSkipWorkflowStep(step?.status);
         const isRetryPending = !!retryStepId && pendingActionId === retryStepId;
+        const isSkipPending =
+          !!retryStepId &&
+          pendingActionId === retryStepId &&
+          pendingActionType === 'skip-step';
         const stepAgentLabel = step?.agent_name?.trim();
         const agentName =
           (stepAgentLabel
@@ -888,8 +900,32 @@ export function WorkflowGraphBoard({
               </div>
             )}
 
-            {canRetryStep && (
-              <div className="absolute -bottom-3 right-3 z-50">
+            {(canRetryStep || canSkipStep) && (
+              <div className="absolute -bottom-3 right-3 z-50 flex items-center gap-1">
+                {canSkipStep && retryStepId && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRetryDialogStepId(null);
+                      onSkipStep?.(retryStepId);
+                    }}
+                    disabled={isRetryPending}
+                    aria-busy={isSkipPending}
+                    className="inline-flex items-center gap-1 rounded-2xl bg-slate-500 px-2.5 py-1 text-[10px] font-semibold text-white transition-colors hover:bg-slate-600 disabled:opacity-40"
+                  >
+                    {isSkipPending ? (
+                      <LoaderCircle className="size-3 animate-spin" />
+                    ) : (
+                      <SkipForward className="size-3" />
+                    )}
+                    {t('workflow.controls.skipStep', {
+                      defaultValue: 'Skip',
+                    })}
+                  </button>
+                )}
+                {canRetryStep && (
+                  <>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -902,12 +938,17 @@ export function WorkflowGraphBoard({
                     }
                   }}
                   disabled={isRetryPending}
+                  aria-busy={
+                    isRetryPending && pendingActionType?.startsWith('retry-')
+                  }
                   className="inline-flex items-center gap-1 rounded-2xl bg-rose-600 px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm hover:bg-rose-700 disabled:opacity-60 transition-colors"
                 >
-                  <ArrowClockwiseIcon
-                    className={cn('size-3', isRetryPending && 'animate-spin')}
-                    weight="bold"
-                  />
+                  {isRetryPending &&
+                  pendingActionType?.startsWith('retry-') ? (
+                    <LoaderCircle className="size-3 animate-spin" />
+                  ) : (
+                    <ArrowClockwiseIcon className="size-3" weight="bold" />
+                  )}
                   {t('workflow.graph.retry', { defaultValue: 'Retry' })}
                 </button>
                 {retryDialogStepId === retryStepId && (
@@ -958,6 +999,8 @@ export function WorkflowGraphBoard({
                       })}
                     </button>
                   </div>
+                )}
+                  </>
                 )}
               </div>
             )}

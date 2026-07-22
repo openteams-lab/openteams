@@ -75,6 +75,41 @@ impl<'a> LoopExecutor<'a> {
                     .await?;
                 Ok(LoopOutcome::Progressed)
             }
+            LoopReviewDecision::LimitReached {
+                feedback,
+                review_attempt,
+            } => {
+                let reason = format!(
+                    "Loop review \"{}\" was rejected on the final allowed review attempt ({}/{}): {}",
+                    active_loop.loop_key,
+                    review_attempt,
+                    MAX_WORKFLOW_REVIEW_ATTEMPTS,
+                    feedback
+                );
+                let failed_loop = WorkflowLoop::update_status(
+                    self.pool,
+                    active_loop.id,
+                    WorkflowLoopStatus::Failed,
+                    Some(reason.clone()),
+                )
+                .await?;
+                Self::emit_loop_event(
+                    self.pool,
+                    self.execution,
+                    &failed_loop,
+                    WorkflowEventType::LoopFailed,
+                    Some(serde_json::json!({
+                        "reason": "review_limit_reached",
+                        "feedback": feedback,
+                        "review_attempt": review_attempt,
+                        "max_review_attempts": MAX_WORKFLOW_REVIEW_ATTEMPTS,
+                    })),
+                )
+                .await?;
+                self.refresh_loop_projection(&failed_loop, "loop_review_limit_reached")
+                    .await?;
+                Ok(LoopOutcome::Failed(reason))
+            }
         }
     }
 
@@ -291,6 +326,28 @@ impl<'a> LoopExecutor<'a> {
             .clone()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| self.plan.title.clone());
+        let review_attempt =
+            WorkflowOrchestrator::next_lead_review_attempt(self.pool, running_review_step.id)
+                .await?;
+        if review_attempt > MAX_WORKFLOW_REVIEW_ATTEMPTS {
+            let feedback = format!(
+                "Loop review \"{}\" cannot run again: the maximum of {} review attempts has been reached.",
+                loop_def.loop_key, MAX_WORKFLOW_REVIEW_ATTEMPTS
+            );
+            WorkflowOrchestrator::transition_step_and_sync(
+                self.pool,
+                self.chat_runner,
+                self.execution,
+                &running_review_step,
+                WorkflowStepStatus::Failed,
+                "loop_review_limit_reached",
+            )
+            .await?;
+            return Ok(LoopReviewDecision::LimitReached {
+                feedback,
+                review_attempt: MAX_WORKFLOW_REVIEW_ATTEMPTS,
+            });
+        }
         let review_inputs = self.review_prompt_inputs(loop_def).await?;
         let ui_config = config::load_config_from_file(&config_path()).await;
         let response_language_instruction =
@@ -299,7 +356,7 @@ impl<'a> LoopExecutor<'a> {
             &workflow_goal,
             loop_def,
             self.execution.id,
-            workflow_loop.retry_count + 1,
+            review_attempt,
             &review_inputs,
             response_language_instruction,
         );
@@ -378,15 +435,31 @@ impl<'a> LoopExecutor<'a> {
                 if let Some(analytics) = self.chat_runner.analytics_service() {
                     analytics.record_event(event);
                 }
+                let terminal_review_status = if workflow_review_attempt_limit_reached(review_attempt)
+                {
+                    WorkflowStepStatus::Failed
+                } else {
+                    WorkflowStepStatus::Completed
+                };
                 let _ = WorkflowOrchestrator::transition_step_and_sync(
                     self.pool,
                     self.chat_runner,
                     self.execution,
                     &recorded_review_step,
-                    WorkflowStepStatus::Completed,
-                    "loop_review_rejected",
+                    terminal_review_status,
+                    if workflow_review_attempt_limit_reached(review_attempt) {
+                        "loop_review_limit_reached"
+                    } else {
+                        "loop_review_rejected"
+                    },
                 )
                 .await?;
+                if workflow_review_attempt_limit_reached(review_attempt) {
+                    return Ok(LoopReviewDecision::LimitReached {
+                        feedback,
+                        review_attempt,
+                    });
+                }
                 WorkflowLoop::update_status(
                     self.pool,
                     workflow_loop.id,

@@ -395,7 +395,10 @@ Check:
 - Reject missing requirements, unrequested scope, obvious bugs, edge-case gaps, or broken shared contracts.
 - Ensure the result fits the workflow goal and predecessor outputs.
 
-If rejecting, cite specific issues with file/line evidence when available.
+Workflow review is capped at five attempts. Complete the entire review now. If
+rejecting, cite every issue you can identify in this single response, with
+file/line evidence and concrete revision guidance when available. Do not hold
+back, defer, or drip-feed issues into later review attempts.
 "#;
 
 static STEP_EXECUTION_RESULT_REVIEW_WORKFLOW: &str = r#"
@@ -594,12 +597,19 @@ You MUST respond in the same language as the step Instructions above.
 The `feedback` field in your JSON output must use the same language as the step instructions.
 "#;
 
+pub const MAX_WORKFLOW_REVIEW_ATTEMPTS: i32 = 5;
+
+pub fn workflow_review_attempt_limit_reached(review_attempt: i32) -> bool {
+    review_attempt >= MAX_WORKFLOW_REVIEW_ATTEMPTS
+}
+
 pub fn build_lead_review_prompt(
     workflow_goal: &str,
     step: &WorkflowStep,
     result: &WorkflowStepRunResult,
     dependency_summaries: &[String],
     acceptance_criteria: &[String],
+    review_attempt: i32,
 ) -> String {
     let dependency_text = if dependency_summaries.is_empty() {
         "None".to_string()
@@ -647,6 +657,10 @@ pub fn build_lead_review_prompt(
 
 Workflow goal: {workflow_goal}
 
+Review attempt: {review_attempt} of at most {max_review_attempts}.
+
+This workflow permits no more than {max_review_attempts} review attempts. Perform the complete review now. If rejecting, report every issue you can identify in this single response, with concrete evidence and revision guidance. Do not hold back, defer, or drip-feed issues into later review attempts.
+
 Predecessor summaries:
 {dependency_text}
 
@@ -663,6 +677,8 @@ Based on your independent verification of the actual code, verdict: approved or 
         step_content = result.content,
         step_outputs = outputs_text,
         workflow_goal = workflow_goal,
+        review_attempt = review_attempt,
+        max_review_attempts = MAX_WORKFLOW_REVIEW_ATTEMPTS,
         dependency_text = dependency_text,
     ));
     prompt
@@ -674,6 +690,7 @@ pub fn build_lead_review_prompt_with_schema(
     result: &WorkflowStepRunResult,
     dependency_summaries: &[String],
     acceptance_criteria: &[String],
+    review_attempt: i32,
 ) -> String {
     let mut prompt = build_lead_review_prompt(
         workflow_goal,
@@ -681,6 +698,7 @@ pub fn build_lead_review_prompt_with_schema(
         result,
         dependency_summaries,
         acceptance_criteria,
+        review_attempt,
     );
     prompt.push_str("\n\nRequired JSON Schema:\n```json\n");
     prompt.push_str(&workflow_review_protocol_json_schema(

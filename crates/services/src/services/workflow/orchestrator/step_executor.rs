@@ -30,7 +30,8 @@ use super::{
     super::{
         chat_runner::ChatRunner,
         workflow_runtime::{
-            self, SummaryPayload, WORKFLOW_PROTOCOL_PARSE_MAX_RETRIES, WorkflowAgentRunOutput,
+            self, MAX_WORKFLOW_REVIEW_ATTEMPTS, SummaryPayload,
+            WORKFLOW_PROTOCOL_PARSE_MAX_RETRIES, WorkflowAgentRunOutput,
             WorkflowReviewProtocolMessage, WorkflowRevisionFeedbackSource, WorkflowRuntimeError,
             WorkflowStepProtocolMessage, WorkflowStepRunResult,
             build_lead_review_prompt_with_schema, build_step_execution_prompt_with_schema,
@@ -38,7 +39,8 @@ use super::{
             parse_review_protocol_output, predecessor_summaries,
             predecessor_summaries_with_reviews, run_workflow_step_agent_follow_up,
             run_workflow_step_agent_prompt, should_retry_workflow_protocol_parse_failure,
-            workflow_review_protocol_json_schema, workflow_step_protocol_json_schema,
+            workflow_review_attempt_limit_reached, workflow_review_protocol_json_schema,
+            workflow_step_protocol_json_schema,
         },
     },
     OrchestratorError, StepOutcome, WorkflowOrchestrator, resolve_step_workflow_session,
@@ -700,6 +702,12 @@ Read this file before writing the final result. Do not rely on the workflow plan
         verdict: ReviewVerdict,
         feedback: &str,
     ) -> Result<WorkflowStepReview, OrchestratorError> {
+        let review_round = WorkflowStepReview::find_by_step(pool, step.id)
+            .await?
+            .iter()
+            .filter(|review| review.reviewer_type == reviewer_type)
+            .count() as i32
+            + 1;
         WorkflowStepReview::create(
             pool,
             &CreateWorkflowStepReview {
@@ -709,12 +717,24 @@ Read this file before writing the final result. Do not rely on the workflow plan
                 reviewer_id,
                 verdict,
                 feedback: feedback.trim().to_string(),
-                review_round: Some(step.retry_count + 1),
+                review_round: Some(review_round),
             },
             Uuid::new_v4(),
         )
         .await
         .map_err(OrchestratorError::Database)
+    }
+
+    pub(crate) async fn next_lead_review_attempt(
+        pool: &SqlitePool,
+        step_id: Uuid,
+    ) -> Result<i32, OrchestratorError> {
+        Ok(WorkflowStepReview::find_by_step(pool, step_id)
+            .await?
+            .iter()
+            .filter(|review| review.reviewer_type == ReviewerType::Lead)
+            .count() as i32
+            + 1)
     }
 
     fn resolve_lead_review_targets<'a>(
@@ -951,6 +971,43 @@ Read this file before writing the final result. Do not rely on the workflow plan
                 return Ok(StepOutcome::Completed);
             }
 
+            let review_attempt =
+                Self::next_lead_review_attempt(pool, waiting_review_step.id).await?;
+            if review_attempt > MAX_WORKFLOW_REVIEW_ATTEMPTS {
+                let reason = format!(
+                    "Step \"{}\" cannot be reviewed again: the maximum of {} review attempts has been reached.",
+                    waiting_review_step.title, MAX_WORKFLOW_REVIEW_ATTEMPTS
+                );
+                let failed_step = Self::transition_step_and_sync(
+                    pool,
+                    chat_runner,
+                    execution,
+                    &waiting_review_step,
+                    WorkflowStepStatus::Failed,
+                    "step_review_limit_reached",
+                )
+                .await?;
+                let _ = Self::write_transcript(
+                    pool,
+                    execution.id,
+                    Some(failed_step.round_id),
+                    Some(lead_workflow_session.id),
+                    Some(failed_step.id),
+                    "system",
+                    "message",
+                    &reason,
+                    Some(
+                        &serde_json::json!({
+                            "reason": "review_limit_reached",
+                            "max_review_attempts": MAX_WORKFLOW_REVIEW_ATTEMPTS,
+                        })
+                        .to_string(),
+                    ),
+                )
+                .await;
+                return Ok(StepOutcome::Failed(reason));
+            }
+
             Self::emit_step_domain_event(
                 pool,
                 execution,
@@ -959,7 +1016,7 @@ Read this file before writing the final result. Do not rely on the workflow plan
                 Some(serde_json::json!({
                     "step_key": waiting_review_step.step_key,
                     "summary": persisted.result.summary,
-                    "review_round": waiting_review_step.retry_count + 1,
+                    "review_round": review_attempt,
                 })),
             )
             .await?;
@@ -970,6 +1027,7 @@ Read this file before writing the final result. Do not rely on the workflow plan
                 &persisted.result,
                 &dependency_summaries,
                 &acceptance_criteria,
+                review_attempt,
             );
 
             let (review_message, _raw_review_output) =
@@ -1043,7 +1101,7 @@ Read this file before writing the final result. Do not rely on the workflow plan
                     &serde_json::json!({
                         "verdict": verdict,
                         "reviewer_type": "lead",
-                        "review_round": waiting_review_step.retry_count + 1,
+                        "review_round": review_attempt,
                     })
                     .to_string(),
                 ),
@@ -1059,7 +1117,7 @@ Read this file before writing the final result. Do not rely on the workflow plan
                         WorkflowEventType::StepLeadReviewPassed,
                         Some(serde_json::json!({
                             "feedback": feedback,
-                            "review_round": waiting_review_step.retry_count + 1,
+                            "review_round": review_attempt,
                         })),
                     )
                     .await?;
@@ -1270,10 +1328,49 @@ Read this file before writing the final result. Do not rely on the workflow plan
                         WorkflowEventType::StepLeadReviewRejected,
                         Some(serde_json::json!({
                             "feedback": feedback,
-                            "review_round": waiting_review_step.retry_count + 1,
+                            "review_round": review_attempt,
                         })),
                     )
                     .await?;
+
+                    if workflow_review_attempt_limit_reached(review_attempt) {
+                        let reason = format!(
+                            "Step \"{}\" was rejected on the final allowed review attempt ({}/{}): {}",
+                            waiting_review_step.title,
+                            review_attempt,
+                            MAX_WORKFLOW_REVIEW_ATTEMPTS,
+                            feedback
+                        );
+                        let failed_step = Self::transition_step_and_sync(
+                            pool,
+                            chat_runner,
+                            execution,
+                            &waiting_review_step,
+                            WorkflowStepStatus::Failed,
+                            "step_review_limit_reached",
+                        )
+                        .await?;
+                        let _ = Self::write_transcript(
+                            pool,
+                            execution.id,
+                            Some(failed_step.round_id),
+                            Some(lead_workflow_session.id),
+                            Some(failed_step.id),
+                            "system",
+                            "message",
+                            &reason,
+                            Some(
+                                &serde_json::json!({
+                                    "reason": "review_limit_reached",
+                                    "review_attempt": review_attempt,
+                                    "max_review_attempts": MAX_WORKFLOW_REVIEW_ATTEMPTS,
+                                })
+                                .to_string(),
+                            ),
+                        )
+                        .await;
+                        return Ok(StepOutcome::Failed(reason));
+                    }
 
                     let revising_step = Self::transition_step_and_sync(
                         pool,

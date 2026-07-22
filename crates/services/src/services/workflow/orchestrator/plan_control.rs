@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use chrono::Utc;
 use db::models::{
     chat_message::{ChatMessage, ChatSenderType},
     chat_session::ChatSession,
@@ -9,11 +10,13 @@ use db::models::{
     workflow_agent_session::WorkflowAgentSession,
     workflow_event::WorkflowEvent,
     workflow_execution::WorkflowExecution,
+    workflow_loop::WorkflowLoop,
     workflow_plan::{CreateWorkflowPlan, WorkflowPlan},
     workflow_plan_revision::{CreateWorkflowPlanRevision, WorkflowPlanRevision},
     workflow_round::WorkflowRound,
     workflow_step::WorkflowStep,
     workflow_step_edge::WorkflowStepEdge,
+    workflow_transcript::WorkflowTranscript,
     workflow_types::*,
 };
 use sqlx::SqlitePool;
@@ -25,15 +28,17 @@ use super::{
         chat_runner::ChatRunner,
         workflow_analytics,
         workflow_compiler::WorkflowCompiler,
+        workflow_loop_executor::LoopExecutor,
         workflow_runtime::{
             WorkflowCardAgent, WorkflowCardProjection, WorkflowCardState, WorkflowCardStep,
             WorkflowRuntimeError, cancel_running_step,
         },
     },
-    BootstrapResult, OrchestratorError, WorkflowOrchestrator, load_agents_for_session,
+    BootstrapResult, OrchestratorError, WorkflowOrchestrator, load_agents_for_session, reducer,
     workflow_agent_id_map, workflow_agent_name_lookup, workflow_plan_agent_id,
     workflow_valid_agent_ids,
 };
+use crate::services::project::source_control::SourceControlService;
 
 impl WorkflowOrchestrator {
     pub async fn create_workflow_plan_and_card(
@@ -369,6 +374,36 @@ impl WorkflowOrchestrator {
             }
         }
         None
+    }
+
+    /// Find a card that plan generation may safely replace.
+    ///
+    /// Unlike `find_session_workflow_card_message_id`, this deliberately excludes
+    /// every card whose plan has already materialized an execution. Plan generation
+    /// must never overwrite the card used to observe an active or terminal run.
+    pub async fn find_reusable_plan_generation_card_message_id(
+        pool: &SqlitePool,
+        session_id: Uuid,
+    ) -> Option<Uuid> {
+        let plans = WorkflowPlan::find_by_session(pool, session_id)
+            .await
+            .unwrap_or_default();
+        let executions = WorkflowExecution::find_by_session(pool, session_id)
+            .await
+            .unwrap_or_default();
+        let execution_card_message_ids = executions
+            .iter()
+            .filter_map(|execution| execution.workflow_card_message_id)
+            .collect::<HashSet<_>>();
+
+        plans.into_iter().find_map(|plan| {
+            let card_message_id = plan.workflow_card_message_id?;
+            let has_execution = executions
+                .iter()
+                .any(|execution| execution.plan_id == plan.id);
+            (!has_execution && !execution_card_message_ids.contains(&card_message_id))
+                .then_some(card_message_id)
+        })
     }
 
     /// Execute a plan that is in `ready` status.
@@ -711,6 +746,198 @@ impl WorkflowOrchestrator {
         .await
     }
 
+    /// Stop active work and mark every runtime part of an execution completed.
+    ///
+    /// This is an explicit user override. It preserves the normal reducer/event
+    /// boundary while allowing unfinished steps to move directly to completed.
+    pub async fn mark_execution_completed(
+        chat_runner: &ChatRunner,
+        pool: &SqlitePool,
+        execution_id: Uuid,
+    ) -> Result<WorkflowExecution, OrchestratorError> {
+        const REASON: &str = "marked_completed_by_user";
+
+        let execution = WorkflowExecution::find_by_id(pool, execution_id)
+            .await?
+            .ok_or_else(|| {
+                OrchestratorError::NotFound(format!("execution {} 未找到", execution_id))
+            })?;
+        if execution.status == WorkflowExecutionStatus::Completed {
+            return Ok(execution);
+        }
+        if !matches!(
+            execution.status,
+            WorkflowExecutionStatus::Failed | WorkflowExecutionStatus::Paused
+        ) {
+            return Err(OrchestratorError::IllegalTransition(format!(
+                "cannot mark workflow completed from {:?}; expected failed or paused",
+                execution.status
+            )));
+        }
+
+        let steps = WorkflowStep::find_by_execution(pool, execution.id).await?;
+        for step in &steps {
+            if step.status == WorkflowStepStatus::Running {
+                cancel_running_step(step.id);
+            }
+        }
+
+        // Move out of runnable states before rewriting child state so the
+        // scheduler cannot claim additional work during manual completion.
+        let waiting_execution = if execution.status == WorkflowExecutionStatus::Waiting {
+            execution.clone()
+        } else {
+            let transitioned = reducer::transition_execution_with_context(
+                pool,
+                &execution,
+                WorkflowExecutionStatus::Waiting,
+                execution.active_round_id,
+                Some(REASON),
+            )
+            .await?
+            .entity;
+            workflow_analytics::track_execution_state_changed(
+                chat_runner.analytics_service(),
+                execution.session_id,
+                execution.id,
+                execution.plan_id,
+                &to_workflow_wire_value(&execution.status),
+                &to_workflow_wire_value(&transitioned.status),
+                None,
+            );
+            transitioned
+        };
+
+        for step in &steps {
+            if let Some(transitioned) =
+                reducer::force_complete_step(pool, &waiting_execution, step, REASON).await?
+            {
+                let duration_ms = transitioned.entity.started_at.and_then(|started| {
+                    transitioned
+                        .entity
+                        .completed_at
+                        .map(|completed| (completed - started).num_milliseconds())
+                });
+                workflow_analytics::track_step_state_changed(
+                    chat_runner.analytics_service(),
+                    waiting_execution.session_id,
+                    waiting_execution.id,
+                    waiting_execution.plan_id,
+                    step.id,
+                    transitioned.entity.retry_count,
+                    &to_workflow_wire_value(&step.status),
+                    "completed",
+                    None,
+                    duration_ms,
+                );
+            }
+        }
+
+        for workflow_loop in WorkflowLoop::find_by_execution(pool, execution.id).await? {
+            if workflow_loop.status == WorkflowLoopStatus::Completed {
+                continue;
+            }
+            let completed_loop = WorkflowLoop::update_status(
+                pool,
+                workflow_loop.id,
+                WorkflowLoopStatus::Completed,
+                None,
+            )
+            .await?;
+            LoopExecutor::emit_loop_event(
+                pool,
+                &waiting_execution,
+                &completed_loop,
+                WorkflowEventType::LoopPassed,
+                Some(serde_json::json!({
+                    "reason": REASON,
+                    "forced": true,
+                })),
+            )
+            .await?;
+        }
+
+        for round in WorkflowRound::find_by_execution(pool, execution.id).await? {
+            if !matches!(
+                round.status,
+                WorkflowRoundStatus::Accepted | WorkflowRoundStatus::Archived
+            ) {
+                WorkflowRound::update_status(pool, round.id, WorkflowRoundStatus::Accepted).await?;
+            }
+        }
+
+        Self::resolve_manual_completion_transcripts(pool, execution.id, REASON).await?;
+
+        for workflow_session in WorkflowAgentSession::find_by_execution(pool, execution.id).await? {
+            if matches!(
+                workflow_session.state,
+                WorkflowAgentSessionState::Completed | WorkflowAgentSessionState::Expired
+            ) {
+                continue;
+            }
+            reducer::transition_agent_session(
+                pool,
+                &waiting_execution,
+                &workflow_session,
+                WorkflowAgentSessionState::Completed,
+            )
+            .await?;
+        }
+
+        let current = WorkflowExecution::find_by_id(pool, execution.id)
+            .await?
+            .ok_or_else(|| {
+                OrchestratorError::NotFound(format!("execution {} 未找到", execution.id))
+            })?;
+        let completed = Self::transition_execution_with_detail_and_sync(
+            pool,
+            chat_runner,
+            &current,
+            WorkflowExecutionStatus::Completed,
+            REASON,
+            "execution_manually_completed",
+            None,
+        )
+        .await?;
+        SourceControlService::invalidate_session_caches(completed.session_id);
+        Ok(completed)
+    }
+
+    async fn resolve_manual_completion_transcripts(
+        pool: &SqlitePool,
+        execution_id: Uuid,
+        reason: &str,
+    ) -> Result<(), OrchestratorError> {
+        for transcript in WorkflowTranscript::find_by_execution(pool, execution_id).await? {
+            if !matches!(
+                transcript.entry_type.as_str(),
+                "approval_request"
+                    | "permission_request"
+                    | "continue_confirmation"
+                    | "input_request"
+                    | "step_review"
+                    | "loop_review"
+                    | "final_review"
+            ) {
+                continue;
+            }
+            let mut meta = transcript
+                .meta_json
+                .as_deref()
+                .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+                .filter(serde_json::Value::is_object)
+                .unwrap_or_else(|| serde_json::json!({}));
+            if meta.get("resolved").and_then(serde_json::Value::as_bool) == Some(true) {
+                continue;
+            }
+            meta["resolved"] = serde_json::json!(true);
+            meta["resolved_action"] = serde_json::json!(reason);
+            meta["resolved_at"] = serde_json::json!(Utc::now().to_rfc3339());
+            WorkflowTranscript::update_meta_json(pool, transcript.id, &meta.to_string()).await?;
+        }
+        Ok(())
+    }
+
     /// Interrupt a specific step.
     pub async fn interrupt_step(
         chat_runner: &ChatRunner,
@@ -985,5 +1212,66 @@ mod tests {
             WorkflowOrchestrator::find_session_workflow_card_message_id(&pool, session_id).await;
 
         assert_eq!(found, Some(card_message_id));
+    }
+
+    #[tokio::test]
+    async fn reusable_plan_generation_card_returns_unexecuted_preview_card() {
+        let pool = setup_pool().await;
+
+        let session_id = Uuid::new_v4();
+        let card_message_id = Uuid::new_v4();
+        create_ready_plan(&pool, session_id, card_message_id, "Preview").await;
+
+        let found =
+            WorkflowOrchestrator::find_reusable_plan_generation_card_message_id(&pool, session_id)
+                .await;
+
+        assert_eq!(found, Some(card_message_id));
+    }
+
+    #[tokio::test]
+    async fn reusable_plan_generation_card_skips_active_execution_card() {
+        let pool = setup_pool().await;
+
+        let session_id = Uuid::new_v4();
+        let card_message_id = Uuid::new_v4();
+        let plan = create_ready_plan(&pool, session_id, card_message_id, "Active").await;
+        create_execution_with_card(
+            &pool,
+            session_id,
+            plan.id,
+            card_message_id,
+            WorkflowExecutionStatus::Running,
+        )
+        .await;
+
+        let found =
+            WorkflowOrchestrator::find_reusable_plan_generation_card_message_id(&pool, session_id)
+                .await;
+
+        assert_eq!(found, None);
+    }
+
+    #[tokio::test]
+    async fn reusable_plan_generation_card_skips_terminal_execution_card() {
+        let pool = setup_pool().await;
+
+        let session_id = Uuid::new_v4();
+        let card_message_id = Uuid::new_v4();
+        let plan = create_ready_plan(&pool, session_id, card_message_id, "Completed").await;
+        create_execution_with_card(
+            &pool,
+            session_id,
+            plan.id,
+            card_message_id,
+            WorkflowExecutionStatus::Completed,
+        )
+        .await;
+
+        let found =
+            WorkflowOrchestrator::find_reusable_plan_generation_card_message_id(&pool, session_id)
+                .await;
+
+        assert_eq!(found, None);
     }
 }

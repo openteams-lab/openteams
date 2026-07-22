@@ -1619,8 +1619,20 @@ async function stopExecution(
   return handleApiResponse<{ status: string }>(response);
 }
 
+async function markExecutionCompleted(
+  sessionId: string,
+  executionId: string,
+): Promise<{ status: string }> {
+  const response = await makeRequest(
+    `/api/chat/sessions/${encodeURIComponent(sessionId)}/workflow/executions/${encodeURIComponent(executionId)}/complete`,
+    { method: 'POST' },
+  );
+  return handleApiResponse<{ status: string }>(response);
+}
+
 export const workflowApi = {
   stopExecution,
+  markExecutionCompleted,
   getSessionStatus: async (
     sessionId: string,
   ): Promise<WorkflowSessionStatusResponse> => {
@@ -1830,6 +1842,18 @@ export const workflowApi = {
       { method: "POST" },
     );
     return handleApiResponse<InterruptStepResponse>(r);
+  },
+  skipStep: async (
+    sessionId: string,
+    stepId: string,
+  ): Promise<ResolveActionResponse> => {
+    const r = await makeRequest(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/workflow-steps/${encodeURIComponent(
+        stepId,
+      )}/skip`,
+      { method: "POST" },
+    );
+    return handleApiResponse<ResolveActionResponse>(r);
   },
   retryStep: async (
     sessionId: string,

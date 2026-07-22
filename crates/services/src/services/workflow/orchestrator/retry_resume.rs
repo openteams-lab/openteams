@@ -85,6 +85,92 @@ impl WorkflowOrchestrator {
         Ok((latest_execution, latest_step))
     }
 
+    /// Skip an interrupted, blocked, or failed step and resume scheduling from
+    /// its downstream nodes.
+    ///
+    /// Skipped steps satisfy dependency edges, but no other step state may use
+    /// this override.
+    pub async fn skip_step(
+        pool: &SqlitePool,
+        chat_runner: &ChatRunner,
+        step_id: Uuid,
+    ) -> Result<(WorkflowExecution, WorkflowStep), OrchestratorError> {
+        let step = WorkflowStep::find_by_id(pool, step_id)
+            .await?
+            .ok_or_else(|| OrchestratorError::NotFound(format!("step {} 未找到", step_id)))?;
+        if !matches!(
+            &step.status,
+            WorkflowStepStatus::Interrupted
+                | WorkflowStepStatus::Blocked
+                | WorkflowStepStatus::Failed
+        ) {
+            return Err(OrchestratorError::IllegalTransition(format!(
+                "step {} is {:?}; only interrupted, blocked, or failed steps can be skipped",
+                step.id, step.status
+            )));
+        }
+        let execution = WorkflowExecution::find_by_id(pool, step.execution_id)
+            .await?
+            .ok_or_else(|| {
+                OrchestratorError::NotFound(format!("execution {} 未找到", step.execution_id))
+            })?;
+
+        let skipped_step = Self::guarded_transition_step_and_sync(
+            pool,
+            chat_runner,
+            &execution,
+            &step,
+            WorkflowStepStatus::Skipped,
+            "step_skipped_by_user",
+        )
+        .await?
+        .ok_or_else(|| {
+            OrchestratorError::IllegalTransition(format!(
+                "step {} changed before it could be skipped",
+                step.id
+            ))
+        })?;
+
+        if let Some(loop_id) = skipped_step.loop_id
+            && let Some(workflow_loop) = WorkflowLoop::find_by_id(pool, loop_id).await?
+            && workflow_loop.review_step_id == skipped_step.id
+            && workflow_loop.status != WorkflowLoopStatus::Completed
+        {
+            let completed_loop = WorkflowLoop::update_status(
+                pool,
+                workflow_loop.id,
+                WorkflowLoopStatus::Completed,
+                None,
+            )
+            .await?;
+            LoopExecutor::emit_loop_event(
+                pool,
+                &execution,
+                &completed_loop,
+                WorkflowEventType::LoopPassed,
+                Some(serde_json::json!({
+                    "reason": "review_step_skipped_by_user",
+                    "step_id": skipped_step.id,
+                    "forced": true,
+                })),
+            )
+            .await?;
+        }
+
+        let latest_execution = Self::synchronize_runtime_state(pool, execution.id, false).await?;
+        Self::refresh_execution_projection_with_reason(
+            pool,
+            chat_runner,
+            execution.id,
+            None,
+            "step_skipped_by_user",
+            vec![skipped_step.id.to_string()],
+        )
+        .await?;
+
+        Ok((latest_execution, skipped_step))
+    }
+
     /// Retry only the review phase of a step, keeping the existing task output.
     pub async fn retry_step_review(
         db: &DBService,

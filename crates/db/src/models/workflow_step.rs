@@ -215,6 +215,33 @@ impl WorkflowStep {
         .await
     }
 
+    pub async fn mark_completed_if_current(
+        pool: &SqlitePool,
+        id: Uuid,
+        expected_status: WorkflowStepStatus,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(
+            r#"
+            UPDATE chat_workflow_steps
+            SET status = 'completed',
+                started_at = COALESCE(started_at, datetime('now', 'subsec')),
+                completed_at = COALESCE(completed_at, datetime('now', 'subsec')),
+                updated_at = datetime('now', 'subsec')
+            WHERE id = ?1 AND status = ?2
+            RETURNING id, execution_id, round_id, compiled_revision_id, step_key,
+                      step_type, title, instructions, assigned_workflow_agent_session_id,
+                      status, retry_count, max_retry, round_index, display_order,
+                      latest_run_id, summary_text, content, loop_id,
+                      lead_review_required, user_review_required, revision_context,
+                      created_at, updated_at, started_at, completed_at
+            "#,
+        )
+        .bind(id)
+        .bind(expected_status)
+        .fetch_optional(pool)
+        .await
+    }
+
     pub async fn recover_orphaned_running(
         pool: &SqlitePool,
         id: Uuid,

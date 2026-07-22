@@ -5,7 +5,9 @@ use db::models::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::workflow_runtime::{WorkflowRuntimeError, extract_json_payload};
+use super::workflow_runtime::{
+    MAX_WORKFLOW_REVIEW_ATTEMPTS, WorkflowRuntimeError, extract_json_payload,
+};
 
 #[derive(Debug, Clone)]
 pub struct LoopReviewPromptStepInput {
@@ -41,7 +43,7 @@ pub fn build_loop_review_prompt(
     workflow_goal: &str,
     loop_def: &CompiledLoopDef,
     execution_id: Uuid,
-    loop_retry_count: i32,
+    review_attempt: i32,
     review_steps: &[LoopReviewPromptStepInput],
     response_language_instruction: &str,
 ) -> String {
@@ -105,7 +107,7 @@ You are the Lead Agent for this workflow. Review all execution results in the fo
 
 ### Loop Information
 - Loop key: {loop_key}
-- Current retry count: {loop_retry_count}
+- Review attempt: {review_attempt} of at most {max_review_attempts}
 - Review scope: {review_scope_step_titles}
 
 ### Execution Results by Step
@@ -118,6 +120,7 @@ Evaluate the loop's execution quality from an overall perspective:
 2. Whether the loop achieved this stage's goal overall.
 3. Whether outputs from one step correctly connect to the next step.
 4. Whether there are systemic issues that require broader rework.
+5. This workflow permits no more than {max_review_attempts} review attempts. Perform the complete review now. If rejecting, report every issue you can identify across the whole review scope in this single response, with concrete revision guidance. Do not hold back, defer, or drip-feed issues into later review attempts.
 
 ### Response Language Requirement
 {response_language_instruction}
@@ -148,7 +151,8 @@ If the entire loop needs rework, omit step_feedbacks or return an empty array.
         workflow_goal = workflow_goal,
         loop_key = loop_def.loop_key,
         execution_id = execution_id,
-        loop_retry_count = loop_retry_count,
+        review_attempt = review_attempt,
+        max_review_attempts = MAX_WORKFLOW_REVIEW_ATTEMPTS,
         review_scope_step_titles = review_scope_step_titles,
         step_sections = step_sections,
         rejected_feedback_template = rejected_feedback_template,
@@ -452,6 +456,10 @@ mod tests {
         assert!(prompt.contains("Revise"));
         assert!(prompt.contains("docs/draft.md"));
         assert!(prompt.contains("\"type\": \"loop_review_result\""));
+        assert!(prompt.contains("Review attempt: 1 of at most 5"));
+        assert!(
+            prompt.contains("report every issue you can identify across the whole review scope")
+        );
     }
 
     #[test]
