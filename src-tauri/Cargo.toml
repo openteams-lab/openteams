@@ -1,6 +1,6 @@
 [package]
 name = "openteams-desktop"
-version = "1.0.26"
+version = "1.0.27"
 description = "OpenTeams Desktop"
 authors = ["openteams-lab"]
 edition = "2021"
