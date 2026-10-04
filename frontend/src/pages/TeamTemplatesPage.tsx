@@ -5,6 +5,7 @@ import {
   Bug,
   ChevronRight,
   Code2,
+  FileJson,
   Flame,
   Megaphone,
   MoreHorizontal,
@@ -15,6 +16,7 @@ import {
   Settings,
   TrendingUp,
   Trash2,
+  Upload,
   Workflow,
   X,
 } from "lucide-react";
@@ -564,12 +566,15 @@ const getTemplateIcon = (
 
 function TeamTemplatesHeader({
   onCreate,
+  onImport,
   t,
 }: {
   onCreate: () => void;
+  onImport: (file: File) => void;
   t: TranslateFn;
 }) {
   const systemBreadcrumbLabel = t("agents.breadcrumb.system");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <header className="flex h-[49px] shrink-0 items-center justify-between border-b border-[var(--team-template-border)] px-[29px]">
@@ -595,17 +600,40 @@ function TeamTemplatesHeader({
         </h1>
       </nav>
 
-      <button
-        type="button"
-        onClick={onCreate}
-        className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[var(--team-template-border)] bg-[var(--team-template-surface)] px-2.5 text-[13px] font-medium text-[var(--team-template-muted)] transition-colors hover:border-[var(--team-template-border-strong)] hover:text-[var(--team-template-title)]"
-      >
-        <Plus aria-hidden="true" className="h-3.5 w-3.5" />
-        {translateWithFallback(t, "teamTemplates.new", "New template")}
-        <kbd className="rounded border border-[var(--team-template-border)] px-1.5 py-px font-mono text-[11px] font-medium text-[var(--team-template-aux)]">
-          N
-        </kbd>
-      </button>
+      <div className="flex items-center gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              onImport(file);
+              e.target.value = "";
+            }
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[var(--team-template-border)] bg-[var(--team-template-surface)] px-2.5 text-[13px] font-medium text-[var(--team-template-muted)] transition-colors hover:border-[var(--team-template-border-strong)] hover:text-[var(--team-template-title)]"
+        >
+          <Upload aria-hidden="true" className="h-3.5 w-3.5" />
+          {translateWithFallback(t, "teamTemplates.import", "Import")}
+        </button>
+        <button
+          type="button"
+          onClick={onCreate}
+          className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[var(--team-template-border)] bg-[var(--team-template-surface)] px-2.5 text-[13px] font-medium text-[var(--team-template-muted)] transition-colors hover:border-[var(--team-template-border-strong)] hover:text-[var(--team-template-title)]"
+        >
+          <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+          {translateWithFallback(t, "teamTemplates.new", "New template")}
+          <kbd className="rounded border border-[var(--team-template-border)] px-1.5 py-px font-mono text-[11px] font-medium text-[var(--team-template-aux)]">
+            N
+          </kbd>
+        </button>
+      </div>
     </header>
   );
 }
@@ -1071,6 +1099,35 @@ const formDirtySnapshot = (form: TeamPresetForm): string =>
       toolsEnabledText: member.toolsEnabledText,
     })),
   });
+
+const teamTemplateDraftKey = (templateId: string): string =>
+  `teamTemplateDraft:${templateId}`;
+
+const saveDraftBackup = (templateId: string, form: TeamPresetForm): void => {
+  try {
+    localStorage.setItem(teamTemplateDraftKey(templateId), JSON.stringify(form));
+  } catch {
+    // localStorage may be full or unavailable; silently ignore
+  }
+};
+
+const restoreDraftBackup = (templateId: string): TeamPresetForm | null => {
+  try {
+    const raw = localStorage.getItem(teamTemplateDraftKey(templateId));
+    if (!raw) return null;
+    return JSON.parse(raw) as TeamPresetForm;
+  } catch {
+    return null;
+  }
+};
+
+const clearDraftBackup = (templateId: string): void => {
+  try {
+    localStorage.removeItem(teamTemplateDraftKey(templateId));
+  } catch {
+    // silently ignore
+  }
+};
 
 const nextMemberDraft = (members: MemberForm[], t?: TranslateFn): MemberForm => {
   const usedIds = new Set(members.map((member) => member.id));
@@ -1971,6 +2028,12 @@ function TemplateDetailView({
     string | null
   >(null);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportCopied, setExportCopied] = useState(false);
+  const exportJson = useMemo(
+    () => (detail ? JSON.stringify(detail, (key, value) => (key === "id" || key === "is_builtin" ? undefined : value), 2) : ""),
+    [detail],
+  );
   const isEditing = Boolean(editorMode && form);
   const viewDetail = isEditing && form ? formToPreviewDetail(form) : detail;
   const controlsDisabled = saving || deleting;
@@ -2301,6 +2364,15 @@ function TemplateDetailView({
               <>
                 <button
                   type="button"
+                  disabled={deleting || !detail}
+                  onClick={() => setShowExportModal(true)}
+                  className="inline-flex h-8 items-center justify-center gap-1.5 bg-transparent px-2 text-[13px] font-medium text-[var(--team-template-muted)] transition-colors duration-150 hover:text-[var(--team-template-title)] disabled:opacity-50"
+                >
+                  <FileJson aria-hidden="true" className="h-3.5 w-3.5 text-[var(--team-template-muted)]" strokeWidth={1.2} />
+                  {translateWithFallback(t, "teamTemplates.export", "Export")}
+                </button>
+                <button
+                  type="button"
                   disabled={deleting}
                   onClick={onEdit}
                   className="inline-flex h-8 items-center justify-center gap-1.5 bg-transparent px-2 text-[13px] font-medium text-[var(--team-template-muted)] transition-colors duration-150 hover:text-[var(--team-template-title)] disabled:opacity-50"
@@ -2556,6 +2628,64 @@ function TemplateDetailView({
           />
         )}
       </aside>
+
+      {showExportModal && detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-2xl rounded-[12px] border border-[var(--team-template-border-strong)] bg-[var(--team-template-surface)] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--team-template-border)] px-6 py-4">
+              <h2 className="text-[16px] font-semibold text-[var(--team-template-title)]">
+                {translateWithFallback(t, "teamTemplates.exportTitle", "Export template")}
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExportModal(false);
+                  setExportCopied(false);
+                }}
+                className="flex h-7 w-7 items-center justify-center rounded-[4px] text-[var(--team-template-muted)] transition-colors duration-150 hover:bg-[var(--team-template-row-hover)] hover:text-[var(--team-template-title)]"
+              >
+                <X aria-hidden="true" className="h-4 w-4" strokeWidth={1.4} />
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <p className="mb-3 text-[13px] text-[var(--team-template-muted)]">
+                {translateWithFallback(t, "teamTemplates.exportDescription", "Copy the JSON below and save it as a file to import later.")}
+              </p>
+              <div className="relative">
+                <pre className="max-h-[400px] overflow-auto rounded-[8px] border border-[var(--team-template-border)] bg-[var(--team-template-code-bg,var(--team-template-row-hover))] p-4 font-mono text-[12px] leading-relaxed text-[var(--team-template-title)] selection:bg-[var(--team-template-icon)] selection:text-white">
+                  {exportJson}
+                </pre>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(exportJson).then(() => {
+                      setExportCopied(true);
+                      setTimeout(() => setExportCopied(false), 2000);
+                    });
+                  }}
+                  className="absolute right-2 top-2 rounded-[4px] border border-[var(--team-template-border)] bg-[var(--team-template-surface)] px-2.5 py-1 text-[11px] font-medium text-[var(--team-template-muted)] transition-colors duration-150 hover:border-[var(--team-template-border-strong)] hover:text-[var(--team-template-title)]"
+                >
+                  {exportCopied
+                    ? translateWithFallback(t, "teamTemplates.copySuccess", "Copied!")
+                    : translateWithFallback(t, "teamTemplates.copyToClipboard", "Copy")}
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end border-t border-[var(--team-template-border)] px-6 py-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExportModal(false);
+                  setExportCopied(false);
+                }}
+                className={`${quietButtonClassName} h-8 rounded-[4px] px-4 text-[13px] font-medium`}
+              >
+                {translateWithFallback(t, "teamTemplates.close", "Close")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2952,9 +3082,9 @@ export function TeamTemplatesPage() {
   );
   const editorSaveStatus =
     editorMode === "edit"
-      ? saving || hasUnsavedEditorChanges
-        ? translateWithFallback(t, "teamTemplates.saving", "Saving...")
-        : translateWithFallback(t, "teamTemplates.saved", "Saved")
+      ? hasUnsavedEditorChanges
+        ? translateWithFallback(t, "teamTemplates.unsaved", "Unsaved changes")
+        : translateWithFallback(t, "teamTemplates.draftBackedUp", "Draft backed up")
       : null;
 
   const openTemplateDetail = (teamId: string) => {
@@ -2974,9 +3104,80 @@ export function TeamTemplatesPage() {
     setSelectedId(null);
   };
 
+  const importTemplateFromFile = useCallback(
+    (file: File) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const raw = JSON.parse(reader.result as string);
+          if (!raw || typeof raw !== "object" || !raw.name || !Array.isArray(raw.members)) {
+            showToast(
+              translateWithFallback(t, "teamTemplates.importInvalid", "Invalid template file. The JSON must contain name and members fields."),
+              "error",
+            );
+            return;
+          }
+          const rawMembers = raw.members as Record<string, unknown>[];
+          const newMembers = rawMembers.map((m: Record<string, unknown>) => ({
+            id: createUniqueTemplateId(),
+            name: typeof m.name === "string" ? m.name : "Member",
+            description: typeof m.description === "string" ? m.description : "",
+            runner_type: typeof m.runner_type === "string" ? m.runner_type : null,
+            recommended_model: typeof m.recommended_model === "string" ? m.recommended_model : null,
+            system_prompt: typeof m.system_prompt === "string" ? m.system_prompt : "",
+            default_workspace_path: null,
+            selected_skill_ids: Array.isArray(m.selected_skill_ids) ? m.selected_skill_ids as string[] : [],
+            tools_enabled: m.tools_enabled ?? {},
+            execution_config: m.execution_config as MemberExecutionConfig | undefined,
+            is_builtin: false,
+            enabled: true,
+          }));
+          const rawLeadIndex = typeof raw.lead_member_id === "string"
+            ? rawMembers.findIndex((m) => m.id === raw.lead_member_id)
+            : -1;
+          const lead_member_id = rawLeadIndex >= 0 ? newMembers[rawLeadIndex].id : null;
+          const preset: ChatTeamPreset = {
+            id: createUniqueTemplateId(),
+            name: typeof raw.name === "string" ? raw.name : "",
+            description: typeof raw.description === "string" ? raw.description : "",
+            members: newMembers,
+            lead_member_id,
+            workflow_steps: Array.isArray(raw.workflow_steps)
+              ? raw.workflow_steps.filter((s: unknown) => s && typeof s === "object" && "title" in (s as Record<string, unknown>))
+              : [],
+            team_protocol: typeof raw.team_protocol === "string" ? raw.team_protocol : "",
+            is_builtin: false,
+            enabled: true,
+            tier: (raw.tier === "advanced" ? "advanced" : "standard") as ChatTeamTemplateTier,
+          };
+          const draft = detailToForm(preset);
+          setForm(draft);
+          setFormError(null);
+          setFieldErrors({});
+          setShowExitPrompt(false);
+          setEditorSelectedMemberId(draft.members[0]?.id ?? null);
+          setEditorMode("create");
+          setSelectedId(null);
+          showToast(
+            translateWithFallback(t, "teamTemplates.importSuccess", "Template imported. Review and save to apply."),
+            "success",
+          );
+        } catch {
+          showToast(
+            translateWithFallback(t, "teamTemplates.importInvalid", "Invalid JSON file. Please check the file format."),
+            "error",
+          );
+        }
+      };
+      reader.readAsText(file);
+    },
+    [showToast, t],
+  );
+
   const startEdit = () => {
     if (!selectedDetailForView || selectedDetailForView.is_builtin) return;
-    const draft = detailToForm(selectedDetailForView);
+    const restored = restoreDraftBackup(selectedDetailForView.id);
+    const draft = restored ?? detailToForm(selectedDetailForView);
     setForm(draft);
     setFormError(null);
     setFieldErrors({});
@@ -3008,6 +3209,7 @@ export function TeamTemplatesPage() {
         editorMode === "create"
           ? await teamPresetsApi.create(validation.payload)
           : await teamPresetsApi.update(form.id, validation.payload);
+      clearDraftBackup(form.id);
       setEditorMode(null);
       await loadTemplates();
       setSelectedDetail(saved);
@@ -3024,6 +3226,7 @@ export function TeamTemplatesPage() {
   };
 
   const closeEditor = () => {
+    if (form?.id) clearDraftBackup(form.id);
     setShowExitPrompt(false);
     setEditorMode(null);
     setFieldErrors({});
@@ -3046,34 +3249,11 @@ export function TeamTemplatesPage() {
   };
 
   const autoSaveTemplate = useCallback(
-    async (draft: TeamPresetForm) => {
+    (draft: TeamPresetForm) => {
       if (editorMode !== "edit" || saving) return;
-      const validation = validateTeamPresetForm(draft, t);
-      if (validation.issue) {
-        setFormError(validation.issue.message);
-        if (validation.issue.fieldKey) {
-          setFieldErrors({ [validation.issue.fieldKey]: validation.issue.message });
-        }
-        if (validation.issue.memberId) {
-          setEditorSelectedMemberId(validation.issue.memberId);
-        }
-        return;
-      }
-
-      setFormError(null);
-      setFieldErrors({});
-      setSaving(true);
-      try {
-        const saved = await teamPresetsApi.update(draft.id, validation.payload);
-        setSelectedDetail(saved);
-        await loadTemplates();
-      } catch (error) {
-        setFormError(errorText(error, translateWithFallback(t, "teamTemplates.saveError", "Failed to save template.")));
-      } finally {
-        setSaving(false);
-      }
+      saveDraftBackup(draft.id, draft);
     },
-    [editorMode, loadTemplates, saving, t],
+    [editorMode, saving],
   );
 
   useEffect(() => {
@@ -3371,7 +3551,7 @@ export function TeamTemplatesPage() {
 
   return (
     <div className="team-template-page flex h-full min-h-0 flex-col font-sans text-[var(--team-template-title)]">
-      <TeamTemplatesHeader onCreate={startCreate} t={t} />
+      <TeamTemplatesHeader onCreate={startCreate} onImport={importTemplateFromFile} t={t} />
 
       <main className="team-template-scrollbar flex-1 overflow-y-auto">
         {loading && (

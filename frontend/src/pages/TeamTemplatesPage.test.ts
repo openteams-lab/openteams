@@ -695,7 +695,7 @@ check('preserves form input on save failure', source.includes('setFormError(erro
 check('confirms unsaved editor exit before leaving edit mode', source.includes('UnsavedEditorExitDialog') && source.includes('hasUnsavedEditorChanges') && source.includes('teamTemplates.unsaved.saveAndExit') && source.includes('teamTemplates.unsaved.discard') && source.includes('teamTemplates.exit') && source.includes('teamTemplates.back'));
 check('auto-generates template ids and hides low-value toggles in the editor', source.includes('createUniqueTemplateId') && !source.includes('label="模板 ID"') && !source.includes('Enabled in picker'));
 check('uses content-as-ui document header in edit mode', source.includes('team-template-document-head') && source.includes('team-template-document-title') && source.includes('team-template-document-description') && source.includes('absolute right-0 top-0') && !source.includes('label="团队名"') && !source.includes('label="描述"'));
-check('uses edit-mode auto-save with a subtle saved status', source.includes('editorSaveStatus') && source.includes('autoSaveTemplate(form)') && source.includes('Saved') && source.includes('window.setTimeout'));
+check('uses edit-mode auto-save with a subtle saved status', source.includes('editorSaveStatus') && source.includes('autoSaveTemplate(form)') && source.includes('Draft backed up') && source.includes('window.setTimeout'));
 check('folds edit-mode delete into the more menu', source.includes('MoreHorizontal') && source.includes('Delete template') && source.includes('setMoreMenuOpen') && !source.includes('mt-8 flex flex-wrap items-center justify-end gap-3 border-t'));
 check('shows member skills and role prompt details', source.includes('selected_skill_ids') && source.includes('system_prompt'));
 check(
