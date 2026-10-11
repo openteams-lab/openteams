@@ -82,6 +82,21 @@
           "model": "claude-sonnet-5"
         }
       },
+      "OPUS_5_5": {
+        "CLAUDE_CODE": {
+          "model": "claude-opus-5-5"
+        }
+      },
+      "SONNET_5_5": {
+        "CLAUDE_CODE": {
+          "model": "claude-sonnet-5-5"
+        }
+      },
+      "HAIKU_5_5": {
+        "CLAUDE_CODE": {
+          "model": "claude-haiku-5-5"
+        }
+      },
       "HAIKU_4_5": {
         "CLAUDE_CODE": {
           "model": "claude-haiku-4-5-20251001"
@@ -160,6 +175,27 @@
       "GPT_6_ASTRA": {
         "CODEX": {
           "model": "gpt-6-astra",
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
+        }
+      },
+      "GPT_6.1_SOL": {
+        "CODEX": {
+          "model": "gpt-6.1-sol",
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
+        }
+      },
+      "GPT_6_SOL": {
+        "CODEX": {
+          "model": "gpt-6-sol",
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
+        }
+      },
+      "GPT_6_LUNA": {
+        "CODEX": {
+          "model": "gpt-6-luna",
           "sandbox": "danger-full-access",
           "model_reasoning_summary": "auto"
         }

@@ -32,6 +32,9 @@ fn codex_model_cache_paths() -> Vec<PathBuf> {
 
 const CODEX_MODEL_FALLBACKS: &[&str] = &[
     "gpt-6-astra",
+    "gpt-6.1-sol",
+    "gpt-6-sol",
+    "gpt-6-luna",
     "gpt-5.6-sol",
     "gpt-5.6-terra",
     "gpt-5.6-luna",
@@ -1000,6 +1003,9 @@ mod tests {
     #[test]
     fn codex_model_fallbacks_include_gpt_6_and_gpt_5_6_models() {
         assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-6-astra"));
+        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-6.1-sol"));
+        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-6-sol"));
+        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-6-luna"));
         assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-sol"));
         assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-terra"));
         assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-luna"));

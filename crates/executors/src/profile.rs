@@ -570,6 +570,9 @@ mod tests {
 
         assert_codex_model(&profiles, "DEFAULT", "gpt-6-astra");
         assert_codex_model(&profiles, "GPT_6_ASTRA", "gpt-6-astra");
+        assert_codex_model(&profiles, "GPT_6.1_SOL", "gpt-6.1-sol");
+        assert_codex_model(&profiles, "GPT_6_SOL", "gpt-6-sol");
+        assert_codex_model(&profiles, "GPT_6_LUNA", "gpt-6-luna");
         assert_codex_model(&profiles, "GPT_5.6_SOL", "gpt-5.6-sol");
         assert_codex_model(&profiles, "GPT_5.6_TERRA", "gpt-5.6-terra");
         assert_codex_model(&profiles, "GPT_5.6_LUNA", "gpt-5.6-luna");
@@ -743,6 +746,9 @@ mod tests {
         assert_claude_model(&profiles, "FABLE_5_1", "claude-fable-5-1");
         assert_claude_model(&profiles, "OPUS_5", "claude-opus-5");
         assert_claude_model(&profiles, "SONNET_5", "claude-sonnet-5");
+        assert_claude_model(&profiles, "OPUS_5_5", "claude-opus-5-5");
+        assert_claude_model(&profiles, "SONNET_5_5", "claude-sonnet-5-5");
+        assert_claude_model(&profiles, "HAIKU_5_5", "claude-haiku-5-5");
         assert_claude_model(&profiles, "HAIKU_4_5", "claude-haiku-4-5-20251001");
         assert_kimi_model(
             &profiles,
