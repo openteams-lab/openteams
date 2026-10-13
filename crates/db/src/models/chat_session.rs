@@ -455,6 +455,252 @@ mod tests {
     use uuid::Uuid;
 
     use super::{ChatSession, ChatSessionStatus, CreateChatSession};
+    use crate::models::chat_message_queue::{ChatMessageQueue, QueuedMessageStatus};
+
+    struct DeliverySession {
+        session_id: Uuid,
+        session_agent_id: Uuid,
+        agent_id: Uuid,
+        message_id: Uuid,
+        delivery_id: Uuid,
+        run_id: Uuid,
+    }
+
+    async fn seed_delivery_session(
+        pool: &SqlitePool,
+        status: ChatSessionStatus,
+        delivery_status: QueuedMessageStatus,
+    ) -> DeliverySession {
+        let fixture = DeliverySession {
+            session_id: Uuid::new_v4(),
+            session_agent_id: Uuid::new_v4(),
+            agent_id: Uuid::new_v4(),
+            message_id: Uuid::new_v4(),
+            delivery_id: Uuid::new_v4(),
+            run_id: Uuid::new_v4(),
+        };
+        sqlx::query("INSERT INTO chat_sessions (id, status) VALUES (?1, ?2)")
+            .bind(fixture.session_id)
+            .bind(status)
+            .execute(pool)
+            .await
+            .expect("create session");
+        sqlx::query("INSERT INTO chat_agents (id, name, runner_type) VALUES (?1, ?2, 'codex')")
+            .bind(fixture.agent_id)
+            .bind(fixture.agent_id.to_string())
+            .execute(pool)
+            .await
+            .expect("create agent");
+        sqlx::query(
+            "INSERT INTO chat_session_agents (id, session_id, agent_id) VALUES (?1, ?2, ?3)",
+        )
+        .bind(fixture.session_agent_id)
+        .bind(fixture.session_id)
+        .bind(fixture.agent_id)
+        .execute(pool)
+        .await
+        .expect("create session member");
+        sqlx::query(
+            "INSERT INTO chat_messages (id, session_id, sender_type, content)
+             VALUES (?1, ?2, 'user', 'hello')",
+        )
+        .bind(fixture.message_id)
+        .bind(fixture.session_id)
+        .execute(pool)
+        .await
+        .expect("create source message");
+        sqlx::query(
+            "INSERT INTO chat_runs (id, session_id, session_agent_id, run_index, run_dir)
+             VALUES (?1, ?2, ?3, 1, 'test-run')",
+        )
+        .bind(fixture.run_id)
+        .bind(fixture.session_id)
+        .bind(fixture.session_agent_id)
+        .execute(pool)
+        .await
+        .expect("create run");
+        sqlx::query(
+            "INSERT INTO chat_message_queue
+             (id, session_id, session_agent_id, agent_id, chat_message_id, status, run_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        )
+        .bind(fixture.delivery_id)
+        .bind(fixture.session_id)
+        .bind(fixture.session_agent_id)
+        .bind(fixture.agent_id)
+        .bind(fixture.message_id)
+        .bind(delivery_status)
+        .bind((delivery_status != QueuedMessageStatus::Queued).then_some(fixture.run_id))
+        .execute(pool)
+        .await
+        .expect("create delivery");
+        fixture
+    }
+
+    #[tokio::test]
+    async fn delete_sessions_with_delivery_history_cascades_runtime_rows() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        crate::run_migrations(&pool).await.expect("run migrations");
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("PRAGMA foreign_keys")
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            1
+        );
+        let survivor = seed_delivery_session(
+            &pool,
+            ChatSessionStatus::Active,
+            QueuedMessageStatus::Completed,
+        )
+        .await;
+
+        for status in [ChatSessionStatus::Archived, ChatSessionStatus::Active] {
+            for delivery_status in [
+                QueuedMessageStatus::Queued,
+                QueuedMessageStatus::Completed,
+                QueuedMessageStatus::Failed,
+            ] {
+                let fixture = seed_delivery_session(&pool, status.clone(), delivery_status).await;
+                assert_eq!(
+                    ChatSession::delete(&pool, fixture.session_id)
+                        .await
+                        .expect("delete session with delivery history"),
+                    1
+                );
+                assert!(
+                    ChatSession::find_by_id(&pool, fixture.session_id)
+                        .await
+                        .unwrap()
+                        .is_none()
+                );
+                for table in [
+                    "chat_session_agents",
+                    "chat_messages",
+                    "chat_runs",
+                    "chat_message_queue",
+                    "chat_session_runtime_revisions",
+                    "chat_runtime_outbox",
+                ] {
+                    let remaining = sqlx::query_scalar::<_, i64>(&format!(
+                        "SELECT COUNT(*) FROM {table} WHERE session_id = ?1"
+                    ))
+                    .bind(fixture.session_id)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+                    assert_eq!(remaining, 0, "{table} must cascade on session deletion");
+
+                    let surviving = sqlx::query_scalar::<_, i64>(&format!(
+                        "SELECT COUNT(*) FROM {table} WHERE session_id = ?1"
+                    ))
+                    .bind(survivor.session_id)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+                    assert_eq!(surviving, 1, "{table} must preserve other sessions");
+                }
+            }
+        }
+        assert!(
+            sqlx::query("PRAGMA foreign_key_check")
+                .fetch_all(&pool)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn delivery_cascades_keep_runtime_events_for_existing_session() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        crate::run_migrations(&pool).await.expect("run migrations");
+        let fixture = seed_delivery_session(
+            &pool,
+            ChatSessionStatus::Archived,
+            QueuedMessageStatus::Completed,
+        )
+        .await;
+        sqlx::query("DELETE FROM chat_runs WHERE id = ?1")
+            .bind(fixture.run_id)
+            .execute(&pool)
+            .await
+            .expect("clear delivery run reference");
+        sqlx::query("DELETE FROM chat_messages WHERE id = ?1")
+            .bind(fixture.message_id)
+            .execute(&pool)
+            .await
+            .expect("cascade delivery deletion");
+
+        let events = sqlx::query_as::<_, (i64, String, Uuid, i64, Uuid, Uuid)>(
+            "SELECT revision, event_type, delivery_id, delivery_revision, session_agent_id, agent_id
+             FROM chat_runtime_outbox WHERE session_id = ?1 ORDER BY revision",
+        )
+        .bind(fixture.session_id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let expected = ["delivery_created", "delivery_updated", "delivery_deleted"]
+            .into_iter()
+            .enumerate()
+            .map(|(index, event)| {
+                (
+                    index as i64 + 1,
+                    event.to_string(),
+                    fixture.delivery_id,
+                    1,
+                    fixture.session_agent_id,
+                    fixture.agent_id,
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(events, expected);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(
+                "SELECT revision FROM chat_session_runtime_revisions WHERE session_id = ?1",
+            )
+            .bind(fixture.session_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+            3
+        );
+    }
+
+    #[tokio::test]
+    async fn deleting_queued_delivery_keeps_runtime_event() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        crate::run_migrations(&pool).await.expect("run migrations");
+        let fixture = seed_delivery_session(
+            &pool,
+            ChatSessionStatus::Active,
+            QueuedMessageStatus::Queued,
+        )
+        .await;
+        assert_eq!(
+            ChatMessageQueue::delete_queued(&pool, fixture.delivery_id)
+                .await
+                .expect("delete queued delivery"),
+            1
+        );
+        let event = sqlx::query_as::<_, (i64, String, Uuid, Uuid)>(
+            "SELECT revision, event_type, session_agent_id, agent_id
+             FROM chat_runtime_outbox WHERE session_id = ?1 ORDER BY revision DESC LIMIT 1",
+        )
+        .bind(fixture.session_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            event,
+            (
+                2,
+                "delivery_deleted".to_string(),
+                fixture.session_agent_id,
+                fixture.agent_id,
+            )
+        );
+    }
 
     async fn setup_pool() -> SqlitePool {
         let pool = SqlitePool::connect("sqlite::memory:")
