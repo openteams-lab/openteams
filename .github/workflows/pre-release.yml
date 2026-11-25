@@ -33,7 +33,7 @@ env:
   NODE_VERSION: 22
   PNPM_VERSION: 10.13.1
   RUST_TOOLCHAIN: nightly-2025-12-04
-  CARGO_XWIN_VERSION: 0.20.2
+  CARGO_XWIN_VERSION: 0.23.1
   ENABLE_MACOS_DMG: "true"
   ENABLE_LINUX_APPIMAGE_UPDATER: ${{ vars.ENABLE_LINUX_APPIMAGE_UPDATER == 'true' }}
   OPENTEAMS_GITHUB_CLIENT_ID: ${{ vars.OPENTEAMS_GITHUB_CLIENT_ID }}
@@ -254,6 +254,7 @@ jobs:
     needs: [bump-version, build-frontend]
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       # Platform matrix - keep target/name in sync with package-cli job
       matrix:
         include:
@@ -267,10 +268,10 @@ jobs:
             os: ubuntu-latest
             name: windows-x64
           - target: x86_64-apple-darwin
-            os: macos-14
+            os: macos-15-intel
             name: macos-x64
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-15
             name: macos-arm64
     env:
       CARGO_INCREMENTAL: "0"
