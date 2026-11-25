@@ -4,7 +4,11 @@ use rust_embed::RustEmbed;
 const PROJECT_ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
 pub fn asset_dir() -> std::path::PathBuf {
-    let path = if cfg!(debug_assertions) {
+    // Allow a separate database and runtime store for an isolated local instance.
+    let override_dir = std::env::var_os("OPENTEAMS_ASSET_DIR").filter(|value| !value.is_empty());
+    let path = if let Some(path) = override_dir {
+        std::path::PathBuf::from(path)
+    } else if cfg!(debug_assertions) {
         std::path::PathBuf::from(PROJECT_ROOT).join("../../dev_assets")
     } else {
         ProjectDirs::from("ai", "openteams-lab", "openteams")

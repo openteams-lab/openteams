@@ -425,7 +425,7 @@ impl StandardCodingAgentExecutor for Codex {
 }
 
 impl Codex {
-    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.153.4";
+    const BASE_COMMAND: &'static str = "npx -y @openai/codex@0.167.0";
 
     pub fn base_command() -> &'static str {
         Self::BASE_COMMAND
@@ -951,8 +951,8 @@ mod tests {
     }
 
     #[test]
-    fn base_command_uses_codex_0_153_4() {
-        assert_eq!(Codex::base_command(), "npx -y @openai/codex@0.153.4");
+    fn base_command_uses_codex_0_167_0() {
+        assert_eq!(Codex::base_command(), "npx -y @openai/codex@0.167.0");
     }
 
     #[test]
