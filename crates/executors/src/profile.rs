@@ -569,6 +569,9 @@ mod tests {
         let profiles = ExecutorConfigs::from_defaults();
 
         assert_codex_model(&profiles, "DEFAULT", "gpt-6-astra");
+        assert_codex_model(&profiles, "GPT_6.2_ASTRA", "gpt-6.2-astra");
+        assert_codex_model(&profiles, "GPT_6.2_SOL", "gpt-6.2-sol");
+        assert_codex_model(&profiles, "GPT_6.1_TERRA", "gpt-6.1-terra");
         assert_codex_model(&profiles, "GPT_6_ASTRA", "gpt-6-astra");
         assert_codex_model(&profiles, "GPT_6.1_SOL", "gpt-6.1-sol");
         assert_codex_model(&profiles, "GPT_6_SOL", "gpt-6-sol");
@@ -744,6 +747,17 @@ mod tests {
         assert_claude_model(&profiles, "OPUS_4_7", "claude-opus-4-7");
         assert_claude_model(&profiles, "OPUS_4_8", "claude-opus-4-8");
         assert_claude_model(&profiles, "FABLE_5_1", "claude-fable-5-1");
+        assert_claude_model(&profiles, "FABLE", "fable");
+        assert_claude_model(&profiles, "FABLE_5_2", "claude-fable-5-2");
+        for alias in [
+            "kimi-code/k3.1-pro",
+            "kimi-code/k3.1-pro-highspeed",
+            "kimi-code/k3",
+            "kimi-code/k3-256k",
+            "kimi-code/kimi-for-coding-highspeed",
+        ] {
+            assert_kimi_model(&profiles, alias, alias);
+        }
         assert_claude_model(&profiles, "OPUS_5", "claude-opus-5");
         assert_claude_model(&profiles, "SONNET_5", "claude-sonnet-5");
         assert_claude_model(&profiles, "OPUS_5_5", "claude-opus-5-5");

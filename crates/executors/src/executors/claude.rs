@@ -1,5 +1,6 @@
 // SDK submodules
 pub mod client;
+mod models;
 pub mod protocol;
 pub mod slash_commands;
 pub mod types;
@@ -50,11 +51,12 @@ use crate::{
     },
     mcp_config::MemberMcpConfig,
     mcp_run::{McpRunContext, PreparedMcpRun, PrivateMcpRunDirectory},
+    model_discovery::ExecutorModelInfo,
     stdout_dup::create_stdout_pipe_writer,
 };
 
 const CLAUDE_CODE_ROUTER_BASE_COMMAND: &str = "npx -y @musistudio/claude-code-router@2.0.0 code";
-const CLAUDE_CODE_BASE_COMMAND: &str = "npx -y @anthropic-ai/claude-code@2.1.161";
+const CLAUDE_CODE_BASE_COMMAND: &str = "npx -y @anthropic-ai/claude-code@2.1.321";
 
 fn base_command(claude_code_router: bool) -> &'static str {
     if claude_code_router {
@@ -323,10 +325,32 @@ impl StandardCodingAgentExecutor for ClaudeCode {
 
     async fn list_models(
         &self,
-        _current_dir: &Path,
-        _env: &ExecutionEnv,
+        current_dir: &Path,
+        env: &ExecutionEnv,
     ) -> Result<Option<Vec<String>>, ExecutorError> {
-        Ok(None)
+        Ok(Some(
+            self.discover_models(current_dir, env)
+                .await?
+                .into_iter()
+                .map(|model| model.id)
+                .collect(),
+        ))
+    }
+
+    async fn discover_model_catalog(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<ExecutorModelInfo>>, ExecutorError> {
+        self.discover_models(current_dir, env).await.map(Some)
+    }
+
+    fn validate_model_catalog(&self, catalog: &[ExecutorModelInfo]) -> Result<(), ExecutorError> {
+        crate::model_discovery::validate_model_effort(
+            catalog,
+            self.model.as_deref(),
+            self.effort.as_deref(),
+        )
     }
 
     async fn spawn(

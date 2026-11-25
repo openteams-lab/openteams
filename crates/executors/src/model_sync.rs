@@ -383,6 +383,26 @@ mod tests {
         assert_eq!(config.thinking_effort.as_deref(), Some("max"));
     }
 
+    #[test]
+    fn latest_model_selections_round_trip_without_alias_rewriting() {
+        for (runner, model) in [
+            ("CODEX", "gpt-6.2-astra"),
+            ("CODEX", "gpt-6.2-sol"),
+            ("CODEX", "gpt-6.1-terra"),
+            ("CLAUDE_CODE", "fable"),
+            ("CLAUDE_CODE", "claude-fable-5-2"),
+            ("KIMI_CODE", "kimi-code/k3.1-pro"),
+            ("KIMI_CODE", "kimi-code/k3.1-pro-highspeed"),
+        ] {
+            let base = agent_from_json(serde_json::json!({runner:{}}));
+            let selected = with_member_execution_overrides(&base, Some(model), Some("high"), None);
+            let encoded = serde_json::to_value(&selected).unwrap();
+            assert_eq!(encoded[runner]["model"], model);
+            let decoded: CodingAgent = serde_json::from_value(encoded).unwrap();
+            assert_eq!(selected, decoded);
+        }
+    }
+
     fn agent_from_json(value: serde_json::Value) -> CodingAgent {
         serde_json::from_value(value).expect("deserialize coding agent")
     }

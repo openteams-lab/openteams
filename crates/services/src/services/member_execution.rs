@@ -28,7 +28,7 @@ use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::services::{
-    agent_runtime::apply_agent_runtime_config,
+    agent_runtime::{apply_agent_runtime_config, validate_agent_model_selection},
     member_scoped_mcp_migration::ensure_member_scoped_mcp_initialized,
     native_skills::list_native_skills_for_runner,
 };
@@ -186,6 +186,7 @@ pub fn build_effective_member_executor(
     if let Some(member_acp) = &resolved.acp {
         executor.overlay_acp_execution_options(member_acp);
     }
+    validate_agent_model_selection(resolved.runner_type, &executor)?;
     let mcp_policy = resolve_acp_mcp_policy(&agent.tools_enabled.0);
     executor.set_acp_mcp_policy(mcp_policy);
     Ok((resolved, executor))

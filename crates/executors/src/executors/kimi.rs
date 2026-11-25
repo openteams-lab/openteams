@@ -38,7 +38,8 @@ use crate::{
     mcp_config::MemberMcpConfig,
     mcp_run::{McpRunContext, PreparedMcpRun},
     model_discovery::{
-        discover_model_map_from_cli_command, model_ids_from_model_map_json, read_config_value,
+        ExecutorModelInfo, discover_model_map_from_cli_command, model_ids_from_model_map_json,
+        read_config_value,
     },
 };
 
@@ -775,6 +776,28 @@ impl StandardCodingAgentExecutor for KimiCode {
         Ok((!models.is_empty()).then(|| models.into_iter().collect()))
     }
 
+    async fn discover_model_catalog(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<ExecutorModelInfo>>, ExecutorError> {
+        // Explicit refresh must report failures so the service retains the last
+        // successful account list. The ID-only API keeps legacy config fallback.
+        let models = discover_model_map_from_cli_command(
+            current_dir,
+            env,
+            &self.cmd,
+            self.provider_list_command()?,
+        )
+        .await?
+        .ok_or_else(|| {
+            ExecutorError::Configuration(
+                "Kimi model discovery executable is unavailable".to_string(),
+            )
+        })?;
+        Ok(Some(models.into_iter().map(Into::into).collect()))
+    }
+
     async fn probe_acp(
         &self,
         current_dir: &Path,
@@ -792,14 +815,15 @@ impl StandardCodingAgentExecutor for KimiCode {
             None,
         )
         .await?;
-        if let Some(models) = self.list_models(current_dir, env).await?
+        if let Some(models) = self.discover_model_catalog(current_dir, env).await?
             && !models.is_empty()
         {
             let default_model = self.configured_default_model(env).await;
             probe.config_source = AcpConfigSource::Stable;
-            probe
-                .config_options
-                .push(self.discovered_model_option(models, default_model.as_deref()));
+            probe.config_options.push(self.discovered_model_option(
+                models.into_iter().map(|model| model.id).collect(),
+                default_model.as_deref(),
+            ));
         }
         Ok(Some(probe))
     }
@@ -1136,6 +1160,47 @@ mod tests {
             .unwrap()
             .into_parts_for_test();
         assert_eq!(args, vec!["provider", "list", "--json"]);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn model_discovery_preserves_k31_pro_and_highspeed_aliases() {
+        let dir = TempDir::new().unwrap();
+        let script = dir.path().join("models.sh");
+        fs::write(&script, "#!/bin/sh\nprintf '%s\\n' '{\"models\":{\"kimi-code/k3.1-pro\":{\"model\":\"k3.1-pro\"},\"kimi-code/k3.1-pro-highspeed\":{\"model\":\"k3.1-pro-highspeed\"}},\"providers\":{\"api_key\":\"secret\"}}'\n").unwrap();
+        let mut executor = kimi();
+        executor.cmd.base_command_override = Some(format!("sh {}", script.display()));
+        let env = ExecutionEnv::new(Default::default(), false, String::new());
+        let catalog = executor
+            .discover_model_catalog(dir.path(), &env)
+            .await
+            .unwrap()
+            .unwrap();
+        let aliases = catalog.into_iter().map(|info| info.id).collect::<Vec<_>>();
+        assert_eq!(
+            aliases,
+            ["kimi-code/k3.1-pro", "kimi-code/k3.1-pro-highspeed"]
+        );
+        for selected in &aliases {
+            executor.model = Some(selected.clone());
+            let option = executor.discovered_model_option(aliases.clone(), None);
+            let AcpConfigOptionKind::Select {
+                current_value,
+                options,
+            } = option.kind
+            else {
+                panic!("expected model select");
+            };
+            assert_eq!(&current_value, selected);
+            assert!(options.iter().any(|option| &option.value == selected));
+        }
+        fs::write(&script, "#!/bin/sh\nexit 1\n").unwrap();
+        assert!(
+            executor
+                .discover_model_catalog(dir.path(), &env)
+                .await
+                .is_err()
+        );
     }
 
     #[test]

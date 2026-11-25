@@ -2,13 +2,21 @@ use std::{
     collections::{BTreeSet, HashSet},
     net::IpAddr,
     path::{Path, PathBuf},
+    process::Stdio,
     time::Duration,
 };
 
+use command_group::{AsyncCommandGroup, AsyncGroupChild};
 use jsonc_parser::ParseOptions;
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::{process::Command, time::timeout};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines},
+    process::{ChildStdin, ChildStdout, Command},
+    time::timeout,
+};
+use ts_rs::TS;
 
 use crate::{
     command::{CmdOverrides, CommandBuilder, apply_overrides, redacted_command},
@@ -18,6 +26,123 @@ use crate::{
 
 const CLI_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(8);
 const PROVIDER_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Model identifiers and capabilities reported by the selected runner/account.
+/// `None` means the runner did not report reasoning support; an empty list means
+/// the model explicitly does not support an effort override.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
+pub struct ExecutorModelInfo {
+    pub id: String,
+    pub display_name: Option<String>,
+    pub reasoning_efforts: Option<Vec<String>>,
+    pub default_reasoning_effort: Option<String>,
+}
+
+impl From<String> for ExecutorModelInfo {
+    fn from(id: String) -> Self {
+        Self {
+            id,
+            display_name: None,
+            reasoning_efforts: None,
+            default_reasoning_effort: None,
+        }
+    }
+}
+
+pub fn validate_model_effort(
+    catalog: &[ExecutorModelInfo],
+    model: Option<&str>,
+    effort: Option<&str>,
+) -> Result<(), ExecutorError> {
+    let (Some(model), Some(effort)) = (model, effort) else {
+        return Ok(());
+    };
+    if let Some(options) = catalog
+        .iter()
+        .find(|info| info.id == model)
+        .and_then(|info| info.reasoning_efforts.as_ref())
+        && !options.iter().any(|option| option == effort)
+    {
+        return Err(ExecutorError::Configuration(format!(
+            "Model {model} does not support reasoning effort {effort}; supported values: {}. Refresh models or update the member configuration.",
+            options.join(", ")
+        )));
+    }
+    Ok(())
+}
+
+/// A short-lived, prompt-free protocol probe shared by native JSONL adapters.
+/// Stderr is discarded: CLI startup errors can contain credentials or config.
+pub(crate) struct ModelDiscoveryProcess {
+    child: AsyncGroupChild,
+    stdin: ChildStdin,
+    lines: Lines<BufReader<ChildStdout>>,
+}
+
+impl Drop for ModelDiscoveryProcess {
+    fn drop(&mut self) {
+        // Cancellation must also terminate descendants launched through npx.
+        if self.child.id().is_some() {
+            let _ = self.child.start_kill();
+        }
+    }
+}
+
+impl ModelDiscoveryProcess {
+    pub async fn start(
+        builder: CommandBuilder,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+        remove_env: &[&str],
+    ) -> Result<Self, ExecutorError> {
+        let (program, args) = builder.build_initial()?.into_resolved().await?;
+        let mut command = Command::new(program);
+        command
+            .args(args)
+            .current_dir(current_dir)
+            .kill_on_drop(true)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .env("NO_COLOR", "1")
+            .env("NPM_CONFIG_LOGLEVEL", "error");
+        env.apply_to_command(&mut command);
+        for key in remove_env {
+            command.env_remove(key);
+        }
+        let mut child = command.group_spawn()?;
+        let stdin = child.inner().stdin.take().expect("piped discovery stdin");
+        let stdout = child.inner().stdout.take().expect("piped discovery stdout");
+        Ok(Self {
+            child,
+            stdin,
+            lines: BufReader::new(stdout).lines(),
+        })
+    }
+
+    pub async fn send(&mut self, message: &Value) -> Result<(), ExecutorError> {
+        let mut bytes = serde_json::to_vec(message)?;
+        bytes.push(b'\n');
+        self.stdin.write_all(&bytes).await?;
+        self.stdin.flush().await?;
+        Ok(())
+    }
+
+    pub async fn receive(&mut self) -> Result<Value, ExecutorError> {
+        while let Some(line) = self.lines.next_line().await? {
+            if let Ok(message) = serde_json::from_str(&line) {
+                return Ok(message);
+            }
+        }
+        Err(ExecutorError::Io(std::io::Error::other(
+            "model discovery process exited before responding",
+        )))
+    }
+
+    pub async fn stop(&mut self) {
+        let _ = self.child.kill().await;
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderKind {
@@ -979,6 +1104,25 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    #[test]
+    fn model_discovery_effort_validation_uses_each_models_reported_options() {
+        let catalog = vec![ExecutorModelInfo {
+            id: "gpt-6.2-sol".to_string(),
+            display_name: None,
+            reasoning_efforts: Some(vec!["low".to_string(), "high".to_string()]),
+            default_reasoning_effort: Some("low".to_string()),
+        }];
+        assert!(validate_model_effort(&catalog, Some("gpt-6.2-sol"), Some("high")).is_ok());
+        assert!(validate_model_effort(&catalog, Some("gpt-6.2-sol"), Some("ultra")).is_err());
+        assert!(validate_model_effort(&catalog, Some("gpt-6.2-sol"), None).is_ok());
+        assert!(validate_model_effort(&catalog, Some("custom-model"), Some("ultra")).is_ok());
+        let unsupported = vec![ExecutorModelInfo {
+            reasoning_efforts: Some(vec![]),
+            ..catalog[0].clone()
+        }];
+        assert!(validate_model_effort(&unsupported, Some("gpt-6.2-sol"), Some("low")).is_err());
+    }
 
     #[tokio::test]
     async fn reads_json_extension_config_with_jsonc_syntax() {

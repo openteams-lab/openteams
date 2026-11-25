@@ -67,6 +67,16 @@
           "model": "claude-opus-4-8"
         }
       },
+      "FABLE": {
+        "CLAUDE_CODE": {
+          "model": "fable"
+        }
+      },
+      "FABLE_5_2": {
+        "CLAUDE_CODE": {
+          "model": "claude-fable-5-2"
+        }
+      },
       "FABLE_5_1": {
         "CLAUDE_CODE": {
           "model": "claude-fable-5-1"
@@ -168,6 +178,27 @@
       "DEFAULT": {
         "CODEX": {
           "model": "gpt-6-astra",
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
+        }
+      },
+      "GPT_6.2_ASTRA": {
+        "CODEX": {
+          "model": "gpt-6.2-astra",
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
+        }
+      },
+      "GPT_6.2_SOL": {
+        "CODEX": {
+          "model": "gpt-6.2-sol",
+          "sandbox": "danger-full-access",
+          "model_reasoning_summary": "auto"
+        }
+      },
+      "GPT_6.1_TERRA": {
+        "CODEX": {
+          "model": "gpt-6.1-terra",
           "sandbox": "danger-full-access",
           "model_reasoning_summary": "auto"
         }
@@ -632,6 +663,31 @@
         "KIMI_CODE": {
           "append_prompt": null,
           "model": "kimi-code/kimi-for-coding"
+        }
+      },
+      "kimi-code/k3.1-pro": {
+        "KIMI_CODE": {
+          "model": "kimi-code/k3.1-pro"
+        }
+      },
+      "kimi-code/k3.1-pro-highspeed": {
+        "KIMI_CODE": {
+          "model": "kimi-code/k3.1-pro-highspeed"
+        }
+      },
+      "kimi-code/k3": {
+        "KIMI_CODE": {
+          "model": "kimi-code/k3"
+        }
+      },
+      "kimi-code/k3-256k": {
+        "KIMI_CODE": {
+          "model": "kimi-code/k3-256k"
+        }
+      },
+      "kimi-code/kimi-for-coding-highspeed": {
+        "KIMI_CODE": {
+          "model": "kimi-code/kimi-for-coding-highspeed"
         }
       },
       "KIMI_K2_5": {

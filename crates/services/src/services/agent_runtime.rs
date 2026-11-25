@@ -18,6 +18,7 @@ use executors::{
         ExecutorError, StandardCodingAgentExecutor, acp::AcpCapabilityProbe, codex::Codex,
         opencode::Opencode, pi::Pi,
     },
+    model_discovery::ExecutorModelInfo,
     profile::{ExecutorConfig, ExecutorConfigs, ProfileError},
 };
 use futures::stream::{self, StreamExt};
@@ -74,7 +75,7 @@ struct CliProbeCacheKey {
 #[derive(Debug, Clone)]
 enum CliProbeValue {
     Version(Option<String>),
-    Models(Option<Vec<String>>),
+    Models(Option<Vec<ExecutorModelInfo>>),
     Acp(AcpProbeOutcome),
     Command(Option<ResolvedRuntimeCommand>),
 }
@@ -178,6 +179,10 @@ pub struct AgentRuntimeStatus {
     /// Whether the npx CLI was detected through the login-shell PATH.
     pub npx_available: bool,
     pub discovered_models: Vec<String>,
+    /// Account-specific model capabilities, when supplied by the runner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub model_details: Option<Vec<ExecutorModelInfo>>,
     pub model_source: AgentRuntimeModelSource,
     pub version: Option<String>,
     pub last_checked_at: Option<DateTime<Utc>>,
@@ -239,6 +244,10 @@ pub struct AgentRuntimeDiagnostics {
     pub acp_probe: Option<AcpCapabilityProbe>,
     pub acp_probe_error: Option<String>,
     pub discovered_models: Vec<String>,
+    /// Account-specific model capabilities, when supplied by the runner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub model_details: Option<Vec<ExecutorModelInfo>>,
     pub model_source: AgentRuntimeModelSource,
     pub version: Option<String>,
     pub last_checked_at: Option<DateTime<Utc>>,
@@ -267,10 +276,26 @@ struct AgentRuntimeStore {
     configs: HashMap<BaseCodingAgent, AgentRuntimeConfig>,
     #[serde(default)]
     discoveries: HashMap<BaseCodingAgent, AgentRuntimeDiscovery>,
+    #[serde(default)]
+    model_details: HashMap<BaseCodingAgent, Vec<ExecutorModelInfo>>,
 }
 
 pub fn store_path() -> PathBuf {
     utils::assets::asset_dir().join(STORE_FILE_NAME)
+}
+
+/// Called after runtime/profile/member overrides have selected the final model.
+pub fn validate_agent_model_selection(
+    runner: BaseCodingAgent,
+    executor: &CodingAgent,
+) -> Result<(), AgentRuntimeError> {
+    let store = read_store(&store_path())?;
+    if let Some(catalog) = store.model_details.get(&runner) {
+        executor
+            .validate_model_catalog(catalog)
+            .map_err(|error| AgentRuntimeError::Io(std::io::Error::other(error.to_string())))?;
+    }
+    Ok(())
 }
 
 pub fn resolve_runtime_probe_dir(
@@ -409,6 +434,7 @@ enum RunnerDiscoveryOutcome {
     Discovered {
         runner: BaseCodingAgent,
         models: Option<Vec<String>>,
+        model_details: Option<Vec<ExecutorModelInfo>>,
         detected_version: Option<String>,
         version_error: Option<String>,
         auth_state: Option<AgentRuntimeAuthState>,
@@ -432,10 +458,14 @@ fn apply_discovery_outcomes(
             RunnerDiscoveryOutcome::Discovered {
                 runner,
                 models,
+                model_details,
                 detected_version,
                 version_error,
                 auth_state,
             } => {
+                if let Some(details) = model_details {
+                    store.model_details.insert(runner, details);
+                }
                 let previous = store.discoveries.get(&runner);
                 let models = models.unwrap_or_else(|| {
                     previous
@@ -539,9 +569,12 @@ async fn discover_runner_runtime(
     let (detected_version, version_error) = split_probe_result(version_result);
 
     match discovered_models {
-        Ok((models, auth_state)) => RunnerDiscoveryOutcome::Discovered {
+        Ok((catalog, auth_state)) => RunnerDiscoveryOutcome::Discovered {
             runner,
-            models,
+            models: catalog
+                .as_ref()
+                .map(|models| models.iter().map(|model| model.id.clone()).collect()),
+            model_details: catalog,
             detected_version,
             version_error,
             auth_state,
@@ -600,6 +633,14 @@ pub fn update_runtime_config(
         }
         config.updated_at = Utc::now();
 
+        if store.configs.get(&runner).is_none_or(|previous| {
+            previous.env_json != config.env_json
+                || previous.executor_options != config.executor_options
+        }) {
+            // Capabilities are account/provider specific. Retain the picker IDs
+            // for continuity, but require a refresh before enforcing old limits.
+            store.model_details.remove(&runner);
+        }
         store.configs.insert(runner, config);
         Ok(())
     })?;
@@ -777,6 +818,7 @@ pub async fn runtime_diagnostics(
         acp_probe,
         acp_probe_error,
         discovered_models: latest_status.discovered_models,
+        model_details: latest_status.model_details,
         model_source: latest_status.model_source,
         version,
         last_checked_at: latest_status.last_checked_at,
@@ -1057,7 +1099,7 @@ fn version_command_base(executor: &CodingAgent) -> Option<String> {
             if config.claude_code_router.unwrap_or(false) {
                 "npx -y @musistudio/claude-code-router@2.0.0".to_string()
             } else {
-                "npx -y @anthropic-ai/claude-code@2.1.161".to_string()
+                "npx -y @anthropic-ai/claude-code@2.1.321".to_string()
             }
         }
         CodingAgent::Amp(_) => "amp".to_string(),
@@ -1207,6 +1249,7 @@ fn cache_runner_acp_models(
     if models.is_empty() {
         return;
     }
+    store.model_details.remove(&runner);
     let now = Utc::now();
     store
         .discoveries
@@ -1416,14 +1459,14 @@ async fn coordinated_list_models(
     env: &ExecutionEnv,
     auth_method_id: Option<&str>,
     policy: CliProbeCachePolicy,
-) -> Result<Option<Vec<String>>, String> {
+) -> Result<Option<Vec<ExecutorModelInfo>>, String> {
     let key = CliProbeCacheKey {
         request: cli_probe_request_key(runner, executor, current_dir, env, auth_method_id)?,
         kind: CliProbeKind::Models,
     };
     match run_coordinated_cli_probe(key, policy, || async {
         executor
-            .list_models(current_dir, env)
+            .discover_model_catalog(current_dir, env)
             .await
             .map(CliProbeValue::Models)
             .map_err(|error| error.to_string())
@@ -1467,7 +1510,13 @@ async fn discover_models_for_executor(
     executor: &CodingAgent,
     current_dir: &Path,
     env: &ExecutionEnv,
-) -> Result<(Option<Vec<String>>, Option<AgentRuntimeAuthState>), String> {
+) -> Result<
+    (
+        Option<Vec<ExecutorModelInfo>>,
+        Option<AgentRuntimeAuthState>,
+    ),
+    String,
+> {
     let acp_result = coordinated_probe_acp(
         runner,
         executor,
@@ -1485,7 +1534,10 @@ async fn discover_models_for_executor(
             auth_state = interpretation.auth_state.map(agent_runtime_auth_state);
             model_fallback = interpretation.model_fallback;
             if let Some(models) = interpretation.models {
-                return Ok((Some(models), auth_state));
+                return Ok((
+                    Some(models.into_iter().map(Into::into).collect()),
+                    auth_state,
+                ));
             }
             None
         }
@@ -1611,6 +1663,14 @@ fn build_status(
         npm_available: dependency_availability.npm,
         npx_available: dependency_availability.npx,
         discovered_models: models_for_runner(runner, executor_config, store),
+        model_details: store.model_details.get(&runner).map(|details| {
+            let models = models_for_runner(runner, executor_config, store);
+            details
+                .iter()
+                .filter(|info| models.contains(&info.id))
+                .cloned()
+                .collect()
+        }),
         model_source: model_source_for_runner(runner, executor_config, store),
         version: discovery.and_then(|entry| entry.version.clone()),
         last_checked_at: discovery.map(|entry| entry.last_checked_at),
@@ -2660,6 +2720,7 @@ mod tests {
         let errors = apply_discovery_outcomes(
             &mut store,
             vec![RunnerDiscoveryOutcome::Discovered {
+                model_details: None,
                 runner,
                 models: None,
                 detected_version: Some("opencode 1.2.24".to_string()),
@@ -2686,6 +2747,7 @@ mod tests {
         let errors = apply_discovery_outcomes(
             &mut store,
             vec![RunnerDiscoveryOutcome::Discovered {
+                model_details: None,
                 runner,
                 models: None,
                 detected_version: None,
@@ -2715,6 +2777,7 @@ mod tests {
         let errors = apply_discovery_outcomes(
             &mut store,
             vec![RunnerDiscoveryOutcome::Discovered {
+                model_details: None,
                 runner,
                 models: None,
                 detected_version: None,
@@ -2913,6 +2976,61 @@ mod tests {
     }
 
     #[test]
+    fn model_catalog_persists_and_failed_refresh_preserves_capabilities() {
+        let runner = BaseCodingAgent::Codex;
+        let mut store = AgentRuntimeStore::default();
+        let catalog = vec![ExecutorModelInfo {
+            id: "gpt-6.2-astra".to_string(),
+            display_name: Some("GPT-6.2 Astra".to_string()),
+            reasoning_efforts: Some(strings(["low", "high", "ultra"])),
+            default_reasoning_effort: Some("low".to_string()),
+        }];
+        assert!(
+            apply_discovery_outcomes(
+                &mut store,
+                vec![RunnerDiscoveryOutcome::Discovered {
+                    runner,
+                    models: Some(vec![catalog[0].id.clone()]),
+                    model_details: Some(catalog.clone()),
+                    detected_version: None,
+                    version_error: None,
+                    auth_state: None,
+                }]
+            )
+            .is_empty()
+        );
+        let serialized = serde_json::to_vec(&store).unwrap();
+        let mut restored: AgentRuntimeStore = serde_json::from_slice(&serialized).unwrap();
+        let errors = apply_discovery_outcomes(
+            &mut restored,
+            vec![RunnerDiscoveryOutcome::Failed {
+                runner,
+                message: "model/list failed".to_string(),
+                detected_version: None,
+                preserved_models: vec![catalog[0].id.clone()],
+            }],
+        );
+        assert_eq!(errors.len(), 1);
+        assert_eq!(restored.model_details[&runner], catalog);
+        assert_eq!(restored.discoveries[&runner].models, ["gpt-6.2-astra"]);
+        let profiles = ExecutorConfigs::from_defaults();
+        let status = build_statuses(&profiles, &restored)
+            .into_iter()
+            .find(|status| status.runner_type == runner)
+            .unwrap();
+        assert_eq!(status.model_details, Some(catalog));
+        assert_eq!(status.discovered_models, ["gpt-6.2-astra"]);
+        assert!(status.last_error.unwrap().contains("model/list failed"));
+    }
+
+    #[test]
+    fn legacy_runtime_store_without_model_details_remains_readable() {
+        let store: AgentRuntimeStore =
+            serde_json::from_value(serde_json::json!({"configs":{},"discoveries":{}})).unwrap();
+        assert!(store.model_details.is_empty());
+    }
+
+    #[test]
     fn successful_refresh_replaces_cached_cli_model_list() {
         let runner = BaseCodingAgent::Gemini;
         let mut store = AgentRuntimeStore::default();
@@ -2930,6 +3048,7 @@ mod tests {
         let errors = apply_discovery_outcomes(
             &mut store,
             vec![RunnerDiscoveryOutcome::Discovered {
+                model_details: None,
                 runner,
                 models: Some(vec!["gemini-new".to_string()]),
                 detected_version: Some("gemini 1.1.0".to_string()),
@@ -2961,6 +3080,7 @@ mod tests {
         let store = AgentRuntimeStore {
             configs: HashMap::new(),
             discoveries: configs,
+            model_details: HashMap::new(),
         };
         let executor_config = ExecutorConfig::new_with_default(model_agent(None));
 
@@ -3210,6 +3330,7 @@ mod tests {
                 Ok(apply_discovery_outcomes(
                     store,
                     vec![RunnerDiscoveryOutcome::Discovered {
+                        model_details: None,
                         runner,
                         models: Some(vec!["kimi-k2.6".to_string()]),
                         detected_version: Some("kimi 1.0.0".to_string()),
@@ -3316,6 +3437,7 @@ mod tests {
             npm_available: true,
             npx_available: false,
             discovered_models: vec!["gpt-5.2-codex".to_string()],
+            model_details: None,
             model_source: AgentRuntimeModelSource::Runner,
             version: None,
             last_checked_at: None,
@@ -3354,6 +3476,7 @@ mod tests {
             acp_probe: None,
             acp_probe_error: None,
             discovered_models: Vec::new(),
+            model_details: None,
             model_source: AgentRuntimeModelSource::None,
             version: None,
             last_checked_at: None,
@@ -3535,8 +3658,9 @@ mod tests {
         let errors = apply_discovery_outcomes(
             &mut store,
             vec![RunnerDiscoveryOutcome::Discovered {
+                model_details: None,
                 runner,
-                models,
+                models: models.map(|models| models.into_iter().map(|model| model.id).collect()),
                 detected_version: None,
                 version_error: None,
                 auth_state,

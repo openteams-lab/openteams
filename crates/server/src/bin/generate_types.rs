@@ -253,6 +253,7 @@ fn generate_types_content() -> String {
         services::services::agent_runtime::AgentRuntimeModelSource::decl(),
         services::services::agent_runtime::AgentRuntimeReasoningCapability::decl(),
         services::services::agent_runtime::AgentRuntimeAuthState::decl(),
+        executors::model_discovery::ExecutorModelInfo::decl(),
         services::services::agent_runtime::AgentRuntimeStatus::decl(),
         services::services::agent_runtime::AgentRuntimeListResponse::decl(),
         services::services::agent_runtime::AgentRuntimeRefreshError::decl(),

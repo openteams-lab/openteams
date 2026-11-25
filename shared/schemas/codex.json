@@ -58,6 +58,8 @@
         "null"
       ],
       "enum": [
+        "none",
+        "minimal",
         "low",
         "medium",
         "high",

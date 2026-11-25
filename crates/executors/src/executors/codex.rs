@@ -1,11 +1,12 @@
 pub mod client;
 pub mod jsonrpc;
+mod models;
 pub mod normalize_logs;
 pub mod review;
 pub mod session;
 pub mod slash_commands;
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::HashMap,
     env,
     path::{Path, PathBuf},
     sync::Arc,
@@ -23,27 +24,6 @@ pub fn codex_home() -> Option<PathBuf> {
     }
     dirs::home_dir().map(|home| home.join(".codex"))
 }
-
-fn codex_model_cache_paths() -> Vec<PathBuf> {
-    codex_home()
-        .map(|home| vec![home.join("models_cache.json")])
-        .unwrap_or_default()
-}
-
-const CODEX_MODEL_FALLBACKS: &[&str] = &[
-    "gpt-6-astra",
-    "gpt-6.1-sol",
-    "gpt-6-sol",
-    "gpt-6-luna",
-    "gpt-5.6-sol",
-    "gpt-5.6-terra",
-    "gpt-5.6-luna",
-    "gpt-5.5",
-    "gpt-5.4",
-    "gpt-5.4-mini",
-    "gpt-5.3-codex-spark",
-    "codex-auto-review",
-];
 
 use async_trait::async_trait;
 use codex_app_server_protocol::{
@@ -79,10 +59,7 @@ use crate::{
     logs::utils::patch,
     mcp_config::MemberMcpConfig,
     mcp_run::{McpRunContext, PreparedMcpRun},
-    model_discovery::{
-        ProviderKind, cli_model_commands, discover_from_sources, model_slugs_from_models_json,
-        read_config_value, runner_config_paths,
-    },
+    model_discovery::ExecutorModelInfo,
     skill_config::NativeSkillConfigBackend,
     stdout_dup::create_stdout_pipe_writer,
 };
@@ -122,6 +99,8 @@ pub enum AskForApproval {
 #[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
 pub enum ReasoningEffort {
+    None,
+    Minimal,
     Low,
     Medium,
     High,
@@ -327,55 +306,31 @@ impl StandardCodingAgentExecutor for Codex {
         current_dir: &Path,
         env: &ExecutionEnv,
     ) -> Result<Option<Vec<String>>, ExecutorError> {
-        let config_paths = runner_config_paths([
-            self.default_mcp_config_path(),
-            codex_home().map(|home| home.join("config.json")),
-        ]);
-        let mut models = BTreeSet::new();
-        if let Some(discovered) = discover_from_sources(
-            current_dir,
-            env,
-            &self.cmd,
+        Ok(Some(
+            self.discover_models(current_dir, env)
+                .await?
+                .into_iter()
+                .map(|model| model.id)
+                .collect(),
+        ))
+    }
+
+    async fn discover_model_catalog(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<ExecutorModelInfo>>, ExecutorError> {
+        self.discover_models(current_dir, env).await.map(Some)
+    }
+
+    fn validate_model_catalog(&self, catalog: &[ExecutorModelInfo]) -> Result<(), ExecutorError> {
+        crate::model_discovery::validate_model_effort(
+            catalog,
             self.model.as_deref(),
-            config_paths,
-            cli_model_commands(Self::BASE_COMMAND, &self.cmd),
-            &[ProviderKind::OpenAiCompatible],
+            self.model_reasoning_effort
+                .as_ref()
+                .map(|effort| effort.as_ref()),
         )
-        .await?
-        {
-            models.extend(discovered);
-        }
-
-        for cache_path in codex_model_cache_paths() {
-            match read_config_value(&cache_path).await {
-                Ok(Some(value)) => {
-                    let slugs = model_slugs_from_models_json(&value);
-                    if !slugs.is_empty() {
-                        models.extend(slugs);
-                        break;
-                    }
-                }
-                Ok(None) => {}
-                Err(err) => {
-                    tracing::debug!(
-                        "Failed to read Codex model cache at {}: {err}",
-                        cache_path.display()
-                    );
-                }
-            }
-        }
-
-        models.extend(
-            CODEX_MODEL_FALLBACKS
-                .iter()
-                .map(|model| (*model).to_string()),
-        );
-
-        if models.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(models.into_iter().collect()))
-        }
     }
 
     async fn spawn(
@@ -951,7 +906,7 @@ mod tests {
     use tempfile::TempDir;
     use uuid::Uuid;
 
-    use super::{CODEX_MODEL_FALLBACKS, Codex, build_codex_mcp_servers, codex_config_has_provider};
+    use super::{Codex, build_codex_mcp_servers, codex_config_has_provider};
     use crate::{
         command::CmdOverrides,
         env::{ExecutionEnv, RepoContext},
@@ -1001,14 +956,34 @@ mod tests {
     }
 
     #[test]
-    fn codex_model_fallbacks_include_gpt_6_and_gpt_5_6_models() {
-        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-6-astra"));
-        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-6.1-sol"));
-        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-6-sol"));
-        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-6-luna"));
-        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-sol"));
-        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-terra"));
-        assert!(CODEX_MODEL_FALLBACKS.contains(&"gpt-5.6-luna"));
+    fn new_models_and_efforts_survive_start_resume_and_serialization() {
+        for model in ["gpt-6.2-astra", "gpt-6.2-sol", "gpt-6.1-terra"] {
+            for effort in [
+                "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra",
+            ] {
+                let codex: Codex =
+                    serde_json::from_value(json!({"model":model,"model_reasoning_effort":effort}))
+                        .unwrap();
+                let serialized = serde_json::to_value(&codex).unwrap();
+                let restored: Codex = serde_json::from_value(serialized).unwrap();
+                let start = restored.build_thread_start_params(std::path::Path::new("/workspace"));
+                assert_eq!(start.model.as_deref(), Some(model));
+                assert_eq!(
+                    start.config.as_ref().unwrap()["model_reasoning_effort"],
+                    effort
+                );
+                let resume = Codex::build_thread_resume_params(
+                    start,
+                    "thread-id".to_string(),
+                    std::path::PathBuf::from("/workspace/rollout.jsonl"),
+                );
+                assert_eq!(resume.model.as_deref(), Some(model));
+                assert_eq!(
+                    resume.config.as_ref().unwrap()["model_reasoning_effort"],
+                    effort
+                );
+            }
+        }
     }
 
     #[tokio::test]

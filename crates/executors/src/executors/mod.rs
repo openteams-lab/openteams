@@ -389,6 +389,26 @@ pub trait StandardCodingAgentExecutor {
         Ok(None)
     }
 
+    /// Rich model discovery; older adapters retain their existing ID-only API.
+    async fn discover_model_catalog(
+        &self,
+        current_dir: &Path,
+        env: &ExecutionEnv,
+    ) -> Result<Option<Vec<crate::model_discovery::ExecutorModelInfo>>, ExecutorError> {
+        Ok(self
+            .list_models(current_dir, env)
+            .await?
+            .map(|models| models.into_iter().map(Into::into).collect()))
+    }
+
+    /// Validate adapter-specific selections against previously discovered capabilities.
+    fn validate_model_catalog(
+        &self,
+        _catalog: &[crate::model_discovery::ExecutorModelInfo],
+    ) -> Result<(), ExecutorError> {
+        Ok(())
+    }
+
     async fn probe_acp(
         &self,
         _current_dir: &Path,
